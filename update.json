@@ -1,9 +1,9 @@
 {
-  "version": "1.6.2",
-  "build": 23,
-  "apk": "apk/Solegram-1.6.2-b23-release.apk",
+  "version": "1.6.3",
+  "build": 24,
+  "apk": "apk/Solegram-1.6.3-b24-release.apk",
   "size": 79024431,
-  "sha256": "a69839020e93325bf55d059a4fc5d0712fbb82436c3b3687a722d90fe1435a9a",
-  "changelog": "Solegram 1.6.2\n\n• Поле ввода как в iOS: кнопки смайликов и голосового/камеры стоят ближе к полю набора текста.",
+  "sha256": "5f3a29830a3052619722dbceda63fcab68af9863e89dbadc66e18a0f4e7df07b",
+  "changelog": "Solegram 1.6.3\n\n• Размытие фона под шторками (выбор фото, меню вложений и другие) теперь плавно уходит вместе со шторкой и больше не остаётся на экране после её закрытия.",
   "latest": "apk/Solegram-latest.apk"
 }
