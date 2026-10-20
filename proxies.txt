@@ -1,0 +1,9 @@
+# Solegram: your own proxy list.
+# Solegram downloads this file when it looks for a working proxy and tries these proxies first.
+# Add one proxy link per line: the usual Telegram links to an MTProto proxy (t.me or tg://proxy, with server, port and secret)
+# or to a SOCKS5 proxy. Lines without a link (like these) are ignored.
+#
+# Свой список прокси Solegram.
+# Solegram скачивает этот файл при поиске рабочего прокси и проверяет эти прокси первыми.
+# По одной ссылке на строку: обычные ссылки Telegram на MTProto-прокси (t.me или tg://proxy с server, port и secret)
+# или на SOCKS5. Строки без ссылки (как эти) пропускаются.
