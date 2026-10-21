@@ -1,0 +1,35 @@
+# Solegram plugin blocklist
+#
+# Solegram downloads this file (at most every few hours) and refuses to install or run any
+# plugin whose SHA-256 is listed here. Already installed plugins on the list are turned off
+# and the user is notified.
+#
+# Format:
+#   - one SHA-256 of a .plugin file per line: 64 hexadecimal characters, case does not matter
+#   - "#" starts a comment, also after a hash on the same line
+#   - empty lines are ignored; anything else is ignored too
+#
+# The SHA-256 of a plugin is shown in Solegram: Plugins > plugin > Security > SHA-256,
+# or computed with: sha256sum file.plugin
+#
+# Example (not a real entry):
+#   0000000000000000000000000000000000000000000000000000000000000000  # name, reason, date
+#
+# ---------------------------------------------------------------------------------------------
+#
+# Список заблокированных плагинов Solegram
+#
+# Solegram скачивает этот файл (не чаще раза в несколько часов) и не устанавливает и не
+# запускает плагины, SHA-256 которых указан здесь. Уже установленные плагины из списка
+# отключаются, а пользователь получает уведомление.
+#
+# Формат:
+#   - одна строка — один SHA-256 файла .plugin: 64 шестнадцатеричных символа, регистр не важен
+#   - «#» начинает комментарий, в том числе после хеша на той же строке
+#   - пустые строки и всё остальное игнорируются
+#
+# SHA-256 плагина виден в Solegram: Плагины > плагин > Безопасность > SHA-256,
+# или его можно посчитать командой: sha256sum file.plugin
+#
+# Пример (ненастоящая запись):
+#   0000000000000000000000000000000000000000000000000000000000000000  # название, причина, дата
