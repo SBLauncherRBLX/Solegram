@@ -68,11 +68,12 @@ public class SolegramFloatingScreen {
         if (opaqueColor(actionBar.getBackground()) == 0 || actionBar.getTranslationY() != 0f) {
             return null;
         }
-        final View scrollRoot = findScrollRoot(fragmentView);
+        final java.util.ArrayList<View> overlays = new java.util.ArrayList<>();
+        final View scrollRoot = findScrollRoot(fragmentView, overlays);
         if (scrollRoot == null) {
             return null;
         }
-        return new SolegramFloatingScreen(fragment, actionBar, fragmentView, scrollRoot);
+        return new SolegramFloatingScreen(fragment, actionBar, fragmentView, scrollRoot, overlays);
     }
 
     private static boolean isScroll(View view) {
@@ -96,8 +97,13 @@ public class SolegramFloatingScreen {
         return false;
     }
 
-    /** The one list that fills the screen; null when something else sits (or may later sit) at the top of it. */
-    private static View findScrollRoot(View view) {
+    /**
+     * The one list that fills the screen; null when something else sits (or may later sit) at the top of it.
+     *
+     * @param overlays gets the full-height overlays laid out from the top (empty and progress views): they start
+     *                 below the header, as the list's rows do
+     */
+    private static View findScrollRoot(View view, java.util.ArrayList<View> overlays) {
         if (isScroll(view)) {
             return view;
         }
@@ -123,7 +129,13 @@ public class SolegramFloatingScreen {
                 if (containsScroll(child, 3)) {
                     return null; // a second list would start under the header
                 }
-                continue; // overlays: empty and progress views, fast scroll
+                // overlays: empty and progress views, fast scroll
+                final int gravity = params instanceof FrameLayout.LayoutParams ? ((FrameLayout.LayoutParams) params).gravity : -1;
+                final int vertical = gravity == -1 ? Gravity.TOP : gravity & Gravity.VERTICAL_GRAVITY_MASK;
+                if (params instanceof ViewGroup.MarginLayoutParams && vertical != Gravity.CENTER_VERTICAL && vertical != Gravity.BOTTOM) {
+                    overlays.add(child);
+                }
+                continue;
             }
             final int gravity = params instanceof FrameLayout.LayoutParams ? ((FrameLayout.LayoutParams) params).gravity : -1;
             final int vertical = gravity == -1 ? Gravity.TOP : gravity & Gravity.VERTICAL_GRAVITY_MASK;
@@ -144,11 +156,18 @@ public class SolegramFloatingScreen {
     private final BlurredBackgroundSourceColor colorSource;
     private int paddingBase, paddingApplied = -1;
     private int lastPageColor;
+    // full-height overlays and the top margins they had of their own / were given
+    private final View[] overlays;
+    private final int[] overlayBase, overlayApplied;
 
-    private SolegramFloatingScreen(BaseFragment fragment, ActionBar actionBar, View fragmentView, View scrollRoot) {
+    private SolegramFloatingScreen(BaseFragment fragment, ActionBar actionBar, View fragmentView, View scrollRoot, java.util.ArrayList<View> overlays) {
         this.actionBar = actionBar;
         this.fragmentView = fragmentView;
         this.scrollRoot = scrollRoot;
+        this.overlays = overlays.toArray(new View[0]);
+        this.overlayBase = new int[this.overlays.length];
+        this.overlayApplied = new int[this.overlays.length];
+        java.util.Arrays.fill(this.overlayApplied, -1);
         this.resourcesProvider = fragment.getResourceProvider();
 
         if (Build.VERSION.SDK_INT >= 31) {
@@ -243,6 +262,23 @@ public class SolegramFloatingScreen {
         paddingApplied = want;
         if (current != want) {
             scrollRoot.setPadding(scrollRoot.getPaddingLeft(), want, scrollRoot.getPaddingRight(), scrollRoot.getPaddingBottom());
+        }
+        // empty and loading views fill the screen: under the header their sticker, text or shimmer rows were
+        // hidden behind it or sat too high, so they start below it, as the list does
+        for (int i = 0; i < overlays.length; i++) {
+            final View overlay = overlays[i];
+            if (overlay.getParent() != fragmentView || !(overlay.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) {
+                continue;
+            }
+            final ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) overlay.getLayoutParams();
+            if (params.topMargin != overlayApplied[i]) {
+                overlayBase[i] = params.topMargin;
+            }
+            overlayApplied[i] = overlayBase[i] + headerHeight;
+            if (params.topMargin != overlayApplied[i]) {
+                params.topMargin = overlayApplied[i];
+                overlay.setLayoutParams(params);
+            }
         }
     }
 

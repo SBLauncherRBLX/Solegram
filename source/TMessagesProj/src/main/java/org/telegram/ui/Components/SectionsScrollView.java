@@ -71,6 +71,21 @@ public class SectionsScrollView extends ScrollView {
         };
     }
 
+    @Override
+    protected int computeScrollDeltaToGetChildRectOnScreen(android.graphics.Rect rect) {
+        int delta = super.computeScrollDeltaToGetChildRectOnScreen(rect);
+        // Solegram: content that runs on under a floating header (a top padding that is not clipped) can't be
+        // read there, so a focused field or the cursor is brought out below it
+        final int hidden = getClipToPadding() ? 0 : getPaddingTop();
+        if (hidden > 0 && rect.height() <= getHeight() - hidden) {
+            final int visibleTop = getScrollY() + delta + hidden;
+            if (rect.top < visibleTop) {
+                delta = Math.max(delta - (visibleTop - rect.top), -getScrollY());
+            }
+        }
+        return delta;
+    }
+
     private ArrayList<Runnable> onScroll = new ArrayList<>();
     public void onScroll(Runnable listener) {
         onScroll.add(listener);
@@ -147,11 +162,13 @@ public class SectionsScrollView extends ScrollView {
             toBottomMargin = ((MarginLayoutParams) toLp).topMargin;
         }
 
+        // Solegram: getChildX/Y() already include the content's own position; adding it again drew every card
+        // one top padding too low (the padding is not zero under Solegram's floating header)
         AndroidUtilities.rectTmp.set(
-            contentView.getX() + getChildX(from),
-            Math.max(getScrollY() - dp(16), contentView.getY() + getChildY(from) - fromTopMargin),
-            contentView.getX() + getChildX(from) + from.getWidth(),
-            Math.min(getHeight() + dp(16) + getScrollY(), contentView.getY() + getChildY(to) + to.getHeight() + toBottomMargin)
+            getChildX(from),
+            Math.max(getScrollY() - dp(16), getChildY(from) - fromTopMargin),
+            getChildX(from) + from.getWidth(),
+            Math.min(getHeight() + dp(16) + getScrollY(), getChildY(to) + to.getHeight() + toBottomMargin)
         );
         if (AndroidUtilities.rectTmp.bottom < AndroidUtilities.rectTmp.top) return;
         RecyclerListView.drawBackgroundRect(canvas, AndroidUtilities.rectTmp, dp(16), dp(16), from.getAlpha(), resourcesProvider);
@@ -180,11 +197,14 @@ public class SectionsScrollView extends ScrollView {
         prev = prevChild != null && isSectionView(prevChild);
         next = nextChild != null && isSectionView(nextChild);
 
+        // Solegram: the canvas here is the content's own (child coordinates); the visible area is moved into it.
+        // Mixing both cut the top of every card away once the content starts below a top padding (floating header)
+        final float contentTop = contentView.getY();
         AndroidUtilities.rectTmp.set(
             child.getX(),
-            Math.max(getScrollY() - dp(16), contentView.getY() + child.getY()),
+            Math.max(getScrollY() - contentTop - dp(16), child.getY()),
             child.getX() + child.getWidth(),
-            Math.min(getHeight() + getScrollY() + dp(16), contentView.getY() + child.getY() + child.getHeight())
+            Math.min(getHeight() + getScrollY() - contentTop + dp(16), child.getY() + child.getHeight())
         );
         if (prev && next) {
             prev = child.getY() >= AndroidUtilities.rectTmp.top;
