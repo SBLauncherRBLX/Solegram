@@ -1,0 +1,128 @@
+// Solegram: the glass lens of the tab bar's selection while it is pressed or dragged (iOS 26 style).
+// Clear glass over the tabs (img): the middle is magnified and sharp; in a band along the rim the surface
+// curves away and bends the picture strongly outwards (content from beyond the edge is pulled in, squeezed
+// and even mirrored at the very rim), the colours split there into red/green/blue fringes. The rim is lit
+// with the colours around it (what lies just outside the outline and what the glass shows just inside),
+// brightened: a crisp line on the outline and a softer glow across the bevel give the glass its thickness;
+// a very soft shade lies just inside it. Almost no body colour, so the bar shows through.
+uniform shader img;
+
+uniform float2 center;    // px
+uniform float2 halfSize;  // px, half width / half height of the capsule
+uniform float magnify;    // centre magnification, 1 = none
+uniform float band;       // px, width of the curved rim band
+uniform float bend;       // px, how far the rim pulls the picture from outside
+uniform float dispersion; // 0..1, colour split in the rim band
+uniform float light;      // 0..1, rim line strength
+uniform float shade;      // 0..1, soft dark inner edge
+uniform float4 tint;      // premultiplied glass body colour (very faint)
+uniform float dp;         // px per dp
+uniform float2 barCenter; // px, the bar's glass capsule (the picture is empty outside it)
+uniform float2 barHalf;   // px
+uniform float dark;       // 1 in a dark theme: the rim is made to look as it does in the light one
+
+float sdPill(float2 p) {
+  float r = min(halfSize.x, halfSize.y);
+  float2 q = abs(p) - halfSize + r;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+
+// a point moved into the bar's glass (a little in from its outline): the lens is taller than the bar, and
+// outside the bar the picture is empty, which split the colours there into a red line
+float2 inBar(float2 q) {
+  float r0 = min(barHalf.x, barHalf.y);
+  float r = max(1.0, r0 - 2.5 * dp);
+  float ext = max(barHalf.x, barHalf.y) - r0;
+  float2 v = q - barCenter;
+  float2 a = barHalf.x >= barHalf.y ? float2(clamp(v.x, -ext, ext), 0.0) : float2(0.0, clamp(v.y, -ext, ext));
+  float2 w = v - a;
+  float l = length(w);
+  if (l > r) {
+    w *= r / l;
+  }
+  return barCenter + a + w;
+}
+
+half4 S(float2 q) {
+  return img.eval(inBar(q));
+}
+
+half4 main(float2 fragCoord) {
+  float2 p = fragCoord - center;
+  float sd = sdPill(p);
+  float coverage = clamp(0.5 - sd, 0.0, 1.0);
+  if (coverage <= 0.0) {
+    return half4(0.0);
+  }
+
+  // outward normal of the outline
+  float2 n = float2(sdPill(p + float2(0.5, 0.0)) - sdPill(p - float2(0.5, 0.0)),
+                    sdPill(p + float2(0.0, 0.5)) - sdPill(p - float2(0.0, 0.5)));
+  float nl = length(n);
+  n = nl > 0.0001 ? n / nl : float2(0.0, -1.0);
+
+  // rim band: flat glass inside it, a quarter-circle bevel across it (steeper and steeper to the edge)
+  float x = 1.0 - clamp(-sd / max(band, 1.0), 0.0, 1.0); // 0 inside the band's inner edge, 1 on the rim
+  float tilt = 1.0 - sqrt(max(0.0, 1.0 - x * x));
+
+  float2 base = center + p / magnify;
+  float2 off = n * (tilt * bend);
+  half4 c = S(base + off);
+  if (dispersion > 0.0 && tilt > 0.001) {
+    // red bent least, blue most: fringes along the rim only, the middle stays clean
+    float k = dispersion * tilt;
+    half4 cr = S(base + off * (1.0 - 0.55 * k) - n * (k * 2.5));
+    half4 cg = S(base + off * (1.0 + 0.10 * k));
+    half4 cb = S(base + off * (1.0 + 0.70 * k) + n * (k * 2.5));
+    c = half4(cr.r, cg.g, cb.b, max(max(cr.a, cg.a), cb.a));
+  }
+
+  // almost clear body under the picture
+  half4 col = c + half4(tint) * (1.0 - c.a);
+
+  // soft dark inner edge, fading in over the band
+  float inner = shade * x * x;
+  col = half4(col.rgb * (1.0 - inner), col.a + inner * (1.0 - col.a));
+
+  // the rim's light takes the colours next to it: just outside the outline and just inside the glass
+  half4 outA = S(fragCoord + n * (3.0 * dp));
+  half4 outB = S(fragCoord + n * (7.0 * dp) + float2(-n.y, n.x) * (4.0 * dp));
+  half4 inA = S(base - n * (2.0 * dp));
+  half4 env = outA * 0.4 + outB * 0.25 + inA * 0.35;
+  half3 e = env.a > 0.01 ? env.rgb / env.a : half3(1.0);
+  e = mix(half3(1.0), e, half(clamp(env.a, 0.0, 1.0)));      // nothing there: plain white light
+  // only the hue of what is near counts, not how dark it is: the rim is as bright in a dark theme as in
+  // the light one (a dark bar would otherwise make it a dull grey)
+  half mx = max(max(e.r, e.g), e.b);
+  e = e / max(mx, 0.12);
+  e = mix(half3(1.0), e, half(0.85));                         // the hue a touch softer: light, not paint
+  half lum = dot(e, half3(0.299, 0.587, 0.114));
+  e = clamp(mix(half3(lum), e, 1.6), 0.0, 1.0);              // a little richer, as light through coloured glass
+  half3 rimCol = clamp(0.38 + 0.8 * e, 0.0, 1.0);           // brightened, keeps its hue
+  rimCol *= half(mix(1.0, 0.78, dark));                       // a light line on a dark bar stands out far more
+
+  // lit from the top-left: that side and the opposite one shine, the flanks less
+  float2 L = normalize(float2(-0.7, -0.7));
+  float d = dot(n, L);
+  float facing = abs(d);
+  float lit = 0.3 + 0.7 * facing * facing;
+  float near = d > 0.0 ? 1.0 : 0.7;                           // the far side a touch dimmer
+  float depth = -sd;                                          // px inside the outline
+  // crisp line on the outline (about 1.5dp)
+  float edgeLine = light * mix(1.0, 0.42, dark) * (1.0 - smoothstep(0.7 * dp, 1.8 * dp, depth)) * lit * near;
+  // the bevel's glow (about 5dp): the thickness of the glass
+  float bevel = 1.0 - smoothstep(0.0, 5.0 * dp, depth);
+  // light over a dark picture shows much more than over a white one: less of it in a dark theme, so the
+  // rim reads the same in both
+  float glow = light * mix(0.42, 0.08, dark) * bevel * bevel * lit * near;
+  // a small bright glint where the light hits straight
+  float glint = light * mix(0.3, 0.14, dark) * (1.0 - smoothstep(1.0 * dp, 3.0 * dp, depth)) * facing * facing * facing * facing;
+  float hl = clamp(edgeLine + glint, 0.0, 1.0);
+  float gl = clamp(glow, 0.0, 1.0);
+  // glow: the rim colour laid over like light (screen), then the crisp line on top
+  half3 lightCol = rimCol * half(gl);
+  col = half4(col.rgb + lightCol * (1.0 - col.rgb), col.a + half(gl) * (1.0 - col.a));
+  col = half4(col.rgb * (1.0 - half(hl)) + rimCol * half(hl), col.a + half(hl) * (1.0 - col.a));
+
+  return col * coverage;
+}

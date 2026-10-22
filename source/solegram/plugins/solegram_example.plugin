@@ -1,0 +1,68 @@
+__id__ = "solegram_example"
+__name__ = "Solegram Example"
+__description__ = "Пример плагина: **автозамена** в исходящих, пункт меню сообщения «Информация», настройки."
+__author__ = "Solegram"
+__version__ = "1.0.0"
+__icon__ = "exteraPlugins/1"
+__app_version__ = ">=12.0"
+__sdk_version__ = ">=1.4.0"
+
+from typing import Any, Dict, List
+
+from base_plugin import BasePlugin, HookResult, HookStrategy, MenuItemData, MenuItemType
+from android_utils import copy_to_clipboard
+from ui.bulletin import BulletinHelper
+from ui.settings import Divider, Header, Input, Selector, Switch, Text
+
+STYLES = ["Как есть", "ВЕРХНИЙ РЕГИСТР", "нижний регистр"]
+
+
+class ExamplePlugin(BasePlugin):
+    def on_plugin_load(self):
+        self.add_on_send_message_hook()
+        self.add_menu_item(MenuItemData(
+            menu_type=MenuItemType.MESSAGE_CONTEXT_MENU,
+            text="Информация о сообщении",
+            icon="msg_info",
+            on_click=self.on_message_info,
+        ))
+        self.logger.info("Example plugin loaded")
+
+    def on_send_message_hook(self, account: int, params: Any) -> HookResult:
+        text = getattr(params, "message", None)
+        if not isinstance(text, str) or not text:
+            return HookResult()
+        if self.get_setting("shrug", True):
+            text = text.replace("/shrug", "¯\\_(ツ)_/¯")
+        style = self.get_setting("style", 0)
+        if style == 1:
+            text = text.upper()
+        elif style == 2:
+            text = text.lower()
+        signature = self.get_setting("signature", "")
+        if signature:
+            text = f"{text}\n\n{signature}"
+        if text == params.message:
+            return HookResult()
+        params.message = text
+        return HookResult(strategy=HookStrategy.MODIFY, params=params)
+
+    def on_message_info(self, context: Dict[str, Any]):
+        message = context.get("message")
+        if message is None:
+            return
+        owner = message.messageOwner
+        info = f"id: {message.getId()}\ndialog: {message.getDialogId()}\ndate: {owner.date}"
+        copy_to_clipboard(info)
+        BulletinHelper.show_info(f"Сообщение #{message.getId()} — данные скопированы")
+
+    def create_settings(self) -> List[Any]:
+        return [
+            Header(text="Исходящие сообщения"),
+            Switch(key="shrug", text="Заменять /shrug", default=True, subtext="/shrug → ¯\\_(ツ)_/¯", icon="msg_emoji_smiles"),
+            Selector(key="style", text="Регистр текста", default=0, items=STYLES, icon="msg_text"),
+            Input(key="signature", text="Подпись", default="", subtext="Добавляется в конец каждого сообщения", icon="msg_edit"),
+            Divider(text="Плагин работает только для сообщений, отправленных из Solegram."),
+            Text(text="Показать уведомление", icon="msg_info", accent=True,
+                 on_click=lambda view: BulletinHelper.show_success("Плагины работают!")),
+        ]

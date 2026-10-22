@@ -1,0 +1,276 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.telegram.build-app-plugin'
+apply plugin: 'com.chaquo.python'
+
+repositories {
+    mavenCentral()
+    google()
+    maven { url 'https://maven.aliucord.com/releases' }
+}
+
+configurations {
+    compile.exclude module: 'support-v4'
+}
+
+configurations.all {
+    exclude group: 'com.google.firebase', module: 'firebase-core'
+    exclude group: 'androidx.recyclerview', module: 'recyclerview'
+}
+
+dependencies {
+    implementation project(':TMessagesProj')
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation files('../TMessagesProj/libs/libgsaverification-client.aar')
+
+    // Solegram plugin engine: Xposed-style method hooking (LSPlant) and runtime class generation
+    implementation 'com.aliucord:Aliuhook:1.1.4'
+    implementation 'com.linkedin.dexmaker:dexmaker:2.28.4'
+    implementation 'org.mvel:mvel2:2.5.2.Final'
+}
+
+android {
+    compileSdkVersion 36
+    buildToolsVersion '36.0.0'
+
+    defaultConfig.applicationId = APP_PACKAGE
+
+
+    lintOptions {
+        disable 'MissingTranslation'
+        disable 'ExtraTranslation'
+        disable 'BlockedPrivateApi'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+
+        coreLibraryDesugaringEnabled true
+    }
+
+    androidResources {
+        noCompress += "pack"
+        localeFilters += ["zz"]
+    }
+
+    signingConfigs {
+        debug {
+            storeFile solegramKeystore()
+            storePassword solegramProp("SOLEGRAM_STORE_PASSWORD", RELEASE_STORE_PASSWORD)
+            keyAlias solegramProp("SOLEGRAM_KEY_ALIAS", RELEASE_KEY_ALIAS)
+            keyPassword solegramProp("SOLEGRAM_KEY_PASSWORD", RELEASE_KEY_PASSWORD)
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+        }
+
+        release {
+            storeFile solegramKeystore()
+            storePassword solegramProp("SOLEGRAM_STORE_PASSWORD", RELEASE_STORE_PASSWORD)
+            keyAlias solegramProp("SOLEGRAM_KEY_ALIAS", RELEASE_KEY_ALIAS)
+            keyPassword solegramProp("SOLEGRAM_KEY_PASSWORD", RELEASE_KEY_PASSWORD)
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            jniDebuggable true
+            signingConfig signingConfigs.debug
+            applicationIdSuffix ".beta"
+            minifyEnabled false
+            shrinkResources false
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
+            ndk.debugSymbolLevel = 'FULL'
+        }
+
+        standalone {
+            debuggable false
+            jniDebuggable false
+            signingConfig signingConfigs.release
+            applicationIdSuffix ".web"
+            minifyEnabled true
+            shrinkResources true
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
+            ndk.debugSymbolLevel = 'FULL'
+        }
+
+        release {
+            debuggable false
+            jniDebuggable false
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
+            ndk.debugSymbolLevel = 'FULL'
+        }
+    }
+
+    sourceSets.debug {
+        manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest.xml'
+    }
+
+    sourceSets.standalone {
+        manifest.srcFile '../TMessagesProj/config/release/AndroidManifest.xml'
+    }
+
+    sourceSets.release {
+        manifest.srcFile '../TMessagesProj/config/release/AndroidManifest.xml'
+    }
+
+    flavorDimensions "minApi"
+
+    productFlavors {
+        bundleAfat {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            }
+            ext {
+                abiVersionCode = 1
+            }
+            buildConfigField "boolean", "BUNDLE", "true"
+        }
+        afat {
+            ndk {
+                abiFilters(*solegramAbis())
+            }
+            sourceSets.debug {
+                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.release {
+                manifest.srcFile '../TMessagesProj/config/release/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.standalone {
+                manifest.srcFile '../TMessagesProj/config/release/AndroidManifest_standalone.xml'
+            }
+            ext {
+                abiVersionCode = 9
+            }
+            buildConfigField "boolean", "BUNDLE", "false"
+        }
+    }
+
+    defaultConfig.versionCode = Integer.parseInt(APP_VERSION_CODE)
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            // "-b<build>" lets the OTA updater read the build number from the file name alone.
+            outputFileName = "Solegram-" + SOLEGRAM_VERSION_NAME + "-b" + SOLEGRAM_BUILD + "-" + variant.buildType.name + ".apk"
+            // Telegram reads versionCode % 10 as the ABI/store marker, so keep that digit.
+            // Solegram build number sits in between so OTA updates always increase versionCode.
+            output.versionCodeOverride = defaultConfig.versionCode * 1000 + Integer.parseInt(SOLEGRAM_BUILD) * 10 + variant.productFlavors.get(0).abiVersionCode
+        }
+    }
+
+    variantFilter { variant ->
+        def names = variant.flavors*.name
+        // Solegram ships only the universal "afat" APK (debug + release).
+        if (!names.contains("afat") || variant.buildType.name == "standalone") {
+            setIgnore(true)
+        }
+    }
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 36
+        versionName APP_VERSION_NAME
+        ndkVersion "27.2.12479018"
+
+        multiDexEnabled true
+
+        vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
+
+        externalNativeBuild {
+            cmake {
+                version '3.22.1'
+                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' // , '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                targets 'tmessages.49'
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    packagingOptions {
+        jniLibs {
+            pickFirsts += ['lib/*/libc++_shared.so']
+        }
+        resources {
+            excludes += ['META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/DEPENDENCIES']
+        }
+    }
+    namespace 'org.telegram.messenger.regular'
+
+    lintOptions {
+        checkReleaseBuilds false
+    }
+}
+
+
+def solegramProp(String name, String fallback = null) {
+    def env = System.getenv(name)
+    if (env != null && !env.isEmpty()) return env
+    def propsFile = rootProject.file('local.properties')
+    if (propsFile.exists()) {
+        def props = new Properties()
+        propsFile.withInputStream { props.load(it) }
+        def v = props.getProperty(name)
+        if (v != null && !v.isEmpty()) return v
+    }
+    return fallback
+}
+
+def solegramOwnKeystore() {
+    def path = solegramProp("SOLEGRAM_KEYSTORE")
+    if (path != null) {
+        def f = rootProject.file(path)
+        if (f.exists()) return f
+    }
+    return null
+}
+
+def solegramKeystore() {
+    // Debug builds may fall back to the public upstream keystore; release builds may not (see below).
+    return solegramOwnKeystore() ?: file("../TMessagesProj/config/release.keystore")
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseTasks = graph.allTasks.findAll { it.project == project && it.name.toLowerCase().contains("release") && (it.name.startsWith("assemble") || it.name.startsWith("package") || it.name.startsWith("bundle")) }
+    if (!releaseTasks.isEmpty() && solegramOwnKeystore() == null) {
+        throw new GradleException("Solegram release builds must be signed with the Solegram key: set SOLEGRAM_KEYSTORE, SOLEGRAM_STORE_PASSWORD, SOLEGRAM_KEY_ALIAS and SOLEGRAM_KEY_PASSWORD in local.properties. Otherwise the APK could never update an existing install.")
+    }
+}
+
+def solegramAbis() {
+    return solegramProp("SOLEGRAM_ABIS", "arm64-v8a").split(",").collect { it.trim() }.findAll { !it.isEmpty() } as String[]
+}
+
+chaquopy {
+    defaultConfig {
+        version = "3.11"
+        buildPython(solegramProp("SOLEGRAM_BUILD_PYTHON", "python3.11"))
+        pip {
+            // Same pre-installed libraries as the exteraGram plugin environment
+            install("requests")
+            install("beautifulsoup4")
+            install("PyYAML")
+            install("packaging")
+            install("pillow")
+            install("lxml")
+        }
+    }
+}

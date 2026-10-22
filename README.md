@@ -1,6 +1,6 @@
 # Solegram
 
-Telegram-клиент для Android на основе официального исходного кода Telegram 12.10.6
+Telegram-клиент для Android на основе официального исходного кода Telegram 13.0.3
 (DrKLO/Telegram) в духе exteraGram: глубокая кастомизация, режим призрака, сохранение
 удалённых сообщений, плагины exteraGram/AyuGram и обновления «по воздуху» из Telegram-канала.
 
@@ -12,6 +12,11 @@ Telegram-клиент для Android на основе официального 
 Solegram — неофициальный клиент. Он не связан с Telegram и использует открытый
 [Telegram API](https://core.telegram.org/api) и исходный код
 [Telegram for Android](https://github.com/DrKLO/Telegram).
+
+## Исходный код
+
+Полный открытый исходный код Solegram лежит в папке **[`source/`](source/)** (лицензия GPL-2.0).
+Как его собрать, написано в [`source/README.md`](source/README.md). Код обновляется вместе с каждым выпуском.
 
 ## Скачать
 

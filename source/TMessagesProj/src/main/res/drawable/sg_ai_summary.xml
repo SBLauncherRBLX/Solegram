@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: AI summary - lines of text condensed, with the sparkle of AI -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- the text, shorter line by line -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.9,4.6H13.2A0.9,0.9 0,0 1,13.2 6.4H3.9A0.9,0.9 0,0 1,3.9 4.6Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.9,9.6H12.6A0.9,0.9 0,0 1,12.6 11.4H3.9A0.9,0.9 0,0 1,3.9 9.6Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.9,14.6H9.2A0.9,0.9 0,0 1,9.2 16.4H3.9A0.9,0.9 0,0 1,3.9 14.6Z" />
+    <!-- the large sparkle -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.8,10.2C17.25,13.45 18.25,14.45 21.5,14.9C18.25,15.35 17.25,16.35 16.8,19.6C16.35,16.35 15.35,15.35 12.1,14.9C15.35,14.45 16.35,13.45 16.8,10.2Z" />
+    <!-- the small sparkle -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.75"
+        android:pathData="M19.6,2.6C19.8,4.05 20.25,4.5 21.7,4.7C20.25,4.9 19.8,5.35 19.6,6.8C19.4,5.35 18.95,4.9 17.5,4.7C18.95,4.5 19.4,4.05 19.6,2.6Z" />
+</vector>
