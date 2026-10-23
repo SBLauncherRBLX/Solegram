@@ -1029,6 +1029,8 @@ public class ChatActivity extends BaseFragment implements
 
     private final BlurredBackgroundSourceBitmap scrimBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
     private final BlurredBackgroundDrawableViewFactory scrimBlur3Factory = new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap);
+    // Solegram: the menus' glass (message menu, reactions, ⋮) is live glass in their windows; Telegram's picture stays without it
+    private final com.solegram.messenger.ui.SolegramLiveGlass.Factory solegramScrimFactory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR);
     private Bitmap scrimBlurBitmap;
     private BitmapShader scrimBlurBitmapShader;
     private Paint scrimBlurBitmapPaint;
@@ -4644,9 +4646,10 @@ public class ChatActivity extends BaseFragment implements
         glassBackgroundDrawableFactoryFrosted.setSourceRootView(viewPositionWatcher, parentView);
         navbarContentDrawableFactory.setSourceRootView(viewPositionWatcher, parentView);
         scrimBlur3Factory.setSourceRootView(viewPositionWatcher, parentView);
+        solegramScrimFactory.setSourceRootView(viewPositionWatcher, parentView);
 
         if (headerItem != null) {
-            headerItem.setBlurredBackgroundFactory(scrimBlur3Factory, BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider));
+            headerItem.setBlurredBackgroundFactory(solegramScrimFactory, BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider));
         }
 
         contentView.setOccupyStatusBar(!inBubbleMode && !isInsideContainer && !inPreviewMode);
@@ -31368,7 +31371,7 @@ public class ChatActivity extends BaseFragment implements
 
             updateScrimSourceBitmap();
 
-            popupLayout.setBackground(scrimBlur3Factory.create(popupLayout, true)
+            popupLayout.setBackground(solegramScrimFactory.create(popupLayout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider))
                 .setRadius(dp(12))
                 .setPadding(dp(8)));
@@ -32413,7 +32416,7 @@ public class ChatActivity extends BaseFragment implements
             } else {
                 final boolean tags = getUserConfig().getClientUserId() == getDialogId();
                 reactionsLayout = new ReactionsContainerLayout(tags ? ReactionsContainerLayout.TYPE_TAGS : ReactionsContainerLayout.TYPE_DEFAULT, ChatActivity.this, contentView.getContext(), currentAccount, getResourceProvider());
-                reactionsLayout.setBackgroundFactory(scrimBlur3Factory, BlurredBackgroundProviderImpl.messageMenuReactionsBackground(resourceProvider));
+                reactionsLayout.setBackgroundFactory(solegramScrimFactory, BlurredBackgroundProviderImpl.messageMenuReactionsBackground(resourceProvider));
                 if (tags) {
                     reactionsLayout.setHint(getUserConfig().isPremium() ? LocaleController.getString(R.string.SavedTagReactionsHint2) : AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.SavedTagReactionsPremiumHint), Theme.key_windowBackgroundWhiteBlueText2, 0, () -> {
                         closeMenu(false);
@@ -33249,6 +33252,7 @@ public class ChatActivity extends BaseFragment implements
         panel.offset(left, top);
 
         // the panels are drops drawn in the chat: the popup keeps only their content
+        com.solegram.messenger.ui.SolegramLiveGlass.release(popupLayout.getBackgroundDrawable());
         popupLayout.setBackground(new android.graphics.drawable.InsetDrawable(new android.graphics.drawable.ColorDrawable(0), dp(8)));
         popupLayout.setReactionsTransitionProgress(1f);
         if (reactionsLayout != null) {
@@ -33308,7 +33312,9 @@ public class ChatActivity extends BaseFragment implements
         private final RectF rect = new RectF();
         private final int[] loc = new int[2], loc2 = new int[2];
 
-        // the blurred picture of the chat under the glass, as the menu's own glass has it
+        // the chat's live glass under the menu, or (without it) the blurred picture of the chat, as the menu's own glass has it
+        @Nullable
+        private final BlurredBackgroundDrawable liveGlass;
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final Matrix fillMatrix = new Matrix();
         private Bitmap fillBitmap;
@@ -33353,20 +33359,28 @@ public class ChatActivity extends BaseFragment implements
             }
             menu = group.add();
             menu.rest(panel.centerX(), panel.centerY(), panel.width(), panel.height(), dp(12));
-            fill = (canvas, path, bounds) -> {
-                final Bitmap bitmap = scrimBlur3SourceBitmap.getBitmap();
-                if (bitmap == null || bitmap.isRecycled()) {
-                    return;
-                }
-                if (bitmap != fillBitmap) {
-                    fillBitmap = bitmap;
-                    fillShader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-                    fillPaint.setShader(fillShader);
-                }
-                fillMatrix.set(scrimBlur3SourceBitmap.getMatrix());
-                fillShader.setLocalMatrix(fillMatrix);
-                canvas.drawPath(path, fillPaint);
-            };
+            if (glassBackgroundSourceRenderNode != null && parentChatActivity == null && com.solegram.messenger.ui.SolegramLiveGlass.available()) {
+                // the chat's own liquid glass (its live source, as the input bar's): it refracts the chat, not the dim
+                liveGlass = glassBackgroundDrawableFactory.create(null, com.solegram.messenger.ui.SolegramLiveGlass.glassOnly());
+                liveGlass.setRadius(dp(12));
+                fill = SolegramLiquidGlass.live(liveGlass);
+            } else {
+                liveGlass = null;
+                fill = (canvas, path, bounds) -> {
+                    final Bitmap bitmap = scrimBlur3SourceBitmap.getBitmap();
+                    if (bitmap == null || bitmap.isRecycled()) {
+                        return;
+                    }
+                    if (bitmap != fillBitmap) {
+                        fillBitmap = bitmap;
+                        fillShader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                        fillPaint.setShader(fillShader);
+                    }
+                    fillMatrix.set(scrimBlur3SourceBitmap.getMatrix());
+                    fillShader.setLocalMatrix(fillMatrix);
+                    canvas.drawPath(path, fillPaint);
+                };
+            }
         }
 
         /** The window is shown: the drops flow out of the message. */
@@ -33520,6 +33534,9 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
             released = true;
+            if (liveGlass != null) {
+                liveGlass.setAlpha(0); // the chat's glass source stops reading the chat under it
+            }
             AndroidUtilities.cancelRunOnUIThread(timeout);
             if (framePosted) {
                 framePosted = false;
@@ -46751,7 +46768,7 @@ public class ChatActivity extends BaseFragment implements
 
             scrimPopupContainerLayout.setClipToOutline(true);
             scrimPopupContainerLayout.setOutlineProvider(ViewOutlineProviderImpl.boundsWithPaddingRoundRect(dp(8), dp(12)));
-            scrimPopupContainerLayout.setBackground(scrimBlur3Factory.create(scrimPopupContainerLayout, true)
+            scrimPopupContainerLayout.setBackground(solegramScrimFactory.create(scrimPopupContainerLayout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourceProvider))
                 .setRadius(dp(12))
                 .setPadding(dp(8))

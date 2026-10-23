@@ -115,6 +115,16 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     public class LayoutContainer extends FrameLayout {
 
         private Rect rect = new Rect();
+        // Solegram: the screen's content (without the bulletins over it), recorded into a node while glass over it uses it
+        private com.solegram.messenger.ui.SolegramLiveGlass.Host solegramContentSource;
+
+        /** Solegram: the screen's content for live glass drawn over it in this container (bulletins). */
+        public com.solegram.messenger.ui.SolegramLiveGlass.Host solegramContentSource() {
+            if (solegramContentSource == null) {
+                solegramContentSource = new com.solegram.messenger.ui.SolegramLiveGlass.Host(this);
+            }
+            return solegramContentSource;
+        }
         private boolean isKeyboardVisible;
 
         private int fragmentPanTranslationOffset;
@@ -261,7 +271,19 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         break;
                     }
                 }
-                boolean result = super.drawChild(canvas, child, drawingTime);
+                boolean result;
+                // Solegram: the screen (its first child) into the content source while a bulletin's glass reads it
+                final Canvas part = solegramContentSource != null && child == getChildAt(0) && !(child instanceof org.telegram.ui.Components.Bulletin.ParentLayout)
+                    ? solegramContentSource.beginPart(canvas) : null;
+                if (part != null) {
+                    try {
+                        result = super.drawChild(part, child, drawingTime);
+                    } finally {
+                        solegramContentSource.endPart(canvas);
+                    }
+                } else {
+                    result = super.drawChild(canvas, child, drawingTime);
+                }
                 if (actionBarHeight != 0 && headerShadowDrawable != null) {
                     int wasAlpha = headerShadowDrawable.getAlpha();
                     headerShadowDrawable.setBounds(0, actionBarY + actionBarHeight, getMeasuredWidth(), actionBarY + actionBarHeight + headerShadowDrawable.getIntrinsicHeight());

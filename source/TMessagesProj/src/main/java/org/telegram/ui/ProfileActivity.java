@@ -3505,6 +3505,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         viewPositionWatcher = new ViewPositionWatcher(fragmentView);
         iBlur3FactoryLiquidGlass.setSourceRootView(viewPositionWatcher, (ViewGroup) fragmentView);
         scrimBlur3Factory.setSourceRootView(viewPositionWatcher, (ViewGroup) fragmentView);
+        solegramScrimFactory.setSourceRootView(viewPositionWatcher, (ViewGroup) fragmentView);
 
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
@@ -4071,7 +4072,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         ttlIconView.setImageResource(R.drawable.msg_mini_autodelete_timer);
         otherItem.addView(ttlIconView, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
         otherItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
-        otherItem.setBlurredBackgroundFactory(scrimBlur3Factory, BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider));
+        otherItem.setBlurredBackgroundFactory(solegramScrimFactory, BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider));
 
         int scrollTo;
         int scrollToPosition = 0;
@@ -17187,6 +17188,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private final BlurredBackgroundSourceBitmap scrimBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
     private final BlurredBackgroundDrawableViewFactory scrimBlur3Factory = new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap);
+    // Solegram: the ⋮ menu's glass is live glass in its window; Telegram's picture stays without it
+    private final com.solegram.messenger.ui.SolegramLiveGlass.Factory solegramScrimFactory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR);
 
     private ViewPositionWatcher viewPositionWatcher;
 

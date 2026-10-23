@@ -9254,12 +9254,21 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private class ActivityContentLayout extends FrameLayout {
+        // Solegram: the screen drawn through a live source, so glass popups over it refract what it shows now
+        private final com.solegram.messenger.ui.SolegramLiveGlass.Host solegramGlassSource = new com.solegram.messenger.ui.SolegramLiveGlass.Host(this, c -> {
+            super.dispatchDraw(c);
+            drawRippleAbove(c, this);
+        });
+
         public ActivityContentLayout(@NonNull Context context) {
             super(context);
         }
 
         @Override
         protected void dispatchDraw(@NonNull Canvas canvas) {
+            if (solegramGlassSource.draw(canvas)) {
+                return;
+            }
             super.dispatchDraw(canvas);
             drawRippleAbove(canvas, this);
         }

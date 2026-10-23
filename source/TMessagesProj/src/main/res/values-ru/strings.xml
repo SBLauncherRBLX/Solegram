@@ -549,11 +549,11 @@
     <string name="SG_NeutralOverscrollInfo">Край списка не вспыхивает цветом темы, когда тянете его дальше конца</string>
     <string name="SG_GlassElsewhere">Стекло в других элементах</string>
     <string name="SG_GlassMenus">Всплывающие меню</string>
-    <string name="SG_GlassMenusInfo">Меню «⋮» и другие всплывающие меню из того же стекла, что и панель вкладок: размытие под меню, плотность, оттенок и блик из настроек стекла</string>
+    <string name="SG_GlassMenusInfo">Меню и уведомления внизу экрана из того же живого жидкого стекла, что и кнопки в чате: преломляют то, что под ними; плотность, оттенок и блик из настроек стекла (Android 13+)</string>
     <string name="SG_GlassDialogs">Диалоги</string>
-    <string name="SG_GlassDialogsInfo">Окна подтверждений и предупреждений из того же стекла, что и панель вкладок</string>
+    <string name="SG_GlassDialogsInfo">Окна подтверждений и предупреждений из того же живого жидкого стекла, что и кнопки в чате (Android 13+)</string>
     <string name="SG_GlassSheets">Нижние панели</string>
-    <string name="SG_GlassSheetsInfo">Выезжающие снизу панели полупрозрачные, с оттенком стекла, а экран за ними размывается</string>
+    <string name="SG_GlassSheetsInfo">Выезжающие снизу панели из живого жидкого стекла: преломление по краю, внутри матовое, чтобы текст хорошо читался (Android 13+)</string>
     <string name="SG_GlassElsewhereInfo">Меню и диалоги работают на любом Android. Нижним панелям нужно системное размытие окон (Android 12+), энергосбережение может его отключать.</string>
     <string name="SG_GlassElsewhereUnavailable">Нижним панелям нужно системное размытие окон (Android 12+), сейчас оно выключено. Меню и диалоги работают и так.</string>
     <string name="SG_LiquidControls">Жидкие переключатели и ползунки</string>

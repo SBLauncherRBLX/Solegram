@@ -38,8 +38,6 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
-import android.graphics.Bitmap;
-import android.graphics.Matrix;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
@@ -163,60 +161,18 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
             boundsWithInsets.bottom -= Math.max(0, insets.bottom);
         }
 
-        /**
-         * Solegram "glass sheets": a blurred picture of the screen, taken each time the sheet shows, drawn under
-         * the dim. It fades exactly with the sheet (in this window, in step with its animation), unlike the
-         * system's blur-behind, which is applied late and sometimes not at all.
-         */
-        Bitmap backdrop;
-        float backdropScale = 1f;
-        View backdropHost;
-        BackdropProgress backdropProgress;
-        private final Paint backdropPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
-        private final Matrix backdropMatrix = new Matrix();
-        private final int[] backdropLocation = new int[2];
-
-        interface BackdropProgress {
-            float get();
-        }
-
         @Override
         public void draw(@NonNull Canvas canvas) {
-            if (AndroidUtilities.makingGlobalBlurBitmap) {
-                return;
-            }
-            final Bitmap b = backdrop;
-            if (b != null && !b.isRecycled() && backdropHost != null && backdropProgress != null) {
-                final float p = Math.max(0, Math.min(1, backdropProgress.get()));
-                if (p > 0) {
-                    backdropHost.getLocationOnScreen(backdropLocation);
-                    backdropMatrix.setScale(backdropScale, backdropScale);
-                    backdropMatrix.postTranslate(-backdropLocation[0], -backdropLocation[1]);
-                    backdropPaint.setAlpha(Math.round(255 * p));
-                    canvas.save();
-                    canvas.clipRect(getBounds());
-                    canvas.concat(backdropMatrix);
-                    canvas.drawBitmap(b, 0, 0, backdropPaint);
-                    canvas.restore();
-                }
-            }
-            if (boundsWithInsets.isEmpty() || getAlpha() == 0) {
+            if (boundsWithInsets.isEmpty() || getAlpha() == 0 || AndroidUtilities.makingGlobalBlurBitmap) {
                 return;
             }
             canvas.drawRect(boundsWithInsets, bgPaint);
         }
 
-        /** Solegram: told when the dim changes, so the frosted backdrop follows it. */
-        Runnable onAlphaChanged;
-
         @Override
         public void setAlpha(int alpha) {
-            final boolean changed = bgPaint.getAlpha() != alpha;
             bgPaint.setAlpha(alpha);
             invalidateSelf();
-            if (changed && onAlphaChanged != null) {
-                onAlphaChanged.run();
-            }
         }
 
         @Override
@@ -1265,17 +1221,29 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
 
         Rect padding = new Rect();
         shadowDrawable = context.getResources().getDrawable(R.drawable.sheet_shadow_round).mutate();
-        shadowDrawable.setColorFilter(new PorterDuffColorFilter(solegramGlassColor(internalBackgroundColor = getThemedColor(Theme.key_dialogBackground)), PorterDuff.Mode.MULTIPLY));
+        shadowDrawable.setColorFilter(new PorterDuffColorFilter(internalBackgroundColor = getThemedColor(Theme.key_dialogBackground), PorterDuff.Mode.MULTIPLY));
         if (solegramGlass()) {
-            // Solegram "glass sheets": the sheet is translucent like the app's glass, over the frosted screen
-            // the density of menus and glass dialogs (SolegramGlass, region Menus)
-            shadowDrawable.setAlpha(Math.round(255 * com.solegram.messenger.SolegramGlass.menuAlpha(solegramIsDark())));
+            // Solegram "glass sheets": the panel is the app's live glass (its own panel stays for its shadow and
+            // for when there is no live glass), with the density of menus and glass dialogs (SolegramGlass, region Menus)
+            shadowDrawable = new com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable(shadowDrawable, internalBackgroundColor,
+                com.solegram.messenger.SolegramGlass.menuAlpha(solegramIsDark()), resourcesProvider);
         }
         shadowDrawable.getPadding(padding);
+        solegramPanelPadding.set(padding);
         backgroundPaddingLeft = padding.left;
         backgroundPaddingTop = padding.top;
 
         container = new ContainerView(getContext()) {
+            // Solegram: the sheet drawn through a live source, so glass popups over it refract what it shows now
+            private final com.solegram.messenger.ui.SolegramLiveGlass.Host solegramGlassSource = new com.solegram.messenger.ui.SolegramLiveGlass.Host(this, c -> super.draw(c));
+
+            @Override
+            public void draw(@NonNull Canvas canvas) {
+                if (!solegramGlassSource.draw(canvas)) {
+                    super.draw(canvas);
+                }
+            }
+
             @Override
             public boolean drawChild(Canvas canvas, View child, long drawingTime) {
                 try {
@@ -1656,7 +1624,6 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
         if (!solegramBlurApplied || Build.VERSION.SDK_INT < 31) {
             return;
         }
-        backDrawable.onAlphaChanged = null;
         solegramBlurRadius = 1;
         final Window window = getWindow();
         if (window == null) {
@@ -1673,40 +1640,38 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
         solegramBlurRadius = 0;
     }
 
-    /**
-     * Solegram: the frosted backdrop is a blurred picture of the screen taken as the sheet shows (every time,
-     * reused sheets too) and drawn under the dim; it follows the dim, or the sheet's slide when there is none.
-     */
-    private void solegramCaptureBackdrop() {
-        backDrawable.backdrop = null;
-        if (!solegramGlass()) {
+    /** Solegram: the padding of the sheet's own panel (sheet_shadow_round), to know it in sheets that make their own. */
+    private final Rect solegramPanelPadding = new Rect();
+
+    /** Solegram "glass sheets": the glass of the panel shows what is under the sheet's view. */
+    private void solegramAttachGlass() {
+        if (!solegramGlass() || containerView == null) {
             return;
         }
-        backDrawable.backdropHost = container;
-        backDrawable.backdropProgress = () -> {
-            if (dimBehind && dimBehindAlpha > 0) {
-                return backDrawable.getAlpha() / (float) dimBehindAlpha;
+        if (!(shadowDrawable instanceof com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable) && shadowDrawable instanceof android.graphics.drawable.NinePatchDrawable) {
+            // a sheet that made its own panel of the same nine-patch (the share sheet, say) becomes glass too
+            final Rect padding = new Rect();
+            shadowDrawable.getPadding(padding);
+            if (padding.equals(solegramPanelPadding)) {
+                final Drawable own = shadowDrawable;
+                final ColorFilter filter = own.getColorFilter();
+                final int color = filter != null ? com.solegram.messenger.ui.SolegramLiveGlass.colorOf(filter) : internalBackgroundColor;
+                shadowDrawable = new com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable(own, color,
+                    com.solegram.messenger.SolegramGlass.menuAlpha(solegramIsDark()), resourcesProvider);
+                shadowDrawable.setBounds(own.getBounds());
+                shadowDrawable.setAlpha(own.getAlpha());
+                if (containerView.getBackground() == own) {
+                    containerView.setBackground(shadowDrawable);
+                }
             }
-            if (dismissed && containerView == null) {
-                return 0;
-            }
-            final float h = containerView == null ? 0 : containerView.getMeasuredHeight();
-            return h <= 0 ? (dismissed ? 0 : 1) : 1 - containerView.getTranslationY() / h;
-        };
-        final float downscale = 8f;
-        try {
-            AndroidUtilities.makeGlobalBlurBitmap(bitmap -> {
-                backDrawable.backdrop = bitmap;
-                backDrawable.backdropScale = downscale;
-                backDrawable.invalidateSelf();
-            }, downscale, Math.max(2, Math.round(8 * com.solegram.messenger.SolegramGlass.blurScale())), null, null);
-        } catch (Throwable e) {
-            FileLog.e(e);
+        }
+        if (shadowDrawable instanceof com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable) {
+            ((com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable) shadowDrawable).setOwner(containerView);
         }
     }
 
     private static boolean solegramGlass() {
-        return com.solegram.messenger.SolegramConfig.glassSheets;
+        return com.solegram.messenger.SolegramConfig.glassSheets && com.solegram.messenger.ui.SolegramLiveGlass.available();
     }
 
     private boolean solegramIsDark() {
@@ -1718,22 +1683,14 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
      * so its text reads well over anything behind it. Nothing changes without glass sheets.
      */
     public void solegramReadingGlass() {
-        if (solegramGlass() && shadowDrawable != null) {
-            shadowDrawable.setAlpha(Math.round(255 * com.solegram.messenger.SolegramGlass.readingAlpha(solegramIsDark())));
-            if (containerView != null) {
-                containerView.invalidate();
-            }
+        if (shadowDrawable instanceof com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable) {
+            ((com.solegram.messenger.ui.SolegramLiveGlass.SheetDrawable) shadowDrawable).setDensity(com.solegram.messenger.SolegramGlass.readingAlpha(solegramIsDark()));
         }
-    }
-
-    /** Solegram: with glass sheets the sheet takes the tint of the app's glass. */
-    private static int solegramGlassColor(int color) {
-        return solegramGlass() ? com.solegram.messenger.SolegramGlass.tint(color) : color;
     }
 
     private int internalBackgroundColor;
     public void setBackgroundColor(int color) {
-        shadowDrawable.setColorFilter(solegramGlassColor(color), PorterDuff.Mode.MULTIPLY);
+        shadowDrawable.setColorFilter(color, PorterDuff.Mode.MULTIPLY);
         if (internalBackgroundColor != color) {
             internalBackgroundColor = color;
             if (container != null) {
@@ -1749,12 +1706,12 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
     @Override
     public void show() {
         if (!AndroidUtilities.isSafeToShow(getContext())) return;
-        solegramCaptureBackdrop();
         if (attachedFragment != null) {
             onCreateInternal();
         } else {
             super.show();
         }
+        solegramAttachGlass();
         setShowing(true);
         if (focusable) {
             getWindow().setSoftInputMode(focusableSoftInputMode);
@@ -2347,7 +2304,6 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
 
     public void dismissInternal() {
         solegramBlurOff();
-        backDrawable.backdrop = null;
         if (attachedFragment != null) {
             attachedFragment.removeSheet(this);
             AndroidUtilities.removeFromParent(container);

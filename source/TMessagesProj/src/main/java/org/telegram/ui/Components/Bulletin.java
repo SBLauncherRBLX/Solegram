@@ -345,6 +345,7 @@ public class Bulletin {
                         if (currentDelegate != null) {
                             currentDelegate.onShow(Bulletin.this);
                         }
+                        solegramApplyGlass();
                         if (isTransitionsEnabled() && !skipShowAnimation) {
                             ensureLayoutTransitionCreated();
                             layout.transitionRunningEnter = true;
@@ -388,6 +389,32 @@ public class Bulletin {
             containerLayout.addView(parentLayout);
         }
         return this;
+    }
+
+    /**
+     * Solegram "glass menus": the bulletin is live glass, as the chat's bulletins are - over the screen it is
+     * shown on (its content without the bulletins), or over the windows under its own window. Without it the
+     * bulletin keeps its plain look; bulletins with a background of their own (the chat's) keep theirs.
+     */
+    private void solegramApplyGlass() {
+        if (layout == null || layout.hasCustomBackground || !com.solegram.messenger.SolegramConfig.glassMenus || !com.solegram.messenger.ui.SolegramLiveGlass.available()) {
+            return;
+        }
+        com.solegram.messenger.ui.SolegramLiveGlass glass = null;
+        final org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider provider =
+            org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.bulletin(layout.resourcesProvider);
+        if (containerLayout instanceof org.telegram.ui.ActionBar.ActionBarLayout.LayoutContainer) {
+            glass = com.solegram.messenger.ui.SolegramLiveGlass.create(layout, provider, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR,
+                ((org.telegram.ui.ActionBar.ActionBarLayout.LayoutContainer) containerLayout).solegramContentSource());
+        } else if (containerLayout instanceof BulletinWindow.BulletinWindowLayout && com.solegram.messenger.ui.SolegramLiveGlass.canSample(containerLayout.getRootView())) {
+            // a window of its own: the glass looks into the windows under it
+            glass = com.solegram.messenger.ui.SolegramLiveGlass.create(layout, provider, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR);
+        }
+        if (glass != null) {
+            glass.drawable.setRadius(dp(16));
+            layout.setCustomBackground(glass.drawable);
+            layout.invalidate();
+        }
     }
 
     public void setCanHide(boolean canHide) {

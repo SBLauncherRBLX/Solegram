@@ -184,7 +184,6 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     private float blurOpacity;
     private Bitmap blurBitmap;
     private Matrix blurMatrix;
-    private float solegramBlurDownscale = 8f; // Solegram: the scale of the blurred picture (glass dialogs: the menu blur)
     private BitmapShader blurShader;
     private Paint blurPaint;
     private Paint dimBlurPaint;
@@ -216,8 +215,10 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     private boolean topAnimationAutoRepeat = true;
     private boolean blurredBackground;
     private boolean blurredNativeBackground;
-    /** Solegram: drawn as the app's glass (glass dialogs). */
+    /** Solegram: drawn as the app's live glass (glass dialogs). */
     private boolean solegramGlass;
+    @Nullable
+    private com.solegram.messenger.ui.SolegramLiveGlass solegramLive;
     private int backgroundColor;
     float blurAlpha = 0.8f;
     private boolean blurBehind;
@@ -311,9 +312,10 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
         final boolean isDark = AndroidUtilities.computePerceivedBrightness(backgroundColor) < 0.721f;
         blurredNativeBackground = supportsNativeBlur() && progressViewStyle == ALERT_TYPE_MESSAGE;
         blurredBackground = (blurredNativeBackground || !supportsNativeBlur() && SharedConfig.getDevicePerformanceClass() >= SharedConfig.PERFORMANCE_CLASS_HIGH && LiteMode.isEnabled(LiteMode.FLAG_CHAT_BLUR)) && isDark;
-        // Solegram "glass dialogs": the dialog is the app's glass (a blurred copy of the screen under it),
-        // in light themes too, with the density and tint of the glass settings
-        solegramGlass = com.solegram.messenger.SolegramConfig.glassDialogs && progressStyle != ALERT_TYPE_LOADING;
+        // Solegram "glass dialogs": the dialog is the app's live glass (it refracts the screen under it, as the
+        // glass in chats does), in light themes too, with the density and tint of the glass settings
+        solegramGlass = com.solegram.messenger.SolegramConfig.glassDialogs && progressStyle != ALERT_TYPE_LOADING
+            && com.solegram.messenger.ui.SolegramLiveGlass.available();
         if (solegramGlass) {
             blurredNativeBackground = false;
             blurredBackground = true;
@@ -339,6 +341,10 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     public AlertDialog solegramReadingGlass() {
         if (solegramGlass) {
             blurOpacity = com.solegram.messenger.SolegramGlass.readingAlpha(AndroidUtilities.computePerceivedBrightness(backgroundColor) < 0.721f);
+            if (solegramLive != null) {
+                solegramLive.drawable.updateColors();
+                solegramLive.drawable.invalidateDisplayList();
+            }
         }
         return this;
     }
@@ -561,7 +567,7 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
             getLocationOnScreen(containerViewLocation);
             if (blurMatrix != null && blurShader != null) {
                 blurMatrix.reset();
-                blurMatrix.postScale(solegramBlurDownscale, solegramBlurDownscale);
+                blurMatrix.postScale(8f, 8f);
                 blurMatrix.postTranslate(-containerViewLocation[0], -containerViewLocation[1]);
                 blurShader.setLocalMatrix(blurMatrix);
             }
@@ -581,10 +587,30 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
         }
 
         private AnimatedFloat blurPaintAlpha = new AnimatedFloat(0, this);
-        private Paint solegramEdgePaint;
-        private float solegramEdgeTop, solegramEdgeBottom;
-        private int solegramEdgeColor;
         private Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Rect solegramGlassBounds = new android.graphics.Rect();
+        private float solegramGlassRadius = -1;
+
+        /**
+         * Solegram "glass dialogs": the panel is live glass with the outline of the one menu glass (SolegramGlass,
+         * region Menus); the dim stays outside it. Without a live picture of the screen it is a plain panel.
+         */
+        private void solegramDrawGlass(Canvas canvas, float r) {
+            final com.solegram.messenger.ui.SolegramLiveGlass glass = solegramLive;
+            if (glass == null || !glass.isLive()) {
+                backgroundPaint.setColor(backgroundColor);
+                canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, backgroundPaint);
+                return;
+            }
+            if (solegramGlassRadius != r) {
+                solegramGlassRadius = r;
+                glass.drawable.setRadius(r);
+                glass.drawable.updateColors(); // the colour is final now (progress dialogs set theirs late)
+            }
+            AndroidUtilities.rectTmp.round(solegramGlassBounds);
+            glass.drawable.setBounds(solegramGlassBounds);
+            glass.drawable.draw(canvas);
+        }
 
         @Override
         public void draw(Canvas canvas) {
@@ -605,45 +631,27 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
                     AndroidUtilities.rectTmp.set(getPaddingLeft(), getPaddingTop(), getMeasuredWidth() - getPaddingRight(), getMeasuredHeight() - getPaddingBottom());
                 }
 
-                // draw blur of background
-                float blurAlpha = blurPaintAlpha.set(blurPaint != null ? 1f : 0f);
-                if (blurPaint != null) {
-                    blurPaint.setAlpha((int) (0xFF * blurAlpha));
-                    canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, blurPaint);
-                }
-
-                // draw dim above blur
-                if (dimBlurPaint == null) {
-                    dimBlurPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    // Solegram: light glass dialogs keep only a trace of the dim, or the glass turns muddy grey
-                    final float dim = solegramGlass && !Theme.isCurrentThemeDark() ? dimAlpha * 0.35f : dimAlpha;
-                    dimBlurPaint.setColor(ColorUtils.setAlphaComponent(0xff000000, (int) (0xFF * dim)));
-                }
-                canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, dimBlurPaint);
-
-                // draw background
-                backgroundPaint.setColor(solegramGlass ? com.solegram.messenger.SolegramGlass.tint(backgroundColor) : backgroundColor);
-                backgroundPaint.setAlpha((int) (backgroundPaint.getAlpha() * (blurAlpha * (blurOpacity - 1f) + 1f)));
-                canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, backgroundPaint);
                 if (solegramGlass) {
-                    // the glass edge of menus (SolegramGlass, region Menus): a light line on top, a darker one below
-                    if (solegramEdgePaint == null) {
-                        solegramEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                        solegramEdgePaint.setStyle(Paint.Style.STROKE);
+                    solegramDrawGlass(canvas, r);
+                } else {
+                    // draw blur of background
+                    float blurAlpha = blurPaintAlpha.set(blurPaint != null ? 1f : 0f);
+                    if (blurPaint != null) {
+                        blurPaint.setAlpha((int) (0xFF * blurAlpha));
+                        canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, blurPaint);
                     }
-                    final boolean dark = AndroidUtilities.computePerceivedBrightness(backgroundColor) < 0.721f;
-                    final int top = com.solegram.messenger.SolegramGlass.menuRimTop(dark);
-                    final int bottom = com.solegram.messenger.SolegramGlass.menuEdgeBottom(dark);
-                    final float w = Math.max(1, com.solegram.messenger.SolegramGlass.highlightWidth(AndroidUtilities.dpf2(com.solegram.messenger.SolegramGlass.MENU_RIM_WIDTH_DP), true));
-                    solegramEdgePaint.setStrokeWidth(w);
-                    if (solegramEdgeTop != AndroidUtilities.rectTmp.top || solegramEdgeBottom != AndroidUtilities.rectTmp.bottom || solegramEdgeColor != top) {
-                        solegramEdgeTop = AndroidUtilities.rectTmp.top;
-                        solegramEdgeBottom = AndroidUtilities.rectTmp.bottom;
-                        solegramEdgeColor = top;
-                        solegramEdgePaint.setShader(new android.graphics.LinearGradient(0, solegramEdgeTop, 0, solegramEdgeBottom, top, bottom, Shader.TileMode.CLAMP));
+
+                    // draw dim above blur
+                    if (dimBlurPaint == null) {
+                        dimBlurPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                        dimBlurPaint.setColor(ColorUtils.setAlphaComponent(0xff000000, (int) (0xFF * dimAlpha)));
                     }
-                    AndroidUtilities.rectTmp.inset(w / 2f, w / 2f);
-                    canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, solegramEdgePaint);
+                    canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, dimBlurPaint);
+
+                    // draw background
+                    backgroundPaint.setColor(backgroundColor);
+                    backgroundPaint.setAlpha((int) (backgroundPaint.getAlpha() * (blurAlpha * (blurOpacity - 1f) + 1f)));
+                    canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, backgroundPaint);
                 }
             }
             super.draw(canvas);
@@ -693,6 +701,11 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     protected View inflateContent(boolean setContent) {
         containerView = new AlertDialogView(getContext());
         containerView.setOrientation(LinearLayout.VERTICAL);
+        if (solegramGlass) {
+            // Solegram "glass dialogs": the dialog's colour with the density of menus (blurOpacity)
+            solegramLive = com.solegram.messenger.ui.SolegramLiveGlass.create(containerView, com.solegram.messenger.ui.SolegramLiveGlass.panel(resourcesProvider,
+                (r, dark) -> ColorUtils.setAlphaComponent(backgroundColor, Math.round(255 * blurOpacity)), true), com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
+        }
         if ((blurredBackground || progressViewStyle == ALERT_TYPE_SPINNER) && progressViewStyle != ALERT_TYPE_LOADING) {
             containerView.setBackground(null);
             containerView.setPadding(0, 0, 0, 0);
@@ -1386,19 +1399,10 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
                         params.setBlurBehindRadius(20);
                     }
                 }
-            } else {
-                // Solegram: glass dialogs have the blur and colours of the one menu glass (SolegramGlass, region Menus)
-                final float blurDownscale = solegramBlurDownscale = solegramGlass ? com.solegram.messenger.SolegramGlass.MENU_BLUR_DOWNSCALE : 8f;
-                AndroidUtilities.makeGlobalBlurBitmap(blurred -> {
-                    if (blurred == null) {
+            } else if (!solegramGlass) { // Solegram: glass dialogs are live glass, no picture of the screen
+                AndroidUtilities.makeGlobalBlurBitmap(bitmap -> {
+                    if (bitmap == null) {
                         return;
-                    }
-                    Bitmap bitmap = blurred;
-                    if (solegramGlass) {
-                        bitmap = AndroidUtilities.applyColorMatrix(blurred, com.solegram.messenger.SolegramGlass.menuBackdropMatrix(Theme.isCurrentThemeDark()));
-                        if (bitmap != blurred) {
-                            blurred.recycle();
-                        }
                     }
                     if (blurPaint == null) {
                         blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1407,11 +1411,11 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
                     blurShader = new BitmapShader(blurBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
                     blurPaint.setShader(blurShader);
                     blurMatrix = new Matrix();
-                    blurMatrix.postScale(blurDownscale, blurDownscale);
+                    blurMatrix.postScale(8f, 8f);
                     blurMatrix.postTranslate(-containerViewLocation[0], -containerViewLocation[1]);
                     blurShader.setLocalMatrix(blurMatrix);
                     containerView.invalidate();
-                }, blurDownscale, solegramGlass ? com.solegram.messenger.SolegramGlass.menuBlurRadius() : 8, null, null);
+                }, 8);
             }
         }
 

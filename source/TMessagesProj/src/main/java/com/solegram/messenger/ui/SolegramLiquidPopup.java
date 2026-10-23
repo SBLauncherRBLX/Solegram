@@ -148,7 +148,7 @@ public final class SolegramLiquidPopup {
         state = STATE_PENDING;
     }
 
-    /** Glass colours of the app (tint, rim) over the picture of the screen or Telegram's blur. */
+    /** Glass colours of the app (tint, rim) over the live glass or Telegram's blur. */
     public void glassColors(BlurredBackgroundColorProvider provider, boolean tinted) {
         final boolean dark = ColorUtils.calculateLuminance(provider.getBackgroundColor() | 0xFF000000) < 0.5;
         // the one menu glass (SolegramGlass, region Menus), as Telegram's blurred menus have it;

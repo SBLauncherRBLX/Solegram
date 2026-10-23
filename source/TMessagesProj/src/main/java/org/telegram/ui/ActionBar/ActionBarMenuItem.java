@@ -758,6 +758,7 @@ public class ActionBarMenuItem extends FrameLayout {
         this.subMenuFactory = subMenuFactory;
         this.subMenuProvider = subMenuProvider;
         if (popupLayout != null && subMenuFactory != null) {
+            com.solegram.messenger.ui.SolegramLiveGlass.release(popupLayout.getBackgroundDrawable()); // Solegram: the replaced live glass lets go
             popupLayout.setBackground(subMenuFactory.create(popupLayout, true)
                     .setColorProvider(subMenuProvider)
                     .setRadius(dp(12))
@@ -814,7 +815,8 @@ public class ActionBarMenuItem extends FrameLayout {
             }
             if (topView instanceof ActionBarMenuSubItem || topView instanceof LinearLayout) {
                 if (subMenuFactory != null) {
-                    frameLayout.setBackground(subMenuFactory.create(popupLayout, true)
+                    // Solegram: the view that draws it (its glass follows where that view is)
+                    frameLayout.setBackground(subMenuFactory.create(frameLayout, true)
                         .setColorProvider(subMenuProvider)
                         .setRadius(dp(12))
                         .setPadding(dp(8))

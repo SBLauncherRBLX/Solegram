@@ -201,6 +201,11 @@ public abstract class BlurredBackgroundDrawable extends Drawable {
         return this;
     }
 
+    /** Solegram: the colours it was given (live glass fills with them where it has no picture). */
+    public BlurredBackgroundColorProvider solegramColorProvider() {
+        return colorProvider;
+    }
+
     private int outsetX, outsetY;
 
     public BlurredBackgroundDrawable setOutset(int dx, int dy) {

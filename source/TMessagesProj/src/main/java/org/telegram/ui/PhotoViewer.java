@@ -23606,6 +23606,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     }
 
     private class PhotoViewerWindowView extends FrameLayout {
+        // Solegram: the viewer drawn through a live source, so glass popups over it refract what it shows now
+        private final com.solegram.messenger.ui.SolegramLiveGlass.Host solegramGlassSource = new com.solegram.messenger.ui.SolegramLiveGlass.Host(this, c -> super.draw(c));
 
         public PhotoViewerWindowView(@NonNull Context context) {
             super(context);
@@ -23787,6 +23789,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         @Override
         public void draw(@NonNull Canvas canvas) {
             if (windowViewSkipRender) {
+                return;
+            }
+            if (solegramGlassSource.draw(canvas)) {
                 return;
             }
             super.draw(canvas);

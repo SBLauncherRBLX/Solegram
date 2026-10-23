@@ -1498,7 +1498,10 @@ public class ItemOptions {
 
         if (blurForMenu && scrimBlur3SourceBitmap != null) {
             setGapBackgroundColor(Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuItem, resourcesProvider), 0.06f));
-            BlurredBackgroundDrawable bg = new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap)
+            // Solegram: live glass over the screen under the menu's window; Telegram's picture stays without it, and
+            // over Telegram's blurred backdrop (a picture too: live glass there would show the screen sharper than round it)
+            BlurredBackgroundDrawable bg = (blur ? new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap)
+                : new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR))
                 .create(layout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourcesProvider))
                 .setPadding(dp(8))

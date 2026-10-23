@@ -11834,11 +11834,11 @@
     <string name="SG_NeutralOverscrollInfo">List edges no longer flash the theme colour when pulled past the end</string>
     <string name="SG_GlassElsewhere">Glass elsewhere</string>
     <string name="SG_GlassMenus">Popup menus</string>
-    <string name="SG_GlassMenusInfo">Menus are made of the same glass as the tab bar: blur under the menu, density, tint and highlight from the glass settings</string>
+    <string name="SG_GlassMenusInfo">Menus and bottom notifications are made of the same live liquid glass as the buttons in chats: they refract what is under them, with density, tint and highlight from the glass settings (Android 13+)</string>
     <string name="SG_GlassDialogs">Dialogs</string>
-    <string name="SG_GlassDialogsInfo">Confirmation and alert windows are made of the same glass as the tab bar</string>
+    <string name="SG_GlassDialogsInfo">Confirmation and alert windows are made of the same live liquid glass as the buttons in chats (Android 13+)</string>
     <string name="SG_GlassSheets">Bottom panels</string>
-    <string name="SG_GlassSheetsInfo">Sheets that slide up are translucent with the glass tint, the screen behind them is blurred</string>
+    <string name="SG_GlassSheetsInfo">Sheets that slide up are made of live liquid glass: refraction along the edge, frosted inside so text reads well (Android 13+)</string>
     <string name="SG_GlassElsewhereInfo">Menus and dialogs work on any Android. Sheets need system window blur (Android 12+), which battery saver may turn off.</string>
     <string name="SG_GlassElsewhereUnavailable">Sheets need system window blur (Android 12+), which is off right now. Menus and dialogs work anyway.</string>
     <string name="SG_LiquidControls">Liquid switches and sliders</string>
