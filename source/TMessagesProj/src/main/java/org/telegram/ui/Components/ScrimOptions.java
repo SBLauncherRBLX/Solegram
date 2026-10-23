@@ -157,7 +157,8 @@ public class ScrimOptions extends Dialog {
         windowView.addView(containerView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
         iBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
-        iBlur3Factory = new BlurredBackgroundDrawableViewFactory(iBlur3SourceBitmap);
+        // Solegram: its menus are live glass, frosted like the blurred backdrop round them (Telegram's picture without it)
+        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
         iBlur3Factory.setSourceRootView(new ViewPositionWatcher(windowView), windowView);
 
         ViewCompat.setOnApplyWindowInsetsListener(windowView, new OnApplyWindowInsetsListener() {

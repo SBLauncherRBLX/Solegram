@@ -37,6 +37,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.graphics.ColorUtils;
 
+import com.solegram.messenger.SolegramConfig;
 import com.solegram.messenger.SolegramGlass;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -53,6 +54,7 @@ import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawableRender
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
+import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
 import org.telegram.ui.Components.blur3.source.BlurredBackgroundSource;
 
 import java.util.ArrayList;
@@ -205,6 +207,16 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
 
         boolean hasContent() {
             return node != null && node.hasDisplayList() && attached;
+        }
+
+        /** A part host glass can look into now (in a window, with nothing there that must stay in it). */
+        public boolean canSample() {
+            try {
+                return available() && part && attached && !hasWindowBoundContent(view);
+            } catch (Throwable e) {
+                fail(e);
+                return false;
+            }
         }
 
         void addUser() {
@@ -779,11 +791,154 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
     }
     // endregion
 
+    // region Menus: the one glass of every popup menu
+
+    /** Glass menus are on and live glass can be drawn: popup menus are live glass (their plain panel otherwise). */
+    public static boolean menusOn() {
+        return SolegramConfig.glassMenus && available();
+    }
+
+    /**
+     * The glass of a menu panel drawn by {@code owner}: the one menu glass (SolegramGlass, region Menus) at the menu
+     * radius, {@code inset} inside its bounds as the plain panel it stands for has its shadow margin. Null without
+     * glass menus or live glass.
+     *
+     * @param color the panel's colour when it isn't the theme's menu colour (a dark menu over media), 0 (or white) for that one
+     * @param host a part host for a menu over a screen in its own window (else it looks into the windows under it)
+     */
+    @Nullable
+    public static SolegramLiveGlass menu(@NonNull View owner, @Nullable Theme.ResourcesProvider resourcesProvider, int color, int recipe, int inset, @Nullable Host host) {
+        if (!SolegramConfig.glassMenus) {
+            return null;
+        }
+        // white is what a custom panel leaves as "its colour" (ActionBarPopupWindowLayout): the theme's menu colour then
+        final BlurredBackgroundProvider provider = color == 0 || color == Color.WHITE || color == Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider)
+            ? BlurredBackgroundProviderImpl.solegramMenu(resourcesProvider, false) // follows the theme
+            : panel(resourcesProvider, (r, dark) -> SolegramGlass.menuFill(color, dark), true);
+        final SolegramLiveGlass glass = create(owner, provider, recipe, host);
+        if (glass != null) {
+            glass.drawable.setPadding(inset);
+            glass.drawable.setHasPadding(inset > 0);
+            glass.drawable.setRadius(SolegramGlass.menuRadius());
+        }
+        return glass;
+    }
+
+    /**
+     * The background of a menu panel that isn't an ActionBarPopupWindowLayout (the boxes under the message menu,
+     * a menu's top view, custom popups): live glass while glass menus are on and the screen under it can be read,
+     * else {@code plain} (a popup_fixed_alert* panel, coloured as before). Padding and shadow margin are the plain
+     * panel's, so the layout doesn't change.
+     */
+    public static Drawable menuPanel(@NonNull View owner, @NonNull Drawable plain, @Nullable Theme.ResourcesProvider resourcesProvider) {
+        return menuPanel(owner, plain, resourcesProvider, 0);
+    }
+
+    /** {@link #menuPanel(View, Drawable, Theme.ResourcesProvider)} of a panel in its own colour ({@code color}, 0: the theme's menu colour). */
+    public static Drawable menuPanel(@NonNull View owner, @NonNull Drawable plain, @Nullable Theme.ResourcesProvider resourcesProvider, int color) {
+        if (!menusOn()) {
+            return plain;
+        }
+        final Rect padding = new Rect();
+        plain.getPadding(padding);
+        final SolegramLiveGlass glass = menu(owner, resourcesProvider, color, CLEAR, padding.left, null);
+        return glass != null ? new MenuDrawable(plain, glass) : plain;
+    }
+
+    /** A menu panel: its live glass where the screen under it can be read, its plain panel elsewhere. */
+    public static final class MenuDrawable extends Drawable implements Drawable.Callback {
+        private final Drawable plain;
+        private final SolegramLiveGlass glass;
+        private int alpha = 255;
+
+        MenuDrawable(@NonNull Drawable plain, @NonNull SolegramLiveGlass glass) {
+            this.plain = plain;
+            this.glass = glass;
+            plain.setCallback(this);
+            glass.drawable.setCallback(this);
+        }
+
+        private boolean live() {
+            return Build.VERSION.SDK_INT >= 33 && SolegramConfig.glassMenus && glass.isLive();
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            if (live()) {
+                glass.drawable.draw(canvas);
+            } else {
+                plain.draw(canvas);
+            }
+        }
+
+        @Override
+        protected void onBoundsChange(@NonNull Rect bounds) {
+            plain.setBounds(bounds);
+            glass.drawable.setBounds(bounds);
+        }
+
+        @Override
+        public boolean getPadding(@NonNull Rect padding) {
+            return plain.getPadding(padding);
+        }
+
+        @Override
+        public void getOutline(@NonNull android.graphics.Outline outline) {
+            if (live()) {
+                glass.drawable.getOutline(outline);
+            } else {
+                plain.getOutline(outline);
+            }
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            if (this.alpha != alpha) {
+                this.alpha = alpha;
+                plain.setAlpha(alpha);
+                glass.drawable.setAlpha(alpha); // the glass records itself again on a change: only real ones
+            }
+        }
+
+        @Override
+        public int getAlpha() {
+            return alpha;
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {
+            plain.setColorFilter(colorFilter); // the glass has the colours of the one menu glass
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+
+        @Override
+        public void invalidateDrawable(@NonNull Drawable who) {
+            invalidateSelf();
+        }
+
+        @Override
+        public void scheduleDrawable(@NonNull Drawable who, @NonNull Runnable what, long when) {
+            scheduleSelf(what, when);
+        }
+
+        @Override
+        public void unscheduleDrawable(@NonNull Drawable who, @NonNull Runnable what) {
+            unscheduleSelf(what);
+        }
+    }
+    // endregion
+
     // region Telegram's blurred menus
 
     /**
      * Telegram's factory for its blurred menus (a picture of the screen taken when the menu opens) that gives live
-     * glass to the views it makes backgrounds for; Telegram's picture stays where there is no live glass.
+     * glass to the views it makes backgrounds for (with glass menus on); Telegram's picture stays where there is no
+     * live glass. Menus over Telegram's blurred backdrop take {@link #FROSTED}: frosted like the backdrop round
+     * them, refracting at the rim.
      */
     public static class Factory extends BlurredBackgroundDrawableViewFactory {
         private final BlurredBackgroundSource fallbackSource;
@@ -805,7 +960,7 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
 
         @Override
         public BlurredBackgroundDrawable create(View view, BlurredBackgroundColorProvider provider, boolean multiwindow) {
-            if (view != null && available()) {
+            if (view != null && menusOn()) {
                 final SolegramLiveGlass glass = SolegramLiveGlass.create(view, provider, recipe);
                 if (glass != null) {
                     glass.setFallback(fallbackSource, ref);

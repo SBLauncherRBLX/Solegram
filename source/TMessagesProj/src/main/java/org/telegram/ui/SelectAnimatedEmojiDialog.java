@@ -60,6 +60,7 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.math.MathUtils;
@@ -533,6 +534,9 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                     super.dispatchDraw(canvas);
                     return;
                 }
+                if (solegramDrawGlass(this, canvas)) {
+                    return;
+                }
                 canvas.drawColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
             }
         };
@@ -610,7 +614,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                             (int) (view.getPaddingTop() + h * scaleY)
                         );
                     }
-                    outline.setRoundRect(rect, dp(12));
+                    outline.setRoundRect(rect, com.solegram.messenger.SolegramGlass.menuRadius()); // Solegram: the menu corners
                 }
             });
             contentView.setClipToOutline(true);
@@ -5616,7 +5620,34 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
         }
     }
 
+    // Solegram: the popup's panel as live glass (glass menus), made when it is first drawn
+    @Nullable
+    private com.solegram.messenger.ui.SolegramLiveGlass solegramGlass;
+
+    /** Solegram: draws the panel as menu glass while the screen under it can be read; false: the plain panel. */
+    private boolean solegramDrawGlass(View view, Canvas canvas) {
+        if (type == TYPE_TOPIC_ICON || type == TYPE_AVATAR_CONSTRUCTOR || !com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+            return false; // a panel in a sheet, not a popup
+        }
+        if (solegramGlass == null) {
+            solegramGlass = com.solegram.messenger.ui.SolegramLiveGlass.menu(view, resourcesProvider, 0, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR, 0, null);
+            if (solegramGlass == null) {
+                return false;
+            }
+        }
+        if (!solegramGlass.isLive()) {
+            return false;
+        }
+        solegramGlass.drawable.setBounds(0, 0, view.getWidth(), view.getHeight());
+        solegramGlass.drawable.draw(canvas);
+        return true;
+    }
+
     public void setDrawBackground(boolean drawBackground) {
+        if (!drawBackground && solegramGlass != null) {
+            solegramGlass.release(); // Solegram: no panel to draw
+            solegramGlass = null;
+        }
         this.drawBackground = drawBackground;
         contentView.setClipToOutline(drawBackground);
         if (!drawBackground) {

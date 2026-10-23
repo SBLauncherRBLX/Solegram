@@ -56,7 +56,8 @@ public class CastMediaRouteButton extends MediaRouteButton {
         public void onStart() {
             super.onStart();
             if (getDialog() != null && getDialog().getWindow() != null) {
-                Drawable drawable = getContext().getResources().getDrawable(R.drawable.popup_fixed_alert3).mutate();
+                // Solegram: a dialog keeps its own corners (popup_fixed_alert3 is the rounder menu panel now)
+                Drawable drawable = getContext().getResources().getDrawable(R.drawable.sg_dialog_panel_small).mutate();
                 drawable.setColorFilter(new PorterDuffColorFilter(0xF9222222, PorterDuff.Mode.SRC_IN));
                 getDialog().getWindow().setBackgroundDrawable(drawable);
             }

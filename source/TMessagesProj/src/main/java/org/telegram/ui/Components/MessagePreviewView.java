@@ -824,7 +824,7 @@ public class MessagePreviewView extends FrameLayout {
                 .scrimMenuBackground(resourcesProvider))
                 .setPadding(dp(8))
                 .setHasPadding(true)
-                .setRadius(dp(12)));
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius())); // Solegram: the menu corners
 
             addView(menu, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 

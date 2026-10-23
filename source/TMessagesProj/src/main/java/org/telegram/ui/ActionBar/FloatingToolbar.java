@@ -1497,20 +1497,22 @@ public final class FloatingToolbar {
             contentContainer.setBackground(blurredBackgroundDrawableViewFactory
                 .create(contentContainer, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.photoViewerMenu(resourcesProvider))
-                .setRadius(dp(12)));
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius())); // Solegram: the menu corners
         } else {
             GradientDrawable shape = new GradientDrawable();
             shape.setShape(GradientDrawable.RECTANGLE);
-            int r = dp(12);
+            int r = com.solegram.messenger.SolegramGlass.menuRadius(); // Solegram: the menu corners
             shape.setCornerRadii(new float[] { r, r, r, r, r, r, r, r });
+            int color = 0;
             if (currentStyle == STYLE_DIALOG) {
-                shape.setColor(getThemedColor(Theme.key_dialogBackground));
+                shape.setColor(color = getThemedColor(Theme.key_dialogBackground));
             } else if (currentStyle == STYLE_BLACK) {
-                shape.setColor(0xf9222222);
+                shape.setColor(color = 0xf9222222);
             } else if (currentStyle == STYLE_THEME) {
-                shape.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                shape.setColor(color = getThemedColor(Theme.key_windowBackgroundWhite));
             }
-            contentContainer.setBackground(shape);
+            // Solegram: live glass in its colour, as menus are (the plain panel where the screen under it can't be read)
+            contentContainer.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(contentContainer, shape, resourcesProvider, color));
         }
 
         contentContainer.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));

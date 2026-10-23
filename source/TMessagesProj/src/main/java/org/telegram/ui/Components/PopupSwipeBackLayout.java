@@ -129,11 +129,17 @@ public class PopupSwipeBackLayout extends FrameLayout {
         onSwipeBackProgressListeners.add(onSwipeBackProgressListener);
     }
 
+    /** Solegram: the menu's panel is glass: pages show it through instead of an opaque slab, the first one fades. */
+    private boolean solegramSeeThrough() {
+        return getParent() instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout && ((ActionBarPopupWindow.ActionBarPopupWindowLayout) getParent()).solegramSeeThrough();
+    }
+
     @Override
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
         int i = indexOfChild(child);
         int s = canvas.save();
-        if (i != 0) {
+        final boolean seeThrough = solegramSeeThrough();
+        if (i != 0 && !seeThrough) {
             if (foregroundColor == 0) {
                 foregroundPaint.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
             } else {
@@ -141,8 +147,12 @@ public class PopupSwipeBackLayout extends FrameLayout {
             }
             canvas.drawRect(child.getX(), 0, child.getX() + child.getMeasuredWidth(), getMeasuredHeight(), foregroundPaint);
         }
+        if (i == 0 && seeThrough && transitionProgress > 0) {
+            // Solegram: nothing opaque covers it on glass, so it fades as the page over it comes in
+            canvas.saveLayerAlpha(0, 0, getWidth(), getHeight(), (int) (0xFF * (1f - transitionProgress)));
+        }
         boolean b = super.drawChild(canvas, child, drawingTime);
-        if (i == 0) {
+        if (i == 0 && !seeThrough) {
             overlayPaint.setAlpha((int) (transitionProgress * 0x40));
             canvas.drawRect(0, 0, getWidth(), getHeight(), overlayPaint);
         }
@@ -428,7 +438,7 @@ public class PopupSwipeBackLayout extends FrameLayout {
 
         int s = canvas.save();
         mPath.rewind();
-        int rad = AndroidUtilities.dp(12);
+        int rad = com.solegram.messenger.SolegramGlass.menuRadius(); // Solegram: the menu corners
         if (stickToRight) {
             mRect.set(getWidth() - w, y, getWidth(), y + h);
         } else {

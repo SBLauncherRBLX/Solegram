@@ -44,7 +44,7 @@ public class ActionBarMenuSubItem extends FrameLayout {
     private PorterDuff.Mode iconColorMode;
     private int selectorColor;
 
-    int selectorRad = 12;
+    int selectorRad = (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP; // Solegram: the highlight keeps to the menu corners
     boolean top;
     boolean bottom;
 

@@ -157,55 +157,124 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             this(context, resId, resourcesProvider, 0);
         }
 
-        // Solegram "glass menus": live glass in place of the menu's own panel, and the panel it replaced
+        // Solegram "glass menus": live glass in place of the menu's own panel, the panel it replaced, and the screen
+        // it looks at when that is in the menu's own window (null: the windows under the menu's window)
         private com.solegram.messenger.ui.SolegramLiveGlass solegramGlass;
         private Drawable solegramPlainBackground;
+        @Nullable
+        private com.solegram.messenger.ui.SolegramLiveGlass.Host solegramGlassHost;
+        private int solegramGlassColor, solegramGlassRecipeUsed;
+        /** Solegram: FROSTED for a menu over Telegram's blurred backdrop (frosted like the backdrop round it). */
+        public int solegramGlassRecipe = com.solegram.messenger.ui.SolegramLiveGlass.CLEAR;
         // the liquid's fill: live glass with no colour of its own (the liquid tints and outlines it)
         private com.solegram.messenger.ui.SolegramLiveGlass solegramLiquidGlass;
+        // the liquid is filled with glass (live, or Telegram's blur): what is under the panel shows through it
+        private boolean solegramLiquidSeeThrough;
+        /** Solegram: shown by an ActionBarPopupWindow, which decides on its glass (and liquid) itself. */
+        boolean solegramManaged;
 
         /**
          * Solegram "glass menus": the menu turns into the app's live glass - it refracts what is under it as the
-         * glass in chats does - with the colours, tint, density, outline and shadow of the one menu glass. Called
-         * each time the menu is shown (its window is up); without a live picture of the screen it keeps its panel.
+         * glass in chats does - with the colours, tint, density, outline and shadow of the one menu glass
+         * (SolegramLiveGlass.menu). Called each time the menu is shown (its window is up); without a live picture
+         * of the screen it keeps its panel.
          *
          * @param windowRoot the root of the menu's window
          */
         public void solegramUseGlass(View windowRoot) {
-            if (backgroundDrawable == null || getSwipeBack() != null) {
-                return; // no panel of its own; swipe-back pages paint opaque slabs over it, so they stay as they are
+            if (backgroundDrawable == null) {
+                return; // no panel of its own (a page of another menu, a bare list)
             }
             final boolean ours = solegramGlass != null && backgroundDrawable == solegramGlass.drawable;
             if (!ours && backgroundDrawable instanceof org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable) {
-                return; // already Telegram's glass
+                return; // Telegram's blurred menu: its factory gives it live glass (SolegramLiveGlass.Factory)
             }
+            // what is under the menu: the windows under its window, or the screen behind it in its own window (a preview's menu)
+            com.solegram.messenger.ui.SolegramLiveGlass.Host host = null;
             if (!com.solegram.messenger.ui.SolegramLiveGlass.canSample(windowRoot)) {
-                solegramDropGlass(); // nothing live to show: the menu's own panel
-                return;
+                host = solegramScreenBehind();
+                if (host == null || !host.canSample()) {
+                    solegramDropGlass(); // nothing live to show: the menu's own panel
+                    return;
+                }
             }
-            if (ours) {
+            // its own colour; white is what a custom panel leaves (setBackgroundDrawable): the theme's menu colour then
+            final int ownColor = backgroundColor == Color.WHITE ? 0 : backgroundColor;
+            if (ours && solegramGlassHost == host && solegramGlassColor == ownColor && solegramGlassRecipeUsed == solegramGlassRecipe) {
                 solegramGlass.drawable.updateColors(); // theme or glass settings may have changed since the last time
                 solegramGlass.drawable.invalidateDisplayList();
                 invalidate();
                 return;
             }
-            final com.solegram.messenger.ui.SolegramLiveGlass glass = com.solegram.messenger.ui.SolegramLiveGlass.create(this,
-                org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.solegramMenu(resourcesProvider, false),
-                com.solegram.messenger.ui.SolegramLiveGlass.CLEAR);
+            solegramDropGlass(); // it looks somewhere else now
+            final android.graphics.Rect padding = new android.graphics.Rect();
+            backgroundDrawable.getPadding(padding);
+            // the same inset as the panel it replaces (8dp: its shadow margin)
+            // in the menu's own colour (a dark menu over media keeps it dark)
+            final com.solegram.messenger.ui.SolegramLiveGlass glass = com.solegram.messenger.ui.SolegramLiveGlass.menu(this,
+                resourcesProvider, ownColor, solegramGlassRecipe, padding.left, host);
             if (glass == null) {
                 return;
             }
-            final android.graphics.Rect padding = new android.graphics.Rect();
-            backgroundDrawable.getPadding(padding);
             solegramPlainBackground = backgroundDrawable;
             solegramGlass = glass;
-            glass.drawable
-                .setPadding(padding.left) // the same inset as the panel it replaces (8dp for most menus)
-                .setHasPadding(true)
-                .setRadius(dp(com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP));
+            solegramGlassHost = host;
+            solegramGlassColor = ownColor;
+            solegramGlassRecipeUsed = solegramGlassRecipe;
             final int keepColor = backgroundColor;
             setBackgroundDrawable(glass.drawable);
             backgroundColor = keepColor; // views that borrow the menu colour keep the real one
             invalidate();
+        }
+
+        /** Solegram: a menu in the window of the screen it is over (a preview's menu): that screen, else null. */
+        @Nullable
+        private com.solegram.messenger.ui.SolegramLiveGlass.Host solegramScreenBehind() {
+            final android.view.ViewParent container = getParent();
+            if (container instanceof ActionBarLayout.LayoutContainer && container.getParent() instanceof ActionBarLayout) {
+                return ((ActionBarLayout) container.getParent()).solegramScreenBehind((View) container);
+            }
+            return null;
+        }
+
+        /**
+         * Solegram: the panel is glass (live, Telegram's blur, or the liquid's glass), so what is under it shows
+         * through: swipe-back pages don't paint an opaque slab over it.
+         */
+        public boolean solegramSeeThrough() {
+            if (!com.solegram.messenger.SolegramConfig.glassMenus) {
+                return false;
+            }
+            return solegramLiquidActive() ? solegramLiquidSeeThrough : backgroundDrawable instanceof org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+        }
+
+        /** Solegram: a menu shown in some other way than by an ActionBarPopupWindow is glass too, as its window allows. */
+        private void solegramAutoGlass() {
+            if (backgroundDrawable == null) {
+                return;
+            }
+            for (android.view.ViewParent p = getParent(); p instanceof View; p = p.getParent()) {
+                if (p instanceof ActionBarPopupWindowLayout) {
+                    return; // a page of another menu: that menu is the panel
+                }
+            }
+            try {
+                if (com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+                    solegramUseGlass(getRootView());
+                } else {
+                    solegramDropGlass();
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            if (!solegramManaged) {
+                solegramAutoGlass();
+            }
         }
 
         /** Solegram: glass menus turned off (or nothing live under the menu) - the menu's own panel comes back. */
@@ -221,6 +290,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             }
             solegramGlass.release();
             solegramGlass = null;
+            solegramGlassHost = null;
         }
 
         /** Solegram: the live glass shows what is under the menu where it is drawn now (it moves as it animates). */
@@ -237,7 +307,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
         private com.solegram.messenger.ui.SolegramLiquidPopup solegramLiquidPopup;
         @Nullable
         private ActionBarPopupWindow solegramLiquidOwner;
-        private float solegramBaseRadius = dp(12), solegramPanelRadius = dp(12);
+        private float solegramBaseRadius = com.solegram.messenger.SolegramGlass.menuRadius(), solegramPanelRadius = solegramBaseRadius;
         private Drawable solegramOwnPanel;
         private final RectF solegramPanel = new RectF();
         private Paint solegramFillPaint;
@@ -303,6 +373,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             liquid.prepare(owner, originView, originRect, originRadius, shownFromBottom);
             solegramPanelRadius = solegramBaseRadius;
             liquid.fill = null;
+            solegramLiquidSeeThrough = false;
             if (glass && com.solegram.messenger.ui.SolegramLiveGlass.canSample(windowRoot)) {
                 // the live glass of the screen under the menu, refracting along the liquid's edge
                 if (solegramLiquidGlass == null) {
@@ -315,6 +386,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
                 if (solegramLiquidGlass != null) {
                     solegramLiquidGlass.drawable.invalidateDisplayList();
                     liquid.fill = com.solegram.messenger.ui.SolegramLiquidGlass.live(solegramLiquidGlass.drawable);
+                    solegramLiquidSeeThrough = true;
                 }
             } else if (solegramLiquidGlass != null) {
                 solegramLiquidGlass.release(); // not glass this time: it doesn't follow the screen for nothing
@@ -335,6 +407,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
                     blur.draw(canvas);
                     canvas.restore();
                 };
+                solegramLiquidSeeThrough = true;
                 liquid.glassColors(org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.solegramMenu(resourcesProvider, false), false);
                 solegramPanelRadius = dp(com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP);
             } else {
@@ -609,6 +682,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
         @Override
         protected void onDetachedFromWindow() {
             super.onDetachedFromWindow();
+            solegramManaged = false; // its next window (or none) decides again
             if (solegramLiquidActive()) {
                 // taken out of its window mid-way: a window waiting for it closes, the menu is the usual one again
                 solegramLiquidPopup.finishClose();
@@ -624,9 +698,8 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             if (resId != 0) {
                 backgroundDrawable = getResources().getDrawable(resId).mutate();
                 setPadding(dp(8), dp(8), dp(8), dp(8));
-                // Solegram: this panel and its corners, for the liquid drawn in its place
+                // Solegram: this panel, for the liquid drawn in its place (all popup_fixed_alert* have the menu corners)
                 solegramOwnPanel = backgroundDrawable;
-                solegramBaseRadius = resId == R.drawable.popup_fixed_alert2 || resId == R.drawable.popup_fixed_alert ? dp(6) : resId == R.drawable.popup_fixed_alert3 ? dp(9) : dp(12);
             }
             if (backgroundDrawable != null) {
                 backgroundDrawable.getPadding(bgPaddings);
@@ -726,7 +799,22 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             } else {
                 addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
             }
+            if (resId != 0 && swipeBackLayout == null) {
+                // Solegram: the items and their highlights keep to the panel's round corners (swipe-back clips its own)
+                final View content = scrollView != null ? scrollView : linearLayout;
+                content.setOutlineProvider(SOLEGRAM_MENU_OUTLINE);
+                content.setClipToOutline(true);
+            }
         }
+
+        /** Solegram: the round corners of a menu panel, for its content filling the panel. */
+        public static final android.view.ViewOutlineProvider SOLEGRAM_MENU_OUTLINE = new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                final int w = view.getWidth(), h = view.getHeight();
+                outline.setRoundRect(0, 0, w, h, Math.min(com.solegram.messenger.SolegramGlass.menuRadius(), Math.min(w, h) / 2f));
+            }
+        };
 
         @Nullable
         public PopupSwipeBackLayout getSwipeBack() {
@@ -833,6 +921,13 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
 
         @Override
         public void setBackgroundDrawable(Drawable drawable) {
+            if (solegramGlass != null && drawable != solegramGlass.drawable && drawable != solegramPlainBackground) {
+                // Solegram: a panel of its own replaced our glass (story menus' blur, say): the glass lets go
+                solegramGlass.release();
+                solegramGlass = null;
+                solegramGlassHost = null;
+                solegramPlainBackground = null;
+            }
             backgroundColor = Color.WHITE;
             backgroundDrawable = drawable;
             if (backgroundDrawable != null) {
@@ -1017,7 +1112,8 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
                         } else {
                             path.rewind();
                         }
-                        path.addRoundRect(AndroidUtilities.rectTmp, dp(12), dp(12), Path.Direction.CW);
+                        final float radius = com.solegram.messenger.SolegramGlass.menuRadius(); // Solegram: the menu corners
+                        path.addRoundRect(AndroidUtilities.rectTmp, radius, radius, Path.Direction.CW);
                         canvas.clipPath(path);
                         for (int i = 0; i < linearLayout.getChildCount(); i++) {
                             if (linearLayout.getChildAt(i) instanceof GapView && linearLayout.getChildAt(i).getVisibility() == View.VISIBLE) {
@@ -1076,7 +1172,8 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             int count = linearLayout.getChildCount();
             for (int a = 0; a < count; a++) {
                 View child = linearLayout.getChildAt(a);
-                child.setBackground(Theme.createRadSelectorDrawable(color, a == 0 ? 6 : 0, a == count - 1 ? 6 : 0));
+                final int r = (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP; // Solegram: the menu corners
+                child.setBackground(Theme.createRadSelectorDrawable(color, a == 0 ? r : 0, a == count - 1 ? r : 0));
             }
         }
 
@@ -1256,23 +1353,50 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
         dimBehind(0.2f);
     }
 
-    /** Solegram: off for popups that sit next to a highlighted item drawn in the activity window. */
+    /** Solegram: off for a popup whose menus keep their plain panel. */
     public boolean solegramAllowGlass = true;
 
-    /** Solegram "glass menus": the menu is drawn as the app's glass (see ActionBarPopupWindowLayout.solegramUseGlass). */
+    /** Solegram "glass menus": the menus in this window are drawn as the app's glass (see ActionBarPopupWindowLayout.solegramUseGlass). */
     private void solegramApplyGlass() {
         try {
-            if (!(getContentView() instanceof ActionBarPopupWindowLayout)) {
-                return;
-            }
-            final ActionBarPopupWindowLayout layout = (ActionBarPopupWindowLayout) getContentView();
-            if (solegramAllowGlass && com.solegram.messenger.SolegramConfig.glassMenus && com.solegram.messenger.ui.SolegramLiveGlass.available()) {
-                layout.solegramUseGlass(getContentView().getRootView());
-            } else {
-                layout.solegramDropGlass();
+            final boolean glass = solegramAllowGlass && com.solegram.messenger.ui.SolegramLiveGlass.menusOn();
+            final View root = getContentView().getRootView();
+            for (int i = 0; i < solegramPanels.size(); i++) {
+                if (glass) {
+                    solegramPanels.get(i).solegramUseGlass(root);
+                } else {
+                    solegramPanels.get(i).solegramDropGlass();
+                }
             }
         } catch (Throwable e) {
             FileLog.e(e);
+        }
+    }
+
+    // Solegram: the menu panels in this window - the content, or panels in a wrapper (with a top view, the message menu's container)
+    private final ArrayList<ActionBarPopupWindowLayout> solegramPanels = new ArrayList<>();
+
+    /** Solegram: finds the panels before the window shows them; they leave their glass to this window. */
+    private void solegramCollectPanels() {
+        solegramPanels.clear();
+        solegramCollectPanels(getContentView(), 0);
+        for (int i = 0; i < solegramPanels.size(); i++) {
+            solegramPanels.get(i).solegramManaged = true;
+        }
+    }
+
+    private void solegramCollectPanels(View view, int depth) {
+        if (view instanceof ActionBarPopupWindowLayout) {
+            if (((ActionBarPopupWindowLayout) view).getBackgroundDrawable() != null) {
+                solegramPanels.add((ActionBarPopupWindowLayout) view);
+            }
+            return; // its pages are not panels of their own
+        }
+        if (view instanceof ViewGroup && depth < 3) {
+            final ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                solegramCollectPanels(group.getChildAt(i), depth + 1);
+            }
         }
     }
 
@@ -1344,6 +1468,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             setAnimationStyle(0);
         }
         solegramRoomL = solegramRoomT = solegramRoomR = solegramRoomB = 0;
+        solegramCollectPanels();
         super.showAsDropDown(anchor, xoff, yoff, gravity);
         if (liquid == null || !solegramStartLiquid(liquid, anchor, false)) {
             solegramApplyGlass();
@@ -1428,7 +1553,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
                 }
             }
             solegramScreenView = originView != null ? originView : opener;
-            final boolean glass = solegramAllowGlass && com.solegram.messenger.SolegramConfig.glassMenus && com.solegram.messenger.ui.SolegramLiveGlass.available();
+            final boolean glass = solegramAllowGlass && com.solegram.messenger.ui.SolegramLiveGlass.menusOn();
             if (layout.solegramLiquidPrepare(this, originView, originRect, solegramOriginRadius, glass, getContentView().getRootView())) {
                 solegramLiquidLayout = layout;
                 return true;
@@ -1842,6 +1967,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             setAnimationStyle(0);
         }
         solegramRoomL = solegramRoomT = solegramRoomR = solegramRoomB = 0;
+        solegramCollectPanels();
         super.showAtLocation(parent, gravity, x, y);
         unregisterListener();
         if (liquid == null || !solegramStartLiquid(liquid, parent, true)) {

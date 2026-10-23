@@ -385,7 +385,8 @@ public class AvatarPreviewer {
         private final Callback callback;
         private final Theme.ResourcesProvider resourcesProvider;
         private final BlurredBackgroundSourceBitmap iBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
-        private final BlurredBackgroundDrawableViewFactory iBlur3Factory = new BlurredBackgroundDrawableViewFactory(iBlur3SourceBitmap);
+        // Solegram: its menu is live glass, frosted like the blurred backdrop round it (Telegram's picture without it)
+        private final BlurredBackgroundDrawableViewFactory iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
 
         private AnimatorSet openAnimator;
         private boolean showing;
@@ -461,7 +462,7 @@ public class AvatarPreviewer {
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourcesProvider))
                 .setPadding(dp(8))
                 .setHasPadding(true)
-                .setRadius(dp(12)));
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius())); // Solegram: the menu corners
             container.addView(menu, LayoutHelper.createFrameRelatively(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.START));
         }
 

@@ -1603,9 +1603,8 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
 
         if (popupLayout == null) {
             popupRect = new android.graphics.Rect();
+            // Solegram: the menu panel of every menu (glass, round corners), not the old copy bar
             popupLayout = new ActionBarPopupWindow.ActionBarPopupWindowLayout(parentActivity);
-            popupLayout.setPadding(dp(1), dp(1), dp(1), dp(1));
-            popupLayout.setBackgroundDrawable(parentActivity.getResources().getDrawable(R.drawable.menu_copy));
             popupLayout.setAnimationEnabled(false);
             popupLayout.setOnTouchListener((v, event) -> {
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
@@ -1626,7 +1625,7 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
             popupLayout.setShownFromBottom(false);
 
             deleteView = new TextView(parentActivity);
-            deleteView.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+            deleteView.setBackgroundDrawable(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector), (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP));
             deleteView.setGravity(Gravity.CENTER_VERTICAL);
             deleteView.setPadding(dp(20), 0, dp(20), 0);
             deleteView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -1669,7 +1668,7 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
 
         popupLayout.measure(View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST));
         popupWindow.setFocusable(true);
-        popupWindow.showAtLocation(parent, gravity, x, y);
+        popupWindow.showAtLocation(parent, gravity, x, y - dp(7)); // Solegram: the panel's 8dp margin (was 1dp)
         popupWindow.startAnimation();
     }
 

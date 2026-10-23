@@ -171,7 +171,8 @@ public class PollItemMenu extends Dialog {
         });
 
         iBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
-        iBlur3Factory = new BlurredBackgroundDrawableViewFactory(iBlur3SourceBitmap);
+        // Solegram: its menus are live glass, frosted like the blurred backdrop round them (Telegram's picture without it)
+        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
         iBlur3Factory.setSourceRootView(new ViewPositionWatcher(windowView), windowView);
 
         containerView = new FrameLayout(context) {
@@ -747,6 +748,10 @@ public class PollItemMenu extends Dialog {
             final boolean tags = chatActivity.getUserConfig().getClientUserId() == chatActivity.getDialogId();
             ReactionsContainerLayout reactionsLayout = new ReactionsContainerLayout(tags ? ReactionsContainerLayout.TYPE_TAGS : ReactionsContainerLayout.TYPE_DEFAULT, chatActivity, getContext(), chatActivity.getCurrentAccount(), resourcesProvider);
             reactionsLayout.forceAttachToParent = true;
+            if (com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+                // Solegram: the reactions panel is live glass, as the menu under it
+                reactionsLayout.setBackgroundFactory(iBlur3Factory, BlurredBackgroundProviderImpl.messageMenuReactionsBackground(resourcesProvider));
+            }
             int pad = 22;
             int sPad = 24;
             reactionsLayout.setPadding(dp(4) + (LocaleController.isRTL ? 0 : sPad), dp(4), dp(4) + (LocaleController.isRTL ? sPad : 0), dp(pad));

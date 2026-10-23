@@ -323,7 +323,8 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
 
         backgroundPaddings = new Rect();
         if (progressStyle != ALERT_TYPE_SPINNER || blurredBackground) {
-            shadowDrawable = context.getResources().getDrawable(R.drawable.popup_fixed_alert4).mutate();
+            // Solegram: dialogs keep their own corners (popup_fixed_alert4 is the rounder menu panel now)
+            shadowDrawable = context.getResources().getDrawable(R.drawable.sg_dialog_panel).mutate();
             blurOpacity = progressStyle == ALERT_TYPE_SPINNER ? 0.55f : (isDark ? 0.80f : 0.985f);
             if (solegramGlass) {
                 blurOpacity = com.solegram.messenger.SolegramGlass.menuAlpha(isDark); // the density of menus

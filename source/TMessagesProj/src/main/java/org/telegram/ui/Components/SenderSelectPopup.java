@@ -115,7 +115,7 @@ public class SenderSelectPopup extends ActionBarPopupWindow {
 
         Drawable shadowDrawable = ContextCompat.getDrawable(context, R.drawable.popup_fixed_alert4).mutate();
         shadowDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider), PorterDuff.Mode.MULTIPLY));
-        scrimPopupContainerLayout.setBackground(shadowDrawable);
+        scrimPopupContainerLayout.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(scrimPopupContainerLayout, shadowDrawable, resourcesProvider)); // Solegram: menu glass
 
         Rect padding = new Rect();
         shadowDrawable.getPadding(padding);

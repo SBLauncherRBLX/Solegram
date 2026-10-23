@@ -420,7 +420,7 @@ public class ActionBarMenuItem extends FrameLayout {
         if (subMenuFactory != null) {
             popupLayout.setBackground(subMenuFactory.create(popupLayout, true)
                     .setColorProvider(subMenuProvider)
-                    .setRadius(dp(12))
+                    .setRadius(com.solegram.messenger.SolegramGlass.menuRadius()) // Solegram: the menu corners
                     .setPadding(dp(8)));
         }
 
@@ -761,7 +761,7 @@ public class ActionBarMenuItem extends FrameLayout {
             com.solegram.messenger.ui.SolegramLiveGlass.release(popupLayout.getBackgroundDrawable()); // Solegram: the replaced live glass lets go
             popupLayout.setBackground(subMenuFactory.create(popupLayout, true)
                     .setColorProvider(subMenuProvider)
-                    .setRadius(dp(12))
+                    .setRadius(com.solegram.messenger.SolegramGlass.menuRadius()) // Solegram: the menu corners
                     .setPadding(dp(8)));
         }
     }
@@ -818,13 +818,14 @@ public class ActionBarMenuItem extends FrameLayout {
                     // Solegram: the view that draws it (its glass follows where that view is)
                     frameLayout.setBackground(subMenuFactory.create(frameLayout, true)
                         .setColorProvider(subMenuProvider)
-                        .setRadius(dp(12))
+                        .setRadius(com.solegram.messenger.SolegramGlass.menuRadius())
                         .setPadding(dp(8))
                         .setHasPadding(true));
                 } else {
                     Drawable drawable = ContextCompat.getDrawable(getContext(), R.drawable.popup_fixed_alert2).mutate();
                     drawable.setColorFilter(new PorterDuffColorFilter(popupLayout.getBackgroundColor(), PorterDuff.Mode.MULTIPLY));
-                    frameLayout.setBackground(drawable);
+                    // Solegram: glass as the menu under it
+                    frameLayout.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(frameLayout, drawable, resourcesProvider, popupLayout.getBackgroundColor()));
                 }
             }
             frameLayout.addView(topView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));

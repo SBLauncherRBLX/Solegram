@@ -1058,7 +1058,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                 popupLayout.layout(left, top, viewPager.getRight() + shadowPaddingLeft, top + popupLayout.getMeasuredHeight());
                 popupLayout.setVisibility(popupLayout.getBottom() < b ? VISIBLE : GONE);
 
-                int radius = AndroidUtilities.dp(6);
+                int radius = com.solegram.messenger.SolegramGlass.menuRadius(); // Solegram: the corners of its panel (popup_fixed_alert2)
                 rectF.set(viewPager.getLeft(), viewPager.getTop(), viewPager.getRight(), viewPager.getTop() + radius * 2);
                 clipPath.reset();
                 clipPath.addRoundRect(rectF, radius, radius, Path.Direction.CW);

@@ -1101,6 +1101,15 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
 
         private GestureDetectorFixDoubleTap gestureDetector;
         private ScaleGestureDetector scaleGestureDetector;
+        // Solegram: the editor drawn through a live source, so glass menus over it refract what it shows now
+        private final com.solegram.messenger.ui.SolegramLiveGlass.Host solegramGlassSource = new com.solegram.messenger.ui.SolegramLiveGlass.Host(this, c -> super.draw(c));
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            if (!solegramGlassSource.draw(canvas)) {
+                super.draw(canvas);
+            }
+        }
 
         public WindowView(Context context) {
             super(context);

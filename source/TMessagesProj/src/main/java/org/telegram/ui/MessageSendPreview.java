@@ -223,7 +223,8 @@ public class MessageSendPreview extends Dialog implements NotificationCenter.Not
         });
 
         iBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
-        iBlur3Factory = new BlurredBackgroundDrawableViewFactory(iBlur3SourceBitmap);
+        // Solegram: its menu is live glass, frosted like the blurred backdrop round it (Telegram's picture without it)
+        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
         iBlur3Factory.setSourceRootView(new ViewPositionWatcher(windowView), windowView);
 
         containerView = new SizeNotifierFrameLayout(context) {
@@ -1303,6 +1304,10 @@ public class MessageSendPreview extends Dialog implements NotificationCenter.Not
         };
         effectSelector.setClipChildren(false);
         effectSelector.setClipToPadding(false);
+        if (com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+            // Solegram: the effects panel is live glass, as the menu under it
+            effectSelector.setBackgroundFactory(iBlur3Factory, BlurredBackgroundProviderImpl.messageMenuReactionsBackground(resourcesProvider));
+        }
         effectSelector.setPadding(AndroidUtilities.dp(4), AndroidUtilities.dp(22), AndroidUtilities.dp(4), AndroidUtilities.dp(22));
         effectSelector.setDelegate(new ReactionsContainerLayout.ReactionsContainerDelegate() {
             @Override

@@ -339,7 +339,8 @@ public class ContentPreviewViewer {
     private int currentAccount;
 
     private final BlurredBackgroundSourceBitmap scrimBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
-    private final BlurredBackgroundDrawableViewFactory scrimBlur3Factory = new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap);
+    // Solegram: its menus are live glass, frosted like the blurred backdrop round them (Telegram's picture without it)
+    private final BlurredBackgroundDrawableViewFactory scrimBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
 
     private ColorDrawable backgroundDrawable = new ColorDrawable(0x71000000);
     private Bitmap blurrBitmap;
@@ -552,7 +553,7 @@ public class ContentPreviewViewer {
             ActionBarPopupWindow.ActionBarPopupWindowLayout previewMenu = new ActionBarPopupWindow.ActionBarPopupWindowLayout(containerView.getContext(), R.drawable.popup_fixed_alert4, resourcesProvider, flags);
             previewMenu.setBackground(scrimBlur3Factory.create(previewMenu, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourcesProvider))
-                .setRadius(dp(12))
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius()) // Solegram: the menu corners
                 .setPadding(dp(8))
                 .setHasPadding(true));
 
@@ -1167,7 +1168,7 @@ public class ContentPreviewViewer {
             for (int i = 0; i < previewMenu.getItemsCount(); ++i) {
                 View child = previewMenu.getItemAt(i);
                 if (child instanceof ActionBarMenuSubItem) {
-                    ((ActionBarMenuSubItem) child).updateSelectorBackground(i == 0, i == previewMenu.getItemsCount() - 1, 12);
+                    ((ActionBarMenuSubItem) child).updateSelectorBackground(i == 0, i == previewMenu.getItemsCount() - 1, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP); // Solegram: the menu corners
                 }
             }
         }
@@ -1679,6 +1680,16 @@ public class ContentPreviewViewer {
         slideUpDrawable = parentActivity.getResources().getDrawable(R.drawable.preview_arrow);
 
         windowView = new FrameLayout(activity) {
+            // Solegram: the preview drawn through a live source, so the glass of its menus refracts what it shows now
+            private final com.solegram.messenger.ui.SolegramLiveGlass.Host solegramGlassSource = new com.solegram.messenger.ui.SolegramLiveGlass.Host(this, c -> super.draw(c));
+
+            @Override
+            public void draw(Canvas canvas) {
+                if (!solegramGlassSource.draw(canvas)) {
+                    super.draw(canvas);
+                }
+            }
+
             @Override
             public boolean dispatchKeyEvent(KeyEvent event) {
                 if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == 1) {

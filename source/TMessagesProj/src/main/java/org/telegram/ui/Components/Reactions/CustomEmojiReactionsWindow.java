@@ -36,6 +36,7 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 
@@ -242,7 +243,7 @@ public class CustomEmojiReactionsWindow {
 
                 @Override
                 public void getOutline(View view, Outline outline) {
-                    float radius = AndroidUtilities.lerp(fromRadius, dp(8), enterTransitionProgress);
+                    float radius = AndroidUtilities.lerp(fromRadius, com.solegram.messenger.SolegramGlass.menuRadius(), enterTransitionProgress); // Solegram: the menu corners
                     rectTmp.set(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
                     AndroidUtilities.lerp(fromRect, rectTmp, enterTransitionProgress, rectF);
                     rectF.round(rect);
@@ -291,6 +292,15 @@ public class CustomEmojiReactionsWindow {
                 reactionsContainerLayout.getDelegate().drawRoundRect(canvas, AndroidUtilities.rectTmp, 0, containerView.getX() + x, getBlurOffset() + y, 255,true);
             });
         }
+        if (type != TYPE_STORY && com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+            // Solegram: the panel is live glass, as menus are (a factory given later replaces it)
+            solegramGlass = com.solegram.messenger.ui.SolegramLiveGlass.menu(containerView, resourcesProvider,
+                type == TYPE_STORY_LIKES ? ColorUtils.blendARGB(Color.BLACK, Color.WHITE, 0.13f) : 0, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR, dp(8), null);
+            if (solegramGlass != null) {
+                blurredBackgroundDrawable = solegramGlass.drawable;
+                selectAnimatedEmojiDialog.searchBox.setUseCustomBackground(); // the search box tints the glass instead of covering it
+            }
+        }
         if (attachToParent) {
             ViewGroup group = (ViewGroup) reactionsContainerLayout.getParent();
             group.addView(windowView);
@@ -316,11 +326,19 @@ public class CustomEmojiReactionsWindow {
     }
 
     private BlurredBackgroundDrawable blurredBackgroundDrawable;
+    // Solegram: the panel's own live glass (glass menus), until a factory gives it Telegram's
+    @Nullable
+    private com.solegram.messenger.ui.SolegramLiveGlass solegramGlass;
+
     public void setBackgroundFactory(BlurredBackgroundDrawableViewFactory backgroundFactory, BlurredBackgroundProvider backgroundColorProvider) {
+        if (solegramGlass != null) {
+            solegramGlass.release(); // Solegram: replaced
+            solegramGlass = null;
+        }
         this.selectAnimatedEmojiDialog.searchBox.setUseCustomBackground();
         this.blurredBackgroundDrawable = backgroundFactory.create(containerView, true)
             .setColorProvider(backgroundColorProvider)
-            .setRadius(dp(12))
+            .setRadius(com.solegram.messenger.SolegramGlass.menuRadius()) // Solegram: the menu corners
             .setPadding(dp(8));
     }
 
@@ -863,7 +881,7 @@ public class CustomEmojiReactionsWindow {
                 fromRect.offset(fromRectTranslateX, fromRectTranslateY);
             }
             AndroidUtilities.lerp(fromRect, AndroidUtilities.rectTmp, enterTransitionProgress, drawingRect);
-            float radius = AndroidUtilities.lerp(fromRadius, dp(type == TYPE_MESSAGE_EFFECTS ? 20 : 8), enterTransitionProgress);
+            float radius = AndroidUtilities.lerp(fromRadius, com.solegram.messenger.SolegramGlass.menuRadius(), enterTransitionProgress); // Solegram: the menu corners
 
             transitionReactions.clear();
             if (type == TYPE_STORY || (reactionsContainerLayout.getDelegate() != null && reactionsContainerLayout.getDelegate().drawBackground())) {
@@ -872,7 +890,8 @@ public class CustomEmojiReactionsWindow {
                 shadow.setAlpha((int) (Utilities.clamp(progressClpamped / 0.05f, 1f, 0f) * 255));
                 shadow.setBounds((int) drawingRect.left - shadowPad.left, (int) drawingRect.top - shadowPad.top, (int) drawingRect.right + shadowPad.right, (int) drawingRect.bottom + shadowPad.bottom);
 
-                if (blurredBackgroundDrawable != null) {
+                // Solegram: its own glass only while it shows something live (the plain panel otherwise)
+                if (blurredBackgroundDrawable != null && (solegramGlass == null || solegramGlass.isLive())) {
                     AndroidUtilities.rectTmp.set(drawingRect);
                     AndroidUtilities.rectTmp.round(AndroidUtilities.rectTmp2);
                     AndroidUtilities.rectTmp2.inset(-dp(8), -dp(8));

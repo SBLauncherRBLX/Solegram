@@ -652,6 +652,16 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
 
     public LayoutContainer containerView;
     public LayoutContainer containerViewBack;
+
+    /**
+     * Solegram: the screen behind {@code container} (the other container: the screen a preview opened over), for
+     * live glass drawn over it in this window (a preview's menu).
+     */
+    @androidx.annotation.Nullable
+    public com.solegram.messenger.ui.SolegramLiveGlass.Host solegramScreenBehind(View container) {
+        final LayoutContainer other = container == containerView ? containerViewBack : container == containerViewBack ? containerView : null;
+        return other != null && other.getChildCount() > 0 ? other.solegramContentSource() : null;
+    }
     public LayoutContainer sheetContainer;
     private DrawerLayoutContainer drawerLayoutContainer;
     private ActionBar currentActionBar;

@@ -8019,7 +8019,7 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
         if (volumeLayout != null && !view.isSelfUser() && !participant.muted_by_you && (!participant.muted || participant.can_self_unmute)) {
             Drawable shadowDrawable = getContext().getResources().getDrawable(R.drawable.popup_fixed_alert).mutate();
             shadowDrawable.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
-            volumeLayout.setBackgroundDrawable(shadowDrawable);
+            volumeLayout.setBackgroundDrawable(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(volumeLayout, shadowDrawable, null, color)); // Solegram: menu glass in the call's colour
             linearLayout.addView(volumeLayout, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
 
             volumeSlider = new VolumeSlider(getContext(), participant);
@@ -8030,7 +8030,7 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
         buttonsLayout.setOrientation(LinearLayout.VERTICAL);
         Drawable shadowDrawable = getContext().getResources().getDrawable(R.drawable.popup_fixed_alert).mutate();
         shadowDrawable.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
-        buttonsLayout.setBackgroundDrawable(shadowDrawable);
+        buttonsLayout.setBackgroundDrawable(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(buttonsLayout, shadowDrawable, null, color)); // Solegram: menu glass in the call's colour
         linearLayout.addView(buttonsLayout, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, volumeSlider != null ? -8 : 0, 0, 0));
 
         ScrollView scrollView;

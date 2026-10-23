@@ -31373,7 +31373,7 @@ public class ChatActivity extends BaseFragment implements
 
             popupLayout.setBackground(solegramScrimFactory.create(popupLayout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider))
-                .setRadius(dp(12))
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius()) // Solegram: the menu corners
                 .setPadding(dp(8)));
 
             boolean addGap = false;
@@ -32538,7 +32538,7 @@ public class ChatActivity extends BaseFragment implements
                     shadowDrawable2.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
 
                     FrameLayout fl = new FrameLayout(contentView.getContext());
-                    fl.setBackground(shadowDrawable2);
+                    fl.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(fl, shadowDrawable2, themeDelegate)); // Solegram: glass as the menu over it
                     fl.addView(tv, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 11, 11, 11, 11));
                     scrimPopupContainerLayout.addView(fl, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, isReactionsAvailable ? 16 : 0, -8, isReactionsAvailable ? 36 : 0, 0));
                     scrimPopupContainerLayout.applyViewBottom(fl);
@@ -32561,7 +32561,7 @@ public class ChatActivity extends BaseFragment implements
                     shadowDrawable2.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
 
                     FrameLayout fl = new FrameLayout(contentView.getContext());
-                    fl.setBackground(shadowDrawable2);
+                    fl.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(fl, shadowDrawable2, themeDelegate)); // Solegram: glass as the menu over it
                     fl.addView(tv, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 11, 11, 11, 11));
                     scrimPopupContainerLayout.addView(fl, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, isReactionsAvailable ? 16 : 0, -8, isReactionsAvailable ? 36 : 0, 0));
                     scrimPopupContainerLayout.applyViewBottom(fl);
@@ -32666,7 +32666,6 @@ public class ChatActivity extends BaseFragment implements
                 }
             };
             scrimPopupWindow.setPauseNotifications(true);
-            scrimPopupWindow.solegramAllowGlass = false; // the highlighted message lives in the chat window
             scrimPopupWindow.solegramLiquid = false; // Solegram: the message menu flows out of the message its own way
             popupLayout.solegramLiquid = false;
             scrimPopupWindow.setDismissAnimationDuration(220);
@@ -33358,11 +33357,11 @@ public class ChatActivity extends BaseFragment implements
                 reactions = null;
             }
             menu = group.add();
-            menu.rest(panel.centerX(), panel.centerY(), panel.width(), panel.height(), dp(12));
+            menu.rest(panel.centerX(), panel.centerY(), panel.width(), panel.height(), com.solegram.messenger.SolegramGlass.menuRadius()); // Solegram: the menu corners
             if (glassBackgroundSourceRenderNode != null && parentChatActivity == null && com.solegram.messenger.ui.SolegramLiveGlass.available()) {
                 // the chat's own liquid glass (its live source, as the input bar's): it refracts the chat, not the dim
                 liveGlass = glassBackgroundDrawableFactory.create(null, com.solegram.messenger.ui.SolegramLiveGlass.glassOnly());
-                liveGlass.setRadius(dp(12));
+                liveGlass.setRadius(com.solegram.messenger.SolegramGlass.menuRadius());
                 fill = SolegramLiquidGlass.live(liveGlass);
             } else {
                 liveGlass = null;
@@ -33638,7 +33637,7 @@ public class ChatActivity extends BaseFragment implements
             }
             solegramMenuPanelRect(popupLayout, rect, true);
             rect.offset(ox + popupLayout.getX(), oy + popupLayout.getY());
-            changed |= follow(menu, rect, dp(12), menuSettled || !animating);
+            changed |= follow(menu, rect, com.solegram.messenger.SolegramGlass.menuRadius(), menuSettled || !animating);
             if (changed) {
                 group.remove(SOLEGRAM_LIQUID_DIRTY);
             }
@@ -41841,7 +41840,7 @@ public class ChatActivity extends BaseFragment implements
             Drawable shadowDrawable2 = ContextCompat.getDrawable(getParentActivity(), R.drawable.popup_fixed_alert4).mutate();
             shadowDrawable2.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
             shadowDrawable2.getPadding(backgroundPaddings);
-            scrimPopupContainerLayout.setBackground(shadowDrawable2);
+            scrimPopupContainerLayout.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(scrimPopupContainerLayout, shadowDrawable2, getResourceProvider())); // Solegram: menu glass
 
             if (popupLayout.getChildCount() <= 0) {
                 return false;
@@ -41876,7 +41875,6 @@ public class ChatActivity extends BaseFragment implements
                 }
             };
             scrimPopupWindow.setPauseNotifications(true);
-            scrimPopupWindow.solegramAllowGlass = false; // the highlighted message lives in the chat window
             scrimPopupWindow.setDismissAnimationDuration(220);
             scrimPopupWindow.setOutsideTouchable(true);
             scrimPopupWindow.setClippingEnabled(true);
@@ -46767,10 +46765,10 @@ public class ChatActivity extends BaseFragment implements
             }
 
             scrimPopupContainerLayout.setClipToOutline(true);
-            scrimPopupContainerLayout.setOutlineProvider(ViewOutlineProviderImpl.boundsWithPaddingRoundRect(dp(8), dp(12)));
+            scrimPopupContainerLayout.setOutlineProvider(ViewOutlineProviderImpl.boundsWithPaddingRoundRect(dp(8), com.solegram.messenger.SolegramGlass.menuRadius())); // Solegram: the menu corners
             scrimPopupContainerLayout.setBackground(solegramScrimFactory.create(scrimPopupContainerLayout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourceProvider))
-                .setRadius(dp(12))
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius())
                 .setPadding(dp(8))
                 .setHasPadding(true));
 
@@ -46941,7 +46939,6 @@ public class ChatActivity extends BaseFragment implements
                 }
             };
             scrimPopupWindow.setPauseNotifications(true);
-            scrimPopupWindow.solegramAllowGlass = false; // the highlighted message lives in the chat window
             scrimPopupWindow.setDismissAnimationDuration(220);
             scrimPopupWindow.setOutsideTouchable(true);
             scrimPopupWindow.setClippingEnabled(true);

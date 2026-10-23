@@ -4414,11 +4414,15 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         if (blurAndBounce) {
             popupLayout.setBackgroundDrawable(
                 new BlurringShader.StoryBlurDrawer(blurManager, popupLayout, BlurringShader.StoryBlurDrawer.BLUR_TYPE_MENU_BACKGROUND)
-                    .makeDrawable(x, y, baseDrawable, dpf2(8.3f))
+                    .makeDrawable(x, y, baseDrawable, com.solegram.messenger.SolegramGlass.menuRadius()) // Solegram: the menu corners
             );
         } else {
             popupLayout.setBackgroundDrawable(baseDrawable);
             popupLayout.setBackgroundColor(-14145495);
+        }
+        if (com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+            // Solegram: its panel was set after the window showed it: live glass now, as every menu (its panel stays without it)
+            popupLayout.solegramUseGlass(popupWindow.getContentView().getRootView());
         }
     }
 

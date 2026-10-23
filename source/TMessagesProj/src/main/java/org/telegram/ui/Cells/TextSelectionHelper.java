@@ -550,9 +550,8 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
                 if (!movingHandle && isInSelectionMode() && canShowActions()) {
                     if (popupLayout == null) {
                         popupRect = new android.graphics.Rect();
+                        // Solegram: the menu panel of every menu (glass, round corners), not the old copy bar
                         popupLayout = new ActionBarPopupWindow.ActionBarPopupWindowLayout(textSelectionOverlay.getContext());
-                        popupLayout.setPadding(dp(1), dp(1), dp(1), dp(1));
-                        popupLayout.setBackgroundDrawable(textSelectionOverlay.getContext().getResources().getDrawable(R.drawable.menu_copy));
                         popupLayout.setAnimationEnabled(false);
                         popupLayout.setOnTouchListener((v, event) -> {
                             if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
@@ -565,7 +564,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
                         popupLayout.setShownFromBottom(false);
 
                         deleteView = new TextView(textSelectionOverlay.getContext());
-                        deleteView.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+                        deleteView.setBackgroundDrawable(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector), (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP));
                         deleteView.setGravity(Gravity.CENTER_VERTICAL);
                         deleteView.setPadding(dp(20), 0, dp(20), 0);
                         deleteView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -579,7 +578,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
 
                         if (canCut()) {
                             TextView cutView = new TextView(textSelectionOverlay.getContext());
-                            cutView.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+                            cutView.setBackgroundDrawable(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector), (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP));
                             cutView.setGravity(Gravity.CENTER_VERTICAL);
                             cutView.setPadding(dp(20), 0, dp(20), 0);
                             cutView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -595,7 +594,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
 
                         if (canPaste()) {
                             TextView pasteView = new TextView(textSelectionOverlay.getContext());
-                            pasteView.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+                            pasteView.setBackgroundDrawable(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector), (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP));
                             pasteView.setGravity(Gravity.CENTER_VERTICAL);
                             pasteView.setPadding(dp(20), 0, dp(20), 0);
                             pasteView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -628,7 +627,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
                         if (y < 0) y = 0;
                     }
 
-                    popupWindow.showAtLocation(textSelectionOverlay, Gravity.TOP, 0, y - dp(48));
+                    popupWindow.showAtLocation(textSelectionOverlay, Gravity.TOP, 0, y - dp(48) - dp(7)); // Solegram: the panel's 8dp margin (was 1dp)
                     popupWindow.startAnimation();
                 }
             }

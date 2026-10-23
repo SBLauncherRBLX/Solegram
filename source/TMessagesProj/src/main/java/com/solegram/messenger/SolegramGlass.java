@@ -173,7 +173,13 @@ public final class SolegramGlass {
     // Raw colours (constants): the blur3 drawable passes them through tint() / highlight() / shadow() itself; the
     // getters return them processed, for code that draws on its own.
 
-    public static final float MENU_RADIUS_DP = 12f;
+    /** Corners of every popup menu panel: glass, Telegram's blurred menus and the plain panels (popup_fixed_alert*). */
+    public static final float MENU_RADIUS_DP = 20f;
+
+    /** {@link #MENU_RADIUS_DP} in px. */
+    public static int menuRadius() {
+        return org.telegram.messenger.AndroidUtilities.dp(MENU_RADIUS_DP);
+    }
 
     /** The picture under a menu is taken at 1/15 of the screen and blurred there (Telegram's own menu blur at 100%). */
     public static final float MENU_BLUR_DOWNSCALE = 15f;

@@ -446,7 +446,7 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
                 LinearLayout layout = new LinearLayout(context);
                 Drawable shadowDrawable2 = ContextCompat.getDrawable(getContext(), R.drawable.popup_fixed_alert).mutate();
                 shadowDrawable2.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
-                layout.setBackground(shadowDrawable2);
+                layout.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(layout, shadowDrawable2, resourcesProvider)); // Solegram: menu glass
                 layout.addView(copyButton);
 
                 popupWindow = new ActionBarPopupWindow(layout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);

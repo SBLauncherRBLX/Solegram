@@ -1119,6 +1119,9 @@ public class ItemOptions {
     }
 
     public ItemOptions setBlurBackgroundForSwipeback(BlurredBackgroundDrawableViewFactory factory, BlurredBackgroundProvider colorProvider, boolean multiwindow) {
+        if (com.solegram.messenger.SolegramConfig.glassMenus) {
+            return this; // Solegram: the page shows the menu's glass through (PopupSwipeBackLayout), no second glass over it
+        }
         if (linearLayout != null) {
             linearLayout.setBackground(factory.create(linearLayout, multiwindow)
                 .setColorProvider(colorProvider));
@@ -1132,7 +1135,7 @@ public class ItemOptions {
                 .setColorProvider(colorProvider)
                 .setPadding(dp(8))
                 .setHasPadding(true)
-                .setRadius(dp(12)));
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius())); // Solegram: the menu corners
         }
         return this;
     }
@@ -1142,7 +1145,7 @@ public class ItemOptions {
         if (layout instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
             layout.setBackground(
                 new BlurringShader.StoryBlurDrawer(blurManager, layout, BlurringShader.StoryBlurDrawer.BLUR_TYPE_MENU_BACKGROUND)
-                    .makeDrawable(offsetX + ox + layout.getX(), offsetY + oy + layout.getY(), baseDrawable, dp(12))
+                    .makeDrawable(offsetX + ox + layout.getX(), offsetY + oy + layout.getY(), baseDrawable, com.solegram.messenger.SolegramGlass.menuRadius())
             );
         } else {
             for (int i = 0; i < layout.getChildCount(); ++i) {
@@ -1150,8 +1153,21 @@ public class ItemOptions {
                 if (child instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
                     child.setBackground(
                         new BlurringShader.StoryBlurDrawer(blurManager, child, BlurringShader.StoryBlurDrawer.BLUR_TYPE_MENU_BACKGROUND)
-                            .makeDrawable(offsetX + ox + layout.getX() + child.getX(), offsetY + oy + layout.getY() + child.getY(), baseDrawable, dp(12))
+                            .makeDrawable(offsetX + ox + layout.getX() + child.getX(), offsetY + oy + layout.getY() + child.getY(), baseDrawable, com.solegram.messenger.SolegramGlass.menuRadius())
                     );
+                }
+            }
+        }
+        if (actionBarPopupWindow != null && com.solegram.messenger.ui.SolegramLiveGlass.menusOn()) {
+            // Solegram: the blur came after the window showed the menu: live glass now, as every menu (the blur stays without it)
+            final View root = actionBarPopupWindow.getContentView().getRootView();
+            if (layout instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+                ((ActionBarPopupWindow.ActionBarPopupWindowLayout) layout).solegramUseGlass(root);
+            } else {
+                for (int i = 0; i < layout.getChildCount(); ++i) {
+                    if (layout.getChildAt(i) instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+                        ((ActionBarPopupWindow.ActionBarPopupWindowLayout) layout.getChildAt(i)).solegramUseGlass(root);
+                    }
                 }
             }
         }
@@ -1203,6 +1219,9 @@ public class ItemOptions {
 
     private float offsetX, offsetY;
 
+    // Solegram: the selectors of the first and last items round as the menu corners
+    private static final int SOLEGRAM_R = (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP;
+
     public void setupSelectors() {
         if (layout == null) return;
 
@@ -1215,18 +1234,18 @@ public class ItemOptions {
                 final View first = popupLayout.getItemAt(0);
                 final View last = popupLayout.getItemAt(popupLayout.getItemsCount() - 1);
                 if (first instanceof ActionBarMenuSubItem) {
-                    ((ActionBarMenuSubItem) first).updateSelectorBackground(true, first == last, 12);
+                    ((ActionBarMenuSubItem) first).updateSelectorBackground(true, first == last, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP);
                 } else if (first instanceof MessagePreviewView.ToggleButton || first instanceof FrameLayout) {
-                    first.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), 12, first == last ? 12 : 0));
+                    first.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), SOLEGRAM_R, first == last ? SOLEGRAM_R : 0));
                 } else if (first != null && first.getBackground() instanceof RippleDrawable) {
-                    first.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), 12, first == last ? 12 : 0));
+                    first.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), SOLEGRAM_R, first == last ? SOLEGRAM_R : 0));
                 }
                 if (last instanceof ActionBarMenuSubItem) {
-                    ((ActionBarMenuSubItem) last).updateSelectorBackground(last == first, true, 12);
+                    ((ActionBarMenuSubItem) last).updateSelectorBackground(last == first, true, (int) com.solegram.messenger.SolegramGlass.MENU_RADIUS_DP);
                 } else if (last instanceof MessagePreviewView.ToggleButton || last instanceof FrameLayout) {
-                    last.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), first == last ? 12 : 0, 12));
+                    last.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), first == last ? SOLEGRAM_R : 0, SOLEGRAM_R));
                 } else if (last != null && last.getBackground() instanceof RippleDrawable) {
-                    last.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), first == last ? 12 : 0, 12));
+                    last.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_dialogButtonSelector, resourcesProvider), first == last ? SOLEGRAM_R : 0, SOLEGRAM_R));
                 }
             }
         }
@@ -1498,20 +1517,32 @@ public class ItemOptions {
 
         if (blurForMenu && scrimBlur3SourceBitmap != null) {
             setGapBackgroundColor(Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuItem, resourcesProvider), 0.06f));
-            // Solegram: live glass over the screen under the menu's window; Telegram's picture stays without it, and
-            // over Telegram's blurred backdrop (a picture too: live glass there would show the screen sharper than round it)
-            BlurredBackgroundDrawable bg = (blur ? new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap)
-                : new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR))
+            // Solegram: live glass over the screen under the menu's window (Telegram's picture stays without it); over
+            // Telegram's blurred backdrop it is frosted like the backdrop round it, refracting at the rim
+            BlurredBackgroundDrawable bg = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap,
+                    blur ? com.solegram.messenger.ui.SolegramLiveGlass.FROSTED : com.solegram.messenger.ui.SolegramLiveGlass.CLEAR)
                 .create(layout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourcesProvider))
                 .setPadding(dp(8))
                 .setHasPadding(true)
-                .setRadius(dp(12));
+                .setRadius(com.solegram.messenger.SolegramGlass.menuRadius());
 
             bg.setSourceOffset(X + this.translateX, Y + this.translateY);
             layout.setBackground(bg);
         }
 
+        if (blur) {
+            // Solegram: over Telegram's blurred backdrop the menus are frosted like it (their rim still refracts)
+            if (layout instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+                ((ActionBarPopupWindow.ActionBarPopupWindowLayout) layout).solegramGlassRecipe = com.solegram.messenger.ui.SolegramLiveGlass.FROSTED;
+            } else {
+                for (int i = 0; i < layout.getChildCount(); i++) {
+                    if (layout.getChildAt(i) instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+                        ((ActionBarPopupWindow.ActionBarPopupWindowLayout) layout.getChildAt(i)).solegramGlassRecipe = com.solegram.messenger.ui.SolegramLiveGlass.FROSTED;
+                    }
+                }
+            }
+        }
         actionBarPopupWindow.setScaleOut(scaleOut);
         if (scrimView != null && !allowMoveScrim && animateToWidth == 0 && scrimView.isAttachedToWindow()) {
             // Solegram: the menu flows out of the view it is for (a whole cell: out of its edge next to the menu)
