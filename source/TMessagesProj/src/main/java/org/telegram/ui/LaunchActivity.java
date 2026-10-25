@@ -7142,8 +7142,17 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         }
     }
 
+    // Solegram: with an icon pack on, the drawables load through a wrapper that swaps Telegram's icons
+    private android.content.res.Resources iconResources;
+
+    @Override
+    public android.content.res.Resources getResources() {
+        return iconResources = com.solegram.messenger.SolegramIcons.wrap(super.getResources(), iconResources);
+    }
+
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
+        com.solegram.messenger.SolegramIcons.onConfigurationChanged(iconResources);
         AndroidUtilities.checkDisplaySize(this, newConfig);
         AndroidUtilities.setPreferredMaxRefreshRate(getWindow());
         super.onConfigurationChanged(newConfig);

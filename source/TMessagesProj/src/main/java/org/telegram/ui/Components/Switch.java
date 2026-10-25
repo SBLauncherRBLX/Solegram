@@ -246,6 +246,32 @@ public class Switch extends View {
     }
 
     private com.solegram.messenger.ui.LiquidControls.Lens solegramLens;
+    // liquid stretch: the thumb draws out along its way in proportion to its speed, and rounds up as it stops
+    private float solegramStretch, solegramLastProgress = -1;
+    private long solegramLastFrame;
+    private boolean solegramRich;
+    // what the glass thumb refracts: the track (one instance, nothing is made per frame)
+    private final com.solegram.messenger.ui.LiquidControls.LensContent solegramLensContent = c -> solegramDrawTrack(c, solegramTrack.height() / 2f);
+
+    /** Stretch (0..0.3) of the thumb for this frame, from how fast {@link #progress} moves. */
+    private float solegramStretchStep() {
+        final long now = android.view.animation.AnimationUtils.currentAnimationTimeMillis();
+        final float dt = solegramLastFrame == 0 ? 0 : Math.min(0.05f, (now - solegramLastFrame) / 1000f);
+        float target = 0;
+        if (checkAnimator != null && solegramRich && dt > 0 && solegramLastProgress >= 0) {
+            target = Math.min(0.3f, Math.abs(progress - solegramLastProgress) / dt * 0.05f);
+        }
+        solegramLastFrame = checkAnimator != null || solegramStretch > 0.002f ? now : 0;
+        solegramLastProgress = progress;
+        // a little lag, so the shape flows instead of following every frame
+        solegramStretch += (target - solegramStretch) * (dt > 0 ? Math.min(1f, dt * 22f) : 0f);
+        if (solegramStretch < 0.002f && target == 0) {
+            solegramStretch = 0;
+        } else if (checkAnimator == null) {
+            invalidate(); // settling back into a pill after the thumb stopped
+        }
+        return solegramStretch;
+    }
 
     private int solegramTrackColor(float colorProgress) {
         final int offColor = processColor(Theme.getColor(trackColorKey, resourcesProvider));
@@ -295,12 +321,15 @@ public class Switch extends View {
         final float maxScale = Math.max(1f, Math.min(room, roomX));
         final float a = Math.max(0f, Math.min(1f, active)); // the spring may overshoot
         final float scale = 1f + (maxScale - 1f) * a;
-        final float halfW = restW * scale / 2f;
+        // liquid stretch while it travels: longer and a touch thinner, as a drop pulled along
+        final float stretch = solegramStretchStep();
+        final float thumbW = restW * scale * (1f + stretch), thumbH = restH * scale * (1f - stretch * 0.22f);
+        final float halfW = thumbW / 2f;
         final float cx = Math.max(halfW, Math.min(w - halfW, from + (to - from) * progress));
         // the track; while the thumb is glass, not under it - the lens shows it refracted instead
         if (a > 0.01f) {
             canvas.save();
-            com.solegram.messenger.ui.LiquidControls.clipOutThumb(canvas, cx, h / 2f, restW * scale, restH * scale);
+            com.solegram.messenger.ui.LiquidControls.clipOutThumb(canvas, cx, h / 2f, thumbW, thumbH);
             solegramDrawTrack(canvas, trackH / 2f);
             canvas.restore();
         } else {
@@ -309,9 +338,9 @@ public class Switch extends View {
         if (solegramLens == null) {
             solegramLens = new com.solegram.messenger.ui.LiquidControls.Lens();
         }
-        com.solegram.messenger.ui.LiquidControls.drawThumb(canvas, cx, h / 2f, restW * scale, restH * scale, a, c -> solegramDrawTrack(c, trackH / 2f),
+        com.solegram.messenger.ui.LiquidControls.drawThumb(canvas, cx, h / 2f, thumbW, thumbH, a, solegramLensContent,
             solegramLens, getMeasuredWidth(), getMeasuredHeight());
-        solegramDrawIcon(canvas, cx, h / 2f, restH * scale, 1f - a);
+        solegramDrawIcon(canvas, cx, h / 2f, thumbH, 1f - a);
     }
 
     /** The lock / tick / cross of the stock thumb, on the white pill; it fades while the thumb is clear glass. */
@@ -340,6 +369,7 @@ public class Switch extends View {
     private void animateToCheckedState(boolean newCheckedState) {
         checkAnimator = ObjectAnimator.ofFloat(this, "progress", newCheckedState ? 1 : 0);
         if (solegramLiquid()) {
+            solegramRich = com.solegram.messenger.ui.SolegramMotion.rich(); // the stretch is decoration: off in power saving
             // springy travel like the liquid glass demo: overshoot, settle, the thumb glows as glass meanwhile
             checkAnimator.setDuration(420);
             checkAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_BACK);

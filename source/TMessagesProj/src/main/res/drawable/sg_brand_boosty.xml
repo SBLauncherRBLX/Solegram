@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: Boosty mark from Simple Icons (CC0), for profile links -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2.661 14.337 L6.801 0 h6.362 L11.88 4.444 l-0.038 0.077 l-3.378 11.733 h3.15 c-1.321 3.289 -2.35 5.867 -3.086 7.733 c-5.816 -0.063 -7.442 -4.228 -6.02 -9.155 M8.554 24 l7.67 -11.035 h-3.25 l2.83 -7.073 c4.852 0.508 7.137 4.33 5.791 8.952 C20.16 19.81 14.344 24 8.68 24 h-0.127 z" />
+</vector>

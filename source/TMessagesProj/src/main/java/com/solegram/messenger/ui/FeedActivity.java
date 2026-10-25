@@ -278,7 +278,8 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
         listView.setLayoutManager(layoutManager = new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
         listView.setClipToPadding(false);
-        listView.setItemAnimator(null);
+        // posts that come and go glide in and out; a post that unfolds its text pushes the ones under it smoothly
+        listView.setItemAnimator(SolegramMotion.itemAnimator());
         listView.setAdapter(adapter = new Adapter(context));
         listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -351,6 +352,8 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
 
     private void updateState() {
         final FeedController controller = FeedController.getInstance(currentAccount);
+        // what the list shows now, to animate the change (new posts slide in, gone ones fade out)
+        final ArrayList<FeedController.Post> shown = new ArrayList<>(posts);
         posts.clear();
         // message filters: in "hide completely" mode filtered posts leave the Feed; otherwise they are folded (see the adapter)
         final boolean hideFiltered = com.solegram.messenger.SolegramMessageFilters.mode() == com.solegram.messenger.SolegramMessageFilters.MODE_HIDE;
@@ -360,13 +363,13 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
             }
         }
         if (adapter != null) {
-            adapter.notifyDataSetChanged();
+            dispatchPosts(shown);
         }
         if (emptyView == null) {
             return;
         }
         final boolean empty = posts.isEmpty();
-        emptyView.setVisibility(empty ? View.VISIBLE : View.GONE);
+        SolegramMotion.setVisible(emptyView, empty, true);
         if (empty) {
             final boolean loading = controller.isLoading() || !controller.isEmptyAndLoaded();
             progressView.setVisibility(loading ? View.VISIBLE : View.GONE);
@@ -374,7 +377,51 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
         }
         if (refreshItem != null) {
             refreshItem.setEnabled(!controller.isLoading());
-            refreshItem.setAlpha(controller.isLoading() ? 0.5f : 1f);
+            SolegramMotion.fadeTo(refreshItem, controller.isLoading() ? 0.5f : 1f);
+        }
+    }
+
+    /** Tells the list what changed from {@code shown} to {@link #posts}: item by item when it animates, else all at once. */
+    private void dispatchPosts(ArrayList<FeedController.Post> shown) {
+        if (listView == null || listView.getItemAnimator() == null || shown.isEmpty() || posts.isEmpty()
+            || !SolegramMotion.enabled() || !listView.isAttachedToWindow()) {
+            if (listView != null && shown.isEmpty() && !posts.isEmpty() && SolegramConfig.animateLists
+                && SolegramMotion.rich() && listView.isAttachedToWindow()) {
+                // the first posts arrive: they rise in one after another, as rows of the settings do
+                listView.setLayoutAnimation(com.solegram.messenger.SolegramUi.listAppearAnimation());
+                listView.scheduleLayoutAnimation();
+            }
+            adapter.notifyDataSetChanged();
+            return;
+        }
+        // at the very top new posts show up in place; further down the reading position stays where it is
+        final int first = layoutManager.findFirstVisibleItemPosition();
+        final View firstView = layoutManager.findViewByPosition(first);
+        final boolean atTop = first <= 0 && (firstView == null || firstView.getTop() >= listView.getPaddingTop());
+        final ArrayList<FeedController.Post> now = posts;
+        androidx.recyclerview.widget.DiffUtil.calculateDiff(new androidx.recyclerview.widget.DiffUtil.Callback() {
+            @Override
+            public int getOldListSize() {
+                return shown.size();
+            }
+
+            @Override
+            public int getNewListSize() {
+                return now.size();
+            }
+
+            @Override
+            public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                return android.text.TextUtils.equals(shown.get(oldPosition).key, now.get(newPosition).key);
+            }
+
+            @Override
+            public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                return false; // a refreshed post may have new text, media or views: always bound again
+            }
+        }, false).dispatchUpdatesTo(adapter);
+        if (atTop) {
+            layoutManager.scrollToPosition(0);
         }
     }
 
@@ -447,6 +494,14 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
             });
             cell.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return new RecyclerListView.Holder(cell);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position, @NonNull java.util.List payloads) {
+            if (payloads.contains(SolegramMotion.PAYLOAD_RESIZE)) {
+                return; // the post changed its height by itself (see FeedPostCell): it stays as it is, the rest glides
+            }
+            super.onBindViewHolder(holder, position, payloads);
         }
 
         @Override

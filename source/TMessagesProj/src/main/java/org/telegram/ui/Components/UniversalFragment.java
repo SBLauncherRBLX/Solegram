@@ -67,7 +67,7 @@ public abstract class UniversalFragment extends BaseFragment {
                 savedScrollPosition = -1;
             }
         };
-        if (com.solegram.messenger.SolegramConfig.animateLists) {
+        if (com.solegram.messenger.SolegramConfig.animateLists && com.solegram.messenger.ui.SolegramMotion.enabled()) {
             listView.setLayoutAnimation(com.solegram.messenger.SolegramUi.listAppearAnimation());
         }
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));

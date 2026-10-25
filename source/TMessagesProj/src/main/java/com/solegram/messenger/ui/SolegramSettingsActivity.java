@@ -118,6 +118,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_CAMERA_FPS_30 = 803;
     private static final int ID_CAMERA_ENHANCE = 804;
     private static final int ID_CAMERA_HD = 805;
+    private static final int ID_CAMERA_CONTROLS = 806;
 
     // browser
     private static final int ID_ADBLOCK = 901;
@@ -209,6 +210,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_TRANSCRIBE_URL = 242;
     private static final int ID_TRANSCRIBE_KEY = 243;
     private static final int ID_TRANSCRIBE_MODEL = 244;
+    private static final int ID_PROFILE_LINKS = 250;
+    private static final int ID_PROFILE_LINKS_EDIT = 251;
 
     // ghost
     private static final int ID_GHOST_MASTER = 301;
@@ -443,6 +446,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_THEMES, R.drawable.msg_theme, getString(R.string.SG_ThemesAndIcons)), TILE_BLUE));
         items.add(UItem.asShadow(null));
 
+        items.add(UItem.asHeader(getString(R.string.SG_IconPack)));
+        if (iconPackPicker == null) {
+            iconPackPicker = new SolegramIconPackPicker(getContext(), getResourceProvider(), this::setIconPack);
+        }
+        iconPackPicker.setSelected(SolegramConfig.iconPack);
+        items.add(UItem.asCustom(iconPackPicker));
+        items.add(UItem.asShadow(getString(R.string.SG_IconPackInfo)));
+
         items.add(UItem.asHeader(getString(R.string.SG_Animations)));
         items.add(UItem.asButtonCheck(ID_SMOOTH_TRANSITIONS, getString(R.string.SG_SmoothTransitions), getString(R.string.SG_SmoothTransitionsInfo)).setChecked(SolegramConfig.smoothTransitions));
         items.add(UItem.asButtonCheck(ID_PRESS_SCALE, getString(R.string.SG_PressScale), getString(R.string.SG_PressScaleInfo)).setChecked(SolegramConfig.pressScale));
@@ -460,6 +471,30 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private SolegramGlassPreview glassPreview;
+    private SolegramIconPackPicker iconPackPicker;
+
+    /**
+     * Another icon pack: new views load from it at once. Theme's cached icons load again, the screens below
+     * build their views again when they come back, and this list makes its rows anew (rebinding a row keeps
+     * the icon it has).
+     */
+    private void setIconPack(int pack) {
+        SolegramConfig.putInt("iconPack", pack);
+        Theme.reloadAllResources(ApplicationLoader.applicationContext);
+        if (getParentActivity() instanceof LaunchActivity) {
+            ((LaunchActivity) getParentActivity()).rebuildAllFragments(false);
+        }
+        if (listView != null && listView.adapter != null) {
+            final androidx.recyclerview.widget.RecyclerView.LayoutManager layoutManager = listView.getLayoutManager();
+            final android.os.Parcelable state = layoutManager != null ? layoutManager.onSaveInstanceState() : null;
+            listView.setAdapter(listView.adapter);
+            listView.getRecycledViewPool().clear();
+            if (state != null) {
+                layoutManager.onRestoreInstanceState(state);
+            }
+        }
+        redrawEverything();
+    }
     private org.telegram.ui.SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow titleEmojiPicker;
 
     private void fillGlass(ArrayList<UItem> items) {
@@ -682,6 +717,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         if (SolegramConfig.showUserId) {
             items.add(UItem.asButtonCheck(ID_SHOW_DC, getString(R.string.SG_ShowDc), getString(R.string.SG_ShowDcInfo)).setChecked(SolegramConfig.showDcInProfile));
         }
+        items.add(UItem.asButtonCheck(ID_PROFILE_LINKS, getString(R.string.SG_ProfileLinksShow), getString(R.string.SG_ProfileLinksShowInfo)).setChecked(SolegramConfig.profileLinks));
+        items.add(tile(UItem.asButton(ID_PROFILE_LINKS_EDIT, R.drawable.sg_brand_link, getString(R.string.SG_ProfileLinksMine)), TILE_BLUE));
         items.add(UItem.asShadow(null));
     }
 
@@ -839,6 +876,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_MAIN, 0, R.string.SG_SettingsTitle, 0},
         {PAGE_APPEARANCE, 0, R.string.SG_Appearance, -1},
         {PAGE_APPEARANCE, ID_AVATAR_IN_CHATS, R.string.SG_AvatarShapeInChats, -1},
+        {PAGE_APPEARANCE, 0, R.string.SG_IconPack, 18},
         {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_SystemFont, -1},
         {PAGE_APPEARANCE, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
         {PAGE_APPEARANCE, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
@@ -883,6 +921,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_CHATS, ID_CONFIRM_GIFS, R.string.SG_ConfirmGifs, -1},
         {PAGE_CHATS, ID_CONFIRM_VOICE, R.string.SG_ConfirmVoice, -1},
         {PAGE_CHATS, ID_SHOW_ID, R.string.SG_ShowId, -1},
+        {PAGE_CHATS, ID_PROFILE_LINKS, R.string.SG_ProfileLinksShow, 17},
+        {PAGE_CHATS, ID_PROFILE_LINKS_EDIT, R.string.SG_ProfileLinksMine, 17},
         {PAGE_AI, 0, R.string.SG_AiPage, 2},
         {PAGE_AI, ID_TRANSLATE_HERE, R.string.SG_TranslateHereItem, 3},
         {PAGE_AI, ID_FREE_TRANSLATE, R.string.SG_FreeTranslate, 3},
@@ -914,6 +954,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_CAMERA, 0, R.string.SG_Camera, 7},
         {PAGE_CAMERA, ID_CAMERA_ENHANCE, R.string.SG_CameraEnhance, 7},
         {PAGE_CAMERA, ID_CAMERA_HD, R.string.SG_CameraHd, 7},
+        {PAGE_CAMERA, ID_CAMERA_CONTROLS, R.string.SG_CameraControls, 7},
         {PAGE_CAMERA, ID_CAMERA_FPS_AUTO, R.string.SG_CameraFps, 7},
         {PAGE_BROWSER, 0, R.string.SG_Browser, 8},
         {PAGE_BROWSER, ID_ADBLOCK, R.string.SG_AdBlock, 8},
@@ -976,6 +1017,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         "плагины plugins extera ayugram безопасность проверка вредоносный вирус опасные блокировка security malware",
         "фильтры фильтр сообщений скрыть спрятать реклама спам мат слова регулярные выражения regex zalgo erid ayugram swiftgram filter hide спонсорские sponsored ads",
         "напоминания напоминание напомнить напоминалка будильник позже отложить дела задачи remind reminder reminders alarm later snooze todo",
+        "ссылки ссылка профили соцсети социальные сети о себе био инстаграм тикток ютуб гитхаб вк твич дискорд стим сайт links bio instagram tiktok youtube github vk twitch discord steam x twitter website",
+        "иконки значки иконка набор пак стиль тонкие линейные заливка залитые phosphor icons icon pack thin outline filled",
     };
 
     /** Solegram's pages and settings as results of Telegram's settings search. */
@@ -1137,9 +1180,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillCamera(ArrayList<UItem> items) {
+        items.add(UItem.asHeader(getString(R.string.SG_CameraScreen)));
+        items.add(UItem.asCheck(ID_CAMERA_CONTROLS, getString(R.string.SG_CameraControls)).setChecked(SolegramConfig.cameraControls));
+        items.add(UItem.asShadow(getString(R.string.SG_CameraControlsInfo)));
+
         items.add(UItem.asHeader(getString(R.string.SG_CameraPhotos)));
         items.add(UItem.asCheck(ID_CAMERA_ENHANCE, getString(R.string.SG_CameraEnhance)).setChecked(SolegramConfig.cameraEnhance));
-        items.add(UItem.asShadow(getString(R.string.SG_CameraEnhanceInfo)));
+        // the same setting as the HDR button on the camera screen
+        items.add(UItem.asShadow(SolegramConfig.cameraControls ? getString(R.string.SG_CameraEnhanceInfo) + "\n\n" + getString(R.string.SG_CameraEnhanceHdr) : getString(R.string.SG_CameraEnhanceInfo)));
         items.add(UItem.asCheck(ID_CAMERA_HD, getString(R.string.SG_CameraHd)).setChecked(SolegramConfig.cameraHd));
         items.add(UItem.asShadow(getString(R.string.SG_CameraHdInfo)));
 
@@ -1587,7 +1635,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_CHANNEL, R.drawable.msg_channel, getString(R.string.SG_Channel), "@" + SolegramConfig.getUpdateChannel()), TILE_BLUE));
         items.add(tile(UItem.asButton(ID_SOURCE, R.drawable.msg_link, getString(R.string.SG_SourceCode)), TILE_GRAY));
         items.add(tile(UItem.asButton(ID_LICENSE, R.drawable.msg_info, getString(R.string.SG_License), "GPL-2.0"), TILE_GRAY));
-        items.add(UItem.asShadow(getString(R.string.SG_Credits)));
+        items.add(UItem.asShadow(getString(R.string.SG_Credits) + " " + getString(R.string.SG_CreditsIcons)));
     }
     // endregion
 
@@ -1670,6 +1718,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_CAMERA_HD:
                 toggleCheck(view, "cameraHd");
+                return;
+            case ID_CAMERA_CONTROLS:
+                toggleCheck(view, "cameraControls");
+                listView.adapter.update(true);
                 return;
 
             // browser
@@ -2042,6 +2094,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_FORWARD_NO_AUTHOR:
                 toggleCheck(view, "forwardWithoutAuthor");
+                return;
+            case ID_PROFILE_LINKS:
+                toggleCheck(view, "profileLinks");
+                return;
+            case ID_PROFILE_LINKS_EDIT:
+                SolegramProfileLinksSheet.show(this);
                 return;
             case ID_SHOW_DC:
                 toggleCheck(view, "showDcInProfile");

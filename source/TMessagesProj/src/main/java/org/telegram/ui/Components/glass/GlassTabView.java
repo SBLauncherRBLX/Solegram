@@ -231,6 +231,9 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     }
 
     public void setSelected(boolean selected, boolean animated) {
+        if (selected && animated && !isSelectedAnimator.getValue() && getParent() instanceof org.telegram.ui.MainTabsLayout) {
+            com.solegram.messenger.ui.SolegramMotion.bounce(imageView, attachScale); // Solegram: the chosen tab's icon pops
+        }
         isSelectedAnimator.setValue(selected, animated);
         checkPlayAnimation(animated);
 
@@ -307,6 +310,14 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         }
 
         if (tabAnimation == null) {
+            return;
+        }
+
+        // Solegram: an icon pack shows its own icons instead of the animations (filled when selected)
+        final int packIcon = com.solegram.messenger.SolegramIcons.tabIcon(tabAnimation.name(), isSelected);
+        if (packIcon != 0) {
+            imageView.setImageResource(packIcon);
+            updateColors();
             return;
         }
 

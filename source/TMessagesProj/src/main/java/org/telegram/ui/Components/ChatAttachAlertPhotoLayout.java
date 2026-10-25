@@ -174,6 +174,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     private Runnable videoRecordRunnable;
     private DecelerateInterpolator interpolator = new DecelerateInterpolator(1.5f);
     private FrameLayout cameraPanel;
+    /** Solegram: the camera controls on the viewfinder, null when switched off. */
+    private com.solegram.messenger.ui.SolegramCameraUi sgCamera;
     private ShutterButton shutterButton;
     private ZoomControlView zoomControlView;
     private AnimatorSet zoomControlAnimation;
@@ -1173,7 +1175,32 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         recordTime.setPadding(dp(24), dp(5), dp(10), dp(5));
         container.addView(recordTime, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 16, 0, 0));
 
+        if (com.solegram.messenger.ui.SolegramCameraUi.enabled()) {
+            // Solegram: settings on the viewfinder; the layer goes over the preview, under the shutter panel
+            sgCamera = new com.solegram.messenger.ui.SolegramCameraUi(context, container, new SolegramCameraHost());
+            sgCamera.overlay.setVisibility(View.GONE);
+            sgCamera.overlay.setAlpha(0f);
+            container.addView(sgCamera.overlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        }
+
         cameraPanel = new FrameLayout(context) {
+            // Solegram: the viewfinder controls appear, fade and go with the shutter panel
+            @Override
+            public void setAlpha(float alpha) {
+                super.setAlpha(alpha);
+                if (sgCamera != null) {
+                    sgCamera.overlay.setAlpha(alpha);
+                }
+            }
+
+            @Override
+            public void setVisibility(int visibility) {
+                super.setVisibility(visibility);
+                if (sgCamera != null) {
+                    sgCamera.overlay.setVisibility(visibility);
+                }
+            }
+
             @Override
             protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
                 int cx;
@@ -1207,6 +1234,17 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 switchCameraButton.layout(cx2 - switchCameraButton.getMeasuredWidth() / 2, cy2 - switchCameraButton.getMeasuredHeight() / 2, cx2 + switchCameraButton.getMeasuredWidth() / 2, cy2 + switchCameraButton.getMeasuredHeight() / 2);
                 for (int a = 0; a < 2; a++) {
                     flashModeButton[a].layout(cx3 - flashModeButton[a].getMeasuredWidth() / 2, cy3 - flashModeButton[a].getMeasuredHeight() / 2, cx3 + flashModeButton[a].getMeasuredWidth() / 2, cy3 + flashModeButton[a].getMeasuredHeight() / 2);
+                }
+                if (sgCamera != null) {
+                    // the last shot where the flash was (the flash went to the top row), photo / video under the shutter
+                    final View thumb = sgCamera.thumb;
+                    thumb.layout(cx3 - thumb.getMeasuredWidth() / 2, cy3 - thumb.getMeasuredHeight() / 2, cx3 + thumb.getMeasuredWidth() / 2, cy3 + thumb.getMeasuredHeight() / 2);
+                    final View mode = sgCamera.modeSwitch;
+                    if (getMeasuredWidth() == dp(126)) {
+                        mode.layout(0, getMeasuredHeight(), getMeasuredWidth(), getMeasuredHeight() + mode.getMeasuredHeight());
+                    } else {
+                        mode.layout(0, getMeasuredHeight() - mode.getMeasuredHeight() - dp(2), getMeasuredWidth(), getMeasuredHeight() - dp(2));
+                    }
                 }
             }
         };
@@ -1257,6 +1295,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 if (parentAlert.avatarPicker != 2 && !(parentAlert.baseFragment instanceof ChatActivity) || takingPhoto || parentAlert.destroyed || cameraView == null) {
                     return false;
                 }
+                if (sgCamera != null && sgCamera.isTimerRunning()) {
+                    return false;
+                }
                 if (parentAlert.isStickerMode) {
                     return false;
                 }
@@ -1283,6 +1324,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 }
                 switchCameraButton.animate().alpha(0f).translationX(-dp(30)).setDuration(150).setInterpolator(CubicBezierInterpolator.DEFAULT).start();
                 tooltipTextView.animate().alpha(0f).setDuration(150).setInterpolator(CubicBezierInterpolator.DEFAULT).start();
+                if (sgCamera != null) {
+                    sgCamera.setRecording(true);
+                }
                 outputFile = AndroidUtilities.generateVideoPath(parentAlert.baseFragment instanceof ChatActivity && ((ChatActivity) parentAlert.baseFragment).isSecretChat());
                 AndroidUtilities.updateViewVisibilityAnimated(recordTime, true);
                 recordTime.setText(AndroidUtilities.formatLongDuration(0));
@@ -1336,7 +1380,20 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             }
 
             @Override
+            public void shutterVideoTapped() {
+                // Solegram video mode: the self-timer counts down before the recording too
+                if (sgCamera != null && sgCamera.startTimer(this::shutterLongPressed)) {
+                    return;
+                }
+                shutterLongPressed();
+            }
+
+            @Override
             public void shutterReleased() {
+                if (sgCamera != null && sgCamera.isTimerRunning()) {
+                    sgCamera.cancelTimer(); // a tap during the countdown stops it
+                    return;
+                }
                 if (takingPhoto || cameraView == null || cameraView.getCameraSession() == null) {
                     return;
                 }
@@ -1349,6 +1406,19 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 if (!photoEnabled) {
                     BulletinFactory.of(cameraView, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.GlobalAttachPhotoRestricted)).show();
                     return;
+                }
+                if (sgCamera != null && sgCamera.startTimer(this::takePhotoNow)) {
+                    return;
+                }
+                takePhotoNow();
+            }
+
+            private void takePhotoNow() {
+                if (takingPhoto || cameraView == null || cameraView.getCameraSession() == null || parentAlert.destroyed) {
+                    return;
+                }
+                if (sgCamera != null && cameraView.getCameraSession().camera1Session != null) {
+                    cameraView.getCameraSession().camera1Session.solegramSquare = sgCamera.isSquare();
                 }
                 final File cameraFile = AndroidUtilities.generatePicturePath(parentAlert.baseFragment instanceof ChatActivity && ((ChatActivity) parentAlert.baseFragment).isSecretChat(), null);
                 final boolean sameTakePictureOrientation = cameraView.getCameraSession().isSameTakePictureOrientation();
@@ -1427,6 +1497,11 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         });
         switchCameraButton.setContentDescription(LocaleController.getString(R.string.AccDescrSwitchCamera));
+        if (sgCamera != null) {
+            cameraPanel.addView(sgCamera.thumb, LayoutHelper.createFrame(52, 52, Gravity.LEFT | Gravity.TOP));
+            cameraPanel.addView(sgCamera.modeSwitch, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 30, Gravity.LEFT | Gravity.TOP));
+            sgCamera.attachPanel(shutterButton, switchCameraButton);
+        }
 
         for (int a = 0; a < 2; a++) {
             flashModeButton[a] = new ImageView(context);
@@ -2036,7 +2111,12 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     cameraView.getLocationOnScreen(viewPosition);
                     float viewX = event.getRawX() - viewPosition[0];
                     float viewY = event.getRawY() - viewPosition[1];
-                    cameraView.focusToPoint((int) viewX, (int) viewY);
+                    if (sgCamera != null && sgCamera.isActive()) {
+                        // Solegram: its own focus ring, with the exposure sun to drag
+                        sgCamera.onTapToFocus(cameraView.getX() + viewX, cameraView.getY() + viewY);
+                    } else {
+                        cameraView.focusToPoint((int) viewX, (int) viewY);
+                    }
                 }
             }
         }
@@ -2054,6 +2134,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         switchCameraButton.animate().alpha(1f).translationX(0).setDuration(150).setInterpolator(CubicBezierInterpolator.DEFAULT).start();
         tooltipTextView.animate().alpha(1f).setDuration(150).setInterpolator(CubicBezierInterpolator.DEFAULT).start();
         AndroidUtilities.updateViewVisibilityAnimated(recordTime, false);
+        if (sgCamera != null) {
+            sgCamera.setRecording(false);
+        }
 
         AndroidUtilities.cancelRunOnUIThread(videoRecordRunnable);
         videoRecordRunnable = null;
@@ -2294,6 +2377,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     }
 
     private void showZoomControls(boolean show, boolean animated) {
+        if (sgCamera != null && show) {
+            return; // the zoom pill over the shutter shows the zoom
+        }
         if (zoomControlView.getTag() != null && show || zoomControlView.getTag() == null && !show) {
             if (show) {
                 if (zoomControlHideRunnable != null) {
@@ -2453,10 +2539,18 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             return;
         }
         cameraView.initTexture();
-        if (shouldLoadAllMedia()) {
+        if (shouldLoadAllMedia() && sgCamera == null) {
             tooltipTextView.setVisibility(VISIBLE);
         } else {
             tooltipTextView.setVisibility(GONE);
+        }
+        if (sgCamera != null) {
+            sgCamera.modeSwitch.setVisibility(sgCameraVideoAllowed() ? VISIBLE : GONE);
+            if (!sgCameraVideoAllowed()) {
+                sgCamera.setPhotoMode();
+            }
+            sgApplyCameraAspect();
+            sgCamera.setActive(true);
         }
         if (cameraPhotos.isEmpty()) {
             counterTextView.setVisibility(View.INVISIBLE);
@@ -2585,6 +2679,10 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             //    cameraView.setThumbDrawable(cameraViewItemDecoration.placeholderDrawable);
             //}
             cameraView.setRecordFile(AndroidUtilities.generateVideoPath(parentAlert.baseFragment instanceof ChatActivity && ((ChatActivity) parentAlert.baseFragment).isSecretChat()));
+            if (sgCamera != null) {
+                // Solegram: the frame picked on the viewfinder from the start, so opening needs no restart
+                cameraView.solegramAspect = sgCamera.cameraAspect();
+            }
             cameraView.setFocusable(true);
             cameraView.setFpsLimit(30);
             cameraView.setOutlineProvider(new ViewOutlineProvider() {
@@ -2613,10 +2711,16 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             cameraView.setDelegate(new CameraView.CameraViewDelegate() {
                 @Override
                 public void onCameraInit() {
+                    if (sgCamera != null) {
+                        // a new session starts at its widest: the zoom follows, the controls show what it offers
+                        cameraZoom = 0;
+                        zoomControlView.setZoom(0, false);
+                        sgCamera.onCameraInit();
+                    }
                     String current = cameraView.getCameraSession().getCurrentFlashMode();
                     String next = cameraView.getCameraSession().getNextFlashMode();
                     if (current == null || next == null) return;
-                    if (current.equals(next)) {
+                    if (sgCamera != null || current.equals(next)) {
                         for (int a = 0; a < 2; a++) {
                             flashModeButton[a].setVisibility(View.INVISIBLE);
                             flashModeButton[a].setAlpha(0.0f);
@@ -2689,6 +2793,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     public void hideCamera(boolean async) {
         if (!deviceHasGoodCamera || cameraView == null) {
             return;
+        }
+        if (sgCamera != null) {
+            sgCamera.cancelTimer();
         }
         saveLastCameraBitmap();
         cameraViewItemDecoration.updateBitmap();
@@ -2835,6 +2942,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         if (takingPhoto || cameraView == null) {
             return;
         }
+        if (sgCamera != null) {
+            sgCamera.setActive(false);
+        }
         animateCameraValues[1] = itemSize;
         animateCameraValues[2] = itemSize * 2 + dp(GAP);
         if (zoomControlHideRunnable != null) {
@@ -2965,8 +3075,13 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         int cameraViewW, cameraViewH;
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) cameraView.getLayoutParams();
 
+        if (sgCamera != null && cameraView.fit != cameraExpanded) {
+            // Solegram: the open camera shows the whole frame that is taken (letterboxed), the tile stays filled
+            cameraView.fit = cameraExpanded;
+            cameraView.requestLayout();
+        }
         float textureStartHeight = cameraView.getTextureHeight(startWidth, startHeight);
-        float textureEndHeight = cameraView.getTextureHeight(endWidth, endHeight);
+        float textureEndHeight = cameraView.getTextureHeight(endWidth, endHeight, cameraView.fit);
 
         float fromScale = textureStartHeight / textureEndHeight;
         float fromScaleY = startHeight / endHeight;
@@ -4112,9 +4227,104 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         return false;
     }
 
+    // region Solegram camera controls
+
+    private boolean sgCameraVideoAllowed() {
+        return videoEnabled && !parentAlert.isStickerMode && (parentAlert.avatarPicker == 2 || parentAlert.baseFragment instanceof ChatActivity);
+    }
+
+    /** The camera gives the frame the controls ask for (4:3 for 4:3 and 1:1, 16:9 for 16:9 and video). */
+    private void sgApplyCameraAspect() {
+        if (sgCamera == null || cameraView == null) {
+            return;
+        }
+        final int aspect = sgCamera.cameraAspect();
+        if (cameraView.solegramAspect != aspect) {
+            cameraView.solegramAspect = aspect;
+            if (cameraView.isInited()) {
+                canSaveCameraPreview = false;
+                cameraView.resetCamera();
+            }
+        }
+        final org.telegram.messenger.camera.CameraSessionWrapper session = cameraView.getCameraSession();
+        if (session != null && session.camera1Session != null) {
+            session.camera1Session.solegramSquare = sgCamera.isSquare();
+        }
+    }
+
+    private class SolegramCameraHost implements com.solegram.messenger.ui.SolegramCameraUi.Host {
+        @Override
+        public CameraView camera() {
+            return cameraView;
+        }
+
+        @Override
+        public boolean isSettled() {
+            return cameraOpened && !cameraAnimationInProgress && cameraView != null && cameraView.getTranslationY() == 0;
+        }
+
+        @Override
+        public void setZoom(float zoom) {
+            if (cameraView == null) {
+                return;
+            }
+            cameraZoom = zoom;
+            zoomControlView.setZoom(zoom, false);
+            cameraView.setZoom(zoom);
+        }
+
+        @Override
+        public float zoom() {
+            return cameraZoom;
+        }
+
+        @Override
+        public MediaController.PhotoEntry lastShot() {
+            if (cameraPhotos.isEmpty()) {
+                return null;
+            }
+            final Object last = cameraPhotos.get(cameraPhotos.size() - 1);
+            return last instanceof MediaController.PhotoEntry ? (MediaController.PhotoEntry) last : null;
+        }
+
+        @Override
+        public void onAspectChanged() {
+            sgApplyCameraAspect();
+        }
+
+        @Override
+        public void onModeChanged(boolean video) {
+            sgApplyCameraAspect();
+        }
+
+        @Override
+        public void openShots() {
+            if (cameraView == null || cameraPhotos.isEmpty() || takingPhoto) {
+                return;
+            }
+            openPhotoViewer(null, false, false);
+            CameraController.getInstance().stopPreview(cameraView.getCameraSessionObject());
+        }
+
+        @Override
+        public boolean isVideoAllowed() {
+            return sgCameraVideoAllowed();
+        }
+
+        @Override
+        public int controlsInset() {
+            return AndroidUtilities.navigationBarHeight + dp(126) + (cameraPhotoRecyclerView != null && cameraPhotoRecyclerView.getVisibility() == View.VISIBLE ? dp(96) : 0);
+        }
+    }
+    // endregion
+
     @Override
     public boolean onCustomMeasure(View view, int width, int height) {
         boolean isPortrait = width < height;
+        if (sgCamera != null && view == sgCamera.overlay) {
+            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
+            return true;
+        }
         if (view == cameraView) {
             if (cameraOpened && !cameraAnimationInProgress) {
                 cameraView.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
@@ -4163,6 +4373,16 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         int height = (bottom - top);
         boolean isPortrait = width < height;
         int navbar = AndroidUtilities.navigationBarHeight;
+        if (sgCamera != null) {
+            if (view == sgCamera.overlay) {
+                view.layout(0, 0, width, height);
+                return true;
+            } else if (view == zoomControlView || view == counterTextView) {
+                // the zoom pill and the last shot do their work: these stay out of sight and out of reach
+                view.layout(0, 0, 0, 0);
+                return true;
+            }
+        }
         if (view == cameraPanel) {
             if (isPortrait) {
                 if (cameraPhotoRecyclerView.getVisibility() == View.VISIBLE) {

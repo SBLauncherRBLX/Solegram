@@ -65,6 +65,43 @@ public class SeekBarView extends FrameLayout {
     private final RectF solegramTrackRect = new RectF();
     private final RectF solegramFillRect = new RectF();
     private com.solegram.messenger.ui.LiquidControls.Lens solegramLens;
+    // the liquid thumb follows its place on a stiff spring (a tap on the track glides there, a fast drag trails a
+    // little) and draws out along its way in proportion to its speed, as a drop pulled along
+    private final com.solegram.messenger.ui.SolegramLiquid.Spring solegramFollow = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).params(0.16f, 0.88f).rest(0.5f);
+    private boolean solegramFollowReady, solegramRich;
+    private int solegramFollowWidth;
+    private long solegramFollowFrame;
+    private float solegramStretch;
+
+    /** Where the liquid thumb is drawn this frame for its real place {@code target} (px, like thumbX). */
+    private int solegramFollow(int target) {
+        final boolean animate = solegramFollowReady && solegramFollowWidth == getMeasuredWidth()
+            && (pressed || solegramFollow.isActive()) && com.solegram.messenger.ui.SolegramMotion.enabled();
+        if (!animate) {
+            // at rest, or moved by the player: exactly where it belongs
+            solegramFollow.set(target);
+            solegramFollowReady = true;
+            solegramFollowWidth = getMeasuredWidth();
+            solegramFollowFrame = 0;
+            solegramStretch = 0;
+            solegramRich = com.solegram.messenger.ui.SolegramMotion.rich();
+            return target;
+        }
+        solegramFollow.to(target);
+        final long now = android.view.animation.AnimationUtils.currentAnimationTimeMillis();
+        final float dt = solegramFollowFrame == 0 ? 1f / 60f : Math.max(0f, Math.min(1f / 30f, (now - solegramFollowFrame) / 1000f));
+        solegramFollowFrame = now;
+        final boolean moving = solegramFollow.step(dt);
+        final float stretchTarget = moving && solegramRich ? Math.min(0.32f, Math.abs(solegramFollow.velocity) / AndroidUtilities.dp(2600)) : 0f;
+        solegramStretch += (stretchTarget - solegramStretch) * Math.min(1f, dt * 24f);
+        if (moving || solegramStretch > 0.003f) {
+            postInvalidateOnAnimation();
+        } else {
+            solegramStretch = 0;
+            solegramFollowFrame = 0;
+        }
+        return Math.round(solegramFollow.value);
+    }
     private int thumbDX;
     private float progressToSet = -100;
     private float minProgress = -1;
@@ -479,13 +516,15 @@ public class SeekBarView extends FrameLayout {
         float solegramActiveValue = 0, solegramTw = 0, solegramTh = 0, solegramCx = 0;
         boolean solegramClipped = false;
         if (solegramLiquid) {
+            thumbX = solegramFollow(thumbX); // the fill, the lens and the glass all follow the thumb as drawn
             solegramActiveValue = solegramActive.set(pressed ? 1f : 0f);
             final float a = Math.max(0f, Math.min(1f, solegramActiveValue));
             final float scale = com.solegram.messenger.ui.LiquidControls.SLIDER_REST_SCALE
                 + (com.solegram.messenger.ui.LiquidControls.SLIDER_ACTIVE_SCALE - com.solegram.messenger.ui.LiquidControls.SLIDER_REST_SCALE) * a;
             final float fullHeight = Math.max(AndroidUtilities.dp(12), Math.min(AndroidUtilities.dp(28), getMeasuredHeight() - AndroidUtilities.dp(8)));
             solegramTh = fullHeight * scale;
-            solegramTw = solegramTh * 1.45f;
+            solegramTw = solegramTh * 1.45f * (1f + solegramStretch);
+            solegramTh *= 1f - solegramStretch * 0.2f;
             // never past the view: it clips, and the glass would be cut in half at the ends
             solegramCx = Math.max(solegramTw / 2f + 1, Math.min(getMeasuredWidth() - solegramTw / 2f - 1, thumbX + selectorWidth / 2f));
             if (a > 0.01f) {

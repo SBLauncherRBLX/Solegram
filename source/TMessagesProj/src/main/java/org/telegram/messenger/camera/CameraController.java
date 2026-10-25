@@ -410,6 +410,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
             CameraSession session = (CameraSession) sessionObject;
             final CameraInfo info = session.cameraInfo;
             final boolean flipFront = session.isFlipFront();
+            final boolean square = session.solegramSquare;
             Camera camera = info.camera;
             try {
                 // Solegram: focus is locked right before the shot, as the stock camera does it; the
@@ -424,7 +425,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                             FileLog.e(e);
                         }
                     }
-                    SolegramPhotoEnhance.execute(() -> savePicture(data, path, info, flipFront, ignoreOrientation, callback));
+                    SolegramPhotoEnhance.execute(() -> savePicture(data, path, info, flipFront, ignoreOrientation, square, callback));
                 };
                 if (focusMode == null) {
                     camera.takePicture(null, null, pictureCallback);
@@ -528,7 +529,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
     // Solegram: what the picture callback did before, now on a background thread: the front camera
     // photo turned and mirrored (now at JPEG 95 instead of 80) or the JPEG written as it is, then
     // Solegram processing, then the bitmap cached and the caller told on the main thread.
-    private static void savePicture(byte[] data, File path, CameraInfo info, boolean flipFront, boolean ignoreOrientation, Utilities.Callback<Integer> callback) {
+    private static void savePicture(byte[] data, File path, CameraInfo info, boolean flipFront, boolean ignoreOrientation, boolean square, Utilities.Callback<Integer> callback) {
         Bitmap bitmap = null;
         int orientation = 0;
         int size = (int) (AndroidUtilities.getPhotoSize() / AndroidUtilities.density);
@@ -581,6 +582,10 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                 bitmap.recycle();
             }
             bitmap = enhanced;
+        }
+        if (square) {
+            // Solegram: the 1:1 frame picked on the viewfinder, the middle of the 4:3 picture
+            bitmap = SolegramPhotoEnhance.cropSquare(path, bitmap);
         }
         if (bitmap == null) {
             bitmap = decodeBounded(data, MAX_CACHE_SIDE);
@@ -671,6 +676,8 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                             session.availableFlashModes.add(rawFlashMode);
                         }
                     }
+                    // Solegram: the torch is offered by the camera controls, not in Telegram's flash cycle
+                    session.torchSupported = rawFlashModes.contains(Camera.Parameters.FLASH_MODE_TORCH);
                     if (!TextUtils.equals(session.getCurrentFlashMode(), params.getFlashMode()) || !session.availableFlashModes.contains(session.getCurrentFlashMode())) {
                         session.checkFlashMode(session.availableFlashModes.get(0));
                     } else {
@@ -722,6 +729,8 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                             session.availableFlashModes.add(rawFlashMode);
                         }
                     }
+                    // Solegram: the torch is offered by the camera controls, not in Telegram's flash cycle
+                    session.torchSupported = rawFlashModes.contains(Camera.Parameters.FLASH_MODE_TORCH);
                     if (!TextUtils.equals(session.getCurrentFlashMode(), params.getFlashMode()) || !session.availableFlashModes.contains(session.getCurrentFlashMode())) {
                         session.checkFlashMode(session.availableFlashModes.get(0));
                     } else {
@@ -770,7 +779,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                         if (camera != null) {
                             try {
                                 Camera.Parameters params = camera.getParameters();
-                                params.setFlashMode(session.getCurrentFlashMode().equals(Camera.Parameters.FLASH_MODE_ON) ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
+                                params.setFlashMode(session.getCurrentFlashMode().equals(Camera.Parameters.FLASH_MODE_ON) || session.getCurrentFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH) ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
                                 camera.setParameters(params);
                                 session.onStartRecord();
                             } catch (Exception e) {
@@ -804,7 +813,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                     if (camera != null) {
                         try {
                             Camera.Parameters params = camera.getParameters();
-                            params.setFlashMode(session.getCurrentFlashMode().equals(Camera.Parameters.FLASH_MODE_ON) ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
+                            params.setFlashMode(session.getCurrentFlashMode().equals(Camera.Parameters.FLASH_MODE_ON) || session.getCurrentFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH) ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
                             camera.setParameters(params);
                         } catch (Exception e) {
                             FileLog.e(e);

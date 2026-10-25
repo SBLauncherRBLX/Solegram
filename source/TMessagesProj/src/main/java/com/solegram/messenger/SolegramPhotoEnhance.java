@@ -178,6 +178,82 @@ public final class SolegramPhotoEnhance {
         }
     }
 
+    /**
+     * Cuts the photo in the file to its middle square (the 1:1 frame of the camera controls) and
+     * writes it back, EXIF kept. {@code current} is the photo as the file holds it now, when the
+     * caller has it decoded (processed or turned): then that is cut, else the file is read again.
+     * Returns the square bitmap (the given one is recycled), or {@code current} when nothing was cut.
+     * Call off the UI thread.
+     */
+    public static Bitmap cropSquare(File file, Bitmap current) {
+        if (file == null || !file.exists()) {
+            return current;
+        }
+        Bitmap square = null;
+        File tmp = null;
+        try {
+            if (current != null && !current.isRecycled()) {
+                final int w = current.getWidth(), h = current.getHeight();
+                if (w == h) {
+                    return current;
+                }
+                final int side = Math.min(w, h);
+                square = Bitmap.createBitmap(current, (w - side) / 2, (h - side) / 2, side, side);
+            } else {
+                final BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+                final int w = bounds.outWidth, h = bounds.outHeight;
+                if (w <= 0 || h <= 0 || w == h) {
+                    return current;
+                }
+                final int side = Math.min(w, h);
+                final BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = sampleSize(side, side, MAX_SIDE);
+                final android.graphics.BitmapRegionDecoder decoder = android.graphics.BitmapRegionDecoder.newInstance(file.getAbsolutePath(), false);
+                try {
+                    final int left = (w - side) / 2, top = (h - side) / 2;
+                    square = decoder.decodeRegion(new Rect(left, top, left + side, top + side), options);
+                } finally {
+                    decoder.recycle();
+                }
+                if (square == null) {
+                    return current;
+                }
+            }
+            tmp = new File(file.getAbsolutePath() + ".sq.tmp");
+            try (FileOutputStream out = new FileOutputStream(tmp)) {
+                if (!square.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)) {
+                    throw new IllegalStateException("compress failed");
+                }
+                out.flush();
+                out.getFD().sync();
+            }
+            copyExif(file, tmp);
+            if (!tmp.renameTo(file)) {
+                throw new IllegalStateException("rename failed");
+            }
+            tmp = null;
+            if (current != null && current != square) {
+                current.recycle();
+            }
+            return square;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            if (square != null && square != current) {
+                square.recycle();
+            }
+            return current;
+        } finally {
+            if (tmp != null) {
+                try {
+                    tmp.delete();
+                } catch (Throwable ignore) {
+                }
+            }
+        }
+    }
+
     // Java heap needed: the pixel array and two float planes at the processed size, and before
     // Android 8 the bitmaps too (they live outside the Java heap since then).
     private static boolean fits(int srcW, int srcH, int maxSide) {

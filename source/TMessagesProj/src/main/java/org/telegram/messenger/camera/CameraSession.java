@@ -70,6 +70,16 @@ public class CameraSession {
 
     public ArrayList<String> availableFlashModes = new ArrayList<>();
 
+    // Solegram camera controls: the torch the camera offers besides off / auto / on, the exposure
+    // compensation picked on the viewfinder (in the camera's steps, kept while this session lives),
+    // the zoom ratios the camera lists, and a square crop of the photos taken now.
+    public volatile boolean torchSupported;
+    public volatile boolean solegramSquare;
+    private volatile int exposureIndex;
+    private volatile int minExposure, maxExposure;
+    private volatile float exposureStep;
+    private volatile List<Integer> zoomRatios;
+
     private int infoCameraId = -1;
     Camera.CameraInfo info = new Camera.CameraInfo();
 
@@ -295,6 +305,7 @@ public class CameraSession {
                     }
                     params.setFlashMode(currentFlashMode);
                     params.setZoom((int) (currentZoom * maxZoom));
+                    readSolegramCaps(params);
                     try {
                         setParameters(camera, params, fpsBefore);
                     } catch (Exception e) {
@@ -435,6 +446,7 @@ public class CameraSession {
                         //
                     }
                     params.setFlashMode(useTorch ? Camera.Parameters.FLASH_MODE_TORCH : currentFlashMode);
+                    readSolegramCaps(params);
                     // The higher frame rate is only for the time of a recording, so photos keep their usual exposure.
                     final int[] fpsBefore = updateFpsRange(params, isVideo && wantsHighFps());
 
@@ -664,6 +676,109 @@ public class CameraSession {
             configurePhotoCamera();
         }
     }
+
+    // region Solegram camera controls
+
+    // What the camera offers for exposure and zoom, read whenever the parameters are set up; the
+    // exposure picked on the viewfinder goes in with them, so a zoom or rotation keeps it.
+    private void readSolegramCaps(Camera.Parameters params) {
+        try {
+            final int min = params.getMinExposureCompensation(), max = params.getMaxExposureCompensation();
+            final float step = params.getExposureCompensationStep();
+            minExposure = min;
+            maxExposure = max;
+            exposureStep = step;
+            if (min < max && step > 0) {
+                params.setExposureCompensation(Math.max(min, Math.min(max, exposureIndex)));
+            }
+            zoomRatios = params.isZoomSupported() ? params.getZoomRatios() : null;
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    /** The camera can shift its exposure (both ways). */
+    public boolean isExposureSupported() {
+        return minExposure < 0 && maxExposure > 0 && exposureStep > 0;
+    }
+
+    public int getMinExposure() {
+        return minExposure;
+    }
+
+    public int getMaxExposure() {
+        return maxExposure;
+    }
+
+    /** Size of one exposure step in EV. */
+    public float getExposureStep() {
+        return exposureStep;
+    }
+
+    public int getExposureIndex() {
+        return exposureIndex;
+    }
+
+    /**
+     * Exposure compensation in the camera's own steps (0 = as the camera meters). Only this
+     * parameter is sent, so dragging the slider stays light. Call on the main thread.
+     */
+    public void setExposureIndex(int index) {
+        if (!isExposureSupported()) {
+            return;
+        }
+        index = Math.max(minExposure, Math.min(maxExposure, index));
+        if (index == exposureIndex) {
+            return;
+        }
+        exposureIndex = index;
+        try {
+            final Camera camera = destroyed ? null : cameraInfo.camera;
+            if (camera != null) {
+                final Camera.Parameters params = camera.getParameters();
+                params.setExposureCompensation(index);
+                camera.setParameters(params);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    /** Largest zoom the camera gives, as a ratio (2f = 2x); 1 when it can't zoom. */
+    public float getMaxZoomRatio() {
+        final List<Integer> ratios = zoomRatios;
+        if (ratios == null || ratios.isEmpty()) {
+            return 1f;
+        }
+        return ratios.get(ratios.size() - 1) / 100f;
+    }
+
+    /** Zoom ratio of a zoom value (0..1, the value {@link #setZoom} takes). */
+    public float zoomRatio(float zoom) {
+        final List<Integer> ratios = zoomRatios;
+        if (ratios == null || ratios.isEmpty() || maxZoom <= 0) {
+            return 1f;
+        }
+        final int index = Math.max(0, Math.min(ratios.size() - 1, (int) (zoom * maxZoom)));
+        return ratios.get(index) / 100f;
+    }
+
+    /** Zoom value (0..1) of the first zoom step that reaches the ratio. */
+    public float zoomForRatio(float ratio) {
+        final List<Integer> ratios = zoomRatios;
+        if (ratios == null || ratios.isEmpty() || maxZoom <= 0) {
+            return 0f;
+        }
+        final int wanted = Math.round(ratio * 100);
+        for (int i = 0; i < ratios.size(); i++) {
+            if (ratios.get(i) >= wanted) {
+                // the value lands on this step after (int) (zoom * maxZoom)
+                return i == 0 ? 0f : Math.min(1f, (i + 0.5f) / maxZoom);
+            }
+        }
+        return 1f;
+    }
+    // endregion
 
     protected void configureRecorder(int quality, MediaRecorder recorder) {
         updateCameraInfo();

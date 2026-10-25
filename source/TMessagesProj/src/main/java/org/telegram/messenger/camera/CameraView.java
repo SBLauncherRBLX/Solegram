@@ -106,6 +106,9 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
 
     public boolean isStory;
     public boolean recordHevc;
+    /** Solegram camera controls: shape of the frame, {@link #SG_ASPECT_DEFAULT} leaves Telegram's choice. */
+    public volatile int solegramAspect;
+    public static final int SG_ASPECT_DEFAULT = 0, SG_ASPECT_4_3 = 1, SG_ASPECT_16_9 = 2;
     private float scaleX, scaleY;
     private Size[] previewSize = new Size[2];
     private Size[] pictureSize = new Size[2];
@@ -545,6 +548,11 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     public float getTextureHeight(float width, float height) {
+        return getTextureHeight(width, height, false);
+    }
+
+    /** Height of the preview in a view of this size; fitted inside it (letterboxed) or filling it. */
+    public float getTextureHeight(float width, float height, boolean fitted) {
         if (previewSize[0] == null || cameraSession[0] == null) {
             return height;
         }
@@ -557,7 +565,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
             frameWidth = previewSize[0].getHeight();
             frameHeight = previewSize[0].getWidth();
         }
-        float s = Math.max(width / (float) frameWidth , height / (float) frameHeight);
+        float s = fitted ? Math.min(width / (float) frameWidth, height / (float) frameHeight) : Math.max(width / (float) frameWidth , height / (float) frameHeight);
         return (int) (s * frameHeight);
     }
 
@@ -758,6 +766,22 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
 //            photoMaxWidth = wantedWidth = AndroidUtilities.displaySize.x;
 //            photoMaxHeight = wantedHeight = AndroidUtilities.displaySize.y;
 //            aspectRatio = new Size(wantedWidth, wantedHeight);
+        } else if (solegramAspect != SG_ASPECT_DEFAULT && !dual && !isStory) {
+            // Solegram: the frame picked on the viewfinder, with either camera
+            final boolean low = SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW;
+            if (solegramAspect == SG_ASPECT_4_3) {
+                aspectRatio = new Size(4, 3);
+                wantedWidth = 1280;
+                wantedHeight = 960;
+                photoMaxWidth = low ? 1280 : 1920;
+                photoMaxHeight = low ? 960 : 1440;
+            } else {
+                aspectRatio = new Size(16, 9);
+                wantedWidth = 1280;
+                wantedHeight = 720;
+                photoMaxWidth = low ? 1280 : 1920;
+                photoMaxHeight = low ? 720 : 1080;
+            }
         } else if (initialFrontface) {
             aspectRatio = new Size(16, 9);
             photoMaxWidth = wantedWidth = 1280;
@@ -1057,11 +1081,21 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 dt = 17;
             }
             lastDrawTime = newTime;
-            outerPaint.setAlpha((int) (interpolator.getInterpolation(outerAlpha) * 255));
-            innerPaint.setAlpha((int) (interpolator.getInterpolation(innerAlpha) * 127));
             float interpolated = interpolator.getInterpolation(focusProgress);
-            canvas.drawCircle(cx, cy, baseRad + baseRad * (1.0f - interpolated), outerPaint);
-            canvas.drawCircle(cx, cy, baseRad * interpolated, innerPaint);
+            if (com.solegram.messenger.SolegramConfig.cameraControls) {
+                // Solegram: the focus ring of its camera controls (stories too): a thin yellow ring that lands and settles
+                outerPaint.setColor(0xFFFFD60A);
+                outerPaint.setStrokeWidth(AndroidUtilities.dpf2(1.5f));
+                outerPaint.setAlpha((int) (interpolator.getInterpolation(outerAlpha) * 255));
+                canvas.drawCircle(cx, cy, dp(34) * (1f + 0.35f * (1f - interpolated)), outerPaint);
+            } else {
+                outerPaint.setColor(0xffffffff);
+                outerPaint.setStrokeWidth(dp(2));
+                outerPaint.setAlpha((int) (interpolator.getInterpolation(outerAlpha) * 255));
+                innerPaint.setAlpha((int) (interpolator.getInterpolation(innerAlpha) * 127));
+                canvas.drawCircle(cx, cy, baseRad + baseRad * (1.0f - interpolated), outerPaint);
+                canvas.drawCircle(cx, cy, baseRad * interpolated, innerPaint);
+            }
 
             if (focusProgress < 1) {
                 focusProgress += dt / 200.0f;
@@ -1158,7 +1192,8 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        if (flipAnimator != null) {
+        if (flipAnimator != null || fit) {
+            // fitted (Solegram camera controls): black bars around the frame, as in a camera app
             canvas.drawColor(Color.BLACK);
         }
         super.dispatchDraw(canvas);

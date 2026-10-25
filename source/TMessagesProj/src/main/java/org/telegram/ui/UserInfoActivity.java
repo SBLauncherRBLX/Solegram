@@ -297,6 +297,7 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
     private static final int INFO_BIRTHDAY = 9;
     private static final int BUTTON_ADD_ACCOUNT = 10;
     private static final int BUTTON_LOGOUT = 11;
+    private static final int BUTTON_SG_LINKS = 101; // Solegram: profile links, kept in the bio
 
     private final ArrayList<Integer> accountNumbers = new ArrayList<>();
     private void updateAccounts() {
@@ -351,6 +352,8 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
         items.add(UItem.asShadow(-1, null));
         bioRow = items.size();
         items.add(UItem.asCustom(bioEdit));
+        // Solegram: links to profiles on other platforms, written into the bio above
+        items.add(SettingsActivity.SettingCell.Factory.of(BUTTON_SG_LINKS, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.sg_brand_link, getString(R.string.SG_ProfileLinks), getString(R.string.SG_ProfileLinksMineInfo)));
         items.add(UItem.asShadow(bioInfo));
 
         final TLRPC.User user = getUserConfig().getCurrentUser();
@@ -528,6 +531,13 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
             presentFragment(new ChangeUsernameActivity());
         } else if (item.id == BUTTON_LOGOUT) {
             presentFragment(new LogoutActivity());
+        } else if (item.id == BUTTON_SG_LINKS && !item.instanceOf(SettingsActivity.AccountCell.Factory.class)) {
+            // the bio being edited goes in and comes back with the links; Done saves it as usual
+            com.solegram.messenger.ui.SolegramProfileLinksSheet.show(this, bioEdit.getText().toString(), bio -> {
+                bioEdit.setText(bio);
+                checkDone(true);
+                updateBioInfo();
+            });
         }
     }
 

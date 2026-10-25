@@ -244,6 +244,19 @@ public final class SolegramNowPlayingBio {
         AndroidUtilities.runOnUIThread(restoreRunnable, delay);
     }
 
+    /**
+     * The user's own bio, for an editor to start from: while the music line stands in for it, the one kept on the
+     * device; otherwise the bio without a music line.
+     */
+    public static String ownBio(long userId, @Nullable String about) {
+        final String written = prefs().getString(KEY_WRITTEN + userId, null);
+        if (written != null && same(about, written)) {
+            return prefs().getString(KEY_ORIGINAL + userId, "");
+        }
+        final String stripped = SolegramNowPlaying.stripBio(about);
+        return stripped == null ? "" : stripped;
+    }
+
     /** Without the invisible mark, in case Telegram drops it from the bio. */
     private static String plain(@Nullable String s) {
         return s == null ? "" : s.replace("\u2060", "");

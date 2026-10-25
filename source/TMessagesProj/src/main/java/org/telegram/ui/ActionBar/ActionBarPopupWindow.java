@@ -1467,13 +1467,143 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
         if (liquid != null) {
             setAnimationStyle(0);
         }
+        final boolean spring = liquid == null && solegramPrepareSpring();
         solegramRoomL = solegramRoomT = solegramRoomR = solegramRoomB = 0;
         solegramCollectPanels();
         super.showAsDropDown(anchor, xoff, yoff, gravity);
         if (liquid == null || !solegramStartLiquid(liquid, anchor, false)) {
             solegramApplyGlass();
         }
+        if (spring) {
+            solegramSpringIn(anchor);
+        }
     }
+
+    // region Solegram motion: a glass menu grows out of what opened it on a spring and shrinks back into it
+
+    private static final float SOLEGRAM_SCALE_FROM = 0.84f, SOLEGRAM_SCALE_TO = 0.9f;
+    // the window animation given up for the spring (-2: none), set again for a show without it
+    private int solegramTakenStyle = -2;
+    private boolean solegramSprung;
+    @Nullable
+    private ValueAnimator solegramOpenAnimator;
+    @Nullable
+    private View solegramMotionAnchor;
+    private float solegramPivotX = Float.NaN, solegramPivotY;
+    private final int[] solegramMotionLoc = new int[2];
+
+    /**
+     * Before a show: the spring replaces the window animation for glass menus that use the usual one (a menu with
+     * no window animation animates its own way); everything a previous spring left on the content is undone.
+     */
+    private boolean solegramPrepareSpring() {
+        if (solegramOpenAnimator != null) {
+            final ValueAnimator running = solegramOpenAnimator;
+            solegramOpenAnimator = null;
+            running.cancel();
+        }
+        final View content = getContentView();
+        if (solegramSprung && content != null) {
+            content.setScaleX(1f);
+            content.setScaleY(1f);
+            content.setAlpha(1f);
+        }
+        solegramSprung = false;
+        solegramMotionAnchor = null;
+        final boolean wanted = solegramSpringAllowed() && (solegramTakenStyle != -2 || getAnimationStyle() != 0);
+        if (wanted) {
+            if (solegramTakenStyle == -2) {
+                solegramTakenStyle = getAnimationStyle();
+            }
+            setAnimationStyle(0);
+        } else if (solegramTakenStyle != -2) {
+            setAnimationStyle(solegramTakenStyle);
+            solegramTakenStyle = -2;
+        }
+        return wanted;
+    }
+
+    /** Glass menus of this window may spring (not those that animate their own way: no liquid, no glass). */
+    private boolean solegramSpringAllowed() {
+        return solegramLiquid && solegramAllowGlass && animationEnabled && getContentView() != null
+            && com.solegram.messenger.SolegramConfig.glassMenus && com.solegram.messenger.ui.SolegramMotion.enabled();
+    }
+
+    /** Just shown: the menu scales up from the point nearest to what opened it, with a soft overshoot. */
+    private void solegramSpringIn(@Nullable View opener) {
+        final View content = getContentView();
+        solegramSprung = true;
+        solegramMotionAnchor = solegramOriginView != null ? solegramOriginView : opener;
+        solegramPivotX = Float.NaN;
+        content.setAlpha(0f);
+        content.setScaleX(SOLEGRAM_SCALE_FROM);
+        content.setScaleY(SOLEGRAM_SCALE_FROM);
+        final ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setInterpolator(null); // linear time: the spring curve and the fade are applied below
+        animator.setDuration(com.solegram.messenger.ui.SolegramMotion.SPRING);
+        animator.addUpdateListener(a -> {
+            final float t = a.getAnimatedFraction();
+            solegramApplyPivot(content);
+            final float s = SOLEGRAM_SCALE_FROM + (1f - SOLEGRAM_SCALE_FROM) * com.solegram.messenger.ui.SolegramMotion.SPRING_GENTLE.getInterpolation(t);
+            content.setScaleX(s);
+            content.setScaleY(s);
+            content.setAlpha(com.solegram.messenger.ui.SolegramMotion.EASE_OUT.getInterpolation(Math.min(1f, t * 2.4f)));
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (solegramOpenAnimator == animation) {
+                    solegramOpenAnimator = null;
+                    content.setScaleX(1f);
+                    content.setScaleY(1f);
+                    content.setAlpha(1f);
+                }
+            }
+        });
+        solegramOpenAnimator = animator;
+        animator.start();
+    }
+
+    /**
+     * The point the menu grows from and shrinks into: what opened it (its centre, kept inside the menu), else the
+     * menu's corner toward the middle of the screen's nearest edges. Found once the menu is laid out.
+     */
+    private void solegramApplyPivot(View content) {
+        if (Float.isNaN(solegramPivotX)) {
+            if (!content.isLaidOut() || content.getWidth() <= 0 || content.getHeight() <= 0) {
+                return;
+            }
+            // the menu on screen without its scale: its window's place plus its offset in the window
+            final View root = content.getRootView();
+            root.getLocationOnScreen(solegramMotionLoc);
+            float x = solegramMotionLoc[0], y = solegramMotionLoc[1];
+            for (View v = content; v != root && v != null; v = v.getParent() instanceof View ? (View) v.getParent() : null) {
+                x += v.getLeft();
+                y += v.getTop();
+            }
+            final int w = content.getWidth(), h = content.getHeight();
+            final View anchor = solegramMotionAnchor;
+            float ax, ay;
+            if (solegramOriginRect != null) {
+                ax = solegramOriginRect.centerX();
+                ay = solegramOriginRect.centerY();
+            } else if (anchor != null && anchor.isAttachedToWindow() && anchor != anchor.getRootView()
+                && anchor.getWidth() > 0 && anchor.getWidth() <= dp(200) && anchor.getHeight() > 0 && anchor.getHeight() <= dp(200)) {
+                anchor.getLocationOnScreen(solegramMotionLoc);
+                ax = solegramMotionLoc[0] + anchor.getWidth() * anchor.getScaleX() / 2f;
+                ay = solegramMotionLoc[1] + anchor.getHeight() * anchor.getScaleY() / 2f;
+            } else {
+                // shown at a place: menus open toward the middle of the screen, from the corner nearest its edge
+                ax = x + w / 2f > AndroidUtilities.displaySize.x / 2f ? x + w : x;
+                ay = y + h / 2f > AndroidUtilities.displaySize.y / 2f ? y + h : y;
+            }
+            solegramPivotX = Math.max(0, Math.min(w, ax - x));
+            solegramPivotY = Math.max(0, Math.min(h, ay - y));
+        }
+        content.setPivotX(solegramPivotX);
+        content.setPivotY(solegramPivotY);
+    }
+    // endregion
 
     // region Solegram liquid: the menu flows out of what opened it and back into it
 
@@ -1863,6 +1993,11 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
         if (solegramLiquidLayout != null && solegramLiquidLayout.solegramLiquidActive()) {
             return; // Solegram: it flows out as liquid
         }
+        if (!solegramSprung && isShowing() && windowAnimatorSet == null && solegramSpringAllowed()) {
+            // Solegram: a menu with no window animation of its own (a header's menu) grows out of its button too,
+            // together with Telegram's reveal of its items below
+            solegramSpringIn(null);
+        }
         if (animationEnabled) {
             if (windowAnimatorSet != null) {
                 return;
@@ -1966,12 +2101,16 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
         if (liquid != null) {
             setAnimationStyle(0);
         }
+        final boolean spring = liquid == null && solegramPrepareSpring();
         solegramRoomL = solegramRoomT = solegramRoomR = solegramRoomB = 0;
         solegramCollectPanels();
         super.showAtLocation(parent, gravity, x, y);
         unregisterListener();
         if (liquid == null || !solegramStartLiquid(liquid, parent, true)) {
             solegramApplyGlass();
+        }
+        if (spring) {
+            solegramSpringIn(parent);
         }
     }
 
@@ -2052,6 +2191,20 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             if (outEmptyTime > 0) {
                 windowAnimatorSet.playTogether(ValueAnimator.ofFloat(0, 1f));
                 windowAnimatorSet.setDuration(outEmptyTime);
+            } else if (solegramSprung && com.solegram.messenger.ui.SolegramMotion.enabled()) {
+                // Solegram: the menu shrinks back into what opened it (from wherever its opening got to)
+                if (solegramOpenAnimator != null) {
+                    final ValueAnimator running = solegramOpenAnimator;
+                    solegramOpenAnimator = null;
+                    running.cancel();
+                }
+                solegramApplyPivot(viewGroup);
+                windowAnimatorSet.playTogether(
+                        ObjectAnimator.ofFloat(viewGroup, View.SCALE_Y, SOLEGRAM_SCALE_TO),
+                        ObjectAnimator.ofFloat(viewGroup, View.SCALE_X, SOLEGRAM_SCALE_TO),
+                        ObjectAnimator.ofFloat(viewGroup, View.ALPHA, 0.0f));
+                windowAnimatorSet.setDuration(Math.max(180, dismissAnimationDuration));
+                windowAnimatorSet.setInterpolator(com.solegram.messenger.ui.SolegramMotion.EASE_IN);
             } else if (scaleOut) {
                 windowAnimatorSet.playTogether(
                         ObjectAnimator.ofFloat(viewGroup, View.SCALE_Y, 0.8f),

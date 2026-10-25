@@ -84,6 +84,7 @@ public class PluginSecuritySheet extends BottomSheet {
         super(fragment.getParentActivity(), false, fragment.getResourceProvider());
         Context context = fragment.getParentActivity();
         fixNavigationBar();
+        SolegramMotion.springSheet(this);
 
         boolean refusedByUser = !blocklisted && mode != MODE_VIEW && SolegramConfig.pluginsBlockDangerous
             && report.verdict == PluginSecurity.VERDICT_DANGER;
@@ -360,7 +361,7 @@ public class PluginSecuritySheet extends BottomSheet {
     private void updateDetailsToggle(boolean toggle) {
         boolean shown = detailsLayout.getVisibility() == View.VISIBLE;
         if (toggle) {
-            android.transition.TransitionManager.beginDelayedTransition(content);
+            SolegramMotion.beginLayoutTransition(content); // the details unfold, what is under them glides down
             shown = !shown;
             detailsLayout.setVisibility(shown ? View.VISIBLE : View.GONE);
         }

@@ -676,6 +676,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     private final com.solegram.messenger.ui.SolegramLiquid.Spring lensX = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).params(0.3f, 0.8f);
     private final com.solegram.messenger.ui.SolegramLiquid.Spring lensA = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).rest(0.002f);
     private long lensLastFrame;
+    private boolean lensRich;
     @Nullable
     private Object lensShader;
     private boolean lensShaderFailed;
@@ -710,6 +711,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     return;
                 }
                 lensTracking = true;
+                lensRich = com.solegram.messenger.ui.SolegramMotion.rich();
                 lensDownX = ev.getX();
                 lensDownChild = child;
                 lensStartSelected = findSelectedTab();
@@ -830,7 +832,10 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         // about 1.25 of the capsule's height: over the bar's glass at the top and bottom
         final float lensH = getHeight() - dp(1);
         final float lensW = Math.max(pillW * 1.18f + dp(6), lensH * 1.2f);
-        final float w = Math.max(dp(8), pillW + (lensW - pillW) * a), h = Math.max(dp(8), tabH + (lensH - tabH) * a);
+        // liquid stretch: the glass draws out along its way as it slides, and rounds up again as it stops
+        final float stretch = lensRich ? Math.min(0.22f, Math.abs(lensX.velocity) / dp(2400)) : 0f;
+        final float w = Math.max(dp(8), pillW + (lensW - pillW) * a) * (1f + stretch);
+        final float h = Math.max(dp(8), tabH + (lensH - tabH) * a) * (1f - stretch * 0.15f);
         final float r = h / 2f;
         lensRect.set(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
         lensPath.rewind();

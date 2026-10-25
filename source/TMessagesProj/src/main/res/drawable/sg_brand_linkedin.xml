@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: LinkedIn mark from Simple Icons (CC0), for profile links -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M20.447 20.452 h-3.554 v-5.569 c0 -1.328 -0.027 -3.037 -1.852 -3.037 c-1.853 0 -2.136 1.445 -2.136 2.939 v5.667 H9.351 V9 h3.414 v1.561 h0.046 c0.477 -0.9 1.637 -1.85 3.37 -1.85 c3.601 0 4.267 2.37 4.267 5.455 v6.286 zM5.337 7.433 c-1.144 0 -2.063 -0.926 -2.063 -2.065 c0 -1.138 0.92 -2.063 2.063 -2.063 c1.14 0 2.064 0.925 2.064 2.063 c0 1.139 -0.925 2.065 -2.064 2.065 zm1.782 13.019 H3.555 V9 h3.564 v11.452 zM22.225 0 H1.771 C0.792 0 0 0.774 0 1.729 v20.542 C0 23.227 0.792 24 1.771 24 h20.451 C23.2 24 24 23.227 24 22.271 V1.729 C24 0.774 23.2 0 22.222 0 h0.003 z" />
+</vector>

@@ -369,8 +369,15 @@ public class FeedPostCell extends View {
                 downX = e.getX();
                 downY = e.getY();
                 pressedHeader = downY < card.top + dp(14) + dp(44);
-                return card.contains(downX, downY);
+                if (card.contains(downX, downY)) {
+                    // the card gives in under the finger, unless the touch turns out to be a scroll
+                    removeCallbacks(pressIn);
+                    postDelayed(pressIn, android.view.ViewConfiguration.getTapTimeout());
+                    return true;
+                }
+                return false;
             case MotionEvent.ACTION_UP:
+                releasePress(true);
                 if (Math.abs(e.getX() - downX) < dp(10) && Math.abs(e.getY() - downY) < dp(10)) {
                     if (translateLabel != null && translateRect.contains(downX, downY)) {
                         toggleTranslation();
@@ -378,8 +385,7 @@ public class FeedPostCell extends View {
                         toggleSummary();
                     } else if (truncated && textLayout != null && downY >= textTop && downY <= textTop + textLayout.getHeight() + dp(30)) {
                         post.expanded = true;
-                        requestLayout();
-                        invalidate();
+                        relayout();
                     } else if (pressedHeader) {
                         delegate.onOpenChannel(post);
                     } else {
@@ -388,9 +394,41 @@ public class FeedPostCell extends View {
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                releasePress(false);
                 return true;
         }
         return true;
+    }
+
+    private boolean pressShown;
+    private final Runnable pressIn = () -> {
+        if (SolegramConfig.pressScale) {
+            pressShown = true;
+            SolegramMotion.press(this, true, SolegramMotion.PRESS_CARD);
+        }
+    };
+    private final Runnable pressOut = () -> SolegramMotion.press(this, false, SolegramMotion.PRESS_CARD);
+
+    /** The finger is gone: a quick tap still shows a short dip before the card springs back. */
+    private void releasePress(boolean tap) {
+        removeCallbacks(pressIn);
+        removeCallbacks(pressOut);
+        if (!pressShown && tap) {
+            pressIn.run();
+            if (pressShown) {
+                postDelayed(pressOut, 90);
+            }
+        } else {
+            pressOut.run();
+        }
+        pressShown = false;
+    }
+
+    /** The post changed its height (text unfolded, a translation or summary shown): the posts under it glide. */
+    private void relayout() {
+        requestLayout();
+        invalidate();
+        SolegramMotion.rowResized(this);
     }
 
     private void toggleSummary() {
@@ -403,13 +441,11 @@ public class FeedPostCell extends View {
             if (p.showSummary) {
                 p.showTranslated = false;
             }
-            requestLayout();
-            invalidate();
+            relayout();
             return;
         }
         p.summarizing = true;
-        requestLayout();
-        invalidate();
+        relayout();
         final String source = p.message.messageOwner.message;
         final String language = SolegramConfig.aiSummaryLanguage == 1 ? TranslateAlert2.getToLanguage() : null;
         com.solegram.messenger.SolegramSummarizer.summarize(source, language, (result, error) -> {
@@ -426,8 +462,7 @@ public class FeedPostCell extends View {
                 }
             }
             if (post == p) {
-                requestLayout();
-                invalidate();
+                relayout();
             }
         });
     }
@@ -442,13 +477,11 @@ public class FeedPostCell extends View {
             if (p.showTranslated) {
                 p.showSummary = false;
             }
-            requestLayout();
-            invalidate();
+            relayout();
             return;
         }
         p.translating = true;
-        requestLayout();
-        invalidate();
+        relayout();
         final String source = p.message.messageOwner.message;
         SolegramTranslator.translate(source, TranslateAlert2.getToLanguage(), result -> {
             p.translating = false;
@@ -459,8 +492,7 @@ public class FeedPostCell extends View {
                 p.showSummary = false;
             }
             if (post == p) {
-                requestLayout();
-                invalidate();
+                relayout();
             }
         });
     }
@@ -475,6 +507,9 @@ public class FeedPostCell extends View {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        removeCallbacks(pressIn);
+        removeCallbacks(pressOut);
+        pressShown = false;
         avatar.onDetachedFromWindow();
         media.onDetachedFromWindow();
     }

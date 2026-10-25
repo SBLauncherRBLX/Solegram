@@ -36,7 +36,6 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.utils.RenderNodeEffects;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
@@ -434,19 +433,9 @@ public class SolegramCallSheet extends FrameLayout {
     }
 
     private static void show(View view, boolean show, boolean animated) {
-        view.animate().cancel();
-        if (show) {
-            if (animated && view.getVisibility() != View.VISIBLE) {
-                view.setVisibility(View.VISIBLE);
-                view.setAlpha(0f);
-                view.animate().alpha(1f).setDuration(180).start();
-            } else {
-                view.setVisibility(View.VISIBLE);
-                view.setAlpha(1f);
-            }
-        } else {
-            view.setVisibility(View.GONE);
-        }
+        // new content springs in (fade, slight scale and rise); the old one goes at once, the sheet's height
+        // change (startMorph) is what shows it going
+        SolegramMotion.setVisible(view, show, show && animated);
     }
 
     private void animateShown(boolean show, boolean animated) {
@@ -482,7 +471,8 @@ public class SolegramCallSheet extends FrameLayout {
                 }
             }
         });
-        animator.setDuration(show ? 220 : 180);
+        animator.setDuration(show ? SolegramMotion.NORMAL : SolegramMotion.FAST + 20);
+        animator.setInterpolator(show ? SolegramMotion.EASE_OUT : SolegramMotion.EASE_IN);
         shownAnimator = animator;
         animator.start();
     }
@@ -517,8 +507,8 @@ public class SolegramCallSheet extends FrameLayout {
                 }
             }
         });
-        animator.setDuration(260);
-        animator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        animator.setDuration(300); // it relayouts the call screen each frame: kept short
+        animator.setInterpolator(SolegramMotion.EMPHASIZED);
         morphAnimator = animator;
         animator.start();
     }

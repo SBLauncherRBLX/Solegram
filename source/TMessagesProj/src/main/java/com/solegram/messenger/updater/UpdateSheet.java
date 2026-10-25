@@ -6,7 +6,11 @@
 package com.solegram.messenger.updater;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Outline;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.text.TextUtils;
@@ -30,6 +34,8 @@ import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.AnimatedFloat;
+import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
@@ -39,12 +45,16 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
     private final UpdateController.UpdateInfo info;
     private final ButtonWithCounterView button;
     private final TextView laterButton;
+    // the download as the button shows it (a fill behind its text)
+    private boolean downloading;
+    private float downloadProgress;
 
     public UpdateSheet(BaseFragment fragment, UpdateController.UpdateInfo info) {
         super(fragment.getParentActivity(), false, fragment.getResourceProvider());
         this.info = info;
         Context context = fragment.getParentActivity();
         fixNavigationBar();
+        com.solegram.messenger.ui.SolegramMotion.springSheet(this);
 
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -102,7 +112,29 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
             layout.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 0, 24, 0));
         }
 
-        button = new ButtonWithCounterView(context, resourcesProvider);
+        button = new ButtonWithCounterView(context, resourcesProvider) {
+            // the download fills the button from the left; the fill glides between the progress updates
+            private final AnimatedFloat shownProgress = new AnimatedFloat(this, 0, 420, CubicBezierInterpolator.EASE_OUT_QUINT);
+            private final AnimatedFloat shownFill = new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
+            private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Path fillClip = new Path();
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                final float shown = shownFill.set(downloading ? 1f : 0f);
+                final float progress = shownProgress.set(downloadProgress, !downloading && shown <= 0f);
+                if (shown > 0f && progress > 0f && getWidth() > 0) {
+                    canvas.save();
+                    fillClip.rewind();
+                    fillClip.addRoundRect(0, 0, getWidth(), getHeight(), AndroidUtilities.dp(8), AndroidUtilities.dp(8), Path.Direction.CW);
+                    canvas.clipPath(fillClip);
+                    fillPaint.setColor(Color.argb((int) (0x2E * shown), 255, 255, 255));
+                    canvas.drawRect(0, 0, getWidth() * progress, getHeight(), fillPaint);
+                    canvas.restore();
+                }
+                super.onDraw(canvas);
+            }
+        };
         button.setOnClickListener(v -> onButton());
         layout.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 18, 16, 0));
 
@@ -146,6 +178,9 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
 
     private void updateButton(boolean animated) {
         UpdateController uc = UpdateController.getInstance();
+        downloading = !uc.isDownloaded(info) && uc.isDownloading(info);
+        downloadProgress = downloading ? Math.max(0f, Math.min(1f, uc.getDownloadProgress())) : 0f;
+        button.invalidate();
         if (uc.isDownloaded(info)) {
             button.setText(LocaleController.getString(R.string.SG_InstallUpdate), animated);
         } else if (uc.isDownloading(info)) {

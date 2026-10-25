@@ -620,6 +620,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     // Solegram music in the profile: the card, and on the own profile an invitation to connect a player
     private int sgNowPlayingRow = -1;
     private int sgNowPlayingConnectRow = -1;
+    // Solegram: links to profiles on other platforms, read from the bio, as buttons under it
+    private int sgLinksRow = -1;
     private int setUsernameRow;
     private int bioRow;
     private int phoneSuggestionSectionRow;
@@ -10508,25 +10510,63 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         final boolean about = userInfo != null && !TextUtils.isEmpty(sgAbout());
         final boolean track = sgNowPlayingTrack() != null;
         final boolean offer = !track && sgOfferMusic();
-        if (about != (userInfoRow >= 0) || track != (sgNowPlayingRow >= 0) || offer != (sgNowPlayingConnectRow >= 0)) {
+        final boolean links = sgProfileLinks() != null;
+        if (about != (userInfoRow >= 0) || track != (sgNowPlayingRow >= 0) || offer != (sgNowPlayingConnectRow >= 0) || links != (sgLinksRow >= 0)) {
             updateListAnimated(false);
             return;
         }
         if (userInfoRow >= 0) {
             listAdapter.notifyItemChanged(userInfoRow);
         }
+        if (sgLinksRow >= 0) {
+            listAdapter.notifyItemChanged(sgLinksRow);
+        }
         if (sgNowPlayingRow >= 0) {
             listAdapter.notifyItemChanged(sgNowPlayingRow);
         }
     }
 
-    /** The bio as shown: without the music line, which the card shows. */
+    /** The bio as shown: without the music line, which the card shows, and the lines of links, which the buttons show. */
     private String sgAbout() {
         if (userInfo == null) {
             return null;
         }
-        return com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about;
+        final String about = com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about;
+        if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || TextUtils.isEmpty(about)) {
+            return about;
+        }
+        return com.solegram.messenger.SolegramProfileLinks.parse(about).text;
     }
+
+    /** The links to profiles on other platforms in this profile's bio, or null when there are none to show. */
+    private java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> sgProfileLinks() {
+        if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || userInfo == null || TextUtils.isEmpty(userInfo.about)) {
+            return null;
+        }
+        final String about = com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about;
+        final java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> links = com.solegram.messenger.SolegramProfileLinks.parse(about).links;
+        return links.isEmpty() ? null : links;
+    }
+
+    private final com.solegram.messenger.ui.SolegramProfileLinksView.Delegate sgLinksDelegate = new com.solegram.messenger.ui.SolegramProfileLinksView.Delegate() {
+        @Override
+        public void onOpen(com.solegram.messenger.SolegramProfileLinks.Link link) {
+            if (getParentActivity() != null) {
+                Browser.openUrl(getParentActivity(), link.url());
+            }
+        }
+
+        @Override
+        public void onCopy(com.solegram.messenger.SolegramProfileLinks.Link link) {
+            AndroidUtilities.addToClipboard(link.url());
+            BulletinFactory.of(ProfileActivity.this).createCopyLinkBulletin().show();
+        }
+
+        @Override
+        public void onEdit() {
+            com.solegram.messenger.ui.SolegramProfileLinksSheet.show(ProfileActivity.this);
+        }
+    };
 
     /** What this profile listens to: the player on this phone for the own profile, else the music line of the bio. */
     private com.solegram.messenger.SolegramNowPlaying.Track sgNowPlayingTrack() {
@@ -10631,6 +10671,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         solegramIdRow = -1;
         sgNowPlayingRow = -1;
         sgNowPlayingConnectRow = -1;
+        sgLinksRow = -1;
         setUsernameRow = -1;
         bioRow = -1;
         channelRow = -1;
@@ -10885,6 +10926,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (userInfo != null && !TextUtils.isEmpty(sgAbout())) {
                     userInfoRow = rowCount++;
+                }
+                if (sgProfileLinks() != null) {
+                    sgLinksRow = rowCount++;
                 }
                 if (sgNowPlayingTrack() != null) {
                     sgNowPlayingRow = rowCount++;
@@ -13307,7 +13351,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 VIEW_TYPE_TEXT2 = 32,
                 VIEW_TYPE_LINKED_COMMUNITY = 33,
                 VIEW_TYPE_SG_NOW_PLAYING = 34,
-                VIEW_TYPE_SG_NOW_PLAYING_CONNECT = 35
+                VIEW_TYPE_SG_NOW_PLAYING_CONNECT = 35,
+                VIEW_TYPE_SG_LINKS = 36
                         ;
 
         private Context mContext;
@@ -13334,6 +13379,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 case VIEW_TYPE_SG_NOW_PLAYING_CONNECT: {
                     view = new TextCell(mContext, resourcesProvider);
                     view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                    break;
+                }
+                case VIEW_TYPE_SG_LINKS: {
+                    // the buttons take their taps themselves (open, long press copies)
+                    final com.solegram.messenger.ui.SolegramProfileLinksView links = new com.solegram.messenger.ui.SolegramProfileLinksView(mContext, resourcesProvider);
+                    links.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                    links.setDelegate(sgLinksDelegate);
+                    view = links;
                     break;
                 }
                 case VIEW_TYPE_HEADER: {
@@ -13640,6 +13693,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 case VIEW_TYPE_SG_NOW_PLAYING:
                     ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(sgNowPlayingTrack(), sgIsSelf());
                     break;
+                case VIEW_TYPE_SG_LINKS: {
+                    final java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> links = sgProfileLinks();
+                    ((com.solegram.messenger.ui.SolegramProfileLinksView) holder.itemView).setLinks(links != null ? links : new ArrayList<>(), sgIsSelf());
+                    break;
+                }
                 case VIEW_TYPE_SG_NOW_PLAYING_CONNECT: {
                     final TextCell cell = (TextCell) holder.itemView;
                     cell.heightDp = 58;
@@ -14529,7 +14587,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             int type = holder.getItemViewType();
             return type != VIEW_TYPE_HEADER && type != VIEW_TYPE_DIVIDER && type != VIEW_TYPE_SHADOW &&
                     type != VIEW_TYPE_EMPTY && type != VIEW_TYPE_EMPTY2 && type != VIEW_TYPE_HEADER_EMPTY && type != VIEW_TYPE_BOTTOM_PADDING && type != VIEW_TYPE_SHARED_MEDIA &&
-                    type != 9 && type != 10 && type != VIEW_TYPE_BOT_APP && type != VIEW_TYPE_TEXT2; // These are legacy ones, left for compatibility
+                    type != 9 && type != 10 && type != VIEW_TYPE_BOT_APP && type != VIEW_TYPE_TEXT2 && // These are legacy ones, left for compatibility
+                    type != VIEW_TYPE_SG_LINKS; // Solegram: the buttons take their own taps
         }
 
         @Override
@@ -14543,6 +14602,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return VIEW_TYPE_SG_NOW_PLAYING;
             } else if (position == sgNowPlayingConnectRow) {
                 return VIEW_TYPE_SG_NOW_PLAYING_CONNECT;
+            } else if (position == sgLinksRow) {
+                return VIEW_TYPE_SG_LINKS;
             }
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
@@ -16013,6 +16074,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, solegramIdRow, sparseIntArray);
             put(++pointer, sgNowPlayingRow, sparseIntArray);
             put(++pointer, sgNowPlayingConnectRow, sparseIntArray);
+            put(++pointer, sgLinksRow, sparseIntArray);
             put(++pointer, channelRow, sparseIntArray);
             put(++pointer, botStarsBalanceRow, sparseIntArray);
             put(++pointer, botTonBalanceRow, sparseIntArray);

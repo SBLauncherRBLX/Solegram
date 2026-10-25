@@ -40,6 +40,8 @@ public class SolegramConfig {
     /** Chats screen title, see {@link SolegramUi#TITLE_APP}. */
     public static int mainTitle;
     public static String mainTitleText = "";
+    /** Icon pack, see {@link SolegramIcons#PACK_STANDARD}: Telegram's icons, thin or filled ones. */
+    public static int iconPack;
     // endregion
 
     // region Glass (100 = Telegram's value unless noted)
@@ -117,6 +119,11 @@ public class SolegramConfig {
     public static boolean nowPlayingShareBio = false;
     // endregion
 
+    // region Profile links
+    /** Links to profiles on other platforms in a bio show as buttons with the platform's mark (SolegramProfileLinks). */
+    public static boolean profileLinks = true;
+    // endregion
+
     // region In-app browser
     /** Ads and trackers of web pages are not loaded (a domain list, page cleanup, YouTube ads, pop-ups). */
     public static boolean adBlock = true;
@@ -134,6 +141,15 @@ public class SolegramConfig {
     public static boolean cameraEnhance = true;
     /** Photos from the in-app camera are sent in HD (2560 px) unless switched off in the editor. */
     public static boolean cameraHd = true;
+    /** The attach camera with Solegram's controls on the viewfinder (flash, HDR, timer, frame, grid, zoom, exposure). */
+    public static boolean cameraControls = true;
+    /** 3x3 grid over the viewfinder (attach camera and stories). */
+    public static boolean cameraGrid;
+    /** Self-timer of the attach camera in seconds: 0, 3 or 10. */
+    public static int cameraTimer;
+    /** Frame of attach camera photos: 0 = 4:3, 1 = 16:9, 2 = 1:1 (the middle of 4:3). */
+    public static int cameraAspect;
+    public static final int CAMERA_ASPECT_4_3 = 0, CAMERA_ASPECT_16_9 = 1, CAMERA_ASPECT_1_1 = 2;
     // endregion
 
     // region Animations
@@ -302,6 +318,8 @@ public class SolegramConfig {
         avatarShapeInChats = p.getBoolean("avatarShapeInChats", false);
         mainTitle = clamp(p.getInt("mainTitle", 0), 0, 3);
         mainTitleText = p.getString("mainTitleText", "");
+        iconPack = clamp(p.getInt("iconPack", 0), 0, 2);
+        SolegramIcons.setPack(iconPack);
 
         glassThickness = clamp(p.getInt("glassThickness", 100), 25, 300);
         glassRefraction = clamp(p.getInt("glassRefraction", 100), 0, 300);
@@ -346,6 +364,7 @@ public class SolegramConfig {
         nowPlayingSpotify = p.getBoolean("nowPlayingSpotify", true);
         nowPlayingSoundCloud = p.getBoolean("nowPlayingSoundCloud", true);
         nowPlayingShareBio = p.getBoolean("nowPlayingShareBio", false);
+        profileLinks = p.getBoolean("profileLinks", true);
         adBlock = p.getBoolean("adBlock", true);
         adBlockCosmetic = p.getBoolean("adBlockCosmetic", true);
         adBlockYouTube = p.getBoolean("adBlockYouTube", true);
@@ -354,6 +373,13 @@ public class SolegramConfig {
         cameraFps = p.getInt("cameraFps", 0);
         cameraEnhance = p.getBoolean("cameraEnhance", true);
         cameraHd = p.getBoolean("cameraHd", true);
+        cameraControls = p.getBoolean("cameraControls", true);
+        cameraGrid = p.getBoolean("cameraGrid", false);
+        cameraTimer = p.getInt("cameraTimer", 0);
+        if (cameraTimer != 3 && cameraTimer != 10) {
+            cameraTimer = 0;
+        }
+        cameraAspect = clamp(p.getInt("cameraAspect", CAMERA_ASPECT_4_3), CAMERA_ASPECT_4_3, CAMERA_ASPECT_1_1);
 
         smoothTransitions = p.getBoolean("smoothTransitions", true);
         pressScale = p.getBoolean("pressScale", true);
@@ -569,6 +595,7 @@ public class SolegramConfig {
             case "nowPlaying":
             case "nowPlayingSpotify":
             case "nowPlayingSoundCloud":
+            case "profileLinks":
             case "adBlock":
             case "adBlockCosmetic":
             case "adBlockYouTube":
@@ -579,6 +606,7 @@ public class SolegramConfig {
             case "neutralOverscroll":
             case "cameraEnhance":
             case "cameraHd":
+            case "cameraControls":
             case "reminderAi":
                 return true;
             default:

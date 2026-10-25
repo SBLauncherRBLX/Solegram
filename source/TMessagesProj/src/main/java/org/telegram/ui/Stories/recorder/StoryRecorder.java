@@ -1921,6 +1921,8 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
 
     /* PAGE_CAMERA */
     private CollageLayoutView2 collageLayoutView;
+    /** Solegram: the 3x3 grid of the camera controls over the story camera (the same setting as the attach camera's). */
+    private View sgGridView;
     private DualCameraView cameraView;
     private QRScanner qrScanner;
     private ScannedLinkPreview qrLinkView;
@@ -2160,6 +2162,9 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
             @Override
             protected void onLayoutUpdate(CollageLayout layout) {
                 collageListView.setVisible(false, true);
+                if (sgGridView != null) {
+                    sgGridView.invalidate();
+                }
                 if (layout != null && layout.parts.size() > 1) {
                     collageButton.setIcon(new CollageLayoutButton.CollageLayoutDrawable(lastCollageLayout = layout), true);
                     collageButton.setSelected(true, true);
@@ -2179,6 +2184,33 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
             updateActionBarButtons(true);
         });
         previewContainer.addView(collageLayoutView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        sgGridView = new View(context) {
+            private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final org.telegram.ui.Components.AnimatedFloat shown = new org.telegram.ui.Components.AnimatedFloat(this, 0, 220, CubicBezierInterpolator.EASE_OUT_QUINT);
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                final boolean on = com.solegram.messenger.SolegramConfig.cameraControls && com.solegram.messenger.SolegramConfig.cameraGrid
+                    && currentPage == PAGE_CAMERA && cameraView != null && !collageLayoutView.hasLayout();
+                final float t = shown.set(on ? 1 : 0);
+                if (t <= 0) {
+                    return;
+                }
+                line.setStrokeWidth(Math.max(1, AndroidUtilities.dpf2(0.66f)));
+                for (int i = 1; i <= 2; i++) {
+                    final float x = getWidth() * i / 3f, y = getHeight() * i / 3f;
+                    line.setColor(0x1F000000);
+                    line.setAlpha((int) (0x1F * t));
+                    canvas.drawLine(x + 1, 0, x + 1, getHeight(), line);
+                    canvas.drawLine(0, y + 1, getWidth(), y + 1, line);
+                    line.setColor(0x8CFFFFFF);
+                    line.setAlpha((int) (0x8C * t));
+                    canvas.drawLine(x, 0, x, getHeight(), line);
+                    canvas.drawLine(0, y, getWidth(), y, line);
+                }
+            }
+        };
+        previewContainer.addView(sgGridView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         collageLayoutView.setOnClickListener(v -> {
             if (noCameraPermission) {
                 requestCameraPermission(true);
@@ -4516,6 +4548,9 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
 
         final int oldPage = currentPage;
         currentPage = page;
+        if (sgGridView != null) {
+            sgGridView.invalidate();
+        }
 
         if (pageAnimator != null) {
             pageAnimator.cancel();
@@ -6961,6 +6996,9 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
         collageButton.setTranslationX(cameraView.dualAvailable() ? 0 : dp(46));
 //        collageLayoutView.getLast().addView(cameraView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         collageLayoutView.setCameraView(cameraView);
+        if (sgGridView != null) {
+            sgGridView.invalidate();
+        }
         if (MessagesController.getGlobalMainSettings().getInt("storyhint2", 0) < 1) {
             cameraHint.show();
             MessagesController.getGlobalMainSettings().edit().putInt("storyhint2", MessagesController.getGlobalMainSettings().getInt("storyhint2", 0) + 1).apply();

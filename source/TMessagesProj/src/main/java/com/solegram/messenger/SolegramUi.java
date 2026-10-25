@@ -86,9 +86,7 @@ public final class SolegramUi {
 
     // region Animations
 
-    private static final java.util.WeakHashMap<android.view.View, android.animation.ValueAnimator> pressAnimators = new java.util.WeakHashMap<>();
-
-    /** Springy press feedback for list rows: shrink a little while held, bounce back on release. */
+    /** Springy press feedback for list rows: shrink a little while held, bounce back on release (SolegramMotion). */
     public static void animatePress(android.view.View view, boolean pressed) {
         if (!SolegramConfig.pressScale || view == null) {
             return;
@@ -97,58 +95,12 @@ public final class SolegramUi {
                 || view.getHeight() <= 0 || view.getHeight() > AndroidUtilities.dp(140)) {
             return;
         }
-        android.animation.ValueAnimator running = pressAnimators.remove(view);
-        if (running != null) {
-            running.cancel();
-        }
-        final float target = pressed ? 0.97f : 1f;
-        if (Math.abs(view.getScaleX() - target) < 0.001f) {
-            return;
-        }
-        android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofFloat(view.getScaleX(), target);
-        // the map holds the animator, so the animator must not hold the view strongly (or the view never leaves the map)
-        final java.lang.ref.WeakReference<android.view.View> viewRef = new java.lang.ref.WeakReference<>(view);
-        animator.addUpdateListener(a -> {
-            final android.view.View v = viewRef.get();
-            if (v != null) {
-                final float s = (float) a.getAnimatedValue();
-                v.setScaleX(s);
-                v.setScaleY(s);
-            }
-        });
-        if (pressed) {
-            animator.setDuration(110);
-            animator.setInterpolator(org.telegram.ui.Components.CubicBezierInterpolator.EASE_OUT);
-        } else {
-            animator.setDuration(420);
-            animator.setInterpolator(new android.view.animation.OvershootInterpolator(2.4f));
-        }
-        if (!pressed) {
-            animator.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(android.animation.Animator animation) {
-                    final android.view.View v = viewRef.get();
-                    if (v != null && pressAnimators.get(v) == animation) {
-                        pressAnimators.remove(v);
-                    }
-                }
-            });
-        }
-        pressAnimators.put(view, animator);
-        animator.start();
+        com.solegram.messenger.ui.SolegramMotion.press(view, pressed, com.solegram.messenger.ui.SolegramMotion.PRESS_ROW);
     }
 
     /** Recycled rows must never keep a half-finished press scale (only rows Solegram scaled are touched). */
     public static void resetPress(android.view.View view) {
-        if (view == null) {
-            return;
-        }
-        android.animation.ValueAnimator running = pressAnimators.remove(view);
-        if (running != null) {
-            running.cancel();
-            view.setScaleX(1f);
-            view.setScaleY(1f);
-        }
+        com.solegram.messenger.ui.SolegramMotion.resetPress(view);
     }
 
     /** Rows of settings lists fade and rise in one after another when a screen opens. */
@@ -156,8 +108,9 @@ public final class SolegramUi {
         android.view.animation.AnimationSet set = new android.view.animation.AnimationSet(true);
         set.addAnimation(new android.view.animation.AlphaAnimation(0f, 1f));
         set.addAnimation(new android.view.animation.TranslateAnimation(0, 0, AndroidUtilities.dp(14), 0));
-        set.setDuration(300);
-        set.setInterpolator(org.telegram.ui.Components.CubicBezierInterpolator.EASE_OUT_QUINT);
+        // the motion system's smooth spring: quick to start, no tail; rows 25 ms apart
+        set.setDuration(com.solegram.messenger.ui.SolegramMotion.SPRING - 40);
+        set.setInterpolator(com.solegram.messenger.ui.SolegramMotion.SPRING_SMOOTH);
         android.view.animation.LayoutAnimationController controller = new android.view.animation.LayoutAnimationController(set, 0.06f);
         controller.setOrder(android.view.animation.LayoutAnimationController.ORDER_NORMAL);
         return controller;

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: Twitch mark from Simple Icons (CC0), for profile links -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.571 4.714 h1.715 v5.143 H11.57 zm4.715 0 H18 v5.143 h-1.714 zM6 0 L1.714 4.286 v15.428 h5.143 V24 l4.286 -4.286 h3.428 L22.286 12 V0 zm14.571 11.143 l-3.428 3.428 h-3.429 l-3 3 v-3 H6.857 V1.714 h13.714 Z" />
+</vector>

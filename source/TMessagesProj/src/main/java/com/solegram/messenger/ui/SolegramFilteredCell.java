@@ -248,15 +248,21 @@ public class SolegramFilteredCell extends View {
             return;
         }
         pressing = value;
-        final float from = pressed;
-        final android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofFloat(from, value ? 1f : 0f);
-        animator.setDuration(value ? 90 : 180);
+        if (pressAnimator != null) {
+            pressAnimator.cancel(); // a quick tap turns the press around instead of two animators fighting
+        }
+        final android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofFloat(pressed, value ? 1f : 0f);
+        animator.setDuration(value ? 90 : SolegramMotion.NORMAL);
+        animator.setInterpolator(value ? SolegramMotion.EASE_OUT : SolegramMotion.EASE_BOTH);
         animator.addUpdateListener(a -> {
             pressed = (float) a.getAnimatedValue();
             invalidate();
         });
+        pressAnimator = animator;
         animator.start();
     }
+
+    private android.animation.ValueAnimator pressAnimator;
 
     @Override
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {

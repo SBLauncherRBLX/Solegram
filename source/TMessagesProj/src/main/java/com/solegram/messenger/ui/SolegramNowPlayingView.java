@@ -85,6 +85,8 @@ public class SolegramNowPlayingView extends View {
     private Bitmap coverShaderBitmap;
     private float contentAlpha = 1f;
     private ValueAnimator fadeAnimator;
+    // the progress line glides to a new place after a seek, and follows the song exactly while it plays
+    private final org.telegram.ui.Components.AnimatedFloat shownProgress = new org.telegram.ui.Components.AnimatedFloat(this, 0, 380, CubicBezierInterpolator.EASE_OUT_QUINT);
 
     public SolegramNowPlayingView(Context context, Theme.ResourcesProvider resourcesProvider) {
         super(context);
@@ -279,18 +281,21 @@ public class SolegramNowPlayingView extends View {
         titlePaint.setColor(textColor);
         titlePaint.setAlpha(alpha);
         final CharSequence title = TextUtils.ellipsize(track.title, titlePaint, textWidth, TextUtils.TruncateAt.END);
-        canvas.drawText(title, 0, title.length(), textLeft, card.top + dp(showProgress ? 46 : 50), titlePaint);
+        // a new song's lines rise into place as they fade in
+        final float rise = dp(8) * (1f - contentAlpha);
+        canvas.drawText(title, 0, title.length(), textLeft, card.top + dp(showProgress ? 46 : 50) + rise, titlePaint);
 
         if (!TextUtils.isEmpty(track.artist)) {
             artistPaint.setColor(grayColor);
             artistPaint.setAlpha(alpha);
             final CharSequence artist = TextUtils.ellipsize(track.artist, artistPaint, textWidth, TextUtils.TruncateAt.END);
-            canvas.drawText(artist, 0, artist.length(), textLeft, card.top + dp(showProgress ? 65 : 70), artistPaint);
+            canvas.drawText(artist, 0, artist.length(), textLeft, card.top + dp(showProgress ? 65 : 70) + rise * 1.4f, artistPaint);
         }
 
         if (showProgress) {
             final float y = card.bottom - dp(9);
-            final float progress = Math.min(1f, track.currentPosition() / (float) track.duration);
+            final float actual = Math.max(0f, Math.min(1f, track.currentPosition() / (float) track.duration));
+            final float progress = shownProgress.set(actual, Math.abs(actual - shownProgress.get()) < 0.02f);
             progressPaint.setColor(ColorUtils.setAlphaComponent(textColor, dark ? 0x30 : 0x22));
             progressPaint.setAlpha((int) (Color.alpha(progressPaint.getColor()) * contentAlpha));
             canvas.drawLine(textLeft, y, textRight, y, progressPaint);

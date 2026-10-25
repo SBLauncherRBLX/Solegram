@@ -132,6 +132,7 @@ public class SolegramReminderSheet extends BottomSheet {
         this.fallback = SolegramReminders.fallbackText(source);
         final Context context = fragment.getParentActivity();
         fixNavigationBar();
+        SolegramMotion.springSheet(this);
         setApplyBottomPadding(false);
 
         final int textColor = getThemedColor(Theme.key_dialogTextBlack);
@@ -314,7 +315,7 @@ public class SolegramReminderSheet extends BottomSheet {
         setLoading(true);
         setStatus(getString(R.string.SG_ReminderComposing), true);
         regenerate.setEnabled(false);
-        regenerate.animate().alpha(0.4f).setDuration(150).start();
+        regenerate.animate().alpha(0.4f).setDuration(SolegramMotion.FAST).setInterpolator(SolegramMotion.EASE_BOTH).start();
         SolegramReminders.compose(source, asked ? lastAiTitle : null, asked, (title, body, code) -> {
             if (token != requestToken) {
                 return; // the user stopped waiting or asked again
@@ -338,7 +339,7 @@ public class SolegramReminderSheet extends BottomSheet {
             }
             regenerate.setText(getString(code == SolegramSummarizer.COMPOSE_NEEDS_CONSENT ? R.string.SG_ReminderAiCompose : R.string.SG_ReminderRegenerate));
             regenerate.setEnabled(true);
-            regenerate.animate().alpha(1f).setDuration(150).start();
+            regenerate.animate().alpha(1f).setDuration(SolegramMotion.FAST).setInterpolator(SolegramMotion.EASE_BOTH).start();
             setLoading(false);
         });
     }
@@ -353,7 +354,7 @@ public class SolegramReminderSheet extends BottomSheet {
         applyText(fallback[0], fallback[1], 0);
         setStatus(getString(R.string.SG_ReminderTextFromMessages), false);
         regenerate.setEnabled(true);
-        regenerate.animate().alpha(1f).setDuration(150).start();
+        regenerate.animate().alpha(1f).setDuration(SolegramMotion.FAST).setInterpolator(SolegramMotion.EASE_BOTH).start();
         setLoading(false);
         if (focus) {
             titleField.requestFocus();
@@ -412,8 +413,12 @@ public class SolegramReminderSheet extends BottomSheet {
                 applyText(fallback[0], fallback[1], 0);
             }
         } else {
-            fields.animate().alpha(1f).setDuration(220).start();
-            shimmer.animate().alpha(0f).setDuration(220).withEndAction(() -> shimmer.setVisibility(View.GONE)).start();
+            // the text written for it rises out of the shimmer
+            if (fields.getAlpha() < 0.99f) {
+                fields.setTranslationY(AndroidUtilities.dp(6));
+            }
+            fields.animate().alpha(1f).translationY(0).setDuration(SolegramMotion.SPRING).setInterpolator(SolegramMotion.SPRING_SMOOTH).start();
+            shimmer.animate().alpha(0f).setDuration(SolegramMotion.NORMAL).setInterpolator(SolegramMotion.EASE_OUT).withEndAction(() -> shimmer.setVisibility(View.GONE)).start();
         }
     }
     // endregion

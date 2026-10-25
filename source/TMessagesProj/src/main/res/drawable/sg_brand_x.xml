@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: X mark from Simple Icons (CC0), for profile links -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M14.234 10.162 L22.977 0 h-2.072 l-7.591 8.824 L7.251 0 H0.258 l9.168 13.343 L0.258 24 H2.33 l8.016 -9.318 L16.749 24 h6.993 zm-2.837 3.299 l-0.929 -1.329 L3.076 1.56 h3.182 l5.965 8.532 l0.929 1.329 l7.754 11.09 h-3.182 z" />
+</vector>
