@@ -81,6 +81,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     public static final int PAGE_CAMERA = 11;
     public static final int PAGE_BROWSER = 12;
     public static final int PAGE_PROXY = 13;
+    public static final int PAGE_SCAM = 14;
 
     private final int page;
 
@@ -104,6 +105,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_PROXY = 17;
     private static final int ID_FILTERS = 18;
     private static final int ID_REMINDERS = 19;
+    private static final int ID_SCAM = 20;
 
     // music in the profile
     private static final int ID_NOW_PLAYING = 701;
@@ -128,6 +130,16 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_ADBLOCK_TOTAL = 905;
     private static final int ID_ADBLOCK_ALLOWED = 906;
     private static final int ID_BROWSER_SETTINGS = 907;
+
+    // anti-scam
+    private static final int ID_SCAM_LINKS = 971;
+    private static final int ID_SCAM_ACCOUNTS = 972;
+    private static final int ID_SCAM_NANO = 973;
+    private static final int ID_SCAM_SOFT = 974;
+    private static final int ID_SCAM_NORMAL = 975;
+    private static final int ID_SCAM_STRICT = 976;
+    private static final int ID_SCAM_TRUSTED = 977;
+    private static final int ID_SCAM_TRUSTED_ADD = 978;
 
     // proxy
     private static final int ID_PROXY_FIND = 951;
@@ -280,8 +292,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.solegramProxyChanged);
             NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxySettingsChanged);
         }
-        if (page == PAGE_AI) {
-            // Gemini Nano status and download progress
+        if (page == PAGE_AI || page == PAGE_SCAM) {
+            // Gemini Nano status and download progress (anti-scam shows its AI switch only where Nano is)
             NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.solegramGeminiNanoChanged);
         }
         return super.onFragmentCreate();
@@ -358,6 +370,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case PAGE_PROXY:
                 fillProxy(items);
                 break;
+            case PAGE_SCAM:
+                fillScam(items);
+                break;
             default:
                 fillMain(items);
         }
@@ -382,6 +397,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(category(ID_CHATS, R.drawable.msg_discussion, R.string.SG_Chats, R.string.SG_ChatsSub, null, TILE_GREEN));
         items.add(category(ID_FILTERS, R.drawable.msg_archive_hide, R.string.SG_Filters, R.string.SG_FiltersSub,
             SolegramConfig.messageFilters ? getString(R.string.SG_On) : null, TILE_RED));
+        items.add(category(ID_SCAM, R.drawable.outline_shield_plain_24, R.string.SG_Scam, R.string.SG_ScamSub,
+            getString(SolegramConfig.scamLinks || SolegramConfig.scamAccounts ? R.string.SG_On : R.string.SG_Off), TILE_YELLOW));
         items.add(category(ID_AI_PAGE, R.drawable.sg_ai_summary, R.string.SG_AiPage, R.string.SG_AiPageSub, null, TILE_PURPLE));
         final int reminders = com.solegram.messenger.SolegramReminders.upcomingCount();
         items.add(category(ID_REMINDERS, R.drawable.msg_notifications, R.string.SG_Reminders, R.string.SG_RemindersSub,
@@ -998,6 +1015,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_REMINDERS, SolegramRemindersActivity.ID_EVENING, R.string.SG_ReminderEveningTime, 16},
         {PAGE_REMINDERS, SolegramRemindersActivity.ID_EXACT, R.string.SG_ReminderExact, 16},
         {PAGE_REMINDERS, SolegramRemindersActivity.ID_SOUND, R.string.SG_ReminderSound, 16},
+        {PAGE_SCAM, 0, R.string.SG_Scam, 19},
+        {PAGE_SCAM, ID_SCAM_LINKS, R.string.SG_ScamLinks, 19},
+        {PAGE_SCAM, ID_SCAM_ACCOUNTS, R.string.SG_ScamAccounts, 19},
+        {PAGE_SCAM, ID_SCAM_NANO, R.string.SG_ScamNano, 19},
+        {PAGE_SCAM, ID_SCAM_NORMAL, R.string.SG_ScamSensitivity, 19},
+        {PAGE_SCAM, ID_SCAM_TRUSTED, R.string.SG_ScamTrusted, 19},
     };
 
     private static final String[] SEARCH_KEYWORDS = {
@@ -1020,6 +1043,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         "напоминания напоминание напомнить напоминалка будильник позже отложить дела задачи remind reminder reminders alarm later snooze todo",
         "ссылки ссылка профили соцсети социальные сети о себе био инстаграм тикток ютуб гитхаб вк твич дискорд стим сайт links bio instagram tiktok youtube github vk twitch discord steam x twitter website",
         "иконки значки иконка набор пак стиль тонкие линейные заливка залитые phosphor icons icon pack thin outline filled",
+        "мошенники мошенник мошенничество скам скамер обман развод фишинг подозрительные ссылки опасные ссылки аккаунты безопасность защита антискам доверенные сайты scam scammer phishing fraud suspicious links anti-scam safety trusted sites",
     };
 
     /** Solegram's pages and settings as results of Telegram's settings search. */
@@ -1117,6 +1141,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return LocaleController.getString(R.string.SG_Filters);
             case PAGE_REMINDERS:
                 return LocaleController.getString(R.string.SG_Reminders);
+            case PAGE_SCAM:
+                return LocaleController.getString(R.string.SG_Scam);
             default:
                 return LocaleController.getString(R.string.SG_SettingsTitle);
         }
@@ -1232,6 +1258,63 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         builder.setMessage(TextUtils.join("\n", sites));
         builder.setPositiveButton(getString(R.string.SG_AdBlockClearAllowed), (d, w) -> {
             com.solegram.messenger.SolegramAdBlock.clearAllowed();
+            listView.adapter.update(true);
+        });
+        builder.setNegativeButton(getString(R.string.Close), null);
+        showDialog(builder.create());
+    }
+
+    private void fillScam(ArrayList<UItem> items) {
+        items.add(UItem.asRippleCheck(ID_SCAM_LINKS, getString(R.string.SG_ScamLinks)).setChecked(SolegramConfig.scamLinks));
+        items.add(UItem.asShadow(getString(R.string.SG_ScamLinksInfo)));
+        items.add(UItem.asRippleCheck(ID_SCAM_ACCOUNTS, getString(R.string.SG_ScamAccounts)).setChecked(SolegramConfig.scamAccounts));
+        items.add(UItem.asShadow(getString(R.string.SG_ScamAccountsInfo)));
+        // only where Gemini Nano is on the phone: nothing else ever looks automatically
+        if (com.solegram.messenger.SolegramGeminiNano.isAvailable()) {
+            items.add(UItem.asButtonCheck(ID_SCAM_NANO, getString(R.string.SG_ScamNano), getString(R.string.SG_ScamNanoInfo)).setChecked(SolegramConfig.scamNano));
+            items.add(UItem.asShadow(null));
+        }
+
+        final int sensitivity = SolegramConfig.scamSensitivity;
+        items.add(UItem.asHeader(getString(R.string.SG_ScamSensitivity)));
+        items.add(UItem.asRadio2(ID_SCAM_SOFT, getString(R.string.SG_ScamSoft), getString(R.string.SG_ScamSoftInfo))
+            .setChecked(sensitivity == com.solegram.messenger.SolegramScamRules.SENSITIVITY_SOFT));
+        items.add(UItem.asRadio2(ID_SCAM_NORMAL, getString(R.string.SG_ScamNormal), getString(R.string.SG_ScamNormalInfo))
+            .setChecked(sensitivity == com.solegram.messenger.SolegramScamRules.SENSITIVITY_NORMAL));
+        items.add(UItem.asRadio2(ID_SCAM_STRICT, getString(R.string.SG_ScamStrict), getString(R.string.SG_ScamStrictInfo))
+            .setChecked(sensitivity == com.solegram.messenger.SolegramScamRules.SENSITIVITY_STRICT));
+        items.add(UItem.asShadow(null));
+
+        final int trusted = com.solegram.messenger.SolegramScamGuard.getTrustedSites().length;
+        items.add(tile(UItem.asButton(ID_SCAM_TRUSTED, R.drawable.msg_language, getString(R.string.SG_ScamTrusted),
+            trusted == 0 ? getString(R.string.SG_ScamTrustedNone) : String.valueOf(trusted)), TILE_TEAL));
+        items.add(tile(UItem.asButton(ID_SCAM_TRUSTED_ADD, R.drawable.msg_add, getString(R.string.SG_ScamTrustedAdd)), TILE_BLUE));
+        items.add(UItem.asShadow(getString(R.string.SG_ScamPrivacyInfo)));
+    }
+
+    /** The trusted sites: a tap on one offers to remove it. */
+    private void showTrustedSites() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        final String[] sites = com.solegram.messenger.SolegramScamGuard.getTrustedSites();
+        final org.telegram.ui.ActionBar.AlertDialog.Builder builder = new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity(), getResourceProvider());
+        builder.setTitle(getString(R.string.SG_ScamTrusted));
+        if (sites.length == 0) {
+            builder.setMessage(getString(R.string.SG_ScamTrustedEmpty));
+            builder.setPositiveButton(getString(R.string.OK), null);
+            showDialog(builder.create());
+            return;
+        }
+        builder.setItems(sites, (d, which) -> {
+            final String site = sites[which];
+            confirm(getString(R.string.SG_ScamTrusted), LocaleController.formatString(R.string.SG_ScamTrustedRemove, site), getString(R.string.Delete), () -> {
+                com.solegram.messenger.SolegramScamGuard.untrustSite(site);
+                listView.adapter.update(true);
+            });
+        });
+        builder.setPositiveButton(getString(R.string.SG_ScamTrustedClear), (d, w) -> {
+            com.solegram.messenger.SolegramScamGuard.clearTrustedSites();
             listView.adapter.update(true);
         });
         builder.setNegativeButton(getString(R.string.Close), null);
@@ -1689,6 +1772,41 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_REMINDERS:
                 presentFragment(new SolegramRemindersActivity());
+                return;
+            case ID_SCAM:
+                presentFragment(new SolegramSettingsActivity(PAGE_SCAM));
+                return;
+
+            // anti-scam
+            case ID_SCAM_LINKS:
+                toggleCheck(view, "scamLinks");
+                com.solegram.messenger.SolegramScamGuard.onSettingsChanged();
+                return;
+            case ID_SCAM_ACCOUNTS:
+                toggleCheck(view, "scamAccounts");
+                return;
+            case ID_SCAM_NANO:
+                toggleCheck(view, "scamNano");
+                return;
+            case ID_SCAM_SOFT:
+            case ID_SCAM_NORMAL:
+            case ID_SCAM_STRICT:
+                SolegramConfig.putInt("scamSensitivity", item.id == ID_SCAM_SOFT ? com.solegram.messenger.SolegramScamRules.SENSITIVITY_SOFT
+                    : item.id == ID_SCAM_STRICT ? com.solegram.messenger.SolegramScamRules.SENSITIVITY_STRICT : com.solegram.messenger.SolegramScamRules.SENSITIVITY_NORMAL);
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "scamSensitivity");
+                com.solegram.messenger.SolegramScamGuard.onSettingsChanged();
+                listView.adapter.update(true);
+                return;
+            case ID_SCAM_TRUSTED:
+                showTrustedSites();
+                return;
+            case ID_SCAM_TRUSTED_ADD:
+                askText(getString(R.string.SG_ScamTrustedAdd), getString(R.string.SG_ScamTrustedAddInfo), "", "example.com", text -> {
+                    if (com.solegram.messenger.SolegramScamGuard.normalizeSite(text) != null) {
+                        com.solegram.messenger.SolegramScamGuard.trustSite(text);
+                        listView.adapter.update(true);
+                    }
+                });
                 return;
 
             // music in the profile

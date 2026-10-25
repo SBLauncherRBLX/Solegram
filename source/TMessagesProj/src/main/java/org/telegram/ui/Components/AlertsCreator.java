@@ -1741,8 +1741,14 @@ public class AlertsCreator {
     public static void showOpenUrlAlert(Context context, String url, boolean punycode, boolean tryTelegraph, boolean ask, boolean forceNotInternalForApps, long inlineReturn, Browser.Progress progress, @Nullable TLRPC.WebPage webPage, Theme.ResourcesProvider resourcesProvider) {
         if (!AndroidUtilities.isContextSafe(context)) return;
         final String scheme = url == null ? null : Uri.parse(url).getScheme();
-        if (Browser.isInternalUrl(url, null) || !ask || "mailto".equalsIgnoreCase(scheme)) {
+        // Solegram: a link already confirmed in the anti-scam warning is not asked about twice
+        if (Browser.isInternalUrl(url, null) || !ask || "mailto".equalsIgnoreCase(scheme) || com.solegram.messenger.SolegramScamGuard.isConfirmed(url)) {
             Browser.openUrl(context, Uri.parse(url), inlineReturn == 0, tryTelegraph, forceNotInternalForApps && checkInternalBotApp(url), progress, null, false, true, false);
+            return;
+        }
+        // Solegram: and a suspicious one gets the anti-scam warning instead of "Open this link?"
+        if (url != null && com.solegram.messenger.SolegramScamGuard.interceptOpen(context, Uri.parse(url),
+            () -> Browser.openUrl(context, Uri.parse(url), inlineReturn == 0, tryTelegraph, forceNotInternalForApps && checkInternalBotApp(url), progress, null, false, true, false))) {
             return;
         }
 

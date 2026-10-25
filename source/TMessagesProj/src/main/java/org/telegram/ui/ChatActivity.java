@@ -7897,6 +7897,7 @@ public class ChatActivity extends BaseFragment implements
             contentView.addView(hashtagSearchTabs, LayoutHelper.createFrameMarginPx(LayoutHelper.MATCH_PARENT, 50, Gravity.FILL_HORIZONTAL | Gravity.TOP, 0, -dp(5), 0, 0));
         }
         contentView.addView(topPanelLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
+        solegramAddScamBanner(context);
 
         contentView.addView(actionBar);
 
@@ -33051,6 +33052,32 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    // region Solegram anti-scam
+
+    @Nullable
+    private com.solegram.messenger.ui.SolegramScamBanner solegramScamBanner;
+
+    /** Solegram: "Possibly a scammer" in the glass top panel of a private chat with a risky stranger. */
+    private void solegramAddScamBanner(Context context) {
+        solegramScamBanner = null;
+        if (topPanelLayout == null || currentUser == null || chatMode != MODE_DEFAULT || UserObject.isUserSelf(currentUser)
+            || UserObject.isReplyUser(currentUser) || isReport()) {
+            return;
+        }
+        final com.solegram.messenger.ui.SolegramScamBanner banner = new com.solegram.messenger.ui.SolegramScamBanner(context, this, currentUser.id,
+            themeDelegate, () -> endReached[0] ? messages : null, visible -> { // the first messages count only once the chat's start is loaded
+                if (topPanelLayout != null && solegramScamBanner != null) {
+                    topPanelLayout.setViewVisible(solegramScamBanner, visible, true);
+                }
+            });
+        solegramScamBanner = banner;
+        topPanelLayout.addView(banner, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        topPanelLayout.setPriority(banner, 1); // above Telegram's "Report spam / Add contact" bar
+        topPanelLayout.setDebugName(banner, "solegram scam banner");
+    }
+
+    // endregion
+
     // region Solegram liquid message menu
 
     /** Removing a blob that is not there only marks the outline for a rebuild (after place() at rest). */
@@ -37902,7 +37929,16 @@ public class ChatActivity extends BaseFragment implements
         if (url == null || getParentActivity() == null) {
             return;
         }
-        boolean noforwards = isPeerNoForwards() || (messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.noforwards);
+        // Solegram: a suspicious link shows the anti-scam warning first; "Open anyway" comes back here
+        final MessageObject sgMessage = messageObject;
+        final ChatMessageCell sgCell = cell;
+        if (!longPress && com.solegram.messenger.SolegramScamGuard.interceptMessageLink(this, messageObject, url, () -> didPressMessageUrl(url, false, sgMessage, sgCell))) {
+            if (cell != null) {
+                cell.resetPressedLink(-1);
+            }
+            return;
+        }
+        boolean noforwards =isPeerNoForwards() || (messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.noforwards);
         if (url instanceof URLSpanMono) {
             if (!noforwards || getDialogId() == UserObject.VERIFY) {
                 ((URLSpanMono) url).copyToClipboard();

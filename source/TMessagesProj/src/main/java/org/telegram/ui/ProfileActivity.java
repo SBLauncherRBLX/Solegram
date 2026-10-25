@@ -622,6 +622,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int sgNowPlayingConnectRow = -1;
     // Solegram: links to profiles on other platforms, read from the bio, as buttons under it
     private int sgLinksRow = -1;
+    // Solegram anti-scam: "Possibly a scammer" with the main reasons, for a risky stranger
+    private int sgScamRow = -1;
+    private int sgScamDividerRow = -1;
     private int setUsernameRow;
     private int bioRow;
     private int phoneSuggestionSectionRow;
@@ -10539,6 +10542,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
 
     /** The links to profiles on other platforms in this profile's bio, or null when there are none to show. */
+    /** Solegram anti-scam: the risk of this stranger, or null when there is nothing to warn about. */
+    @Nullable
+    private com.solegram.messenger.SolegramScamGuard.AccountRisk sgScamRisk() {
+        if (userId == 0 || userId == getUserConfig().getClientUserId()) {
+            return null;
+        }
+        final com.solegram.messenger.SolegramScamGuard.AccountRisk risk = com.solegram.messenger.SolegramScamGuard.accountRisk(currentAccount, userId, null);
+        return risk != null && risk.level != com.solegram.messenger.SolegramScamRules.SAFE ? risk : null;
+    }
+
     private java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> sgProfileLinks() {
         if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || userInfo == null || TextUtils.isEmpty(userInfo.about)) {
             return null;
@@ -10719,6 +10732,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         botPermissionsDivider = -1;
         unofficialSecurityRiskRow = -1;
         unofficialSecurityRiskDividerRow = -1;
+        sgScamRow = -1;
+        sgScamDividerRow = -1;
         linkedCommunityRow = -1;
         linkedCommunityDividerRow = -1;
 
@@ -10911,6 +10926,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (!isBot && userInfo != null && userInfo.unofficial_security_risk) {
                     unofficialSecurityRiskRow = rowCount++;
                     unofficialSecurityRiskDividerRow = rowCount++;
+                }
+                if (sgScamRisk() != null) {
+                    sgScamRow = rowCount++;
+                    sgScamDividerRow = rowCount++;
                 }
 
                 if (userInfo != null && (userInfo.flags2 & 64) != 0 && (profileChannelMessageFetcher == null || !profileChannelMessageFetcher.loaded || !profileChannelMessageFetcher.messageObjects.isEmpty())) {
@@ -13981,6 +14000,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         sb.append(formatString(R.string.ProfileUnofficialSecurityRisk, UserObject.getForcedFirstName(getMessagesController().getUser(userId))));
                         textView.setText(sb);
                     }
+                    if (position == sgScamRow) {
+                        // Solegram anti-scam: the warning, as Telegram's own security warning above
+                        final com.solegram.messenger.SolegramScamGuard.AccountRisk risk = sgScamRisk();
+                        if (risk != null) {
+                            final SpannableStringBuilder sb = new SpannableStringBuilder("⚠️");
+                            final ColoredImageSpan span = new ColoredImageSpan(R.drawable.round_warn);
+                            span.translate(0, dp(1));
+                            span.setOverrideColor(com.solegram.messenger.SolegramScamGuard.levelColor(risk.level));
+                            sb.setSpan(span, 0, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            sb.append(" ");
+                            sb.append(formatString(R.string.SG_ScamProfileWarning, risk.summary(3)));
+                            textView.setText(sb);
+                        }
+                    }
                     break;
                 case VIEW_TYPE_PREMIUM_TEXT_CELL:
                 case VIEW_TYPE_STARS_TEXT_CELL:
@@ -14640,7 +14673,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     position == helpSectionCell || position == setAvatarSectionRow || position == passwordSuggestionSectionRow ||
                     position == phoneSuggestionSectionRow || position == premiumSectionsRow || position == reportDividerRow ||
                     position == channelDividerRow || position == graceSuggestionSectionRow || position == balanceDividerRow ||
-                    position == botPermissionsDivider || position == channelBalanceSectionRow || position == unofficialSecurityRiskDividerRow
+                    position == botPermissionsDivider || position == channelBalanceSectionRow || position == unofficialSecurityRiskDividerRow || position == sgScamDividerRow
             ) {
                 return VIEW_TYPE_SHADOW;
             } else if (position >= membersStartRow && position < membersEndRow) {
@@ -14673,7 +14706,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return VIEW_TYPE_BOT_APP;
             } else if (position == infoSectionRow || position == infoAffiliateRow) {
                 return VIEW_TYPE_SHADOW_TEXT;
-            } else if (position == unofficialSecurityRiskRow) {
+            } else if (position == unofficialSecurityRiskRow || position == sgScamRow) {
                 return VIEW_TYPE_TEXT2;
             } else if (position == linkedCommunityRow) {
                 return VIEW_TYPE_LINKED_COMMUNITY;
@@ -16044,6 +16077,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, affiliateRow, sparseIntArray);
             put(++pointer, infoAffiliateRow, sparseIntArray);
             put(++pointer, unofficialSecurityRiskRow, sparseIntArray);
+            put(++pointer, sgScamRow, sparseIntArray);
             put(++pointer, sendMessageRow, sparseIntArray);
             put(++pointer, reportRow, sparseIntArray);
             put(++pointer, deleteReactionRow, sparseIntArray);
@@ -16088,6 +16122,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, botPermissionsDivider, sparseIntArray);
             put(++pointer, channelDividerRow, sparseIntArray);
             put(++pointer, unofficialSecurityRiskDividerRow, sparseIntArray);
+            put(++pointer, sgScamDividerRow, sparseIntArray);
             put(++pointer, linkedCommunityRow, sparseIntArray);
             put(++pointer, linkedCommunityDividerRow, sparseIntArray);
         }

@@ -292,6 +292,19 @@ public class Browser {
         if (context == null || uri == null) {
             return;
         }
+        // Solegram: a suspicious link (bio, button, web page...) shows the anti-scam warning first
+        final Uri sgUri = uri;
+        final boolean sgAllowCustom = _allowCustom, sgTryTelegraph = tryTelegraph, sgForceNotInternal = forceNotInternalForApps;
+        final boolean sgAllowIntent = allowIntent, sgInApp = allowInAppBrowser, sgForceRequest = forceRequest;
+        final Progress sgProgress = inCaseLoading;
+        final String sgBrowser = browser;
+        if (com.solegram.messenger.SolegramScamGuard.interceptOpen(context, uri, () -> openUrl(context, sgUri, sgAllowCustom, sgTryTelegraph,
+            sgForceNotInternal, sgProgress, sgBrowser, sgAllowIntent, sgInApp, sgForceRequest))) {
+            if (inCaseLoading != null) {
+                inCaseLoading.end();
+            }
+            return;
+        }
         final int currentAccount = UserConfig.selectedAccount;
         boolean[] forceBrowser = new boolean[]{false};
         boolean internalUri = isInternalUri(uri, forceBrowser);

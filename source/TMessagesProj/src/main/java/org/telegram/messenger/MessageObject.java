@@ -7980,7 +7980,9 @@ public class MessageObject {
     }
 
     private boolean addEntitiesToText(CharSequence text, boolean useManualParse) {
-        return addEntitiesToText(text, false, useManualParse);
+        final boolean result = addEntitiesToText(text, false, useManualParse);
+        com.solegram.messenger.SolegramScamGuard.markLinks(this, text); // Solegram: suspicious links get a warning colour
+        return result;
     }
 
     public boolean addEntitiesToText(CharSequence text, boolean photoViewer, boolean useManualParse) {

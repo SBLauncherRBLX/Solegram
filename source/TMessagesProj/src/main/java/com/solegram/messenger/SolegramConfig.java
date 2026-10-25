@@ -134,6 +134,19 @@ public class SolegramConfig {
     public static String adBlockAllowed = "";
     // endregion
 
+    // region Anti-scam
+    /** Suspicious links in messages are marked, and opening one asks first (SolegramScamGuard). */
+    public static boolean scamLinks = true;
+    /** A stranger who looks like a scammer gets a warning over the chat and in the profile. */
+    public static boolean scamAccounts = true;
+    /** Borderline links and strangers are checked again by Gemini Nano right on the phone, where it exists. */
+    public static boolean scamNano = true;
+    /** How many signs it takes to warn: SolegramScamRules.SENSITIVITY_SOFT / NORMAL / STRICT. */
+    public static int scamSensitivity = SolegramScamRules.SENSITIVITY_NORMAL;
+    /** Sites the user trusts, one per line: never warned about. */
+    public static String scamTrustedSites = "";
+    // endregion
+
     // region Camera
     /** Frame rate of recorded videos and round videos: 0 = the most the camera gives (up to 60), or 30 / 60. */
     public static int cameraFps = 0;
@@ -378,6 +391,11 @@ public class SolegramConfig {
         adBlockYouTube = p.getBoolean("adBlockYouTube", true);
         adBlockPopups = p.getBoolean("adBlockPopups", true);
         adBlockAllowed = p.getString("adBlockAllowed", "");
+        scamLinks = p.getBoolean("scamLinks", true);
+        scamAccounts = p.getBoolean("scamAccounts", true);
+        scamNano = p.getBoolean("scamNano", true);
+        scamSensitivity = clamp(p.getInt("scamSensitivity", SolegramScamRules.SENSITIVITY_NORMAL), SolegramScamRules.SENSITIVITY_SOFT, SolegramScamRules.SENSITIVITY_STRICT);
+        scamTrustedSites = p.getString("scamTrustedSites", "");
         cameraFps = p.getInt("cameraFps", 0);
         cameraEnhance = p.getBoolean("cameraEnhance", true);
         cameraHd = p.getBoolean("cameraHd", true);
@@ -613,6 +631,9 @@ public class SolegramConfig {
             case "adBlockCosmetic":
             case "adBlockYouTube":
             case "adBlockPopups":
+            case "scamLinks":
+            case "scamAccounts":
+            case "scamNano":
             case "smoothTransitions":
             case "pressScale":
             case "animateLists":
