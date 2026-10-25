@@ -72,9 +72,10 @@ public class CameraSession {
 
     // Solegram camera controls: the torch the camera offers besides off / auto / on, the exposure
     // compensation picked on the viewfinder (in the camera's steps, kept while this session lives),
-    // the zoom ratios the camera lists, and a square crop of the photos taken now.
+    // the zoom ratios the camera lists, and the shape the photos taken now are cut to (long side
+    // over short side, 0 = as the camera gives them).
     public volatile boolean torchSupported;
-    public volatile boolean solegramSquare;
+    public volatile float solegramCropRatio;
     private volatile int exposureIndex;
     private volatile int minExposure, maxExposure;
     private volatile float exposureStep;

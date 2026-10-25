@@ -41,7 +41,8 @@ final class GithubUpdater {
     interface DownloadListener {
         void onProgress(float progress);
 
-        void onDone(boolean success);
+        /** @param error null on success: the file is in place and matched its size and SHA-256 */
+        void onDone(boolean success, String error);
     }
 
     private static final int TIMEOUT = 20_000;
@@ -110,7 +111,7 @@ final class GithubUpdater {
         });
     }
 
-    private static File updateDir() {
+    static File updateDir() {
         return new File(ApplicationLoader.applicationContext.getCacheDir(), "solegram/update");
     }
 
@@ -137,67 +138,128 @@ final class GithubUpdater {
             File target = apkFile(info);
             File part = new File(target.getPath() + ".part");
             boolean ok = false;
+            // a lost connection or a stopped background job keeps the part: the next try resumes it.
+            // A file that failed its check is never resumed
+            boolean dropPart = false;
+            String error = null;
             HttpURLConnection connection = null;
             try {
                 File dir = updateDir();
                 dir.mkdirs();
-                // drop APKs of older updates
+                // drop APKs of older updates (the part of this one stays)
                 File[] old = dir.listFiles();
                 if (old != null) {
                     for (File f : old) {
-                        if (!f.getName().equals(target.getName())) {
+                        if (!f.getName().equals(target.getName()) && !f.getName().equals(part.getName())) {
                             f.delete();
                         }
                     }
                 }
-                connection = open(info.url);
-                long total = connection.getContentLengthLong();
-                if (total <= 0) {
-                    total = info.size;
+                long have = part.isFile() ? part.length() : 0;
+                if (info.size > 0 && have > info.size) {
+                    part.delete();
+                    have = 0;
                 }
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                try (InputStream in = connection.getInputStream(); FileOutputStream out = new FileOutputStream(part)) {
-                    byte[] buffer = new byte[64 * 1024];
-                    long done = 0;
-                    long lastReport = 0;
-                    int read;
-                    while ((read = in.read(buffer)) > 0) {
-                        if (gen != generation.get()) {
-                            throw new InterruptedException("cancelled");
+                if (have > 0) {
+                    have = hashInto(part, have, digest);
+                }
+                long done = have;
+                if (info.size <= 0 || have < info.size) {
+                    connection = open(info.url, have);
+                    final boolean append = have > 0 && connection.getResponseCode() == HttpURLConnection.HTTP_PARTIAL
+                        && String.valueOf(connection.getHeaderField("Content-Range")).startsWith("bytes " + have + "-");
+                    if (!append && have > 0) {
+                        // the server sent the whole file: start over
+                        have = 0;
+                        done = 0;
+                        digest.reset();
+                    }
+                    long total = info.size;
+                    if (total <= 0) {
+                        final long length = connection.getContentLengthLong();
+                        total = length > 0 ? have + length : 0;
+                    }
+                    try (InputStream in = connection.getInputStream(); FileOutputStream out = new FileOutputStream(part, append)) {
+                        byte[] buffer = new byte[64 * 1024];
+                        long lastReport = 0;
+                        int read;
+                        while ((read = in.read(buffer)) > 0) {
+                            if (gen != generation.get()) {
+                                throw new InterruptedException("cancelled");
+                            }
+                            out.write(buffer, 0, read);
+                            digest.update(buffer, 0, read);
+                            done += read;
+                            if (total > 0 && done > total) {
+                                dropPart = true;
+                                throw new java.io.IOException("larger than expected");
+                            }
+                            long now = System.currentTimeMillis();
+                            if (total > 0 && now - lastReport > 150) {
+                                lastReport = now;
+                                listener.onProgress(Math.min(1f, done / (float) total));
+                            }
                         }
-                        out.write(buffer, 0, read);
-                        digest.update(buffer, 0, read);
-                        done += read;
-                        long now = System.currentTimeMillis();
-                        if (total > 0 && now - lastReport > 150) {
-                            lastReport = now;
-                            listener.onProgress(Math.min(1f, done / (float) total));
-                        }
+                        out.getFD().sync();
                     }
                     if (total > 0 && done != total) {
                         throw new java.io.IOException("incomplete download: " + done + "/" + total);
                     }
                 }
+                if (info.size > 0 && done != info.size) {
+                    dropPart = true;
+                    throw new SecurityException("size " + done + " != " + info.size);
+                }
                 String hash = toHex(digest.digest());
                 if (!TextUtils.isEmpty(info.sha256) && !info.sha256.equals(hash)) {
+                    dropPart = true;
                     throw new SecurityException("sha256 mismatch");
                 }
                 target.delete();
                 ok = part.renameTo(target);
+                if (!ok) {
+                    error = "rename failed";
+                }
+            } catch (RangeNotSatisfiable e) {
+                dropPart = true;
+                error = e.getMessage();
             } catch (Throwable e) {
                 FileLog.e(e);
+                error = e instanceof SecurityException ? "verification: " + e.getMessage() : e.getClass().getSimpleName() + ": " + e.getMessage();
             } finally {
                 if (connection != null) {
                     connection.disconnect();
                 }
-                if (!ok) {
+                if (!ok && dropPart) {
                     part.delete();
                 }
             }
             if (gen == generation.get()) {
-                listener.onDone(ok);
+                listener.onDone(ok, ok ? null : error);
             }
         });
+    }
+
+    /** Feeds the first {@code length} bytes of a partial download into the digest; returns how many it read. */
+    private static long hashInto(File file, long length, MessageDigest digest) throws java.io.IOException {
+        long read = 0;
+        try (InputStream in = new java.io.FileInputStream(file)) {
+            byte[] buffer = new byte[64 * 1024];
+            int n;
+            while (read < length && (n = in.read(buffer, 0, (int) Math.min(buffer.length, length - read))) > 0) {
+                digest.update(buffer, 0, n);
+                read += n;
+            }
+        }
+        return read;
+    }
+
+    /** SHA-256 of a whole file, lowercase hex. */
+    static String sha256(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        hashInto(file, file.length(), digest);
+        return toHex(digest.digest());
     }
 
     private static final class NotFound extends java.io.IOException {
@@ -206,17 +268,37 @@ final class GithubUpdater {
         }
     }
 
+    /** The server has no bytes after the part we hold (the file changed or the part is complete garbage). */
+    private static final class RangeNotSatisfiable extends java.io.IOException {
+        RangeNotSatisfiable() {
+            super("HTTP 416");
+        }
+    }
+
     private static HttpURLConnection open(String url) throws Exception {
+        return open(url, 0);
+    }
+
+    /** @param from resume from this byte (Range request); the server may still answer with the whole file */
+    private static HttpURLConnection open(String url, long from) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(TIMEOUT);
         connection.setReadTimeout(TIMEOUT);
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", "Solegram-Updater");
+        if (from > 0) {
+            connection.setRequestProperty("Range", "bytes=" + from + "-");
+            // a transparently gzipped body has no byte ranges
+            connection.setRequestProperty("Accept-Encoding", "identity");
+        }
         int code = connection.getResponseCode();
-        if (code != HttpURLConnection.HTTP_OK) {
+        if (code != HttpURLConnection.HTTP_OK && !(from > 0 && code == HttpURLConnection.HTTP_PARTIAL)) {
             connection.disconnect();
             if (code == HttpURLConnection.HTTP_NOT_FOUND) {
                 throw new NotFound();
+            }
+            if (code == 416) {
+                throw new RangeNotSatisfiable();
             }
             throw new java.io.IOException("HTTP " + code);
         }

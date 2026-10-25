@@ -179,51 +179,52 @@ public final class SolegramPhotoEnhance {
     }
 
     /**
-     * Cuts the photo in the file to its middle square (the 1:1 frame of the camera controls) and
-     * writes it back, EXIF kept. {@code current} is the photo as the file holds it now, when the
-     * caller has it decoded (processed or turned): then that is cut, else the file is read again.
-     * Returns the square bitmap (the given one is recycled), or {@code current} when nothing was cut.
-     * Call off the UI thread.
+     * Cuts the middle of the photo in the file to a shape (long side over short side: 1 for the 1:1
+     * frame, the screen's shape for the full screen frame) and writes it back, EXIF kept. The crop is
+     * the middle of the sensor's picture, so the orientation in EXIF doesn't matter. {@code current}
+     * is the photo as the file holds it now, when the caller has it decoded (processed or turned):
+     * then that is cut, else only that region of the file is decoded (halved while it stays above
+     * {@link #MAX_SIDE}; the camera's photos are 4096 at most). Returns the cut bitmap (the given one is recycled), or {@code current} when nothing was
+     * cut (the shape already fits, or a failure: the file is then left as it was). Off the UI thread.
      */
-    public static Bitmap cropSquare(File file, Bitmap current) {
-        if (file == null || !file.exists()) {
+    public static Bitmap cropToRatio(File file, Bitmap current, float ratio) {
+        if (file == null || !file.exists() || ratio < 1f) {
             return current;
         }
-        Bitmap square = null;
+        Bitmap cut = null;
         File tmp = null;
         try {
             if (current != null && !current.isRecycled()) {
                 final int w = current.getWidth(), h = current.getHeight();
-                if (w == h) {
+                final Rect crop = cropRect(w, h, ratio);
+                if (crop == null) {
                     return current;
                 }
-                final int side = Math.min(w, h);
-                square = Bitmap.createBitmap(current, (w - side) / 2, (h - side) / 2, side, side);
+                cut = Bitmap.createBitmap(current, crop.left, crop.top, crop.width(), crop.height());
             } else {
                 final BitmapFactory.Options bounds = new BitmapFactory.Options();
                 bounds.inJustDecodeBounds = true;
                 BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
                 final int w = bounds.outWidth, h = bounds.outHeight;
-                if (w <= 0 || h <= 0 || w == h) {
+                final Rect crop = w > 0 && h > 0 ? cropRect(w, h, ratio) : null;
+                if (crop == null) {
                     return current;
                 }
-                final int side = Math.min(w, h);
                 final BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inSampleSize = sampleSize(side, side, MAX_SIDE);
+                options.inSampleSize = sampleSize(crop.width(), crop.height(), MAX_SIDE);
                 final android.graphics.BitmapRegionDecoder decoder = android.graphics.BitmapRegionDecoder.newInstance(file.getAbsolutePath(), false);
                 try {
-                    final int left = (w - side) / 2, top = (h - side) / 2;
-                    square = decoder.decodeRegion(new Rect(left, top, left + side, top + side), options);
+                    cut = decoder.decodeRegion(crop, options);
                 } finally {
                     decoder.recycle();
                 }
-                if (square == null) {
+                if (cut == null) {
                     return current;
                 }
             }
-            tmp = new File(file.getAbsolutePath() + ".sq.tmp");
+            tmp = new File(file.getAbsolutePath() + ".crop.tmp");
             try (FileOutputStream out = new FileOutputStream(tmp)) {
-                if (!square.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)) {
+                if (!cut.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)) {
                     throw new IllegalStateException("compress failed");
                 }
                 out.flush();
@@ -234,14 +235,14 @@ public final class SolegramPhotoEnhance {
                 throw new IllegalStateException("rename failed");
             }
             tmp = null;
-            if (current != null && current != square) {
+            if (current != null && current != cut) {
                 current.recycle();
             }
-            return square;
+            return cut;
         } catch (Throwable e) {
             FileLog.e(e);
-            if (square != null && square != current) {
-                square.recycle();
+            if (cut != null && cut != current) {
+                cut.recycle();
             }
             return current;
         } finally {
@@ -252,6 +253,27 @@ public final class SolegramPhotoEnhance {
                 }
             }
         }
+    }
+
+    // The middle part of a w x h picture with the given shape, null when it already has it (within 1%).
+    private static Rect cropRect(int w, int h, float ratio) {
+        final int longSide = Math.max(w, h), shortSide = Math.min(w, h);
+        final float current = (float) longSide / shortSide;
+        if (Math.abs(current - ratio) < ratio * 0.01f) {
+            return null;
+        }
+        int newLong = longSide, newShort = shortSide;
+        if (current > ratio) {
+            newLong = Math.round(shortSide * ratio); // too long: the ends go (1:1 from 4:3)
+        } else {
+            newShort = Math.round(longSide / ratio); // too wide: the sides go (20:9 from 16:9)
+        }
+        final int cw = w >= h ? newLong : newShort, ch = w >= h ? newShort : newLong;
+        if (cw <= 0 || ch <= 0) {
+            return null;
+        }
+        final int left = (w - cw) / 2, top = (h - ch) / 2;
+        return new Rect(left, top, left + cw, top + ch);
     }
 
     // Java heap needed: the pixel array and two float planes at the processed size, and before

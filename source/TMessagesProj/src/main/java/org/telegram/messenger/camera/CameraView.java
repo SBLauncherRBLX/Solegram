@@ -108,7 +108,9 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     public boolean recordHevc;
     /** Solegram camera controls: shape of the frame, {@link #SG_ASPECT_DEFAULT} leaves Telegram's choice. */
     public volatile int solegramAspect;
-    public static final int SG_ASPECT_DEFAULT = 0, SG_ASPECT_4_3 = 1, SG_ASPECT_16_9 = 2;
+    /** The frame the current session was set up for (the camera restarts to take a new one). */
+    private volatile int solegramAspectApplied = -1;
+    public static final int SG_ASPECT_DEFAULT = 0, SG_ASPECT_4_3 = 1, SG_ASPECT_16_9 = 2, SG_ASPECT_FULL = 3;
     private float scaleX, scaleY;
     private Size[] previewSize = new Size[2];
     private Size[] pictureSize = new Size[2];
@@ -702,6 +704,123 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         return previewSize[0];
     }
 
+    // region Solegram camera controls
+
+    private static float solegramRatio(Size size) {
+        return size == null || size.getWidth() <= 0 || size.getHeight() <= 0 ? 0 : (float) Math.max(size.getWidth(), size.getHeight()) / Math.min(size.getWidth(), size.getHeight());
+    }
+
+    /**
+     * The running session already gives the frame (a {@code SG_ASPECT_*} value): it was set up for
+     * it, or its preview has the shape that frame would pick (16:9 photos and 16:9 video, the full
+     * screen on a camera whose closest shape is 16:9), so no restart is needed.
+     */
+    public boolean solegramShapeMatches(int aspect) {
+        if (aspect == solegramAspectApplied) {
+            return true;
+        }
+        final Size preview = previewSize[0];
+        final CameraInfo cameraInfo = info[0];
+        if (preview == null || cameraInfo == null || dual) {
+            return false;
+        }
+        float target;
+        if (aspect == SG_ASPECT_4_3) {
+            target = 4f / 3f;
+        } else if (aspect == SG_ASPECT_16_9) {
+            target = 16f / 9f;
+        } else if (aspect == SG_ASPECT_FULL) {
+            final Size[] full = SolegramCamera.pickFullSizes(cameraInfo.getPreviewSizes(), cameraInfo.getPictureSizes(), SolegramCamera.screenRatio(),
+                SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW);
+            target = full != null ? solegramRatio(full[0]) : 16f / 9f;
+        } else {
+            return false;
+        }
+        return Math.abs(solegramRatio(preview) - target) < 0.01f;
+    }
+
+    /** Shape (long over short side) of the photos the session takes, 0 when unknown. */
+    public float solegramPictureRatio() {
+        return solegramRatio(pictureSize[0]);
+    }
+
+    /**
+     * Before a restart for a new frame: the last picture, blurred, stays over the preview until the
+     * new session's first frame (then it fades as after switching cameras), so nothing jumps.
+     */
+    public void solegramFreezeFrame() {
+        blurredStubView.animate().setListener(null).cancel();
+        if (firstFrameRendered && textureView.isAvailable() && textureView.getWidth() > 0 && textureView.getHeight() > 0) {
+            final int w = 120, h = Math.max(1, Math.round(120f * textureView.getHeight() / textureView.getWidth()));
+            final Bitmap bitmap = textureView.getBitmap(w, h);
+            if (bitmap != null) {
+                Utilities.blurBitmap(bitmap, 3);
+                blurredStubView.setBackground(new BitmapDrawable(getResources(), bitmap));
+            }
+        }
+        blurredStubView.setAlpha(1f);
+        blurredStubView.setVisibility(View.VISIBLE);
+    }
+
+    private ValueAnimator solegramFitAnimator;
+
+    /** Fitted (letterboxed) or filling; animated, the preview glides between the two sizes. */
+    public void solegramSetFit(boolean value, boolean animated) {
+        if (fit == value) {
+            return;
+        }
+        final float before = textureView.getHeight() * textureView.getScaleY(); // as seen, a glide under way included
+        fit = value;
+        requestLayout();
+        invalidate();
+        if (solegramFitAnimator != null) {
+            solegramFitAnimator.cancel();
+            solegramFitAnimator = null;
+        }
+        final float after = getTextureHeight(getWidth(), getHeight(), value);
+        if (!animated || before <= 0 || after <= 0 || previewSize[0] == null) {
+            textureView.setScaleX(1f);
+            textureView.setScaleY(1f);
+            blurredStubView.setScaleX(1f);
+            blurredStubView.setScaleY(1f);
+            return;
+        }
+        final float from = before / after;
+        solegramFitAnimator = ValueAnimator.ofFloat(from, 1f);
+        solegramFitAnimator.addUpdateListener(a -> {
+            final float scale = (float) a.getAnimatedValue();
+            textureView.setScaleX(scale);
+            textureView.setScaleY(scale);
+            blurredStubView.setScaleX(scale);
+            blurredStubView.setScaleY(scale);
+        });
+        solegramFitAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (solegramFitAnimator == animation) {
+                    solegramFitAnimator = null;
+                    invalidate();
+                }
+            }
+        });
+        solegramFitAnimator.setDuration(320);
+        solegramFitAnimator.setInterpolator(org.telegram.ui.Components.CubicBezierInterpolator.EASE_OUT_QUINT);
+        textureView.setScaleX(from);
+        textureView.setScaleY(from);
+        blurredStubView.setScaleX(from);
+        blurredStubView.setScaleY(from);
+        solegramFitAnimator.start();
+    }
+
+    /** The open animation drives the preview's scale itself: any fit animation stops. */
+    public void solegramCancelFitAnimation() {
+        if (solegramFitAnimator != null) {
+            solegramFitAnimator.cancel();
+            solegramFitAnimator = null;
+        }
+    }
+    // endregion
+
     protected CameraGLThread cameraThread;
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
@@ -821,6 +940,18 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         if (!square() && !dual) {
             pictureSize[i] = SolegramCamera.pickPictureSize(info[i].getPictureSizes(), aspectRatio, pictureSize[i],
                 SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW);
+        }
+        if (solegramAspect == SG_ASPECT_FULL && !square() && !dual && !isStory) {
+            // Solegram: the whole screen - the camera's shape closest to it (16:9 sizes above stay as the fallback)
+            final Size[] full = SolegramCamera.pickFullSizes(info[i].getPreviewSizes(), info[i].getPictureSizes(), SolegramCamera.screenRatio(),
+                SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW);
+            if (full != null) {
+                previewSize[i] = full[0];
+                pictureSize[i] = full[1];
+            }
+        }
+        if (i == 0) {
+            solegramAspectApplied = solegramAspect;
         }
 
         if (BuildVars.LOGS_ENABLED) {
@@ -1192,7 +1323,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        if (flipAnimator != null || fit) {
+        if (flipAnimator != null || fit || solegramFitAnimator != null) {
             // fitted (Solegram camera controls): black bars around the frame, as in a camera app
             canvas.drawColor(Color.BLACK);
         }

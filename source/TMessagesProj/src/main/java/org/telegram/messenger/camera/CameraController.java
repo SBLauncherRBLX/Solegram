@@ -410,7 +410,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
             CameraSession session = (CameraSession) sessionObject;
             final CameraInfo info = session.cameraInfo;
             final boolean flipFront = session.isFlipFront();
-            final boolean square = session.solegramSquare;
+            final float crop = session.solegramCropRatio;
             Camera camera = info.camera;
             try {
                 // Solegram: focus is locked right before the shot, as the stock camera does it; the
@@ -425,7 +425,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
                             FileLog.e(e);
                         }
                     }
-                    SolegramPhotoEnhance.execute(() -> savePicture(data, path, info, flipFront, ignoreOrientation, square, callback));
+                    SolegramPhotoEnhance.execute(() -> savePicture(data, path, info, flipFront, ignoreOrientation, crop, callback));
                 };
                 if (focusMode == null) {
                     camera.takePicture(null, null, pictureCallback);
@@ -529,7 +529,7 @@ public class CameraController implements MediaRecorder.OnInfoListener {
     // Solegram: what the picture callback did before, now on a background thread: the front camera
     // photo turned and mirrored (now at JPEG 95 instead of 80) or the JPEG written as it is, then
     // Solegram processing, then the bitmap cached and the caller told on the main thread.
-    private static void savePicture(byte[] data, File path, CameraInfo info, boolean flipFront, boolean ignoreOrientation, boolean square, Utilities.Callback<Integer> callback) {
+    private static void savePicture(byte[] data, File path, CameraInfo info, boolean flipFront, boolean ignoreOrientation, float crop, Utilities.Callback<Integer> callback) {
         Bitmap bitmap = null;
         int orientation = 0;
         int size = (int) (AndroidUtilities.getPhotoSize() / AndroidUtilities.density);
@@ -583,9 +583,9 @@ public class CameraController implements MediaRecorder.OnInfoListener {
             }
             bitmap = enhanced;
         }
-        if (square) {
-            // Solegram: the 1:1 frame picked on the viewfinder, the middle of the 4:3 picture
-            bitmap = SolegramPhotoEnhance.cropSquare(path, bitmap);
+        if (crop >= 1f) {
+            // Solegram: the frame picked on the viewfinder - 1:1 from the middle of 4:3, the screen's shape for full screen
+            bitmap = SolegramPhotoEnhance.cropToRatio(path, bitmap, crop);
         }
         if (bitmap == null) {
             bitmap = decodeBounded(data, MAX_CACHE_SIDE);

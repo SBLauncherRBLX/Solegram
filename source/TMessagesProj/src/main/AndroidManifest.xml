@@ -61,6 +61,8 @@
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Solegram updates: on Android 12+ a newer Solegram (same signature) installs itself without the system dialog -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Solegram reminders on the minute; the user may refuse it (then they come a few minutes late). Not USE_EXACT_ALARM: Play keeps that for alarm clocks -->
@@ -553,6 +555,18 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Solegram updates: the check / download / install jobs, and the result of an install session (sent
+             by the system to this explicit, not exported receiver); the first start of the new version -->
+        <service
+            android:name="com.solegram.messenger.updater.UpdateJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <receiver android:name="com.solegram.messenger.updater.UpdateReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

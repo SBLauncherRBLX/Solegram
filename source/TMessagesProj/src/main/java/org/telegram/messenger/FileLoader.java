@@ -210,6 +210,12 @@ public class FileLoader extends BaseController {
     private final LinkedList<FileUploadOperation> uploadSmallOperationQueue = new LinkedList<>();
     private final ConcurrentHashMap<String, FileUploadOperation> uploadOperationPaths = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, FileUploadOperation> uploadOperationPathsEnc = new ConcurrentHashMap<>();
+
+    /** Solegram: a file is being uploaded in this account (the updater does not restart the app then). */
+    public boolean isUploadingAnything() {
+        return !uploadOperationPaths.isEmpty() || !uploadOperationPathsEnc.isEmpty();
+    }
+
     private int currentUploadOperationsCount = 0;
     private int currentUploadSmallOperationsCount = 0;
 

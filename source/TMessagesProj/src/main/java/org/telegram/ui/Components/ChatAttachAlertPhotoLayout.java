@@ -1239,10 +1239,13 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     // the last shot where the flash was (the flash went to the top row), photo / video under the shutter
                     final View thumb = sgCamera.thumb;
                     thumb.layout(cx3 - thumb.getMeasuredWidth() / 2, cy3 - thumb.getMeasuredHeight() / 2, cx3 + thumb.getMeasuredWidth() / 2, cy3 + thumb.getMeasuredHeight() / 2);
-                    final View mode = sgCamera.modeSwitch;
+                    final com.solegram.messenger.ui.SolegramCameraUi.ModeSwitch mode = sgCamera.modeSwitch;
                     if (getMeasuredWidth() == dp(126)) {
-                        mode.layout(0, getMeasuredHeight(), getMeasuredWidth(), getMeasuredHeight() + mode.getMeasuredHeight());
+                        // landscape: the words run upwards along the edge beside the shutter
+                        mode.setVertical(true);
+                        mode.layout(0, cy - dp(110), dp(26), cy + dp(110));
                     } else {
+                        mode.setVertical(false);
                         mode.layout(0, getMeasuredHeight() - mode.getMeasuredHeight() - dp(2), getMeasuredWidth(), getMeasuredHeight() - dp(2));
                     }
                 }
@@ -1295,8 +1298,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 if (parentAlert.avatarPicker != 2 && !(parentAlert.baseFragment instanceof ChatActivity) || takingPhoto || parentAlert.destroyed || cameraView == null) {
                     return false;
                 }
-                if (sgCamera != null && sgCamera.isTimerRunning()) {
-                    return false;
+                if (sgCamera != null && (sgCamera.isTimerRunning() || !cameraView.isInited() || cameraView.getCameraSession() == null)) {
+                    return false; // counting down, or the camera is restarting for a new frame: nothing to record from
                 }
                 if (parentAlert.isStickerMode) {
                     return false;
@@ -1418,7 +1421,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     return;
                 }
                 if (sgCamera != null && cameraView.getCameraSession().camera1Session != null) {
-                    cameraView.getCameraSession().camera1Session.solegramSquare = sgCamera.isSquare();
+                    // the frame on the viewfinder decides the cut: 1:1, or the filled screen for full screen
+                    cameraView.getCameraSession().camera1Session.solegramCropRatio = sgCamera.cropRatio(cameraView);
                 }
                 final File cameraFile = AndroidUtilities.generatePicturePath(parentAlert.baseFragment instanceof ChatActivity && ((ChatActivity) parentAlert.baseFragment).isSecretChat(), null);
                 final boolean sameTakePictureOrientation = cameraView.getCameraSession().isSameTakePictureOrientation();
@@ -2549,7 +2553,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             if (!sgCameraVideoAllowed()) {
                 sgCamera.setPhotoMode();
             }
-            sgApplyCameraAspect();
+            sgApplyCameraAspect(false);
             sgCamera.setActive(true);
         }
         if (cameraPhotos.isEmpty()) {
@@ -2715,7 +2719,10 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                         // a new session starts at its widest: the zoom follows, the controls show what it offers
                         cameraZoom = 0;
                         zoomControlView.setZoom(0, false);
+                        sgRestartUntil = 0;
                         sgCamera.onCameraInit();
+                        // a frame asked for while the camera was starting is taken up once it runs (no-op when it fits)
+                        AndroidUtilities.runOnUIThread(() -> sgApplyCameraAspect(true));
                     }
                     String current = cameraView.getCameraSession().getCurrentFlashMode();
                     String next = cameraView.getCameraSession().getNextFlashMode();
@@ -3075,10 +3082,13 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         int cameraViewW, cameraViewH;
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) cameraView.getLayoutParams();
 
-        if (sgCamera != null && cameraView.fit != cameraExpanded) {
-            // Solegram: the open camera shows the whole frame that is taken (letterboxed), the tile stays filled
-            cameraView.fit = cameraExpanded;
-            cameraView.requestLayout();
+        if (sgCamera != null) {
+            // Solegram: the open camera shows the whole frame that is taken (letterboxed, full screen fills it), the tile stays filled
+            cameraView.solegramCancelFitAnimation();
+            final boolean fit = cameraExpanded && sgCamera.wantsFit();
+            if (cameraView.fit != fit) {
+                cameraView.solegramSetFit(fit, false);
+            }
         }
         float textureStartHeight = cameraView.getTextureHeight(startWidth, startHeight);
         float textureEndHeight = cameraView.getTextureHeight(endWidth, endHeight, cameraView.fit);
@@ -4233,22 +4243,41 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         return videoEnabled && !parentAlert.isStickerMode && (parentAlert.avatarPicker == 2 || parentAlert.baseFragment instanceof ChatActivity);
     }
 
-    /** The camera gives the frame the controls ask for (4:3 for 4:3 and 1:1, 16:9 for 16:9 and video). */
-    private void sgApplyCameraAspect() {
+    /** A restart for a new frame is under way (till the new session's first picture, or a few seconds at most). */
+    private long sgRestartUntil;
+
+    private boolean sgRestarting() {
+        return sgRestartUntil != 0 && android.os.SystemClock.elapsedRealtime() < sgRestartUntil;
+    }
+
+    /**
+     * The camera gives the frame the controls ask for (4:3 for 4:3 and 1:1, 16:9 for 16:9 and video,
+     * the screen's shape for full screen). It restarts only when the running session's shape doesn't
+     * fit (16:9 photos and video share one), once at a time, behind its blurred last picture; asked
+     * during a restart or before the first picture, the new session picks the frame up when it starts.
+     * The open camera is letterboxed for every frame but full screen; the change glides.
+     */
+    private void sgApplyCameraAspect(boolean animated) {
         if (sgCamera == null || cameraView == null) {
             return;
         }
         final int aspect = sgCamera.cameraAspect();
-        if (cameraView.solegramAspect != aspect) {
-            cameraView.solegramAspect = aspect;
-            if (cameraView.isInited()) {
-                canSaveCameraPreview = false;
-                cameraView.resetCamera();
+        final boolean matches = cameraView.solegramShapeMatches(aspect);
+        cameraView.solegramAspect = aspect;
+        boolean restart = false;
+        if (!matches && cameraView.isInited() && cameraView.getCameraSession() != null && !sgRestarting()) {
+            restart = true;
+            sgRestartUntil = android.os.SystemClock.elapsedRealtime() + 3000;
+            canSaveCameraPreview = false;
+            if (animated && cameraOpened) {
+                cameraView.solegramFreezeFrame();
             }
+            cameraView.resetCamera();
         }
-        final org.telegram.messenger.camera.CameraSessionWrapper session = cameraView.getCameraSession();
-        if (session != null && session.camera1Session != null) {
-            session.camera1Session.solegramSquare = sgCamera.isSquare();
+        final boolean fit = cameraExpanded && sgCamera.wantsFit();
+        if (cameraView.fit != fit) {
+            // gliding between letterboxed and filled only when the picture keeps its size; a restart hides the change
+            cameraView.solegramSetFit(fit, animated && !restart && cameraOpened && !cameraAnimationInProgress && LiteMode.isEnabled(LiteMode.FLAGS_CHAT));
         }
     }
 
@@ -4289,12 +4318,18 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         @Override
         public void onAspectChanged() {
-            sgApplyCameraAspect();
+            sgApplyCameraAspect(true);
+        }
+
+        @Override
+        public boolean canChangeCamera() {
+            return cameraView != null && cameraOpened && !cameraAnimationInProgress && !takingPhoto && !sgRestarting()
+                && cameraView.getTranslationY() == 0;
         }
 
         @Override
         public void onModeChanged(boolean video) {
-            sgApplyCameraAspect();
+            sgApplyCameraAspect(true);
         }
 
         @Override

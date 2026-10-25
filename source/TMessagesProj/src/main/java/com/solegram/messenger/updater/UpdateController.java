@@ -57,6 +57,8 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
     }
 
     private static final long AUTO_CHECK_INTERVAL = 6 * 60 * 60 * 1000L;
+    /** A start the user sees checks more often; the periodic job covers the rest (AutoUpdater). */
+    private static final long VISIBLE_START_CHECK_INTERVAL = 30 * 60 * 1000L;
     private static final Pattern FILE_PATTERN = Pattern.compile("(?i)solegram[-_ ]v?(\\d+(?:\\.\\d+)*)(?:[-_ ]+(?:b|build)?(\\d+))?");
     private static final Pattern BUILD_PATTERN = Pattern.compile("(?i)(?:#b|build\\s*[:=]?\\s*#?)(\\d+)");
     private static final Pattern VERSION_PATTERN = Pattern.compile("(?i)version\\s*[:=]?\\s*v?(\\d+(?:\\.\\d+)+)");
@@ -73,6 +75,8 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
     private java.lang.ref.WeakReference<android.app.Activity> sheetActivity;
     private long checkStartedAt;
     private int githubDownloadingBuild;
+    /** The running GitHub download was started by AutoUpdater, not from the sheet. */
+    private boolean backgroundDownload;
 
     public static UpdateController getInstance() {
         if (instance == null) {
@@ -102,10 +106,12 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
     }
 
     public void scheduleAutoCheck() {
+        AutoUpdater.start();
         if (!SolegramConfig.autoUpdateCheck) {
             return;
         }
-        if (Math.abs(System.currentTimeMillis() - SolegramConfig.lastUpdateCheck) < AUTO_CHECK_INTERVAL) {
+        final long interval = AutoUpdater.isAppVisible() ? VISIBLE_START_CHECK_INTERVAL : AUTO_CHECK_INTERVAL;
+        if (Math.abs(System.currentTimeMillis() - SolegramConfig.lastUpdateCheck) < interval) {
             return;
         }
         checkNow(null, false);
@@ -202,6 +208,7 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
             checking = false;
             SolegramConfig.putLong("lastUpdateCheck", System.currentTimeMillis());
             if (error != null) {
+                AutoUpdater.onCheckFinished(null, error);
                 if (manual && fragment != null) {
                     BulletinFactory.of(fragment).createErrorBulletin(error).show();
                 }
@@ -209,16 +216,23 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
                 return;
             }
             if (found != null && found.build > Solegram.getBuild()) {
-                pending = found;
+                if (pending == null || pending.build != found.build || !isDownloading(pending)) {
+                    pending = found; // a running download keeps its own copy of the release
+                }
                 postChanged();
-                if (manual || found.build != SolegramConfig.skippedUpdateBuild) {
+                // auto mode downloads and installs it by itself: no sheet then (a manual check still shows it)
+                final boolean automatic = AutoUpdater.onCheckFinished(found, null);
+                if (!(automatic && !manual) && (manual || found.build != SolegramConfig.skippedUpdateBuild)) {
                     BaseFragment target = fragment != null ? fragment : LaunchActivity.getLastFragment();
-                    if (target != null) {
+                    if (target != null && (manual || AutoUpdater.isAppVisible())) {
                         showUpdateSheet(target);
+                    } else if (!manual && SolegramConfig.autoUpdateMode != SolegramConfig.AUTO_UPDATE_OFF) {
+                        AutoUpdater.notifyAvailable(found);
                     }
                 }
             } else {
                 pending = null;
+                AutoUpdater.onCheckFinished(null, null);
                 postChanged();
                 if (manual && fragment != null) {
                     BulletinFactory.of(fragment).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.SG_UpToDate)).show();
@@ -227,7 +241,7 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
         });
     }
 
-    private void postChanged() {
+    void postChanged() {
         AndroidUtilities.runOnUIThread(() -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramUpdateAvailable));
     }
 
@@ -289,6 +303,7 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
 
     public void skip(UpdateInfo info) {
         SolegramConfig.putInt("skippedUpdateBuild", info.build);
+        AutoUpdater.onSkipped(info);
     }
 
     public void showUpdateSheet(BaseFragment fragment) {
@@ -384,12 +399,42 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
         return downloadFailed;
     }
 
+    /** A newer release found by the background updater becomes the one the sheet and the settings show. */
+    void setPendingIfNewer(UpdateInfo info) {
+        if (info != null && (pending == null || pending.build < info.build)) {
+            pending = info;
+            postChanged();
+        }
+    }
+
+    public boolean isBackgroundDownload() {
+        return backgroundDownload && githubDownloadingBuild != 0;
+    }
+
+    /** The background updater downloads a GitHub release; the sheet shows its progress like its own. */
+    void downloadInBackground(UpdateInfo info) {
+        download(info, true);
+    }
+
+    void cancelBackgroundDownload() {
+        if (isBackgroundDownload()) {
+            GithubUpdater.cancel();
+            githubDownloadingBuild = 0;
+            postChanged();
+        }
+    }
+
     public void download(UpdateInfo info) {
+        download(info, false);
+    }
+
+    private void download(UpdateInfo info, boolean background) {
         if (isDownloading(info)) {
             return;
         }
         if (info.url != null) {
             githubDownloadingBuild = info.build;
+            backgroundDownload = background;
             downloadProgress = 0;
             downloadFailed = false;
             postChanged();
@@ -403,6 +448,13 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
                     // a newer version came out: offer that one instead (its own sheet shows the progress)
                     pending = fresh;
                     githubDownloadingBuild = 0;
+                    if (background) {
+                        postChanged();
+                        if (!AutoUpdater.onCheckFinished(fresh, null)) {
+                            AutoUpdater.onDownloadCancelled();
+                        }
+                        return;
+                    }
                     if (visibleSheet != null) {
                         try {
                             visibleSheet.dismiss();
@@ -445,16 +497,19 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
             }
 
             @Override
-            public void onDone(boolean success) {
+            public void onDone(boolean success, String error) {
                 AndroidUtilities.runOnUIThread(() -> {
                     if (githubDownloadingBuild != info.build) {
                         return; // cancelled
                     }
+                    final boolean background = backgroundDownload;
                     githubDownloadingBuild = 0;
+                    backgroundDownload = false;
                     downloadFailed = !success;
                     downloadProgress = success ? 1f : 0;
                     postChanged();
-                    if (success) {
+                    AutoUpdater.onDownloadFinished(info, success, error, background);
+                    if (success && !background) {
                         install(info);
                     }
                 });
@@ -478,7 +533,9 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
         if (info.url != null) {
             GithubUpdater.cancel();
             githubDownloadingBuild = 0;
+            backgroundDownload = false;
             postChanged();
+            AutoUpdater.onDownloadCancelled();
             return;
         }
         FileLoader.getInstance(info.messageObject.currentAccount).cancelLoadFile(info.document);
@@ -531,20 +588,55 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
             postChanged();
             return;
         }
+        // the file is checked first (same app, same signature, newer, checksum): AutoUpdater then installs it
+        AutoUpdater.installByUser(info, f);
+    }
+
+    /** The system installer for the file (Android 11 and older, where every install is confirmed there). */
+    void openInstaller(UpdateInfo info, File f) {
+        BaseFragment fragment = LaunchActivity.getLastFragment();
+        if (fragment == null || fragment.getParentActivity() == null) {
+            return;
+        }
         try {
             String name = info.document != null ? FileLoader.getDocumentFileName(info.document) : f.getName();
             AndroidUtilities.openForView(f, name, "application/vnd.android.package-archive", fragment.getParentActivity(), null, false);
         } catch (Throwable e) {
             FileLog.e(e);
-            // never fail silently: say why and offer the browser
-            try {
-                // over the update sheet when it is open, otherwise the bulletin would hide behind it
-                final BulletinFactory factory = visibleSheet != null && visibleSheet.isShowing()
-                    ? BulletinFactory.of(visibleSheet.getContainer(), null) : BulletinFactory.of(fragment);
-                factory.createSimpleBulletin(R.raw.error, LocaleController.formatString(R.string.SG_UpdateInstallFailed, e.getClass().getSimpleName()),
-                    LocaleController.getString(R.string.SG_UpdateInBrowser), () -> openInBrowser(fragment.getParentActivity())).show();
-            } catch (Throwable ignore) {
-            }
+            showInstallError(e.getClass().getSimpleName());
+        }
+    }
+
+    /** The downloaded file failed its check and is gone: the sheet offers the download again. */
+    void onInstallRejected() {
+        downloadFailed = true;
+        downloadProgress = 0;
+        postChanged();
+        final BaseFragment fragment = LaunchActivity.getLastFragment();
+        if (fragment == null) {
+            return;
+        }
+        try {
+            final BulletinFactory factory = visibleSheet != null && visibleSheet.isShowing()
+                ? BulletinFactory.of(visibleSheet.getContainer(), null) : BulletinFactory.of(fragment);
+            factory.createErrorBulletin(LocaleController.getString(R.string.SG_UpdateRejected)).show();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /** Never fail silently: say why and offer the browser. */
+    void showInstallError(String reason) {
+        final BaseFragment fragment = LaunchActivity.getLastFragment();
+        if (fragment == null || fragment.getParentActivity() == null) {
+            return;
+        }
+        try {
+            // over the update sheet when it is open, otherwise the bulletin would hide behind it
+            final BulletinFactory factory = visibleSheet != null && visibleSheet.isShowing()
+                ? BulletinFactory.of(visibleSheet.getContainer(), null) : BulletinFactory.of(fragment);
+            factory.createSimpleBulletin(R.raw.error, LocaleController.formatString(R.string.SG_UpdateInstallFailed, reason),
+                LocaleController.getString(R.string.SG_UpdateInBrowser), () -> openInBrowser(fragment.getParentActivity())).show();
+        } catch (Throwable ignore) {
         }
     }
     // endregion

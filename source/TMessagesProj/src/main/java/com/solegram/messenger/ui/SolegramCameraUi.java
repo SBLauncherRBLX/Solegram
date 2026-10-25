@@ -111,6 +111,12 @@ public final class SolegramCameraUi {
         /** The frame setting changed: the camera has to be set up for it. */
         void onAspectChanged();
 
+        /**
+         * The camera may change mode or frame now: open and still (no open / close animation, no
+         * shot being saved, no restart of its own still running).
+         */
+        boolean canChangeCamera();
+
         void onModeChanged(boolean video);
 
         /** The last shot was tapped: show the shots taken. */
@@ -168,6 +174,9 @@ public final class SolegramCameraUi {
     private boolean recording;
     private float iconRotation;
     private int lastDeviceOrientation = -1;
+    /** The photo flash (auto / on) put aside while in video mode. */
+    @Nullable
+    private String photoFlashMode;
     private OrientationEventListener orientationListener;
 
     // self-timer
@@ -190,11 +199,6 @@ public final class SolegramCameraUi {
         topBar.setGravity(Gravity.CENTER);
         topBar.setClipChildren(false);
         topBar.setClipToPadding(false);
-        if (animations()) {
-            final android.animation.LayoutTransition transition = new android.animation.LayoutTransition();
-            transition.setDuration(220);
-            topBar.setLayoutTransition(transition);
-        }
         for (int i = 0; i < buttons.length; i++) {
             final int type = i;
             final CamButton button = new CamButton(context, type);
@@ -260,6 +264,10 @@ public final class SolegramCameraUi {
             if (orientationListener.canDetectOrientation()) {
                 orientationListener.enable();
             }
+            if (recording && (shutter == null || shutter.getState() != ShutterButton.State.RECORDING)) {
+                // the sheet went away mid-recording last time: the controls come back
+                setRecording(false);
+            }
             overlay.resetFocus();
             refresh();
         } else {
@@ -278,10 +286,6 @@ public final class SolegramCameraUi {
 
     /** A camera session is ready (also after switching cameras or frames): show what it offers. */
     public void onCameraInit() {
-        final CameraSession session = session();
-        if (session != null) {
-            session.solegramSquare = isSquare();
-        }
         overlay.resetFocus();
         refresh();
     }
@@ -292,7 +296,10 @@ public final class SolegramCameraUi {
 
     /** Back to photos (video isn't allowed in this chat). */
     public void setPhotoMode() {
-        setVideoMode(false);
+        if (videoMode && !recording) {
+            cancelTimer();
+            applyVideoMode(false, false);
+        }
     }
 
     /** Recording (or not): the settings step aside like in a camera app, the zoom stays. */
@@ -326,12 +333,37 @@ public final class SolegramCameraUi {
         return !videoMode && SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_1_1;
     }
 
-    /** Frame the camera has to give now, a {@code CameraView.SG_ASPECT_*} value. */
+    /** Frame the camera has to give now, a {@code CameraView.SG_ASPECT_*} value (video is always 16:9). */
     public int cameraAspect() {
         if (videoMode || SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_16_9) {
             return CameraView.SG_ASPECT_16_9;
         }
+        if (SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_FULL) {
+            return CameraView.SG_ASPECT_FULL;
+        }
         return CameraView.SG_ASPECT_4_3;
+    }
+
+    /** The open camera shows its frame letterboxed (true) or filling the screen (full screen photos). */
+    public boolean wantsFit() {
+        return videoMode || SolegramConfig.cameraAspect != SolegramConfig.CAMERA_ASPECT_FULL;
+    }
+
+    /**
+     * Shape the next photo is cut to after the shot (long side over short side), 0 for none: 1 for
+     * 1:1, and for full screen the shape of the filled viewfinder - exactly what it showed.
+     */
+    public float cropRatio(@Nullable CameraView camera) {
+        if (videoMode) {
+            return 0;
+        }
+        if (SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_1_1) {
+            return 1f;
+        }
+        if (SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_FULL && camera != null && !camera.fit && camera.getWidth() > 0 && camera.getHeight() > 0) {
+            return (float) Math.max(camera.getWidth(), camera.getHeight()) / Math.min(camera.getWidth(), camera.getHeight());
+        }
+        return 0;
     }
     // endregion
 
@@ -439,13 +471,17 @@ public final class SolegramCameraUi {
                 break;
             }
             case ASPECT: {
-                final int next = (SolegramConfig.cameraAspect + 1) % 3;
+                if (!host.canChangeCamera()) {
+                    return;
+                }
+                // full screen first, then the classic frames
+                final int a = SolegramConfig.cameraAspect;
+                final int next = a == SolegramConfig.CAMERA_ASPECT_FULL ? SolegramConfig.CAMERA_ASPECT_4_3
+                    : a == SolegramConfig.CAMERA_ASPECT_4_3 ? SolegramConfig.CAMERA_ASPECT_16_9
+                    : a == SolegramConfig.CAMERA_ASPECT_16_9 ? SolegramConfig.CAMERA_ASPECT_1_1 : SolegramConfig.CAMERA_ASPECT_FULL;
                 SolegramConfig.putInt("cameraAspect", next);
                 showToast(aspectName(next));
-                final CameraSession session = session();
-                if (session != null) {
-                    session.solegramSquare = isSquare();
-                }
+                zoomPill.stopZoom();
                 host.onAspectChanged();
                 overlay.resetFocus();
                 break;
@@ -490,6 +526,9 @@ public final class SolegramCameraUi {
     }
 
     private static String aspectName(int aspect) {
+        if (aspect == SolegramConfig.CAMERA_ASPECT_FULL) {
+            return LocaleController.getString(R.string.SG_CamFull);
+        }
         return aspect == SolegramConfig.CAMERA_ASPECT_16_9 ? "16:9" : aspect == SolegramConfig.CAMERA_ASPECT_1_1 ? "1:1" : "4:3";
     }
 
@@ -512,10 +551,9 @@ public final class SolegramCameraUi {
 
     private void updateButtons() {
         final CameraSession session = session();
-        final boolean hasFlash = session != null && flashModes(session).size() >= 2;
-        buttons[FLASH].setVisibility(hasFlash ? View.VISIBLE : View.GONE);
-        buttons[HDR].setVisibility(videoMode ? View.GONE : View.VISIBLE);
-        buttons[ASPECT].setVisibility(videoMode ? View.GONE : View.VISIBLE);
+        // while the camera restarts there is no session: the flash button keeps its place till it is back
+        final boolean hasFlash = session != null ? flashModes(session).size() >= 2 : buttons[FLASH].getVisibility() == View.VISIBLE;
+        setButtonsShown(hasFlash, !videoMode, !videoMode);
         for (CamButton button : buttons) {
             button.invalidate();
         }
@@ -526,18 +564,106 @@ public final class SolegramCameraUi {
         buttons[GRID].setContentDescription(LocaleController.getString(SolegramConfig.cameraGrid ? R.string.SG_CamGridOn : R.string.SG_CamGridOff));
     }
 
-    private void setVideoMode(boolean video) {
-        if (videoMode == video || recording || isTimerRunning()) {
+    private final int[] barLefts = new int[5], barTops = new int[5];
+
+    /**
+     * Shows or hides the flash, HDR and frame buttons. The row closes up or opens smoothly: the
+     * buttons that stay glide to their new places, the new ones grow in (by hand, a LayoutTransition
+     * left buttons half faded when taps came fast).
+     */
+    private void setButtonsShown(boolean flash, boolean hdr, boolean aspect) {
+        final boolean[] shown = {flash, hdr, true, aspect, true};
+        boolean changed = false;
+        for (int i = 0; i < buttons.length; i++) {
+            if ((buttons[i].getVisibility() == View.VISIBLE) != shown[i]) {
+                changed = true;
+                break;
+            }
+        }
+        if (!changed) {
             return;
         }
-        videoMode = video;
+        final boolean animate = animations() && active && topBar.isLaidOut() && topBar.getAlpha() > 0;
+        for (int i = 0; i < buttons.length; i++) {
+            // where each one is seen now, a glide still under way included
+            barLefts[i] = topBar.getLeft() + buttons[i].getLeft() + Math.round(buttons[i].getTranslationX());
+            barTops[i] = topBar.getTop() + buttons[i].getTop() + Math.round(buttons[i].getTranslationY());
+        }
+        for (int i = 0; i < buttons.length; i++) {
+            final CamButton button = buttons[i];
+            final boolean wasShown = button.getVisibility() == View.VISIBLE;
+            button.animate().cancel();
+            button.setTranslationX(0);
+            button.setTranslationY(0);
+            button.setScaleX(1f);
+            button.setScaleY(1f);
+            button.setAlpha(1f);
+            button.setVisibility(shown[i] ? View.VISIBLE : View.GONE);
+            if (animate && shown[i] && !wasShown) {
+                button.setAlpha(0f);
+                button.setScaleX(0.5f);
+                button.setScaleY(0.5f);
+                button.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(60).setDuration(260).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+            }
+        }
+        if (!animate) {
+            return;
+        }
+        topBar.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                topBar.getViewTreeObserver().removeOnPreDrawListener(this);
+                for (int i = 0; i < buttons.length; i++) {
+                    final CamButton button = buttons[i];
+                    if (!shown[i] || button.getVisibility() != View.VISIBLE || button.getAlpha() < 1f) {
+                        continue;
+                    }
+                    final int dx = barLefts[i] - (topBar.getLeft() + button.getLeft());
+                    final int dy = barTops[i] - (topBar.getTop() + button.getTop());
+                    if (dx != 0 || dy != 0) {
+                        button.setTranslationX(dx);
+                        button.setTranslationY(dy);
+                        button.animate().translationX(0).translationY(0).setDuration(280).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                    }
+                }
+                return true;
+            }
+        });
+    }
+
+    private void setVideoMode(boolean video) {
+        if (videoMode == video || recording || isTimerRunning() || !host.canChangeCamera()) {
+            return;
+        }
         haptic(modeSwitch);
+        applyVideoMode(video, true);
+    }
+
+    private void applyVideoMode(boolean video, boolean animated) {
+        videoMode = video;
+        zoomPill.stopZoom(); // a glide to a zoom step must not land on a restarted camera
+        modeSwitch.sync(animated);
         if (shutter != null) {
-            shutter.setVideoMode(video, animations());
+            shutter.setVideoMode(video, animated && animations());
         }
         final CameraSession session = session();
-        if (session != null) {
-            session.solegramSquare = isSquare();
+        final CameraView camera = host.camera();
+        if (session != null && camera != null && camera.getCameraSession() != null) {
+            // a recording knows only off and the torch: the photo flash comes back with photos
+            final String mode = session.getCurrentFlashMode();
+            if (video) {
+                if (Camera.Parameters.FLASH_MODE_AUTO.equals(mode) || Camera.Parameters.FLASH_MODE_ON.equals(mode)) {
+                    photoFlashMode = mode;
+                    camera.getCameraSession().setCurrentFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+                } else {
+                    photoFlashMode = null;
+                }
+            } else {
+                if (photoFlashMode != null && Camera.Parameters.FLASH_MODE_OFF.equals(mode) && session.availableFlashModes.contains(photoFlashMode)) {
+                    camera.getCameraSession().setCurrentFlashMode(photoFlashMode);
+                }
+                photoFlashMode = null;
+            }
         }
         refresh();
         overlay.resetFocus();
@@ -708,6 +834,20 @@ public final class SolegramCameraUi {
             }
             texture.draw(canvas);
             canvas.restoreToCount(count);
+            // while the camera restarts for a new frame its blurred last picture lies over the preview: the glass shows it too
+            final View stub = camera.blurredStubView;
+            if (stub != null && stub.getParent() == camera && stub.getVisibility() == View.VISIBLE && stub.getAlpha() > 0 && stub.getWidth() > 0) {
+                final int c = canvas.save();
+                canvas.translate(camera.getX() + stub.getLeft(), camera.getY() + stub.getTop());
+                final Matrix stubMatrix = stub.getMatrix();
+                if (!stubMatrix.isIdentity()) {
+                    tmpMatrix.set(stubMatrix);
+                    canvas.concat(tmpMatrix);
+                }
+                canvas.saveLayerAlpha(0, 0, stub.getWidth(), stub.getHeight(), (int) (255 * stub.getAlpha() * camera.getAlpha()));
+                stub.draw(canvas);
+                canvas.restoreToCount(c);
+            }
         }
     }
 
@@ -1280,6 +1420,27 @@ public final class SolegramCameraUi {
                     drawTimer(canvas, u, color, on);
                     break;
                 case ASPECT: {
+                    if (SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_FULL) {
+                        // full screen: the four corners of the screen, opened out
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setStrokeWidth(1.7f * u);
+                        final float l = 5.5f * u, t = 4.5f * u, r = 18.5f * u, b = 19.5f * u, k = 4.5f * u;
+                        path.rewind();
+                        path.moveTo(l, t + k);
+                        path.lineTo(l, t);
+                        path.lineTo(l + k, t);
+                        path.moveTo(r - k, t);
+                        path.lineTo(r, t);
+                        path.lineTo(r, t + k);
+                        path.moveTo(r, b - k);
+                        path.lineTo(r, b);
+                        path.lineTo(r - k, b);
+                        path.moveTo(l + k, b);
+                        path.lineTo(l, b);
+                        path.lineTo(l, b - k);
+                        canvas.drawPath(path, paint);
+                        break;
+                    }
                     final String text = aspectName(SolegramConfig.cameraAspect);
                     textPaint.setTextSize((text.length() > 3 ? 9.5f : 10.5f) * u);
                     textPaint.setColor(color);
@@ -1534,6 +1695,13 @@ public final class SolegramCameraUi {
             return true;
         }
 
+        void stopZoom() {
+            if (zoomAnimator != null) {
+                zoomAnimator.cancel();
+                zoomAnimator = null;
+            }
+        }
+
         private void animateZoom(float target) {
             if (zoomAnimator != null) {
                 zoomAnimator.cancel();
@@ -1604,15 +1772,20 @@ public final class SolegramCameraUi {
         }
     }
 
-    /** Photo / video under the shutter: tap a word or swipe; the current one sits in the middle. */
+    /**
+     * Photo / video under the shutter (beside it, read upwards, in landscape): tap a word or swipe;
+     * the current one sits in the middle and the words glide on a spring.
+     */
     @SuppressLint("ViewConstructor")
     public final class ModeSwitch extends View {
         private final TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final String[] labels;
         private final float[] widths = new float[2];
-        private final AnimatedFloat modeT = new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
+        private final androidx.dynamicanimation.animation.FloatValueHolder position = new androidx.dynamicanimation.animation.FloatValueHolder(0);
+        private final androidx.dynamicanimation.animation.SpringAnimation spring;
         private float downX, downY;
         private boolean tracking;
+        private boolean vertical;
 
         ModeSwitch(Context context) {
             super(context);
@@ -1627,6 +1800,32 @@ public final class SolegramCameraUi {
             for (int i = 0; i < 2; i++) {
                 widths[i] = paint.measureText(labels[i]);
             }
+            spring = new androidx.dynamicanimation.animation.SpringAnimation(position);
+            spring.setSpring(new androidx.dynamicanimation.animation.SpringForce(0)
+                .setStiffness(650f)
+                .setDampingRatio(0.78f));
+            spring.setMinimumVisibleChange(0.002f);
+            spring.addUpdateListener((animation, value, velocity) -> invalidate());
+        }
+
+        /** Landscape: the words run upwards beside the shutter. */
+        public void setVertical(boolean value) {
+            if (vertical != value) {
+                vertical = value;
+                invalidate();
+            }
+        }
+
+        /** The mode changed: the words glide there (or jump, with animations off or while hidden). */
+        void sync(boolean animated) {
+            final float target = videoMode ? 1 : 0;
+            if (animated && animations() && isAttachedToWindow() && getVisibility() == View.VISIBLE) {
+                spring.animateToFinalPosition(target);
+            } else {
+                spring.cancel();
+                position.setValue(target);
+                invalidate();
+            }
         }
 
         private float spacing() {
@@ -1635,39 +1834,59 @@ public final class SolegramCameraUi {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            final float t = modeT.set(videoMode ? 1 : 0);
+            final float t = Math.max(-0.2f, Math.min(1.2f, position.getValue()));
+            canvas.save();
+            if (vertical) {
+                // drawn as across, turned so it reads upwards: "along" is up the panel
+                canvas.rotate(-90, getWidth() / 2f, getHeight() / 2f);
+            }
             final float cx = getWidth() / 2f - t * spacing();
             final float cy = getHeight() / 2f - (paint.descent() + paint.ascent()) / 2f;
             for (int i = 0; i < 2; i++) {
-                final float selected = i == 0 ? 1f - t : t;
+                final float selected = Math.max(0f, Math.min(1f, i == 0 ? 1f - t : t));
                 paint.setColor(ColorUtils.blendARGB(0xB3FFFFFF, YELLOW, selected));
                 canvas.drawText(labels[i], cx + i * spacing(), cy, paint);
             }
+            canvas.restore();
+        }
+
+        // position of a touch along the words (to the right across, upwards in landscape)
+        private float along(MotionEvent event) {
+            return vertical ? getHeight() - event.getY() : event.getX();
+        }
+
+        private float across(MotionEvent event) {
+            return vertical ? event.getX() : event.getY();
         }
 
         @Override
         public boolean onTouchEvent(MotionEvent event) {
-            if (!host.isVideoAllowed() || recording || isTimerRunning()) {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN && (!host.isVideoAllowed() || recording || isTimerRunning())) {
                 return false;
             }
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downX = event.getX();
-                    downY = event.getY();
+                    downX = along(event);
+                    downY = across(event);
                     tracking = true;
+                    // a swipe here is the mode's: the sheet and the camera's own drags keep out of it
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    if (tracking && Math.abs(event.getX() - downX) > dp(36)) {
-                        setVideoMode(event.getX() < downX);
+                    if (tracking && Math.abs(along(event) - downX) > dp(36)) {
+                        // the words follow the finger: a swipe towards the start brings the next mode in
+                        setVideoMode(along(event) < downX);
                         tracking = false;
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (tracking && Math.abs(event.getX() - downX) < dp(10) && Math.abs(event.getY() - downY) < dp(10)) {
-                        // a tap on the word left or right of the middle
-                        final float mid = getWidth() / 2f;
-                        if (Math.abs(event.getX() - mid) > dp(24)) {
-                            setVideoMode(event.getX() > mid);
+                    if (tracking && Math.abs(along(event) - downX) < dp(10) && Math.abs(across(event) - downY) < dp(10)) {
+                        // a tap on the word before or after the middle one
+                        final float mid = (vertical ? getHeight() : getWidth()) / 2f;
+                        if (Math.abs(along(event) - mid) > dp(24)) {
+                            setVideoMode(along(event) > mid);
                         }
                     }
                     tracking = false;

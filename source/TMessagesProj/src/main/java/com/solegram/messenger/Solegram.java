@@ -105,6 +105,14 @@ public final class Solegram {
                 FileLog.e(e);
             }
         });
+        // updates: the background schedule, and "Solegram updated" on the first start of a new version
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                com.solegram.messenger.updater.AutoUpdater.start();
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }, 1500);
         AndroidUtilities.runOnUIThread(() -> {
             try {
                 UpdateController.getInstance().scheduleAutoCheck();

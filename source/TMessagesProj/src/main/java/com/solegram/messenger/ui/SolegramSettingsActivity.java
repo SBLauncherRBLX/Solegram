@@ -252,6 +252,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_UPDATE_SOURCE = 504;
     private static final int ID_UPDATE_REPO = 505;
     private static final int ID_UPDATE_BROWSER = 506;
+    private static final int ID_UPDATE_WIFI = 507;
 
     // about
     private static final int ID_SOURCE = 601;
@@ -973,7 +974,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_GENERAL, ID_NO_VIBRATION, R.string.SG_DisableVibration, -1},
         {PAGE_GENERAL, ID_ADD_ACCOUNT, R.string.SG_Accounts, -1},
         {PAGE_UPDATES, 0, R.string.SG_Updates, 9},
-        {PAGE_UPDATES, ID_AUTO_UPDATE, R.string.SG_AutoCheckUpdates, 9},
+        {PAGE_UPDATES, ID_AUTO_UPDATE, R.string.SG_AutoUpdate, 9},
         {PAGE_MAIN, ID_EXPORT, R.string.SG_ExportSettings, 10},
         {PAGE_MAIN, ID_IMPORT, R.string.SG_ImportSettings, 10},
         {PAGE_PLUGINS, 0, R.string.SG_Plugins, 14},
@@ -1182,7 +1183,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private void fillCamera(ArrayList<UItem> items) {
         items.add(UItem.asHeader(getString(R.string.SG_CameraScreen)));
         items.add(UItem.asCheck(ID_CAMERA_CONTROLS, getString(R.string.SG_CameraControls)).setChecked(SolegramConfig.cameraControls));
-        items.add(UItem.asShadow(getString(R.string.SG_CameraControlsInfo)));
+        items.add(UItem.asShadow(getString(R.string.SG_CameraControlsInfo2)));
 
         items.add(UItem.asHeader(getString(R.string.SG_CameraPhotos)));
         items.add(UItem.asCheck(ID_CAMERA_ENHANCE, getString(R.string.SG_CameraEnhance)).setChecked(SolegramConfig.cameraEnhance));
@@ -1616,7 +1617,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
         items.add(UItem.asButton(ID_CHECK_UPDATE, R.drawable.msg_download, uc.hasPendingUpdate() ? getString(R.string.SG_InstallUpdate) : getString(R.string.SG_CheckUpdates), value).accent());
         items.add(tile(UItem.asButton(ID_UPDATE_BROWSER, R.drawable.msg_language, getString(R.string.SG_UpdateInBrowser)), TILE_GREEN));
-        items.add(UItem.asCheck(ID_AUTO_UPDATE, getString(R.string.SG_AutoCheckUpdates)).setChecked(SolegramConfig.autoUpdateCheck));
+        items.add(tile(UItem.asButton(ID_AUTO_UPDATE, R.drawable.msg_retry, getString(R.string.SG_AutoUpdate), autoUpdateModeName()), TILE_ORANGE));
+        if (SolegramConfig.autoUpdateMode == SolegramConfig.AUTO_UPDATE_INSTALL) {
+            items.add(UItem.asCheck(ID_UPDATE_WIFI, getString(R.string.SG_UpdateWifiOnly)).setChecked(SolegramConfig.updateWifiOnly));
+        }
         final boolean github = SolegramConfig.updateSource == SolegramConfig.UPDATE_SOURCE_GITHUB;
         items.add(tile(UItem.asButton(ID_UPDATE_SOURCE, R.drawable.msg_download, getString(R.string.SG_UpdateSource), getString(github ? R.string.SG_UpdateSourceGithub : R.string.SG_UpdateSourceTelegram)), TILE_INDIGO));
         if (github) {
@@ -1625,7 +1629,23 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(tile(UItem.asButton(ID_UPDATE_CHANNEL, R.drawable.msg_channel, getString(R.string.SG_UpdateChannel), "@" + SolegramConfig.getUpdateChannel()), TILE_CYAN));
         }
         String last = SolegramConfig.lastUpdateCheck > 0 ? LocaleController.formatDateAudio(SolegramConfig.lastUpdateCheck / 1000, true) : getString(R.string.SG_Never);
-        items.add(UItem.asShadow(LocaleController.formatString(R.string.SG_UpdatesInfo, last)));
+        String info = LocaleController.formatString(R.string.SG_UpdatesInfo, last);
+        final String status = com.solegram.messenger.updater.AutoUpdater.getStatusText();
+        if (status != null) {
+            info += "\n" + LocaleController.formatString(R.string.SG_UpdateStatus, status);
+        }
+        items.add(UItem.asShadow(info));
+    }
+
+    private String autoUpdateModeName() {
+        switch (SolegramConfig.autoUpdateMode) {
+            case SolegramConfig.AUTO_UPDATE_OFF:
+                return getString(R.string.SG_Off);
+            case SolegramConfig.AUTO_UPDATE_NOTIFY:
+                return getString(R.string.SG_AutoUpdateNotify);
+            default:
+                return getString(R.string.SG_AutoUpdateInstallShort);
+        }
     }
 
     private void fillAbout(ArrayList<UItem> items) {
@@ -2213,8 +2233,22 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 }
                 return;
             }
-            case ID_AUTO_UPDATE:
-                toggleCheck(view, "autoUpdateCheck");
+            case ID_AUTO_UPDATE: {
+                String[] names = {getString(R.string.SG_Off), getString(R.string.SG_AutoUpdateNotify), getString(R.string.SG_AutoUpdateInstall)};
+                showDialog(org.telegram.ui.Components.AlertsCreator.createSingleChoiceDialog(getParentActivity(), names, getString(R.string.SG_AutoUpdate), SolegramConfig.autoUpdateMode, (d, which) -> {
+                    SolegramConfig.putInt("autoUpdateMode", which);
+                    com.solegram.messenger.updater.AutoUpdater.onSettingsChanged();
+                    listView.adapter.update(true);
+                    if (which == SolegramConfig.AUTO_UPDATE_INSTALL) {
+                        // after the choice dialog has gone: the one-time "install unknown apps" explanation
+                        AndroidUtilities.runOnUIThread(() -> com.solegram.messenger.updater.AutoUpdater.guideUnknownSources(this), 300);
+                    }
+                }));
+                return;
+            }
+            case ID_UPDATE_WIFI:
+                toggleCheck(view, "updateWifiOnly");
+                com.solegram.messenger.updater.AutoUpdater.onSettingsChanged();
                 return;
             case ID_UPDATE_BROWSER:
                 UpdateController.getInstance().openInBrowser(getParentActivity());

@@ -63,6 +63,90 @@ public final class SolegramCamera {
         return best != null ? best : current;
     }
 
+    /** Long side over short side of the whole screen (the system bars included): the "full screen" frame. */
+    public static float screenRatio() {
+        try {
+            final android.view.WindowManager wm = (android.view.WindowManager) org.telegram.messenger.ApplicationLoader.applicationContext.getSystemService(android.content.Context.WINDOW_SERVICE);
+            final android.graphics.Point size = new android.graphics.Point();
+            wm.getDefaultDisplay().getRealSize(size);
+            if (size.x > 0 && size.y > 0) {
+                return (float) Math.max(size.x, size.y) / Math.min(size.x, size.y);
+            }
+        } catch (Throwable ignore) {
+        }
+        final android.graphics.Point size = org.telegram.messenger.AndroidUtilities.displaySize;
+        return size.x > 0 && size.y > 0 ? (float) Math.max(size.x, size.y) / Math.min(size.x, size.y) : 16f / 9f;
+    }
+
+    private static float ratio(Size size) {
+        return (float) Math.max(size.getWidth(), size.getHeight()) / Math.min(size.getWidth(), size.getHeight());
+    }
+
+    /**
+     * Preview and picture sizes for the full screen frame: of the shapes the camera has for both,
+     * the one closest to the screen without being longer than it (20:9 where the camera has it,
+     * else usually 16:9), the biggest picture of it (up to ~12 MP) and a preview near 1280 on the
+     * long side. The photo is then cut to the screen's shape after the shot, what the filled
+     * preview showed. Null when the camera lists nothing usable.
+     */
+    public static Size[] pickFullSizes(List<Size> previews, List<Size> pictures, float screen, boolean lowEnd) {
+        if (previews == null || pictures == null || previews.isEmpty() || pictures.isEmpty()) {
+            return null;
+        }
+        final int maxSide = lowEnd ? MAX_PHOTO_SIDE_LOW_END : MAX_PHOTO_SIDE;
+        Size bestPreview = null, bestPicture = null;
+        float bestRatio = 0;
+        for (int i = 0; i < previews.size(); i++) {
+            final Size preview = previews.get(i);
+            if (preview == null || preview.getWidth() <= 0 || preview.getHeight() <= 0) {
+                continue;
+            }
+            final int pLong = Math.max(preview.getWidth(), preview.getHeight()), pShort = Math.min(preview.getWidth(), preview.getHeight());
+            if (pLong > 1920 || pShort < 480) {
+                continue;
+            }
+            final float r = ratio(preview);
+            if (r > screen + 0.01f || r < 1.3f) {
+                continue;
+            }
+            // the biggest picture of this shape
+            Size picture = null;
+            long pictureArea = 0;
+            for (int j = 0; j < pictures.size(); j++) {
+                final Size candidate = pictures.get(j);
+                if (candidate == null || candidate.getWidth() <= 0 || candidate.getHeight() <= 0
+                        || Math.max(candidate.getWidth(), candidate.getHeight()) > maxSide || Math.abs(ratio(candidate) - r) > 0.01f) {
+                    continue;
+                }
+                final long area = (long) candidate.getWidth() * candidate.getHeight();
+                if (area > pictureArea) {
+                    picture = candidate;
+                    pictureArea = area;
+                }
+            }
+            if (picture == null) {
+                continue;
+            }
+            boolean better;
+            if (bestPicture == null || r > bestRatio + 0.01f) {
+                better = true;
+            } else if (Math.abs(r - bestRatio) <= 0.01f) {
+                final long bestArea = (long) bestPicture.getWidth() * bestPicture.getHeight();
+                final int bestLong = Math.max(bestPreview.getWidth(), bestPreview.getHeight());
+                // a bigger picture first, then the preview closest to 1280
+                better = pictureArea > bestArea || pictureArea == bestArea && Math.abs(pLong - 1280) < Math.abs(bestLong - 1280);
+            } else {
+                better = false;
+            }
+            if (better) {
+                bestPreview = preview;
+                bestPicture = picture;
+                bestRatio = r;
+            }
+        }
+        return bestPicture != null ? new Size[] {bestPreview, bestPicture} : null;
+    }
+
     /** Frame rate the user wants: 30 leaves the camera as before this setting, otherwise up to 60. */
     public static int targetFps() {
         return SolegramConfig.cameraFps == 30 ? 30 : 60;

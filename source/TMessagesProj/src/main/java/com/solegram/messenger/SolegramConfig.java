@@ -147,9 +147,9 @@ public class SolegramConfig {
     public static boolean cameraGrid;
     /** Self-timer of the attach camera in seconds: 0, 3 or 10. */
     public static int cameraTimer;
-    /** Frame of attach camera photos: 0 = 4:3, 1 = 16:9, 2 = 1:1 (the middle of 4:3). */
+    /** Frame of attach camera photos: 0 = 4:3, 1 = 16:9, 2 = 1:1 (the middle of 4:3), 3 = the whole screen (default). */
     public static int cameraAspect;
-    public static final int CAMERA_ASPECT_4_3 = 0, CAMERA_ASPECT_16_9 = 1, CAMERA_ASPECT_1_1 = 2;
+    public static final int CAMERA_ASPECT_4_3 = 0, CAMERA_ASPECT_16_9 = 1, CAMERA_ASPECT_1_1 = 2, CAMERA_ASPECT_FULL = 3;
     // endregion
 
     // region Animations
@@ -261,7 +261,15 @@ public class SolegramConfig {
     // endregion
 
     // region Updates
+    /** Derived from {@link #autoUpdateMode}: anything but off checks by itself. */
     public static boolean autoUpdateCheck = true;
+    public static final int AUTO_UPDATE_OFF = 0;
+    public static final int AUTO_UPDATE_NOTIFY = 1;
+    public static final int AUTO_UPDATE_INSTALL = 2;
+    /** Off / only tell about a new version / download and install it by itself (updater.AutoUpdater). */
+    public static int autoUpdateMode = AUTO_UPDATE_INSTALL;
+    /** Updates download by themselves only over Wi-Fi (an unmetered network). */
+    public static boolean updateWifiOnly = true;
     /** 0 = GitHub repository (update.json), 1 = Telegram channel. */
     public static int updateSource;
     public static String updateRepo = "";
@@ -379,7 +387,7 @@ public class SolegramConfig {
         if (cameraTimer != 3 && cameraTimer != 10) {
             cameraTimer = 0;
         }
-        cameraAspect = clamp(p.getInt("cameraAspect", CAMERA_ASPECT_4_3), CAMERA_ASPECT_4_3, CAMERA_ASPECT_1_1);
+        cameraAspect = clamp(p.getInt("cameraAspect", CAMERA_ASPECT_FULL), CAMERA_ASPECT_4_3, CAMERA_ASPECT_FULL);
 
         smoothTransitions = p.getBoolean("smoothTransitions", true);
         pressScale = p.getBoolean("pressScale", true);
@@ -452,7 +460,11 @@ public class SolegramConfig {
         pluginsScanBeforeInstall = p.getBoolean("pluginsScanBeforeInstall", true);
         pluginsBlockDangerous = p.getBoolean("pluginsBlockDangerous", false);
 
-        autoUpdateCheck = p.getBoolean("autoUpdateCheck", true);
+        // before the modes there was only the check switch: whoever turned it off keeps updates off
+        autoUpdateMode = p.contains("autoUpdateMode") ? clamp(p.getInt("autoUpdateMode", AUTO_UPDATE_INSTALL), AUTO_UPDATE_OFF, AUTO_UPDATE_INSTALL)
+            : p.getBoolean("autoUpdateCheck", true) ? AUTO_UPDATE_INSTALL : AUTO_UPDATE_OFF;
+        autoUpdateCheck = autoUpdateMode != AUTO_UPDATE_OFF;
+        updateWifiOnly = p.getBoolean("updateWifiOnly", true);
         updateSource = clamp(p.getInt("updateSource", 0), 0, 1);
         updateRepo = p.getString("updateRepo", "");
         updateChannel = p.getString("updateChannel", "");
@@ -568,6 +580,7 @@ public class SolegramConfig {
             case "pluginsEngine":
             case "pluginsScanBeforeInstall":
             case "autoUpdateCheck":
+            case "updateWifiOnly":
             case "showUserId":
             case "glassShadow":
             case "glassVibrancy":
