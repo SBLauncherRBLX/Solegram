@@ -1,9 +1,9 @@
 {
-  "version": "2.5.5",
-  "build": 49,
-  "apk": "apk/Solegram-2.5.5-b49-release.apk",
-  "size": 62940366,
-  "sha256": "6590980860328122d97411a1cd5a0e497afdf2ef6dff981b2c5c9a09b26f2d02",
-  "changelog": "Solegram 2.5.5\n\n• SoleDrop: нижняя панель выбора без пузырька — пункты полного размера с крупными иконками, панель листается вбок, выбранный пункт подсвечивается цветом темы.",
+  "version": "2.5.6",
+  "build": 50,
+  "apk": "apk/Solegram-2.5.6-b50-release.apk",
+  "size": 62940576,
+  "sha256": "66a35cb3ea4213cc8ec48998eaace5ddb9f53a9e3cd68d7936bd109c98c1e523",
+  "changelog": "Solegram 2.5.6\n\n• Безопасность: переключатели теперь такие же, как во всём Solegram, — из жидкого стекла и с плавной анимацией, без рывков.",
   "latest": "apk/Solegram-latest.apk"
 }

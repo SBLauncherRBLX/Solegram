@@ -148,8 +148,8 @@ public class SolegramSecurityActivity extends UniversalFragment {
             return;
         }
         items.add(UItem.asHeader(getString(R.string.SG_SecScreen)));
-        items.add(tile(UItem.asButtonCheck(ID_RECENTS, getString(R.string.SG_SecRecents),
-            getString(Build.VERSION.SDK_INT >= 33 ? R.string.SG_SecRecentsInfo : R.string.SG_SecRecentsInfoOld)).setChecked(SolegramConfig.secureRecents), TILE_INDIGO));
+        items.add(UItem.asButtonCheck(ID_RECENTS, getString(R.string.SG_SecRecents),
+            getString(Build.VERSION.SDK_INT >= 33 ? R.string.SG_SecRecentsInfo : R.string.SG_SecRecentsInfoOld)).setChecked(SolegramConfig.secureRecents));
         items.add(tile(UItem.asButton(ID_NOTIF_PREVIEW, R.drawable.msg_notifications, getString(R.string.SG_SecNotifPreview),
             getString(previewShown() ? R.string.SG_SecNotifPreviewOn : R.string.SG_SecNotifPreviewOff)), TILE_RED)
             .setSolegramSubtitle(getString(R.string.SG_SecNotifPreviewInfo)));
@@ -249,25 +249,30 @@ public class SolegramSecurityActivity extends UniversalFragment {
     }
     // endregion
 
+    private static void setCheckedAnimated(View view, boolean value) {
+        if (view instanceof TextCheckCell) {
+            ((TextCheckCell) view).setChecked(value);
+        } else if (view instanceof org.telegram.ui.Cells.NotificationsCheckCell) {
+            ((org.telegram.ui.Cells.NotificationsCheckCell) view).setChecked(value);
+        }
+    }
+
     @Override
     protected void onClick(UItem item, View view, int position, float x, float y) {
         switch (item.id) {
             case ID_RECENTS: {
                 final boolean value = SolegramConfig.toggle("secureRecents");
-                if (view instanceof TextCheckCell) {
-                    ((TextCheckCell) view).setChecked(value);
-                }
+                // as on every Solegram page: the switch itself slides (liquid), the list is not rebuilt under it
+                setCheckedAnimated(view, value);
+                item.setChecked(value);
                 SolegramSecurity.applyToAll();
                 NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "secureRecents");
-                listView.adapter.update(true);
                 return;
             }
             case ID_WARN_FILES: {
                 final boolean value = SolegramConfig.toggle("warnDangerousFiles");
-                if (view instanceof TextCheckCell) {
-                    ((TextCheckCell) view).setChecked(value);
-                }
-                listView.adapter.update(true);
+                setCheckedAnimated(view, value);
+                item.setChecked(value);
                 return;
             }
             case ID_NOTIF_PREVIEW:
