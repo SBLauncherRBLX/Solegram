@@ -157,8 +157,9 @@ public final class AutoUpdater {
         return queue;
     }
 
+    /** Automatic installing was removed: a new version is only announced, the user installs it. */
     private static boolean isAuto() {
-        return SolegramConfig.autoUpdateMode == SolegramConfig.AUTO_UPDATE_INSTALL;
+        return false;
     }
 
     /** Only a GitHub release with a size and checksum is installed without the user; a skipped version never is. */

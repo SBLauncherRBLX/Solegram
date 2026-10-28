@@ -284,7 +284,7 @@ public class SolegramConfig {
     public static final int AUTO_UPDATE_NOTIFY = 1;
     public static final int AUTO_UPDATE_INSTALL = 2;
     /** Off / only tell about a new version / download and install it by itself (updater.AutoUpdater). */
-    public static int autoUpdateMode = AUTO_UPDATE_INSTALL;
+    public static int autoUpdateMode = AUTO_UPDATE_NOTIFY;
     /** Updates download by themselves only over Wi-Fi (an unmetered network). */
     public static boolean updateWifiOnly = true;
     /** 0 = GitHub repository (update.json), 1 = Telegram channel. */
@@ -487,8 +487,9 @@ public class SolegramConfig {
         pluginsBlockDangerous = p.getBoolean("pluginsBlockDangerous", false);
 
         // before the modes there was only the check switch: whoever turned it off keeps updates off
-        autoUpdateMode = p.contains("autoUpdateMode") ? clamp(p.getInt("autoUpdateMode", AUTO_UPDATE_INSTALL), AUTO_UPDATE_OFF, AUTO_UPDATE_INSTALL)
-            : p.getBoolean("autoUpdateCheck", true) ? AUTO_UPDATE_INSTALL : AUTO_UPDATE_OFF;
+        // automatic installing is gone: who had it is told about new versions instead, and installs them himself
+        autoUpdateMode = p.contains("autoUpdateMode") ? clamp(p.getInt("autoUpdateMode", AUTO_UPDATE_NOTIFY), AUTO_UPDATE_OFF, AUTO_UPDATE_NOTIFY)
+            : p.getBoolean("autoUpdateCheck", true) ? AUTO_UPDATE_NOTIFY : AUTO_UPDATE_OFF;
         autoUpdateCheck = autoUpdateMode != AUTO_UPDATE_OFF;
         updateWifiOnly = p.getBoolean("updateWifiOnly", true);
         updateSource = clamp(p.getInt("updateSource", 0), 0, 1);

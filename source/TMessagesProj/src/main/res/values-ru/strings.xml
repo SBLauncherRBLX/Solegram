@@ -1537,5 +1537,7 @@
     <string name="SG_SoleDropConfirmOther">Друг подтверждает приём. Поднесите телефоны ещё раз.</string>
     <string name="SG_SoleDropCodeRetry">Нажмите, чтобы попробовать снова</string>
     <string name="SG_SoleDropWhat">Что передать</string>
+    <string name="SG_UpdateCheckAuto">Проверять обновления автоматически</string>
+    <string name="SG_UpdateCheckAutoInfo">Solegram сообщит о новой версии, а установите её вы сами</string>
     <!-- SOLEGRAM END -->
 </resources>

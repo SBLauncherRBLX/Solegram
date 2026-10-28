@@ -1550,5 +1550,7 @@
     <string name="SG_SoleDropConfirmOther">Your friend is accepting. Hold the phones together again.</string>
     <string name="SG_SoleDropCodeRetry">Tap to try again</string>
     <string name="SG_SoleDropWhat">What to send</string>
+    <string name="SG_UpdateCheckAuto">Check for updates automatically</string>
+    <string name="SG_UpdateCheckAutoInfo">Solegram tells you about a new version, you install it yourself</string>
     <!-- SOLEGRAM END -->
 </resources>
