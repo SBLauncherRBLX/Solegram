@@ -113,6 +113,17 @@ final class SoleDropGlass {
         return new Veil(radius, padding, resourcesProvider);
     }
 
+    /** The glass of the main tab bar (the same provider), so SoleDrop's choice bar looks exactly like it. */
+    Drawable createTabs(View view, float radius, int padding) {
+        if (factory != null) {
+            final BlurredBackgroundDrawable drawable = factory.create(view, org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.mainTabs(resourcesProvider));
+            drawable.setRadius(radius);
+            drawable.setPadding(padding);
+            return drawable;
+        }
+        return new Veil(radius, padding, resourcesProvider);
+    }
+
     /** Before every frame: the picture the glass shows (recorded again only when the stage changed). */
     void sync() {
         if (source == null || stage.getWidth() <= 0) {

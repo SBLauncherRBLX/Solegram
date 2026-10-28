@@ -29,7 +29,7 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.Theme;
 
 /**
- * SoleDrop's buttons: the main one in the sunset gradient with a soft glow under it, the others in glass. They
+ * SoleDrop's buttons: the main one as Solegram's own (the theme's accent, flat), the others in glass. They
  * give in when pressed and spring back, as the rest of Solegram.
  */
 @SuppressLint("ViewConstructor")
@@ -41,11 +41,13 @@ public class SoleDropButton extends TextView {
     private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private int builtWidth, builtHeight;
+    private final Theme.ResourcesProvider resourcesProvider;
 
     /** @param glass the glass behind a secondary button (null for the main one) */
     public SoleDropButton(Context context, boolean primary, @Nullable Drawable glass, Theme.ResourcesProvider resourcesProvider) {
         super(context);
         this.primary = primary;
+        this.resourcesProvider = resourcesProvider;
         setGravity(Gravity.CENTER);
         setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         setTypeface(AndroidUtilities.bold());
@@ -53,9 +55,9 @@ public class SoleDropButton extends TextView {
         setEllipsize(TextUtils.TruncateAt.END);
         setPadding(dp(18), 0, dp(18), 0);
         if (primary) {
-            setTextColor(0xFFFFFFFF);
+            setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourcesProvider));
             setWillNotDraw(false);
-            glow.setColor(SoleDropPalette.PINK); // hidden under the fill: only its shadow shows
+            glow.setColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)); // hidden under the fill: only its shadow shows
         } else {
             setTextColor(SoleDropPalette.text(resourcesProvider));
             if (glass != null) {
@@ -78,17 +80,16 @@ public class SoleDropButton extends TextView {
             if (w != builtWidth || h != builtHeight) {
                 builtWidth = w;
                 builtHeight = h;
-                fill.setShader(new LinearGradient(0, 0, w, h, SoleDropPalette.BUTTON, null, Shader.TileMode.CLAMP));
-                shine.setShader(new LinearGradient(0, 0, 0, h * 0.6f, 0x40FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-                glow.setShadowLayer(dp(14), 0, dp(5), 0x66FF5C8A);
+                // Solegram's own button: the theme's accent, flat, with a quiet shadow (no coloured glow, no shine)
+                fill.setShader(null);
+                fill.setColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
+                glow.setShadowLayer(dp(8), 0, dp(3), 0x30000000);
             }
             final float inset = dp(6);
             rect.set(inset, inset, w - inset, h - inset);
-            final float r = rect.height() / 2f;
+            final float r = dp(16);
             canvas.drawRoundRect(rect, r, r, glow);
             canvas.drawRoundRect(rect, r, r, fill);
-            rect.inset(dpf2(1), dpf2(1));
-            canvas.drawRoundRect(rect, r, r, shine);
         }
         super.onDraw(canvas);
     }

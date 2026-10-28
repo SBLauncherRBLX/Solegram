@@ -154,7 +154,8 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     private FrameLayout bottom;
     private FrameLayout tilesScroll;
     private LinearLayout tilesRow;
-    private final ArrayList<Tile> tiles = new ArrayList<>();
+    private org.telegram.ui.MainTabsLayout tilesBar;
+    private final org.telegram.ui.Components.glass.GlassTabView[] tabViews = new org.telegram.ui.Components.glass.GlassTabView[6];
     private LinearLayout buttons;
     private SoleDropButton primaryButton, secondaryButton;
     private View closeButton, qrButton;
@@ -394,7 +395,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         buttons.setOrientation(LinearLayout.HORIZONTAL);
         buttons.setClipChildren(false);
         secondaryButton = new SoleDropButton(context, false, null, rp);
-        secondaryButton.setBackground(glass.create(secondaryButton, dp(26), dp(6)));
+        secondaryButton.setBackground(glass.create(secondaryButton, dp(16), dp(6)));
         primaryButton = new SoleDropButton(context, true, null, rp);
         buttons.addView(secondaryButton, LayoutHelper.createLinear(0, 64, 1f, 0, 0, 4, 0));
         buttons.addView(primaryButton, LayoutHelper.createLinear(0, 64, 1f, 4, 0, 0, 0));
@@ -520,123 +521,59 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         R.string.SG_SoleDropPhoto, R.string.SG_SoleDropLocation, R.string.SG_SoleDropLink
     };
 
-    /** Solegram's tile colours (as in its settings), one per kind of thing to send. */
-    private static int tileColor(int type) {
-        switch (type) {
-            case SoleDropProtocol.ITEM_STARS:
-                return 0xFFFFB800;
-            case SoleDropProtocol.ITEM_GIFT:
-                return 0xFFFF2D55;
-            case SoleDropProtocol.ITEM_PHOTO:
-                return 0xFF34C759;
-            case SoleDropProtocol.ITEM_LOCATION:
-                return 0xFF30B0C7;
-            case SoleDropProtocol.ITEM_LINK:
-                return 0xFF5856D6;
-            default:
-                return 0xFF007AFF;
-        }
-    }
+    private static final org.telegram.ui.Components.glass.GlassTabView.TabAnimation[] TILE_ICONS = {
+        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.CONTACTS,
+        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.STARS,
+        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.GIFT,
+        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.GALLERY,
+        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.LOCATION,
+        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.LINK
+    };
 
-    /** A kind of thing to send: a coloured Solegram tile with a white glyph and the name under it. */
-    private final class Tile extends LinearLayout {
-        final int type;
-        final ImageView icon;
-        final TextView label;
-        private boolean selected;
-        private final android.graphics.drawable.GradientDrawable selection = new android.graphics.drawable.GradientDrawable();
-
-        Tile(Context context, int type, int name) {
-            super(context);
-            this.type = type;
-            setOrientation(VERTICAL);
-            setGravity(Gravity.CENTER);
-            selection.setCornerRadius(dp(18));
-            setBackground(selection);
-            icon = new ImageView(context);
-            icon.setScaleType(ImageView.ScaleType.CENTER);
-            final Drawable d = ContextCompat.getDrawable(context, SoleDropItem.icon(type));
-            if (d != null) {
-                final Drawable glyph = d.mutate();
-                glyph.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
-                icon.setImageDrawable(glyph);
-            }
-            final int color = tileColor(type);
-            final android.graphics.drawable.GradientDrawable tile = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                new int[]{ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.14f), color});
-            tile.setCornerRadius(dp(11));
-            icon.setBackground(tile);
-            addView(icon, LayoutHelper.createLinear(38, 38, Gravity.CENTER_HORIZONTAL));
-            label = new TextView(context);
-            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12.5f);
-            label.setGravity(Gravity.CENTER);
-            label.setSingleLine(true);
-            label.setEllipsize(TextUtils.TruncateAt.END);
-            label.setText(getString(name));
-            addView(label, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 6, 4, 0));
-            setContentDescription(getString(name));
-            SolegramMotion.pressable(this, SolegramMotion.PRESS_BUTTON);
-            setOnClickListener(v -> chooseTile(this.type));
-            setSelectedTile(false);
-        }
-
-        void setSelectedTile(boolean selected) {
-            this.selected = selected;
-            final Theme.ResourcesProvider rp = getResourceProvider();
-            // the chosen one: a soft veil and a thin rim in the theme's accent
-            selection.setColor(selected ? ColorUtils.setAlphaComponent(SoleDropPalette.PINK, SoleDropPalette.dark(rp) ? 0x26 : 0x1A) : 0);
-            selection.setStroke(dp(1.5f), selected ? ColorUtils.setAlphaComponent(SoleDropPalette.PINK, 0xB0) : 0);
-            label.setTextColor(selected ? SoleDropPalette.text(rp) : SoleDropPalette.gray(rp));
-            label.setTypeface(selected ? AndroidUtilities.bold() : android.graphics.Typeface.DEFAULT);
-            setSelected(selected);
-        }
-    }
-
-    /** What to send: a Solegram section card with its accent header and the six tiles in two rows. */
+    /**
+     * What to send: Solegram's own bottom tab bar, the same glass, tabs and liquid lens of choice as the main
+     * screen, with a tab for each kind of thing.
+     */
     private void buildTiles(Context context) {
+        final Theme.ResourcesProvider rp = getResourceProvider();
         tilesScroll = new FrameLayout(context);
-        tilesScroll.setBackground(glass.create(tilesScroll, dp(24), dp(6)));
-        final LinearLayout column = new LinearLayout(context);
-        column.setOrientation(LinearLayout.VERTICAL);
-        final TextView header = new TextView(context);
-        header.setText(getString(R.string.SG_SoleDropWhat));
-        header.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        header.setTypeface(AndroidUtilities.bold());
-        header.setTextColor(SoleDropPalette.PINK);
-        column.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 14, 20, 6));
-        tilesRow = new LinearLayout(context);
-        tilesRow.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout row = null;
+        tilesScroll.setClipChildren(false);
+        tilesScroll.setClipToPadding(false);
+        tilesBar = new org.telegram.ui.MainTabsLayout(context, rp);
+        tilesBar.setClipChildren(false);
+        final int pad = dp(org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN + 4);
+        tilesBar.setPadding(pad, pad, pad, pad);
+        tilesBar.setMinTabsWidth(dp(288));
         for (int i = 0; i < TILE_TYPES.length; i++) {
-            if (i % 3 == 0) {
-                row = new LinearLayout(context);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                tilesRow.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 80));
-            }
-            final Tile tile = new Tile(context, TILE_TYPES[i], TILE_NAMES[i]);
-            tiles.add(tile);
-            row.addView(tile, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, 3, 2, 3, 2));
+            final org.telegram.ui.Components.glass.GlassTabView tab = org.telegram.ui.Components.glass.GlassTabView.createMainTab(context, rp, TILE_ICONS[i], TILE_NAMES[i]);
+            final int type = TILE_TYPES[i];
+            tab.setOnClickListener(v -> chooseTile(type));
+            tab.setContentDescription(getString(TILE_NAMES[i]));
+            tabViews[i] = tab;
+            tilesBar.addView(tab);
+            tilesBar.setViewVisible(tab, true, false);
         }
-        column.addView(tilesRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 8, 0, 8, 10));
-        tilesScroll.addView(column, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        bottom.addView(tilesScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 14, 0, 14, 0));
-        updateTiles();
-        // the rows come up one after the other
-        tilesRow.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-            @Override
-            public boolean onPreDraw() {
-                tilesRow.getViewTreeObserver().removeOnPreDrawListener(this);
-                SolegramMotion.staggerIn(tilesRow);
-                return true;
-            }
-        });
+        tilesBar.setBackground(glass.createTabs(tilesBar, dp(org.telegram.ui.DialogsActivity.MAIN_TABS_HEIGHT / 2f), dp(org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN - 0.334f)));
+        tilesScroll.addView(tilesBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, org.telegram.ui.DialogsActivity.MAIN_TABS_BAR_HEIGHT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        bottom.addView(tilesScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 6, 0, 6, 0));
+        updateTiles(false);
     }
 
     private void updateTiles() {
-        for (Tile tile : tiles) {
-            tile.setSelectedTile(tile.type == item.type);
+        updateTiles(true);
+    }
+
+    private void updateTiles(boolean animated) {
+        if (tilesBar == null) {
+            return;
         }
+        for (int i = 0; i < TILE_TYPES.length; i++) {
+            if (TILE_TYPES[i] == item.type && tabViews[i] != null) {
+                tilesBar.setTabSelected(tabViews[i], animated);
+                return;
+            }
+        }
+        tilesBar.setTabSelected(null, animated);
     }
 
     private void chooseTile(int type) {

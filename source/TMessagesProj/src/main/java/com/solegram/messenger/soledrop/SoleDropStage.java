@@ -170,8 +170,9 @@ public class SoleDropStage extends View {
         builtAccent = SoleDropPalette.PINK;
         bgPaint.setColor(bg);
         // the sunset sits at the top edge, where the other phone comes from, and dissolves into the page
-        final float a = dark ? 0.30f : 0.16f;
-        hazePaint.setShader(new LinearGradient(0, 0, 0, h * 0.62f,
+        // only a breath of the accent at the very top, where the other phone comes from: the page stays Solegram's
+        final float a = dark ? 0.14f : 0.08f;
+        hazePaint.setShader(new LinearGradient(0, 0, 0, h * 0.42f,
             new int[]{
                 ColorUtils.blendARGB(bg, SoleDropPalette.PINK, a),
                 ColorUtils.blendARGB(bg, SoleDropPalette.ORANGE, a * 0.55f),
@@ -201,7 +202,7 @@ public class SoleDropStage extends View {
         }
         build(w, h);
         canvas.drawRect(0, 0, w, h, bgPaint);
-        canvas.drawRect(0, 0, w, h * 0.62f, hazePaint);
+        canvas.drawRect(0, 0, w, h * 0.42f, hazePaint);
         drawRipple(canvas, w, h);
     }
 
@@ -245,7 +246,7 @@ public class SoleDropStage extends View {
         matrix.setRotate(breathing ? (t * 24f) % 360f : 0f);
         matrix.postTranslate(cx, cy);
         auraShader.setLocalMatrix(matrix);
-        final float base = (dark ? 0.62f : 0.48f) * (0.7f + 0.3f * breath) + 0.35f * boost;
+        final float base = (dark ? 0.46f : 0.34f) * (0.7f + 0.3f * breath) + 0.35f * boost;
         final int alpha = (int) (255 * Math.min(1f, base) * auraAlpha);
         // one soft band of light hugging the card, blurred as a whole: no rings, no steps
         final float band = spread * 0.9f;

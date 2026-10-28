@@ -79,8 +79,9 @@ final class SoleDropPalette {
         return rp != null ? rp.isDark() : Theme.isCurrentThemeDark();
     }
 
+    /** The page, as Solegram's settings pages: the grey (in the dark theme black) background the cards lie on. */
     static int background(Theme.ResourcesProvider rp) {
-        return Theme.getColor(Theme.key_windowBackgroundWhite, rp) | 0xFF000000;
+        return Theme.getColor(Theme.key_windowBackgroundGray, rp) | 0xFF000000;
     }
 
     static int text(Theme.ResourcesProvider rp) {
@@ -91,10 +92,9 @@ final class SoleDropPalette {
         return Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, rp);
     }
 
-    /** Cards that lie on the page: a step lighter than the page in the dark theme, white in the light one. */
+    /** Cards that lie on the page: Solegram's section cards. */
     static int surface(Theme.ResourcesProvider rp) {
-        final int bg = background(rp);
-        return dark(rp) ? ColorUtils.blendARGB(bg, 0xFFFFFFFF, 0.075f) : 0xFFFFFFFF;
+        return Theme.getColor(Theme.key_windowBackgroundWhite, rp) | 0xFF000000;
     }
 
     /** The plain look of glass (no live glass on this phone): a veil of the surface with a light rim. */
