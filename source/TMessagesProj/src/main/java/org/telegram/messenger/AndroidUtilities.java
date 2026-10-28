@@ -4341,8 +4341,8 @@ public class AndroidUtilities {
             f = FileLoader.getInstance(message.currentAccount).getPathToMessage(message.messageOwner);
         }
         String mimeType = message.type == MessageObject.TYPE_FILE || message.type == MessageObject.TYPE_TEXT ? message.getMimeType() : null;
-        // Solegram: .plugin files open the installer, plugins may handle their own file types.
-        if (com.solegram.messenger.SolegramFiles.tryOpen(f, message.getFileName(), message, activity)) {
+        // Solegram: installers and programs from chats ask first; .plugin files open the installer, plugins may handle their own file types.
+        if (com.solegram.messenger.SolegramFiles.tryOpen(f, message.getFileName(), message, activity, mimeType, resourcesProvider, restrict)) {
             return true;
         }
         return openForView(f, message.getFileName(), mimeType, activity, resourcesProvider, restrict);

@@ -36,9 +36,10 @@ import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 
 /**
- * The icon pack choice: three cards side by side, each with six icons drawn by its pack, the name and a round
- * check below, as the light/dark choice on iOS. The selected card gets an accent rim and its icons the accent
- * colour. Drawing allocates nothing; the colour filters are made again only when the theme changes.
+ * The icon pack choice: three cards side by side, each with six icons drawn by its pack and the name below, as
+ * the light/dark choice on iOS. The icons are in the theme's icon colour; the selected card gets a soft accent
+ * rim, a check badge in its corner and its icons the accent colour. Drawing allocates nothing; the colour
+ * filters are made again only when the theme changes.
  */
 @SuppressLint("ViewConstructor")
 public class SolegramIconPackPicker extends View {
@@ -59,7 +60,7 @@ public class SolegramIconPackPicker extends View {
 
     private final Paint cardPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint radioPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint checkPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Path checkPath = new Path();
@@ -70,7 +71,7 @@ public class SolegramIconPackPicker extends View {
     private int lastGray, lastAccent;
     private float cardWidth, startX;
 
-    private static final int CARD_HEIGHT = 86, GAP = 10, PADDING = 16, TOP = 14;
+    private static final int CARD_HEIGHT = 78, GAP = 10, PADDING = 16, TOP = 12, LABEL = 8, BOTTOM = 14, BADGE = 18;
 
     public SolegramIconPackPicker(Context context, Theme.ResourcesProvider resourcesProvider, Utilities.Callback<Integer> onSelect) {
         super(context);
@@ -91,17 +92,17 @@ public class SolegramIconPackPicker extends View {
             press[c] = new AnimatedFloat(0f, this, 0, 200, CubicBezierInterpolator.EASE_OUT_QUINT);
         }
         rimPaint.setStyle(Paint.Style.STROKE);
-        rimPaint.setStrokeWidth(dp(2));
-        radioPaint.setStrokeWidth(dp(1.5f));
+        rimPaint.setStrokeWidth(dp(1.5f));
         checkPaint.setStyle(Paint.Style.STROKE);
-        checkPaint.setStrokeWidth(dp(2));
+        checkPaint.setStrokeWidth(dp(1.6f));
         checkPaint.setStrokeCap(Paint.Cap.ROUND);
         checkPaint.setStrokeJoin(Paint.Join.ROUND);
         checkPaint.setColor(0xFFFFFFFF);
-        checkPath.moveTo(-dp(4), 0);
-        checkPath.lineTo(-dp(1.2f), dp(2.8f));
-        checkPath.lineTo(dp(4.2f), -dp(2.6f));
-        textPaint.setTextSize(dp(14));
+        checkPath.moveTo(-dp(3.4f), dp(0.2f));
+        checkPath.lineTo(-dp(1f), dp(2.5f));
+        checkPath.lineTo(dp(3.6f), -dp(2.3f));
+        textPaint.setTextSize(dp(13));
+        textPaint.setTypeface(org.telegram.messenger.AndroidUtilities.bold());
         textPaint.setTextAlign(Paint.Align.CENTER);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
@@ -115,13 +116,13 @@ public class SolegramIconPackPicker extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(TOP + CARD_HEIGHT + 10 + 18 + 8 + 20 + 16), MeasureSpec.EXACTLY));
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(TOP + CARD_HEIGHT + LABEL + 18 + BOTTOM), MeasureSpec.EXACTLY));
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        cardWidth = Math.min((w - dp(PADDING) * 2 - dp(GAP) * 2) / 3f, dp(150));
+        cardWidth = Math.min((w - dp(PADDING) * 2 - dp(GAP) * 2) / 3f, dp(132));
         startX = (w - cardWidth * 3 - dp(GAP) * 2) / 2f;
     }
 
@@ -152,10 +153,11 @@ public class SolegramIconPackPicker extends View {
         final boolean animate = !LiteMode.isPowerSaverApplied();
         final int background = Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider);
         final int text = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
-        final int radio = Theme.getColor(Theme.key_radioBackground, resourcesProvider);
-        final int card = ColorUtils.blendARGB(background, text, Theme.isCurrentThemeDark() ? 0.08f : 0.045f);
-        final float iconSize = dp(22), rowGap = dp(14);
-        final float top = dp(TOP);
+        final int textGray = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2, resourcesProvider);
+        final boolean dark = ColorUtils.calculateLuminance(background) < 0.5;
+        final int card = ColorUtils.blendARGB(background, text, dark ? 0.07f : 0.04f);
+        final float iconSize = dp(21), rowGap = dp(12);
+        final float top = dp(TOP), cardHeight = dp(CARD_HEIGHT), radius = dp(16);
 
         for (int c = 0; c < 3; c++) {
             final float p = selection[c].set(selected == c, !animate);
@@ -164,46 +166,47 @@ public class SolegramIconPackPicker extends View {
             final float cx = left + cardWidth / 2f;
 
             canvas.save();
-            canvas.scale(s, s, cx, top + dp(CARD_HEIGHT) / 2f);
-            rect.set(left, top, left + cardWidth, top + dp(CARD_HEIGHT));
-            cardPaint.setColor(ColorUtils.blendARGB(card, lastAccent, 0.08f * p));
-            canvas.drawRoundRect(rect, dp(14), dp(14), cardPaint);
+            canvas.scale(s, s, cx, top + cardHeight / 2f);
+            rect.set(left, top, left + cardWidth, top + cardHeight);
+            // a whisper of the accent in the chosen card, a soft rim around it
+            cardPaint.setColor(ColorUtils.blendARGB(card, lastAccent, (dark ? 0.08f : 0.06f) * p));
+            canvas.drawRoundRect(rect, radius, radius, cardPaint);
             if (p > 0f) {
-                rect.inset(dp(1), dp(1));
+                final float half = rimPaint.getStrokeWidth() / 2f;
+                rect.inset(half, half);
                 rimPaint.setColor(lastAccent);
-                rimPaint.setAlpha((int) (255 * p));
-                canvas.drawRoundRect(rect, dp(13), dp(13), rimPaint);
+                rimPaint.setAlpha((int) (0xC0 * p));
+                canvas.drawRoundRect(rect, radius - half, radius - half, rimPaint);
             }
 
             final float colGap = (cardWidth - iconSize * 3) / 4f;
-            final float iconsTop = top + (dp(CARD_HEIGHT) - iconSize * 2 - rowGap) / 2f;
+            final float iconsTop = top + (cardHeight - iconSize * 2 - rowGap) / 2f;
             for (int i = 0; i < PREVIEW.length; i++) {
                 final int x = (int) (left + colGap + (i % 3) * (iconSize + colGap));
                 final int y = (int) (iconsTop + (i / 3) * (iconSize + rowGap));
                 drawIcon(canvas, gray[c][i], x, y, (int) iconSize, 1f - p);
                 drawIcon(canvas, accent[c][i], x, y, (int) iconSize, p);
             }
-            canvas.restore();
 
-            final float labelY = top + dp(CARD_HEIGHT) + dp(10) + dp(14);
-            textPaint.setColor(text);
-            canvas.drawText(names[c], cx, labelY, textPaint);
-
-            final float radioY = top + dp(CARD_HEIGHT) + dp(10 + 18 + 8 + 10);
-            radioPaint.setStyle(Paint.Style.STROKE);
-            radioPaint.setColor(radio);
-            radioPaint.setAlpha((int) (255 * (1f - p)));
-            canvas.drawCircle(cx, radioY, dp(9.25f), radioPaint);
+            // the check badge grows out of the corner
             if (p > 0f) {
-                radioPaint.setStyle(Paint.Style.FILL);
-                radioPaint.setColor(lastAccent);
-                canvas.drawCircle(cx, radioY, dp(10) * (0.6f + 0.4f * p), radioPaint);
+                final float bx = left + cardWidth - dp(BADGE) / 2f - dp(6), by = top + dp(BADGE) / 2f + dp(6);
+                final float bs = 0.5f + 0.5f * p;
+                badgePaint.setColor(lastAccent);
+                badgePaint.setAlpha((int) (255 * p));
+                canvas.drawCircle(bx, by, dp(BADGE) / 2f * bs, badgePaint);
                 checkPaint.setAlpha((int) (255 * p));
                 canvas.save();
-                canvas.translate(cx, radioY);
+                canvas.translate(bx, by);
+                canvas.scale(bs, bs);
                 canvas.drawPath(checkPath, checkPaint);
                 canvas.restore();
             }
+            canvas.restore();
+
+            final float labelY = top + cardHeight + dp(LABEL) - textPaint.ascent();
+            textPaint.setColor(ColorUtils.blendARGB(textGray, text, p));
+            canvas.drawText(names[c], cx, labelY, textPaint);
         }
     }
 
@@ -217,7 +220,7 @@ public class SolegramIconPackPicker extends View {
     }
 
     private int cardAt(float x, float y) {
-        if (y < dp(TOP) || y > getHeight() - dp(8)) {
+        if (y < dp(TOP) - dp(6) || y > getHeight() - dp(4)) {
             return -1;
         }
         for (int c = 0; c < 3; c++) {

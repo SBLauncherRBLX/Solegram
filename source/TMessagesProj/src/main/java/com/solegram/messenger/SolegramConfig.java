@@ -32,6 +32,10 @@ public class SolegramConfig {
     public static boolean hideStories;
     public static boolean hideEmojiStatus;
     public static boolean hidePhoneNumber;
+    /** Security: the app's screen is not shown in the recent apps (on Android 12 and older: no screenshots either). */
+    public static boolean secureRecents;
+    /** Security: opening an .apk or a program file asks first (always for installers, other types from non-contacts). */
+    public static boolean warnDangerousFiles = true;
     public static boolean monetAccent;
     public static boolean showSeconds;
     public static boolean disableVibration;
@@ -44,25 +48,25 @@ public class SolegramConfig {
     public static int iconPack;
     // endregion
 
-    // region Glass (100 = Telegram's value unless noted)
-    public static int glassThickness = 100;
+    // region Glass (100 = Telegram's value unless noted; the defaults are Solegram's tuned look, see writeGlassDefaults())
+    public static int glassThickness = 70;
     public static int glassRefraction = 100;
     /** Refraction index x100: 150 = Telegram's 1.5. */
-    public static int glassIndex = 150;
-    public static int glassDispersion;
-    public static int glassRim;
+    public static int glassIndex = 130;
+    public static int glassDispersion = 40;
+    public static int glassRim = 10;
     /** Tint layer opacity in percent: 85 = Telegram's liquid glass. */
-    public static int glassOpacity = 85;
-    public static int glassBlur = 100;
-    public static int glassHighlight = 100;
+    public static int glassOpacity = 70;
+    public static int glassBlur = 30;
+    public static int glassHighlight = 150;
     public static int glassTint;
     public static int glassTintAmount = 25;
     public static boolean glassShadow = true;
     public static boolean glassVibrancy = true;
     /** Window blur (Android 12+) behind popup menus, dialogs and bottom sheets. */
-    public static boolean glassMenus;
-    public static boolean glassDialogs;
-    public static boolean glassSheets;
+    public static boolean glassMenus = true;
+    public static boolean glassDialogs = true;
+    public static boolean glassSheets = true;
     /** Switches and sliders drawn like the liquid glass demo (white pill that turns into a lens). */
     public static boolean liquidControls = true;
     /** The app's glass gets the light rim and soft shadow of the glass preview. */
@@ -316,6 +320,7 @@ public class SolegramConfig {
             if (loaded) {
                 return;
             }
+            migrateGlassDefaults();
             reload();
             loaded = true;
         }
@@ -333,6 +338,8 @@ public class SolegramConfig {
         hideStories = p.getBoolean("hideStories", false);
         hideEmojiStatus = p.getBoolean("hideEmojiStatus", false);
         hidePhoneNumber = p.getBoolean("hidePhoneNumber", false);
+        secureRecents = p.getBoolean("secureRecents", false);
+        warnDangerousFiles = p.getBoolean("warnDangerousFiles", true);
         monetAccent = p.getBoolean("monetAccent", false);
         showSeconds = p.getBoolean("showSeconds", false);
         disableVibration = p.getBoolean("disableVibration", false);
@@ -342,21 +349,21 @@ public class SolegramConfig {
         iconPack = clamp(p.getInt("iconPack", 0), 0, 2);
         SolegramIcons.setPack(iconPack);
 
-        glassThickness = clamp(p.getInt("glassThickness", 100), 25, 300);
+        glassThickness = clamp(p.getInt("glassThickness", 70), 25, 300);
         glassRefraction = clamp(p.getInt("glassRefraction", 100), 0, 300);
-        glassIndex = clamp(p.getInt("glassIndex", 150), 100, 250);
-        glassDispersion = clamp(p.getInt("glassDispersion", 0), 0, 100);
-        glassRim = clamp(p.getInt("glassRim", 0), 0, 100);
-        glassOpacity = clamp(p.getInt("glassOpacity", 85), 10, 100);
-        glassBlur = clamp(p.getInt("glassBlur", 100), 0, 300);
-        glassHighlight = clamp(p.getInt("glassHighlight", 100), 0, 300);
+        glassIndex = clamp(p.getInt("glassIndex", 130), 100, 250);
+        glassDispersion = clamp(p.getInt("glassDispersion", 40), 0, 100);
+        glassRim = clamp(p.getInt("glassRim", 10), 0, 100);
+        glassOpacity = clamp(p.getInt("glassOpacity", 70), 10, 100);
+        glassBlur = clamp(p.getInt("glassBlur", 30), 0, 300);
+        glassHighlight = clamp(p.getInt("glassHighlight", 150), 0, 300);
         glassTint = clamp(p.getInt("glassTint", 0), 0, SolegramGlass.TINT_COLORS.length - 1);
         glassTintAmount = clamp(p.getInt("glassTintAmount", 25), 0, 60);
         glassShadow = p.getBoolean("glassShadow", true);
         glassVibrancy = p.getBoolean("glassVibrancy", true);
-        glassMenus = p.getBoolean("glassMenus", false);
-        glassDialogs = p.getBoolean("glassDialogs", false);
-        glassSheets = p.getBoolean("glassSheets", false);
+        glassMenus = p.getBoolean("glassMenus", true);
+        glassDialogs = p.getBoolean("glassDialogs", true);
+        glassSheets = p.getBoolean("glassSheets", true);
         liquidControls = p.getBoolean("liquidControls", true);
         glassPreviewLook = p.getBoolean("glassPreviewLook", true);
         typingAnimation = p.getBoolean("typingAnimation", true);
@@ -370,7 +377,8 @@ public class SolegramConfig {
         aiProvider = p.contains("aiMode") ? clamp(p.getInt("aiMode", SolegramSummarizer.PROVIDER_AUTO), 0, 3)
             : p.getInt("aiProvider", 0) == SolegramSummarizer.PROVIDER_OWN ? SolegramSummarizer.PROVIDER_OWN : SolegramSummarizer.PROVIDER_AUTO;
         aiBaseUrl = p.getString("aiBaseUrl", "");
-        aiApiKey = p.getString("aiApiKey", "");
+        // kept encrypted (SolegramSecrets); a plain key of an older version is moved there here
+        aiApiKey = SolegramSecrets.migrate(p, "aiApiKey");
         aiModel = p.getString("aiModel", "");
         aiSummaryLanguage = p.getInt("aiSummaryLanguage", 0);
         aiConsent = p.getBoolean("aiConsent", false);
@@ -524,7 +532,22 @@ public class SolegramConfig {
         if (parts.length < 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
             return Solegram.GITHUB_REPO;
         }
+        // GitHub names only: the result is put into update links as it is
+        if (!parts[0].matches("[A-Za-z0-9-]{1,39}") || !parts[1].matches("[A-Za-z0-9._-]{1,100}") || parts[1].matches("\\.+")) {
+            return Solegram.GITHUB_REPO;
+        }
         return parts[0] + "/" + parts[1];
+    }
+
+    /** The key of the user's own AI service: encrypted with a Keystore key; as plain text only where the Keystore fails. */
+    public static void setAiApiKey(String key) {
+        final String value = key == null ? "" : key.trim();
+        if (SolegramSecrets.put("aiApiKey", value)) {
+            prefs().edit().remove("aiApiKey").commit();
+        } else {
+            prefs().edit().putString("aiApiKey", value).commit();
+        }
+        aiApiKey = value;
     }
 
     public static String getUpdateBranch() {
@@ -602,6 +625,9 @@ public class SolegramConfig {
             case "showUserId":
             case "glassShadow":
             case "glassVibrancy":
+            case "glassMenus":
+            case "glassDialogs":
+            case "glassSheets":
             case "messageDetails":
             case "markAllReadInMenu":
             case "jumpToFirstInMenu":
@@ -642,6 +668,7 @@ public class SolegramConfig {
             case "cameraHd":
             case "cameraControls":
             case "reminderAi":
+            case "warnDangerousFiles":
                 return true;
             default:
                 return false;
@@ -654,8 +681,10 @@ public class SolegramConfig {
         "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal", "reminderExactAsked"};
     // where message text is sent for AI summaries is chosen on the device, never taken from a settings file
     // changing the public bio is decided on the device too
+    // where updates come from is chosen on the device too: a settings file must not point the updater elsewhere
     private static final java.util.List<String> NOT_IMPORTED = java.util.Arrays.asList("aiApiKey", "aiBaseUrl", "aiProvider", "aiMode", "aiConsent", "transcribeEngine",
-        "nowPlayingShareBio", "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal");
+        "nowPlayingShareBio", "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal", "updateRepo", "updateChannel", "updateSource",
+        "pluginsDevMode");
 
     public static String exportToJson() {
         try {
@@ -740,7 +769,76 @@ public class SolegramConfig {
             }
         }
         editor.commit();
+        SolegramSecrets.put("aiApiKey", "");
         reload();
+    }
+
+    /** Raised when Solegram's glass look changes: everyone gets the new look once, then their own changes stay. */
+    private static final int GLASS_DEFAULTS_VERSION = 1;
+
+    /** Everything on the Glass page, written out with Solegram's look (the same values as the defaults above). */
+    private static void writeGlassDefaults(SharedPreferences.Editor editor) {
+        editor.putInt("glassThickness", 70)
+            .putInt("glassRefraction", 100)
+            .putInt("glassIndex", 130)
+            .putInt("glassDispersion", 40)
+            .putInt("glassRim", 10)
+            .putInt("glassOpacity", 70)
+            .putInt("glassBlur", 30)
+            .putInt("glassHighlight", 150)
+            .putInt("glassTint", 0)
+            .putInt("glassTintAmount", 25)
+            .putBoolean("glassPreviewLook", true)
+            .putBoolean("glassShadow", true)
+            .putBoolean("glassVibrancy", true)
+            .putBoolean("liquidControls", true)
+            .putBoolean("floatingHeader", true)
+            .putBoolean("glassHeaderButtons", true)
+            .putBoolean("frostedHeaders", true)
+            .putBoolean("glassMenus", true)
+            .putBoolean("glassDialogs", true)
+            .putBoolean("glassSheets", true)
+            .putBoolean("glassCallScreen", true);
+    }
+
+    /** Once after the update that brought the new look: every user gets it, later changes are theirs to keep. */
+    private static void migrateGlassDefaults() {
+        try {
+            final SharedPreferences p = prefs();
+            if (p.getInt("glassDefaultsVersion", 0) >= GLASS_DEFAULTS_VERSION) {
+                return;
+            }
+            final SharedPreferences.Editor editor = p.edit();
+            writeGlassDefaults(editor);
+            editor.putInt("glassDefaultsVersion", GLASS_DEFAULTS_VERSION).commit();
+            // textured glass is Telegram's own setting: switched on a moment later, once the app is up
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(SolegramConfig::enableTexturedGlass);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    /** Textured glass (liquid on Android 13+, frosted where the device can blur) on, where the device can draw it. */
+    public static void enableTexturedGlass() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                org.telegram.messenger.LiteMode.toggleFlag(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS, true);
+            }
+            if (org.telegram.messenger.SharedConfig.canBlurChat()) {
+                org.telegram.messenger.LiteMode.toggleFlag(org.telegram.messenger.LiteMode.FLAG_CHAT_BLUR, true);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    /** The Glass page's reset: Solegram's look again, textured glass included. */
+    public static void resetGlass() {
+        final SharedPreferences.Editor editor = prefs().edit();
+        writeGlassDefaults(editor);
+        editor.commit();
+        reload();
+        enableTexturedGlass();
     }
     // endregion
 

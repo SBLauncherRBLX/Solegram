@@ -1,7 +1,9 @@
 // Solegram: the glass lens of the tab bar's selection while it is pressed or dragged (iOS 26 style).
-// Clear glass over the tabs (img): the middle is magnified and sharp; in a band along the rim the surface
-// curves away and bends the picture strongly outwards (content from beyond the edge is pulled in, squeezed
-// and even mirrored at the very rim), the colours split there into red/green/blue fringes. The rim is lit
+// Clear glass over the tabs (img). The surface is a capsule with a rounded (quarter-circle) bevel along its
+// rim: flat in the middle, steeper and steeper towards the outline. The middle magnifies a little and stays
+// sharp; across the bevel the glass bends the picture more and more, so what lies near the rim is pulled out
+// towards it and stretched along the curved edge (on the round ends the arc spreads it sideways too), and the
+// colours split there like in a prism: blue and violet bent the most, red and orange the least. The rim is lit
 // with the colours around it (what lies just outside the outline and what the glass shows just inside),
 // brightened: a crisp line on the outline and a softer glow across the bevel give the glass its thickness;
 // a very soft shade lies just inside it. Almost no body colour, so the bar shows through.
@@ -10,8 +12,8 @@ uniform shader img;
 uniform float2 center;    // px
 uniform float2 halfSize;  // px, half width / half height of the capsule
 uniform float magnify;    // centre magnification, 1 = none
-uniform float band;       // px, width of the curved rim band
-uniform float bend;       // px, how far the rim pulls the picture from outside
+uniform float band;       // px, width of the curved rim band (the bevel)
+uniform float bend;       // px, how far the bevel moves the picture at the outline
 uniform float dispersion; // 0..1, colour split in the rim band
 uniform float light;      // 0..1, rim line strength
 uniform float shade;      // 0..1, soft dark inner edge
@@ -20,12 +22,6 @@ uniform float dp;         // px per dp
 uniform float2 barCenter; // px, the bar's glass capsule (the picture is empty outside it)
 uniform float2 barHalf;   // px
 uniform float dark;       // 1 in a dark theme: the rim is made to look as it does in the light one
-
-float sdPill(float2 p) {
-  float r = min(halfSize.x, halfSize.y);
-  float2 q = abs(p) - halfSize + r;
-  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-}
 
 // a point moved into the bar's glass (a little in from its outline): the lens is taller than the bar, and
 // outside the bar the picture is empty, which split the colours there into a red line
@@ -49,32 +45,59 @@ half4 S(float2 q) {
 
 half4 main(float2 fragCoord) {
   float2 p = fragCoord - center;
-  float sd = sdPill(p);
+
+  // the capsule as a segment with a radius: distance and outward normal in one go (exact, no extra taps)
+  float r = min(halfSize.x, halfSize.y);
+  float ext = max(halfSize.x, halfSize.y) - r;
+  float2 axis = halfSize.x >= halfSize.y ? float2(clamp(p.x, -ext, ext), 0.0) : float2(0.0, clamp(p.y, -ext, ext));
+  float2 v = p - axis;
+  float vl = length(v);
+  float sd = vl - r;
   float coverage = clamp(0.5 - sd, 0.0, 1.0);
   if (coverage <= 0.0) {
     return half4(0.0);
   }
+  float2 n = vl > 0.0001 ? v / vl : float2(0.0, -1.0);
 
-  // outward normal of the outline
-  float2 n = float2(sdPill(p + float2(0.5, 0.0)) - sdPill(p - float2(0.5, 0.0)),
-                    sdPill(p + float2(0.0, 0.5)) - sdPill(p - float2(0.0, 0.5)));
-  float nl = length(n);
-  n = nl > 0.0001 ? n / nl : float2(0.0, -1.0);
+  // the bevel: a quarter circle across the band, h = sqrt(1 - (1 - depth / band)^2); flat glass inside it
+  float depth = -sd;                                          // px inside the outline
+  float t = clamp(depth / max(band, 1.0), 0.0, 1.0);          // 0 on the rim, 1 at the band's inner edge
+  float x = 1.0 - t;
+  float h = sqrt(max(0.0, 1.0 - x * x));
 
-  // rim band: flat glass inside it, a quarter-circle bevel across it (steeper and steeper to the edge)
-  float x = 1.0 - clamp(-sd / max(band, 1.0), 0.0, 1.0); // 0 inside the band's inner edge, 1 on the rim
-  float tilt = 1.0 - sqrt(max(0.0, 1.0 - x * x));
+  // where the bevel takes the picture from, in band widths from the outline: s0 right on the rim, t again where
+  // the flat glass starts. It eases in with the slope of the bevel and flattens out at the rim, so what lies
+  // near the rim is drawn out to it and smeared there instead of folding over into a mirrored copy
+  float s0 = clamp(bend / max(band, 1.0), 0.3333, 0.6667);
+  float g = s0 + (2.0 - 3.0 * s0) * t * t + (2.0 * s0 - 1.0) * t * t * t;
+  float shift = band * (g - t) * min(1.0, bend / max(band * s0, 0.001));
+  // and right at the outline the steep circle turns it a little over the edge: the picture bends round it
+  shift += 0.04 * bend * (1.0 - h);
 
-  float2 base = center + p / magnify;
-  float2 off = n * (tilt * bend);
-  half4 c = S(base + off);
-  if (dispersion > 0.0 && tilt > 0.001) {
-    // red bent least, blue most: fringes along the rim only, the middle stays clean
-    float k = dispersion * tilt;
-    half4 cr = S(base + off * (1.0 - 0.55 * k) - n * (k * 2.5));
-    half4 cg = S(base + off * (1.0 + 0.10 * k));
-    half4 cb = S(base + off * (1.0 + 0.70 * k) + n * (k * 2.5));
-    c = half4(cr.r, cg.g, cb.b, max(max(cr.a, cg.a), cb.a));
+  // the middle magnifies; the bevel bends the picture on top of that. The sample is taken further in, along
+  // the normal: what lies near the rim is stretched across the bevel, and on the round ends it comes from a
+  // smaller arc, so it spreads along the edge as well. A slight pull towards the centre on top of it bends
+  // straight lines near the rim along the curve, as a thick lens does (more of it closed the icons into rings).
+  float2 mid = p / magnify;
+  float2 pull = n * shift + mid * (0.08 * shift / max(r, 1.0));
+  float2 base = center + mid;
+
+  // colour split: a share of the bend, so the fringes are widest at the rim and fade out with the bend inside
+  float k = 0.2 * dispersion;
+  half4 c = S(base - pull);
+  if (k > 0.004 && shift > 0.25) {
+    // five taps across the spectrum, each bent a little more than the last (red least, violet most), blended
+    // back into RGB: smooth rainbow fringes instead of three hard copies
+    half4 t0 = S(base - pull * (1.0 - k));
+    half4 t1 = S(base - pull * (1.0 - 0.5 * k));
+    half4 t3 = S(base - pull * (1.0 + 0.5 * k));
+    half4 t4 = S(base - pull * (1.0 + k));
+    half3 rgb = half3(t0.r * 0.45 + t1.r * 0.35 + c.r * 0.2,
+                      t1.g * 0.2 + c.g * 0.55 + t3.g * 0.25,
+                      c.b * 0.1 + t3.b * 0.4 + t4.b * 0.5);
+    half al = t0.a * 0.15 + t1.a * 0.2 + c.a * 0.3 + t3.a * 0.2 + t4.a * 0.15;
+    // premultiplied: keep the colour no brighter than its coverage
+    c = half4(min(rgb, half3(al)), al);
   }
 
   // almost clear body under the picture
@@ -107,7 +130,6 @@ half4 main(float2 fragCoord) {
   float facing = abs(d);
   float lit = 0.3 + 0.7 * facing * facing;
   float near = d > 0.0 ? 1.0 : 0.7;                           // the far side a touch dimmer
-  float depth = -sd;                                          // px inside the outline
   // crisp line on the outline (about 1.5dp)
   float edgeLine = light * mix(1.0, 0.42, dark) * (1.0 - smoothstep(0.7 * dp, 1.8 * dp, depth)) * lit * near;
   // the bevel's glow (about 5dp): the thickness of the glass

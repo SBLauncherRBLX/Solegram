@@ -54,10 +54,17 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
     private List<LauncherIconController.LauncherIcon> availableIcons = new ArrayList<>();
     private LinearLayoutManager linearLayoutManager;
     private int currentAccount;
+    /** Solegram: the picker has two rows, the colour icons and the themed ones. */
+    private final boolean themed;
 
     public AppIconsSelectorCell(Context context, BaseFragment fragment, int currentAccount) {
+        this(context, fragment, currentAccount, false);
+    }
+
+    public AppIconsSelectorCell(Context context, BaseFragment fragment, int currentAccount, boolean themed) {
         super(context);
         this.currentAccount = currentAccount;
+        this.themed = themed;
         setPadding(0, AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12));
 
         setFocusable(false);
@@ -142,6 +149,17 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
                 }
             }
 
+            // the other row of the picker drops its selection
+            if (getParent() instanceof ViewGroup) {
+                ViewGroup parent = (ViewGroup) getParent();
+                for (int i = 0; i < parent.getChildCount(); i++) {
+                    View child = parent.getChildAt(i);
+                    if (child instanceof AppIconsSelectorCell && child != AppIconsSelectorCell.this) {
+                        ((AppIconsSelectorCell) child).syncSelection();
+                    }
+                }
+            }
+
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_APP_ICON, icon);
         });
         updateIconsVisibility();
@@ -150,7 +168,11 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
     @SuppressLint("NotifyDataSetChanged")
     private void updateIconsVisibility() {
         availableIcons.clear();
-        availableIcons.addAll(Arrays.asList(LauncherIconController.LauncherIcon.values()));
+        for (LauncherIconController.LauncherIcon icon : LauncherIconController.LauncherIcon.values()) {
+            if (icon.themed == themed) {
+                availableIcons.add(icon);
+            }
+        }
         if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             for (int i = 0; i < availableIcons.size(); i++) {
                 if (availableIcons.get(i).premium) {
@@ -167,6 +189,16 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
             if (LauncherIconController.isEnabled(icon)) {
                 linearLayoutManager.scrollToPositionWithOffset(i, AndroidUtilities.dp(16));
                 break;
+            }
+        }
+    }
+
+    /** Shows which icon is on now, after it was picked in another row. */
+    public void syncSelection() {
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof IconHolderView && ((IconHolderView) child).icon != null) {
+                ((IconHolderView) child).setSelected(LauncherIconController.isEnabled(((IconHolderView) child).icon), true);
             }
         }
     }
@@ -212,6 +244,7 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
         private TextView titleView;
 
         private float progress;
+        private LauncherIconController.LauncherIcon icon;
 
         private IconHolderView(@NonNull Context context) {
             super(context);
@@ -272,6 +305,7 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
         }
 
         private void bind(LauncherIconController.LauncherIcon icon) {
+            this.icon = icon;
             iconView.setImageResource(icon.background);
 
             MarginLayoutParams params = (MarginLayoutParams) titleView.getLayoutParams();

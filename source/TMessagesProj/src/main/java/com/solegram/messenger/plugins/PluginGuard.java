@@ -379,14 +379,9 @@ public final class PluginGuard {
             int code = connection.getResponseCode();
             String text;
             if (code == HttpURLConnection.HTTP_OK) {
+                // a list cut off at some size would silently unblock what follows: too large is an error, the old list stays
                 try (InputStream in = connection.getInputStream()) {
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    byte[] buf = new byte[8192];
-                    int r;
-                    while ((r = in.read(buf)) > 0 && out.size() < 4 * 1024 * 1024) {
-                        out.write(buf, 0, r);
-                    }
-                    text = new String(out.toByteArray(), StandardCharsets.UTF_8);
+                    text = com.solegram.messenger.SolegramNet.readString(in, 4 * 1024 * 1024);
                 }
             } else if (code == HttpURLConnection.HTTP_NOT_FOUND) {
                 // the list has not been published yet: nothing is blocked

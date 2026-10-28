@@ -1,0 +1,33 @@
+// SoleDrop: the liquid wave that runs out from the edge where the two phones touch.
+// A ring front (origin above the top edge) bends what is under it like a lens of water: the picture is
+// pushed along the ring's normal by a damped ripple profile, the three colour channels a little apart
+// (dispersion at the crest), and the crest catches the brand light.
+uniform shader content;
+uniform float2 origin;
+uniform float radius;
+uniform float band;
+uniform float amp;
+uniform float glow;
+layout(color) uniform half4 tint;
+
+half4 main(float2 p) {
+    float2 v = p - origin;
+    float d = length(v);
+    float x = (d - radius) / band;
+    // the ripple trails behind the front (x < 0) a little longer than it reaches ahead
+    float env = exp(-x * x * (x > 0.0 ? 1.6 : 0.55));
+    if (env < 0.003) {
+        return content.eval(p);
+    }
+    float2 dir = v / max(d, 1.0);
+    float wave = env * sin(x * 2.4);
+    float2 off = dir * (amp * wave);
+    half4 base = content.eval(p - off);
+    half r = content.eval(p - off * 1.12).r;
+    half b = content.eval(p - off * 0.88).b;
+    half3 c = half3(r, base.g, b);
+    float crest = env * glow * clamp(0.5 + 0.5 * cos(x * 2.4 - 0.6), 0.0, 1.0);
+    c = mix(c, tint.rgb, half(crest * 0.32));
+    c += half3(crest * 0.10);
+    return half4(c, base.a);
+}

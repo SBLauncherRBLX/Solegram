@@ -40256,6 +40256,10 @@ public class ChatActivity extends BaseFragment implements
         if (com.solegram.messenger.SolegramReminders.canRemindIn(this)) {
             actionModeViews.add(actionMode.addItemWithWidth(com.solegram.messenger.SolegramMessageMenu.ACTION_REMIND, R.drawable.msg_notifications, dp(48), LocaleController.getString(R.string.SG_Remind)));
         }
+        // Solegram: the selected messages by SoleDrop, where they may be forwarded
+        if (currentEncryptedChat == null && !isPeerNoForwards()) {
+            actionModeViews.add(actionMode.addItemWithWidth(com.solegram.messenger.SolegramMessageMenu.ACTION_SOLEDROP, R.drawable.msg_soledrop, dp(48), LocaleController.getString(R.string.SG_SoleDrop)));
+        }
     }
 
     /** Solegram: the selected messages (a reminder is made from them). */

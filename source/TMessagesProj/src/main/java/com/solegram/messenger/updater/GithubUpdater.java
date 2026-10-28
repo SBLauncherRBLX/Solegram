@@ -22,6 +22,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Updates published in a GitHub repository. The repository holds {@code update.json} next to
@@ -46,6 +47,20 @@ final class GithubUpdater {
     }
 
     private static final int TIMEOUT = 20_000;
+
+    /**
+     * Where update files may come from, every redirect included: GitHub only (raw files, the repository and its
+     * release assets), https only. The APK is still checked for our signature before it is installed.
+     */
+    private static final String[] ALLOWED_HOSTS = {"raw.githubusercontent.com", "github.com", "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com"};
+    private static final int MAX_REDIRECTS = 5;
+    /** Far above any real Solegram APK; a server that keeps sending must not fill the storage. */
+    private static final long MAX_APK_SIZE = 400L * 1024 * 1024;
+    private static final int MAX_CHANGELOG = 8000;
+    private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
+    /** A file of the repository, named in update.json: plain path segments, no way out of the repository. */
+    private static final Pattern REPO_PATH = Pattern.compile("[A-Za-z0-9._+-]+(/[A-Za-z0-9._+-]+)*");
 
     // own threads: a 78 MB download must never hold Telegram's shared background queues
     private static DispatchQueue checkQueue, downloadQueue;
@@ -88,20 +103,33 @@ final class GithubUpdater {
                 JSONObject o = new JSONObject(json);
                 UpdateController.UpdateInfo info = new UpdateController.UpdateInfo();
                 info.build = o.optInt("build", 0);
-                info.versionName = o.optString("version", String.valueOf(info.build));
-                info.changelog = o.optString("changelog", "");
+                info.versionName = clip(o.optString("version", String.valueOf(info.build)), 32);
+                info.changelog = clip(o.optString("changelog", ""), MAX_CHANGELOG);
                 info.size = o.optLong("size", 0);
-                info.sha256 = o.optString("sha256", "").toLowerCase(Locale.ROOT);
+                info.sha256 = o.optString("sha256", "").trim().toLowerCase(Locale.ROOT);
                 String apk = o.optString("apk", "");
-                if (info.build <= 0 || TextUtils.isEmpty(apk)) {
+                if (info.build <= 0 || info.build > 10_000_000 || TextUtils.isEmpty(apk)) {
                     callback.onResult(null, "update.json: build/apk missing");
                     return;
                 }
-                info.url = apk.startsWith("https://") ? apk : rawUrl(branch, apk);
-                // optional link that always points at the newest APK (for the browser)
+                // every field is checked here: what does not fit is refused, never "fixed"
+                if (!TextUtils.isEmpty(info.sha256) && !SHA256.matcher(info.sha256).matches()) {
+                    callback.onResult(null, "update.json: bad sha256");
+                    return;
+                }
+                if (info.size < 0 || info.size > MAX_APK_SIZE) {
+                    callback.onResult(null, "update.json: bad size");
+                    return;
+                }
+                info.url = fileUrl(branch, apk);
+                if (info.url == null) {
+                    callback.onResult(null, "update.json: apk link not allowed");
+                    return;
+                }
+                // optional link that always points at the newest APK (for the browser); a bad one is ignored
                 final String latest = o.optString("latest", "");
                 if (!TextUtils.isEmpty(latest)) {
-                    info.latestUrl = latest.startsWith("https://") ? latest : rawUrl(branch, latest);
+                    info.latestUrl = fileUrl(branch, latest);
                 }
                 callback.onResult(info, null);
             } catch (Throwable e) {
@@ -109,6 +137,59 @@ final class GithubUpdater {
                 callback.onResult(null, e.getClass().getSimpleName() + ": " + e.getMessage());
             }
         });
+    }
+
+    /** Text at most {@code max} long, without control characters (it is shown as it is). */
+    private static String clip(String s, int max) {
+        if (s == null) {
+            return "";
+        }
+        final StringBuilder sb = new StringBuilder(Math.min(s.length(), max));
+        for (int i = 0; i < s.length() && sb.length() < max; i++) {
+            final char c = s.charAt(i);
+            if (c >= ' ' || max > 32 && (c == '\n' || c == '\t')) { // the version is one line, the changelog has lines
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** An https link to one of the GitHub hosts, on the standard port and without user info. */
+    static boolean isAllowedUrl(String url) {
+        if (url == null) {
+            return false;
+        }
+        try {
+            final URL u = new URL(url);
+            if (!"https".equalsIgnoreCase(u.getProtocol()) || u.getUserInfo() != null || u.getPort() != -1 && u.getPort() != 443) {
+                return false;
+            }
+            final String host = u.getHost() == null ? "" : u.getHost().toLowerCase(Locale.ROOT);
+            for (String allowed : ALLOWED_HOSTS) {
+                if (allowed.equals(host)) {
+                    return true;
+                }
+            }
+        } catch (Exception ignore) {
+        }
+        return false;
+    }
+
+    /** A file named in update.json: a full GitHub link, or a path inside the repository. Null when neither. */
+    private static String fileUrl(String branch, String value) {
+        final String v = value == null ? "" : value.trim();
+        if (v.regionMatches(true, 0, "https://", 0, 8)) {
+            return isAllowedUrl(v) ? v : null;
+        }
+        if (!REPO_PATH.matcher(v).matches()) {
+            return null; // a scheme, a query, a backslash, an encoded character...
+        }
+        for (String segment : v.split("/")) {
+            if (".".equals(segment) || "..".equals(segment)) {
+                return null;
+            }
+        }
+        return rawUrl(branch, v);
     }
 
     static File updateDir() {
@@ -191,6 +272,10 @@ final class GithubUpdater {
                             out.write(buffer, 0, read);
                             digest.update(buffer, 0, read);
                             done += read;
+                            if (done > MAX_APK_SIZE) {
+                                dropPart = true;
+                                throw new java.io.IOException("too large");
+                            }
                             if (total > 0 && done > total) {
                                 dropPart = true;
                                 throw new java.io.IOException("larger than expected");
@@ -279,19 +364,40 @@ final class GithubUpdater {
         return open(url, 0);
     }
 
-    /** @param from resume from this byte (Range request); the server may still answer with the whole file */
+    /**
+     * @param from resume from this byte (Range request); the server may still answer with the whole file.
+     * Redirects are followed here, one by one, so each hop has to be an allowed GitHub host too (release assets
+     * move to a storage host).
+     */
     private static HttpURLConnection open(String url, long from) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(TIMEOUT);
-        connection.setReadTimeout(TIMEOUT);
-        connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", "Solegram-Updater");
-        if (from > 0) {
-            connection.setRequestProperty("Range", "bytes=" + from + "-");
-            // a transparently gzipped body has no byte ranges
-            connection.setRequestProperty("Accept-Encoding", "identity");
+        String current = url;
+        HttpURLConnection connection;
+        int code;
+        for (int hop = 0; ; hop++) {
+            if (!isAllowedUrl(current)) {
+                throw new SecurityException("host not allowed");
+            }
+            connection = (HttpURLConnection) new URL(current).openConnection();
+            connection.setConnectTimeout(TIMEOUT);
+            connection.setReadTimeout(TIMEOUT);
+            connection.setInstanceFollowRedirects(false);
+            connection.setRequestProperty("User-Agent", "Solegram-Updater");
+            if (from > 0) {
+                connection.setRequestProperty("Range", "bytes=" + from + "-");
+                // a transparently gzipped body has no byte ranges
+                connection.setRequestProperty("Accept-Encoding", "identity");
+            }
+            code = connection.getResponseCode();
+            if (code != 301 && code != 302 && code != 303 && code != 307 && code != 308) {
+                break;
+            }
+            final String location = connection.getHeaderField("Location");
+            connection.disconnect();
+            if (TextUtils.isEmpty(location) || hop >= MAX_REDIRECTS) {
+                throw new java.io.IOException("HTTP " + code);
+            }
+            current = new URL(new URL(current), location).toString();
         }
-        int code = connection.getResponseCode();
         if (code != HttpURLConnection.HTTP_OK && !(from > 0 && code == HttpURLConnection.HTTP_PARTIAL)) {
             connection.disconnect();
             if (code == HttpURLConnection.HTTP_NOT_FOUND) {

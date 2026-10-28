@@ -306,6 +306,8 @@ public final class PluginSecurity {
         {"com.solegram.messenger.plugins", "sec_plugins_control"}, {"java.security.KeyStore", "sec_keystore"},
         {"android.security.keystore", "sec_keystore"}, {"android.accounts", "sec_keystore"},
         {"org.telegram.messenger.SharedConfig", "ui_settings"}, {"com.solegram.messenger.SolegramConfig", "ui_settings"},
+        // Solegram's own secrets: the app's api credentials and the user's encrypted keys
+        {"com.solegram.messenger.ApiCredentials", "sec_auth_internals"}, {"com.solegram.messenger.SolegramSecrets", "sec_keystore"},
         // files
         {"os.remove", "file_delete"}, {"os.unlink", "file_delete"}, {"os.rmdir", "file_delete"}, {"os.removedirs", "file_delete"},
         {"shutil.rmtree", "file_delete"}, {"shutil.move", "file_delete"}, {"shutil.make_archive", "file_archive"}, {"shutil", "file_io"},
@@ -354,6 +356,7 @@ public final class PluginSecurity {
         {"savedPasswordHash", "sec_auth_internals"}, {"savedSaltedPassword", "sec_auth_internals"}, {"tmpPassword", "sec_auth_internals"},
         {"passcodeHash", "sec_auth_internals"}, {"passcodeSalt", "sec_auth_internals"}, {"pushString", "sec_auth_internals"},
         {"getAuthKey", "sec_auth_internals"}, {"authKey", "sec_auth_internals"}, {"auth_key", "sec_auth_internals"},
+        {"aiApiKey", "sec_auth_internals"}, {"getApiHash", "sec_auth_internals"}, {"APP_HASH", "sec_auth_internals"},
         {"getDatabase", "msg_database"}, {"queryFinalized", "msg_database"}, {"executeFast", "msg_database"},
         {"getMessagesStorage", "msg_read"}, {"dialogs_dict", "msg_read"}, {"allDialogs", "msg_read"},
         {"getContactsController", "msg_contacts"}, {"contactsDict", "msg_contacts"}, {"phoneBookContacts", "msg_contacts"},
@@ -502,7 +505,7 @@ public final class PluginSecurity {
 
     /** Paths and names of the files that hold the Telegram session and settings. */
     private static final String[] SESSION_FILES = {
-        "tgnet.dat", "userconfing", "cache4.db", "shared_prefs", "/data/data/", "/data/user/"};
+        "tgnet.dat", "userconfing", "cache4.db", "shared_prefs", "/data/data/", "/data/user/", "solegram_api", "solegram_secrets"};
 
     /** Settings and files of the plugin security itself. */
     private static final String[] TAMPER_STRINGS = {

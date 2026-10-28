@@ -138,8 +138,8 @@ public class SolegramRemindersActivity extends UniversalFragment implements Noti
         items.add(UItem.asHeader(getString(R.string.SG_RemindersSettings)));
         items.add(UItem.asButtonCheck(ID_AI, getString(R.string.SG_ReminderAiSetting), getString(R.string.SG_ReminderAiSettingInfo))
             .setChecked(SolegramConfig.reminderAi));
-        items.add(tile(UItem.asButton(ID_MORNING, R.drawable.msg_calendar2, getString(R.string.SG_ReminderMorningTime), clock(SolegramConfig.reminderMorning)), TILE_YELLOW));
-        items.add(tile(UItem.asButton(ID_EVENING, R.drawable.msg_calendar2, getString(R.string.SG_ReminderEveningTime), clock(SolegramConfig.reminderEvening)), TILE_INDIGO));
+        items.add(tile(UItem.asButton(ID_MORNING, R.drawable.menu_day_mode_24, getString(R.string.SG_ReminderMorningTime), clock(SolegramConfig.reminderMorning)), TILE_YELLOW));
+        items.add(tile(UItem.asButton(ID_EVENING, R.drawable.menu_night_mode_24, getString(R.string.SG_ReminderEveningTime), clock(SolegramConfig.reminderEvening)), TILE_INDIGO));
         items.add(UItem.asShadow(getString(R.string.SG_ReminderTimesInfo)));
 
         if (Build.VERSION.SDK_INT >= 31) {
@@ -148,7 +148,7 @@ public class SolegramRemindersActivity extends UniversalFragment implements Noti
                 getString(exact ? R.string.SG_ReminderExactOn : R.string.SG_ReminderExactOff)), exact ? TILE_GREEN : TILE_ORANGE);
             items.add(exact ? exactItem : exactItem.accent());
         }
-        items.add(tile(UItem.asButton(ID_SOUND, R.drawable.msg_notifications, getString(R.string.SG_ReminderSound)), TILE_RED));
+        items.add(tile(UItem.asButton(ID_SOUND, R.drawable.settings_sounds, getString(R.string.SG_ReminderSound)), TILE_RED));
         items.add(UItem.asShadow(getString(Build.VERSION.SDK_INT >= 31 && !SolegramReminders.canScheduleExact()
             ? R.string.SG_ReminderExactInfoShort : R.string.SG_ReminderSoundInfo)));
     }

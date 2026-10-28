@@ -64,6 +64,8 @@ public final class Solegram {
         try {
             SolegramConfig.load();
             MessageVault.init();
+            // "hide in recent apps" follows every activity of the app
+            SolegramSecurity.init();
             if (SolegramConfig.disableVibration) {
                 applyVibrationSetting();
             }
@@ -104,7 +106,7 @@ public final class Solegram {
             } catch (Throwable e) {
                 FileLog.e(e);
             }
-        });
+        }, 1000); // after the first frame: it asks the system for the listener access and the players, and scales the cover
         // updates: the background schedule, and "Solegram updated" on the first start of a new version
         AndroidUtilities.runOnUIThread(() -> {
             try {

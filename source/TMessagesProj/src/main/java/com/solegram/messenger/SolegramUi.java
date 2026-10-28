@@ -206,6 +206,7 @@ public final class SolegramUi {
         if (SolegramConfig.markAllReadInMenu) {
             io.add(R.drawable.msg_markread, LocaleController.getString(R.string.SG_MarkAllRead), () -> markAllRead(fragment));
         }
+        io.add(R.drawable.msg_soledrop, LocaleController.getString(R.string.SG_SoleDrop), () -> com.solegram.messenger.soledrop.SoleDrop.open(fragment, null));
         io.add(R.drawable.sg_settings_mark, LocaleController.getString(R.string.SG_SettingsTitle), () -> fragment.presentFragment(new SolegramSettingsActivity()));
         addPluginItems(io, fragment, PluginMenuItem.DRAWER_MENU, baseContext(fragment));
         addPluginItems(io, fragment, PluginMenuItem.MAIN_MENU, baseContext(fragment));

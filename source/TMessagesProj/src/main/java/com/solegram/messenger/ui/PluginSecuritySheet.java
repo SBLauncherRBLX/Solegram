@@ -147,11 +147,14 @@ public class PluginSecuritySheet extends BottomSheet {
             TextView cancel = new TextView(context);
             cancel.setText(getString(R.string.Cancel));
             cancel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            cancel.setTypeface(AndroidUtilities.bold());
             cancel.setGravity(Gravity.CENTER);
-            cancel.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
-            cancel.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+            // a quiet text button in the accent, rounded like the main one (as the update sheet's)
+            final int accent = getThemedColor(Theme.key_featuredStickers_addButton);
+            cancel.setTextColor(accent);
+            cancel.setBackground(Theme.createRadSelectorDrawable(ColorUtils.setAlphaComponent(accent, 0x1F), 10, 10));
             cancel.setOnClickListener(v -> dismiss());
-            root.addView(cancel, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 4, 16, 4));
+            root.addView(cancel, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 6, 16, 8));
         } else {
             root.addView(new View(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 12));
         }
@@ -312,11 +315,11 @@ public class PluginSecuritySheet extends BottomSheet {
         if (report.findings.isEmpty()) {
             return;
         }
-        detailsToggle = text(context, "", 15, getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
+        detailsToggle = text(context, "", 15, getThemedColor(Theme.key_featuredStickers_addButton));
         detailsToggle.setTypeface(AndroidUtilities.bold());
-        detailsToggle.setPadding(dp(22), dp(10), dp(22), dp(10));
-        detailsToggle.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
-        content.addView(detailsToggle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 6, 0, 0));
+        detailsToggle.setPadding(dp(14), dp(10), dp(14), dp(10));
+        detailsToggle.setBackground(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector), 12, 12));
+        content.addView(detailsToggle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 8, 6, 8, 0));
 
         detailsLayout = new LinearLayout(context);
         detailsLayout.setOrientation(LinearLayout.VERTICAL);

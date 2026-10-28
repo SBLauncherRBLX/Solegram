@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SoleDrop: the private AID F0534F4C4544524F50 ("SOLEDROP" under the proprietary F0 prefix), answered only
+     while the phone is unlocked; not a payment service, so no default-app choice is involved -->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/SG_SoleDrop"
+    android:requireDeviceUnlock="true"
+    android:requireDeviceScreenOn="true">
+    <aid-group android:category="other" android:description="@string/SG_SoleDrop">
+        <aid-filter android:name="F0534F4C4544524F50" />
+    </aid-group>
+</host-apdu-service>

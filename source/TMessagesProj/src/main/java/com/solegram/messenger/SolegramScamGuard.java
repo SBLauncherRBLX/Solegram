@@ -25,6 +25,7 @@ import androidx.annotation.Nullable;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
@@ -69,13 +70,24 @@ public final class SolegramScamGuard {
     private SolegramScamGuard() {
     }
 
+    static {
+        // the well known sites: a list in the app's assets, read once on the first check
+        SolegramScamRules.setSafeDomainSource(() -> ApplicationLoader.applicationContext.getAssets().open("solegram_safe_domains.txt"));
+    }
+
     // region Trusted sites
 
     private static volatile String trustedSource;
     private static volatile Set<String> trusted = new HashSet<>();
 
     /** The user's trusted sites, read again when the setting changed. Cheap: called on every check. */
+    private static volatile boolean usernamesLoaded;
+
     private static Set<String> trustedSites() {
+        if (!usernamesLoaded) {
+            usernamesLoaded = true;
+            SolegramScamRules.setUserTrustedUsernames(trustedUsernames());
+        }
         final String source = SolegramConfig.scamTrustedSites;
         if (!TextUtils.equals(source, trustedSource)) {
             final HashSet<String> set = new HashSet<>();
@@ -96,6 +108,29 @@ public final class SolegramScamGuard {
             }
         }
         return trusted;
+    }
+
+    /** Telegram usernames the user said are no scam (t.me links to them are never marked). */
+    private static Set<String> trustedUsernames() {
+        final Set<String> stored = scamPrefs().getStringSet("trusted_usernames", null);
+        return stored == null ? new HashSet<>() : new HashSet<>(stored);
+    }
+
+    /** "Not a scam" on a link to a Telegram username. */
+    public static void trustUsername(String username) {
+        if (TextUtils.isEmpty(username)) {
+            return;
+        }
+        final Set<String> set = trustedUsernames();
+        if (set.add(username.toLowerCase(Locale.ROOT))) {
+            scamPrefs().edit().putStringSet("trusted_usernames", set).apply();
+            SolegramScamRules.setUserTrustedUsernames(set);
+            synchronized (links) {
+                links.evictAll();
+                reports.evictAll();
+            }
+            redrawChats();
+        }
     }
 
     /** "https://www.Example.com/page" -> "example.com"; null for nothing usable. */
@@ -178,11 +213,18 @@ public final class SolegramScamGuard {
         /** Signs in the message around the link, or null. */
         @Nullable
         public final SolegramScamRules.TextReport text;
-        /** Address plus message. */
+        /** Who sent it where. */
+        public final SolegramScamRules.Context context;
+        /** Address, message and sender together. */
         public final int score;
+        /** The message's signs were part of the score. */
+        public final boolean textCounted;
         /** Text of the message the link is in (for "Check with AI"), or null. */
         @Nullable
         public final String messageText;
+        /** The link's own text in the message, or null. */
+        @Nullable
+        public final String shown;
         /** What AI said: SolegramScamRules level, or -1. */
         public volatile int aiLevel = -1;
         /** AI's own words, or null. */
@@ -191,11 +233,15 @@ public final class SolegramScamGuard {
         public volatile int aiSource;
         volatile boolean aiQueued;
 
-        Link(SolegramScamRules.LinkReport report, @Nullable SolegramScamRules.TextReport text, @Nullable String messageText) {
+        Link(SolegramScamRules.LinkReport report, @Nullable SolegramScamRules.TextReport text, SolegramScamRules.Context context,
+             @Nullable String messageText, @Nullable String shown) {
             this.report = report;
             this.text = text;
-            this.score = SolegramScamRules.combinedScore(report, text);
+            this.context = context;
+            this.score = SolegramScamRules.score(report, text, context);
+            this.textCounted = SolegramScamRules.textCounted(report, text, context);
             this.messageText = messageText;
+            this.shown = shown;
         }
 
         /** Level by the rules and the sensitivity, before AI. */
@@ -205,28 +251,34 @@ public final class SolegramScamGuard {
 
         /** What the user is shown: SolegramScamRules.SAFE / CAUTION / DANGER. */
         public int level() {
-            if (!SolegramConfig.scamLinks || isUserTrustedSite(report.site)) {
+            if (!SolegramConfig.scamLinks || isUserTrustedSite(report.site)
+                || report.telegramUsername != null && SolegramScamRules.isTrustedUsername(report.telegramUsername)) {
                 return SolegramScamRules.SAFE;
             }
             final int base = ruleLevel();
             final int ai = aiLevel;
-            if (ai < 0) {
-                return base;
+            if (ai < 0 || ai >= base) {
+                // Gemini Nano only ever lowers; an online check the user asked for may also confirm a warning
+                return ai > base && aiSource != SolegramSummarizer.SOURCE_NANO && base > SolegramScamRules.SAFE ? ai : base;
             }
-            if (ai > base) {
-                return ai; // AI may always raise
-            }
-            // and lower only a borderline link with no disguised address
+            // lowered only for a borderline link with no disguised address
             return base == SolegramScamRules.CAUTION && !report.hasHardReason() ? ai : base;
         }
 
         /** The reasons with the message's signs, the heaviest first. */
         public List<SolegramScamRules.Reason> reasons() {
             final ArrayList<SolegramScamRules.Reason> list = new ArrayList<>(report.sortedReasons());
-            if (text != null && score > report.score) {
+            if (text != null && textCounted) {
                 list.addAll(text.reasons);
             }
             return list;
+        }
+
+        /** The one reason that says the most (for a one-line summary). */
+        @Nullable
+        public SolegramScamRules.Reason mainReason() {
+            final List<SolegramScamRules.Reason> list = reasons();
+            return list.isEmpty() ? null : list.get(0);
         }
     }
 
@@ -240,7 +292,7 @@ public final class SolegramScamGuard {
         final String key = url + '\u0001' + shown;
         Link link = links.get(key);
         if (link == null) {
-            link = new Link(report(url, shown), null, null);
+            link = new Link(report(url, shown), null, SolegramScamRules.Context.NONE, null, shown);
             links.put(key, link);
         }
         return link;
@@ -253,23 +305,97 @@ public final class SolegramScamGuard {
         }
         trustedSites();
         final String mk = messageKey(m);
-        final String key = url + '\u0001' + shown + '\u0001' + mk;
+        final SolegramScamRules.Context context = context(m);
+        // the sender's standing is part of the key: a contact added, a chat answered, and the link is judged anew
+        final String key = url + '\u0001' + shown + '\u0001' + mk + '\u0001' + context.key();
         Link link = links.get(key);
         if (link == null) {
             final SolegramScamRules.LinkReport report = report(url, shown);
             SolegramScamRules.TextReport text = null;
             final String messageText = m.messageOwner.message;
-            if (!TextUtils.isEmpty(messageText) && !(report.trusted && report.telegramUsername == null && !report.telegramService)) {
+            if (!TextUtils.isEmpty(messageText) && !(report.trusted && !report.userContent && report.telegramUsername == null && !report.telegramService)) {
                 text = texts.get(mk);
                 if (text == null) {
                     text = SolegramScamRules.scoreText(messageText);
                     texts.put(mk, text);
                 }
             }
-            link = new Link(report, text, messageText);
+            link = new Link(report, text, context, messageText, shown);
             links.put(key, link);
         }
         return link;
+    }
+
+    private static final int DAY = 86400;
+
+    /**
+     * Who sent a message and where, as the rules weigh it: oneself, Telegram and verified accounts, contacts, chats the
+     * user talks in or created, big public channels; and strangers. Only cached data, no requests.
+     */
+    static SolegramScamRules.Context context(MessageObject m) {
+        final SolegramScamRules.Context c = new SolegramScamRules.Context();
+        try {
+            if (m.isOutOwner()) {
+                c.outgoing = true; // sent (or forwarded) by the user: never marked
+                return c;
+            }
+            final int account = m.currentAccount;
+            final MessagesController controller = MessagesController.getInstance(account);
+            final long self = UserConfig.getInstance(account).getClientUserId();
+            final long dialogId = m.getDialogId();
+            final long fromId = m.getFromChatId();
+            if (dialogId == self) {
+                c.savedForward = true;
+            }
+            if (fromId == 777000L || UserObject.isService(fromId)) {
+                c.official = true;
+                return c;
+            }
+            boolean contact = false;
+            if (fromId > 0) {
+                final TLRPC.User user = controller.getUser(fromId);
+                if (user != null) {
+                    if (user.self) {
+                        c.outgoing = true;
+                        return c;
+                    }
+                    c.official = user.verified || user.support || user.bot_verification_icon != 0;
+                    contact = user.contact || user.mutual_contact || ContactsController.getInstance(account).isContact(fromId) || isKnown(account, fromId);
+                }
+            } else if (fromId < 0) {
+                final TLRPC.Chat sender = controller.getChat(-fromId);
+                if (sender != null) {
+                    c.official = sender.verified;
+                    c.bigChannel = ChatObject.isChannelAndNotMegaGroup(sender) && ChatObject.isPublic(sender) && sender.participants_count >= 10000;
+                }
+            }
+            c.contact = contact;
+            if (c.official || contact) {
+                return c;
+            }
+            if (dialogId > 0) {
+                if (dialogId != self) {
+                    // a private chat: answered before, or a stranger who wrote out of nowhere
+                    final TLRPC.Dialog dialog = controller.dialogs_dict.get(dialogId);
+                    c.conversed = dialog != null && dialog.read_outbox_max_id > 0;
+                    c.stranger = !c.conversed;
+                }
+            } else {
+                final TLRPC.Chat chat = controller.getChat(-dialogId);
+                if (chat != null) {
+                    c.ownChat = chat.creator;
+                    c.longHistory = chat.date > 0 && System.currentTimeMillis() / 1000L - chat.date > 90L * DAY;
+                    if (fromId == dialogId) {
+                        c.official = chat.verified;
+                        c.bigChannel |= ChatObject.isPublic(chat) && chat.participants_count >= 10000;
+                    }
+                }
+                c.unknownSender = fromId > 0;
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return c;
     }
 
     private static SolegramScamRules.LinkReport report(String url, @Nullable String shown) {
@@ -389,13 +515,18 @@ public final class SolegramScamGuard {
         }
     }
 
-    /** Apple's system orange and red, as the rest of Solegram's warnings. */
+    /** Apple's system red for danger; a calm amber for "be careful" (it asks for attention, not alarm). */
     public static int levelColor(int level) {
         final boolean dark = Theme.isCurrentThemeDark();
         if (level == SolegramScamRules.DANGER) {
             return dark ? 0xFFFF453A : 0xFFFF3B30;
         }
-        return dark ? 0xFFFF9F0A : 0xFFF08A00;
+        return dark ? 0xFFFFB340 : 0xFFC77800;
+    }
+
+    /** {light, dark} tile colours of a level, for the warning's icon. */
+    public static int[] levelTileColors(int level) {
+        return level == SolegramScamRules.DANGER ? new int[]{0xFFFF3B30, 0xFFFF453A} : new int[]{0xFFE59A12, 0xFFF0A92C};
     }
 
     // endregion
@@ -410,6 +541,20 @@ public final class SolegramScamGuard {
     static void confirm(String url) {
         confirmedUrl = url;
         confirmedAt = SystemClock.elapsedRealtime();
+    }
+
+    private static volatile String clearedUrl;
+    private static volatile long clearedAt;
+
+    /** The link was found safe in its message: the next steps of opening it do not look at it again alone. */
+    private static void clear(String url) {
+        clearedUrl = url;
+        clearedAt = SystemClock.elapsedRealtime();
+    }
+
+    private static boolean isCleared(String url) {
+        final String c = clearedUrl;
+        return c != null && SystemClock.elapsedRealtime() - clearedAt <= CONFIRM_WINDOW && sameUrl(c, url);
     }
 
     public static boolean isConfirmed(@Nullable String url) {
@@ -467,8 +612,12 @@ public final class SolegramScamGuard {
                     shown = shownText((Spanned) m.caption, span);
                 }
             }
-            final Link link = m != null && !m.isOutOwner() ? check(m, url, shown) : check(url, shown);
+            if (m != null && m.isOutOwner()) {
+                return false; // the user's own links are never flagged
+            }
+            final Link link = m != null ? check(m, url, shown) : check(url, shown);
             if (link.level() == SolegramScamRules.SAFE) {
+                clear(url); // judged in its message: opening it later (Browser.openUrl) does not judge it again without it
                 return false;
             }
             com.solegram.messenger.ui.SolegramScamDialog.show(fragment, link, () -> {
@@ -492,7 +641,7 @@ public final class SolegramScamGuard {
         }
         try {
             final String url = uri.toString();
-            if (!isCandidate(url) || isConfirmed(url)) {
+            if (!isCandidate(url) || isConfirmed(url) || isCleared(url)) {
                 return false;
             }
             final Link link = check(url, null);
@@ -543,8 +692,9 @@ public final class SolegramScamGuard {
         + "Answer in this exact format: one word on the first line - SAFE, SUSPICIOUS or DANGEROUS - and on the second line "
         + "one short sentence in " + SolegramSummarizer.LANGUAGE + " that explains why. No markdown.";
 
+    /** By what the AI is shown: the address, its text in the message and the message (not who sent it). */
     private static String aiKey(Link link) {
-        return link.report.url + '\u0001' + (link.messageText == null ? 0 : link.messageText.hashCode());
+        return link.report.url + '\u0001' + link.shown + '\u0001' + (link.messageText == null ? 0 : link.messageText.hashCode());
     }
 
     /** What the AI is given about a link: its address, site, signs and (shortened) message. */
@@ -853,6 +1003,22 @@ public final class SolegramScamGuard {
             this.level = level;
         }
 
+        /** The reasons worth reading, the strongest first ("no username" and the like left out). */
+        public List<SolegramScamRules.Reason> reasonsToShow() {
+            final ArrayList<SolegramScamRules.Reason> list = new ArrayList<>();
+            for (SolegramScamRules.Reason r : report.sortedReasons()) {
+                if (r.weight >= 5 || r.code == SolegramScamRules.A_SCAM || r.code == SolegramScamRules.A_FAKE) {
+                    list.add(r);
+                }
+            }
+            return list;
+        }
+
+        /** The one reason that says the most. */
+        public String mainReason() {
+            return summary(1);
+        }
+
         /** The main reasons, shortest list that explains (2-3 of them). */
         public String summary(int max) {
             final StringBuilder sb = new StringBuilder();
@@ -952,6 +1118,9 @@ public final class SolegramScamGuard {
         a.scam = user.scam;
         a.fake = user.fake;
         a.verified = user.verified;
+        a.official = user.support;
+        a.botVerified = user.bot_verification_icon != 0;
+        a.mutualContact = user.mutual_contact;
         a.bot = user.bot;
         a.deleted = UserObject.isDeleted(user);
         a.firstName = user.first_name;
@@ -982,15 +1151,19 @@ public final class SolegramScamGuard {
         if (messages != null) {
             fillFirstMessages(a, messages);
             first = a.firstMessages;
+        } else {
+            // the start of the chat is not loaded (a long chat, or the profile): the user answering there says enough
+            final TLRPC.Dialog dialog = controller.dialogs_dict.get(userId);
+            a.conversed = dialog != null && dialog.read_outbox_max_id > 0;
         }
         final SolegramScamRules.AccountReport report = SolegramScamRules.scoreAccount(a, System.currentTimeMillis() / 1000L);
         if (first != null) {
             final Object[] ai = accountAi.get(account + "_" + userId + "_" + first.hashCode());
-            if (ai != null && (Integer) ai[0] != 0) {
-                report.add(SolegramScamRules.R_AI, (String) ai[1], (Integer) ai[0]);
+            if (ai != null && (Integer) ai[0] >= 0) {
+                report.addAi((String) ai[1], (Integer) ai[0]);
             }
         }
-        final int level = report.flagged ? SolegramScamRules.DANGER : SolegramScamRules.accountLevel(report.score, SolegramConfig.scamSensitivity);
+        final int level = SolegramScamRules.accountLevel(report, SolegramConfig.scamSensitivity);
         return new AccountRisk(userId, report, level);
     }
 
@@ -1004,8 +1177,19 @@ public final class SolegramScamGuard {
             }
             real.add(m);
         }
-        if (real.isEmpty() || messages.size() > 60) {
-            return; // a long chat: not a stranger who just wrote
+        if (real.isEmpty()) {
+            return;
+        }
+        int mine = 0;
+        for (MessageObject m : real) {
+            if (m.isOut()) {
+                mine++;
+            }
+        }
+        a.conversed = mine >= 3;
+        if (real.size() >= 40 || messages.size() > 60) {
+            a.longHistory = true; // a long chat: not a stranger who just wrote
+            return;
         }
         a.wroteFirst = !real.get(0).isOut();
         final StringBuilder sb = new StringBuilder();
@@ -1040,7 +1224,7 @@ public final class SolegramScamGuard {
      */
     public static void autoCheckAccount(int account, AccountRisk risk, @Nullable List<MessageObject> messages, Runnable done) {
         if (risk == null || risk.report.flagged || messages == null || !autoAiAvailable()
-            || !SolegramScamRules.isBorderlineAccount(risk.report.score, SolegramConfig.scamSensitivity)) {
+            || !SolegramScamRules.isBorderlineAccount(risk.report, SolegramConfig.scamSensitivity)) {
             return;
         }
         final SolegramScamRules.Account a = new SolegramScamRules.Account();
@@ -1053,7 +1237,7 @@ public final class SolegramScamGuard {
         if (accountAi.get(key) != null) {
             return;
         }
-        accountAi.put(key, new Object[]{0, null}); // asked: not again
+        accountAi.put(key, new Object[]{-1, null}); // asked: not again
         aiQueue.execute(() -> {
             try {
                 final String text = first.length() > 1500 ? first.substring(0, 1500) : first;
@@ -1064,11 +1248,10 @@ public final class SolegramScamGuard {
                     return;
                 }
                 final int level = (Integer) verdict[0];
-                // AI adds to the signs (or takes a little off): it never decides alone
-                final int delta = level == SolegramScamRules.DANGER ? 30 : level == SolegramScamRules.CAUTION ? 10 : -15;
+                // AI is one more sign next to the strong one already there: it never decides alone
                 final String note = verdict[1] != null ? (String) verdict[1] : LocaleController.getString(level == SolegramScamRules.SAFE ? R.string.SG_ScamAiSafe
                     : level == SolegramScamRules.DANGER ? R.string.SG_ScamAiDangerous : R.string.SG_ScamAiSuspicious);
-                accountAi.put(key, new Object[]{delta, note});
+                accountAi.put(key, new Object[]{level, note});
                 AndroidUtilities.runOnUIThread(done);
             } catch (SolegramGeminiNano.NanoException e) {
                 accountAi.remove(key); // may be asked again later

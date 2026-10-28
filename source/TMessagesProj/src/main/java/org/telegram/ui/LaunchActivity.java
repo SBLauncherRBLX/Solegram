@@ -1508,6 +1508,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private boolean handleIntent(Intent intent, boolean isNew, boolean restore, boolean fromPassword, Browser.Progress progress, boolean rebuildFragments, boolean openedTelegram) {
+        com.solegram.messenger.soledrop.SoleDrop.handleIntent(intent); // Solegram: a SoleDrop tap that started the app
         if (com.solegram.messenger.SolegramIntents.before(intent)) {
             return true;
         }
@@ -6986,6 +6987,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         super.onResume();
         isResumed = true;
         com.solegram.messenger.BackgroundConnection.ensureRunning(this);
+        com.solegram.messenger.soledrop.SoleDrop.onAppResumed(); // Solegram: a fresh SoleDrop token for the next tap
         com.solegram.messenger.plugins.PluginsController.getInstance().dispatchAppEvent(com.solegram.messenger.plugins.PluginsController.APP_EVENT_RESUME);
         // Solegram: keep Material You colors in sync.
         AndroidUtilities.runOnUIThread(() -> {

@@ -13,7 +13,10 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.BulletSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -24,6 +27,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
 
 import com.solegram.messenger.Solegram;
 
@@ -39,7 +43,10 @@ import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
-/** Update prompt: version, size, changelog, download progress and install. */
+/**
+ * Update prompt: version, size, changelog, download progress and install. The "what's new" of an installed
+ * update ({@link #showChangelog}) is the same sheet without the download.
+ */
 public class UpdateSheet extends BottomSheet implements NotificationCenter.NotificationCenterDelegate {
 
     private final UpdateController.UpdateInfo info;
@@ -59,58 +66,9 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(0, AndroidUtilities.dp(20), 0, AndroidUtilities.dp(8));
-
-        ImageView logo = new ImageView(context);
-        Drawable bg = ContextCompat.getDrawable(context, R.drawable.sg_icon_bg_sunset);
-        Drawable fg = ContextCompat.getDrawable(context, R.drawable.sg_icon_fg_sunset);
-        logo.setImageDrawable(new LayerDrawable(new Drawable[]{bg, fg}));
-        logo.setOutlineProvider(new ViewOutlineProvider() {
-            @Override
-            public void getOutline(View view, Outline outline) {
-                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), view.getWidth() * 0.28f);
-            }
-        });
-        logo.setClipToOutline(true);
-        layout.addView(logo, LayoutHelper.createLinear(72, 72, Gravity.CENTER_HORIZONTAL));
-
-        TextView title = new TextView(context);
-        title.setText(LocaleController.getString(R.string.SG_UpdateAvailable));
-        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
-        title.setTypeface(AndroidUtilities.bold());
-        title.setGravity(Gravity.CENTER);
-        title.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
-        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 14, 24, 0));
-
-        TextView subtitle = new TextView(context);
-        subtitle.setText(LocaleController.formatString(R.string.SG_UpdateVersionLine, info.versionName, info.build, AndroidUtilities.formatFileSize(info.size), Solegram.getVersionName()));
-        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        subtitle.setGravity(Gravity.CENTER);
-        subtitle.setTextColor(getThemedColor(Theme.key_dialogTextGray3));
-        layout.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 4, 24, 0));
-
-        if (!TextUtils.isEmpty(info.changelog)) {
-            TextView header = new TextView(context);
-            header.setText(LocaleController.getString(R.string.SG_WhatsNew));
-            header.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-            header.setTypeface(AndroidUtilities.bold());
-            header.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueHeader));
-            layout.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 18, 24, 6));
-
-            ScrollView scroll = new ScrollView(context) {
-                @Override
-                protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-                    super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(240), MeasureSpec.AT_MOST));
-                }
-            };
-            TextView changelog = new TextView(context);
-            changelog.setText(info.changelog);
-            changelog.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-            changelog.setLineSpacing(AndroidUtilities.dp(2), 1f);
-            changelog.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
-            changelog.setTextIsSelectable(true);
-            scroll.addView(changelog);
-            layout.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 0, 24, 0));
-        }
+        addTop(resourcesProvider, context, layout, LocaleController.getString(R.string.SG_UpdateAvailable),
+            LocaleController.formatString(R.string.SG_UpdateVersionLine, info.versionName, info.build, AndroidUtilities.formatFileSize(info.size), Solegram.getVersionName()),
+            info.changelog);
 
         button = new ButtonWithCounterView(context, resourcesProvider) {
             // the download fills the button from the left; the fill glides between the progress updates
@@ -136,33 +94,167 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
             }
         };
         button.setOnClickListener(v -> onButton());
-        layout.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 18, 16, 0));
+        layout.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 20, 16, 0));
 
-        TextView browserButton = new TextView(context);
-        browserButton.setText(LocaleController.getString(R.string.SG_UpdateInBrowser));
-        browserButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        browserButton.setGravity(Gravity.CENTER);
-        browserButton.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
-        browserButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+        // the other ways out: quiet text buttons in the accent, rounded like the main one
+        final LinearLayout secondary = new LinearLayout(context);
+        secondary.setOrientation(LinearLayout.HORIZONTAL);
+        TextView browserButton = textButton(resourcesProvider, context, LocaleController.getString(R.string.SG_UpdateInBrowser));
         browserButton.setOnClickListener(v -> UpdateController.getInstance().openInBrowser(context));
-        layout.addView(browserButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 6, 16, 0));
+        secondary.addView(browserButton, LayoutHelper.createLinear(0, 44, 1f));
 
-        laterButton = new TextView(context);
-        laterButton.setText(LocaleController.getString(R.string.SG_SkipVersion));
-        laterButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        laterButton.setGravity(Gravity.CENTER);
-        laterButton.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
-        laterButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 2));
+        laterButton = textButton(resourcesProvider, context, LocaleController.getString(R.string.SG_SkipVersion));
+        secondary.addView(laterButton, LayoutHelper.createLinear(0, 44, 1f, 8, 0, 0, 0));
+        layout.addView(secondary, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 8, 16, 0));
         laterButton.setOnClickListener(v -> {
             UpdateController.getInstance().skip(info);
             dismiss();
         });
-        layout.addView(laterButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 0, 16, 0));
 
         setCustomView(layout);
         solegramReadingGlass(); // release notes are read: a denser glass than other sheets
         updateButton(false);
     }
+
+    // region Shared look (the update prompt and the notes of an installed update)
+
+    /** The app's icon, a title, a line under it and the release notes in a soft card. */
+    private static void addTop(Theme.ResourcesProvider rp, Context context, LinearLayout layout, String titleText, String subtitleText, String notes) {
+        ImageView logo = new ImageView(context);
+        Drawable bg = ContextCompat.getDrawable(context, R.drawable.sg_icon_bg_sunset);
+        Drawable fg = ContextCompat.getDrawable(context, R.drawable.sg_icon_fg_sunset);
+        logo.setImageDrawable(new LayerDrawable(new Drawable[]{bg, fg}));
+        logo.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), view.getWidth() * 0.28f);
+            }
+        });
+        logo.setClipToOutline(true);
+        logo.setElevation(AndroidUtilities.dp(2));
+        layout.addView(logo, LayoutHelper.createLinear(68, 68, Gravity.CENTER_HORIZONTAL, 0, 2, 0, 0));
+
+        TextView title = new TextView(context);
+        title.setText(titleText);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setGravity(Gravity.CENTER);
+        title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, rp));
+        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 14, 24, 0));
+
+        TextView subtitle = new TextView(context);
+        subtitle.setText(subtitleText);
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setLineSpacing(AndroidUtilities.dp(1), 1f);
+        subtitle.setTextColor(Theme.getColor(Theme.key_dialogTextGray3, rp));
+        layout.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 4, 24, 0));
+
+        if (TextUtils.isEmpty(notes)) {
+            return;
+        }
+        TextView header = new TextView(context);
+        header.setText(LocaleController.getString(R.string.SG_WhatsNew));
+        header.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        header.setTypeface(AndroidUtilities.bold());
+        header.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueHeader, rp));
+        layout.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 22, 20, 22, 8));
+
+        ScrollView scroll = new ScrollView(context) {
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(260), MeasureSpec.AT_MOST));
+            }
+        };
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        final int text = Theme.getColor(Theme.key_dialogTextBlack, rp);
+        scroll.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16), ColorUtils.setAlphaComponent(text, Theme.isCurrentThemeDark() ? 0x12 : 0x0A)));
+        scroll.setClipToOutline(true);
+        TextView changelog = new TextView(context);
+        changelog.setText(formatNotes(notes, Theme.getColor(Theme.key_featuredStickers_addButton, rp)));
+        changelog.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        changelog.setLineSpacing(AndroidUtilities.dp(3), 1f);
+        changelog.setTextColor(text);
+        changelog.setTextIsSelectable(true);
+        changelog.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
+        scroll.addView(changelog);
+        layout.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 16, 0, 16, 0));
+    }
+
+    private static TextView textButton(Theme.ResourcesProvider rp, Context context, String text) {
+        TextView view = new TextView(context);
+        view.setText(text);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        view.setTypeface(AndroidUtilities.bold());
+        view.setGravity(Gravity.CENTER);
+        view.setSingleLine(true);
+        view.setEllipsize(TextUtils.TruncateAt.END);
+        view.setPadding(AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8), 0);
+        final int accent = Theme.getColor(Theme.key_featuredStickers_addButton, rp);
+        view.setTextColor(accent);
+        view.setBackground(Theme.createRadSelectorDrawable(ColorUtils.setAlphaComponent(accent, 0x1F), 10, 10));
+        return view;
+    }
+
+    /**
+     * Release notes as a list: lines starting with "-", "*" or "•" become bullets in the accent with a hanging
+     * indent, lines starting with "#" become bold headings.
+     */
+    static CharSequence formatNotes(String notes, int bulletColor) {
+        final SpannableStringBuilder sb = new SpannableStringBuilder();
+        final String[] lines = notes.replace("\r", "").split("\n");
+        boolean blank = false;
+        for (String raw : lines) {
+            String line = raw.trim();
+            if (line.isEmpty()) {
+                blank = sb.length() > 0; // one empty line between paragraphs, however many there were
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(blank ? "\n\n" : "\n");
+            }
+            blank = false;
+            final int start = sb.length();
+            if (line.startsWith("- ") || line.startsWith("* ") || line.startsWith("• ") || line.startsWith("— ")) {
+                sb.append(line.substring(2).trim());
+                sb.setSpan(new BulletSpan(AndroidUtilities.dp(10), bulletColor), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else if (line.startsWith("#")) {
+                while (line.startsWith("#")) {
+                    line = line.substring(1);
+                }
+                sb.append(line.trim());
+                sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                sb.append(line);
+            }
+        }
+        return sb;
+    }
+
+    /** "Solegram updated to 2.4.1" and its notes, after the update was installed. */
+    public static void showChangelog(BaseFragment fragment, String version, String changelog) {
+        if (fragment == null || fragment.getParentActivity() == null) {
+            return;
+        }
+        final Context context = fragment.getParentActivity();
+        final BottomSheet sheet = new BottomSheet(context, false, fragment.getResourceProvider());
+        sheet.fixNavigationBar();
+        com.solegram.messenger.ui.SolegramMotion.springSheet(sheet);
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(0, AndroidUtilities.dp(20), 0, AndroidUtilities.dp(16));
+        addTop(fragment.getResourceProvider(), context, layout, LocaleController.formatString(R.string.SG_UpdatedTo, version),
+            LocaleController.getString(R.string.SG_UpdatedNotesSub), changelog);
+        final com.solegram.messenger.ui.SolegramProfileLinksSheet.ActionButton ok = new com.solegram.messenger.ui.SolegramProfileLinksSheet.ActionButton(context, fragment.getResourceProvider());
+        ok.setText(LocaleController.getString(R.string.GotIt), false);
+        ok.setOnClickListener(v -> sheet.dismiss());
+        layout.addView(ok, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 20, 16, 0));
+        sheet.setCustomView(layout);
+        sheet.solegramReadingGlass(); // notes to read: the denser glass of the update sheet
+        fragment.showDialog(sheet);
+    }
+    // endregion
 
     private void onButton() {
         UpdateController uc = UpdateController.getInstance();

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram Summer launcher icon (themed set, raster layers rendered by the icon generator) -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/sg_icon_bg_summer" />
+    <foreground android:drawable="@mipmap/sg_icon_fg_summer" />
+    <monochrome android:drawable="@drawable/sg_icon_fg_mono" />
+</adaptive-icon>

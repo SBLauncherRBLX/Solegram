@@ -5,11 +5,17 @@
 
 package com.solegram.messenger;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.IDN;
+import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -22,10 +28,19 @@ import java.util.regex.Pattern;
 
 /**
  * The anti-scam rules: how risky a link or an account looks, from what is known right here, with no network.
- * A link is scored by its address (look-alike domains, brand names on other sites, hidden destinations,
- * downloads, Telegram usernames posing as support...) and by the message around it (free Premium, "your account
- * will be blocked", "send me the code"...); an account by Telegram's own marks and what its profile says.
- * Each sign adds points with a reason the user can read; the sum gives safe, caution or danger.
+ * <p>
+ * A link is judged by its address (look-alike domains, brand names on other sites, hidden destinations,
+ * downloads, Telegram usernames posing as support...), by the message around it (free Premium, "your account
+ * will be blocked", "send me the code"...) and by who sent it where ({@link Context}). Every sign has a kind:
+ * <ul>
+ * <li>hard: a disguised address (telegrarn.org, Cyrillic letters dressed as Latin ones, telegram.org@evil.top).
+ * Nothing talks these away but the user's own trust;</li>
+ * <li>medium: something to look at (a brand's name inside another site's name, a program to install);</li>
+ * <li>weak: common on honest sites too (a cheap domain ending, a short link, free hosting). These count only
+ * next to other evidence: another sign of the address, bait in the message, or a stranger who sent it.</li>
+ * </ul>
+ * Who sent the message then discounts everything but the hard signs: a contact, a long chat, a big public channel,
+ * a verified account. An account is warned about only with two independent strong signs, or Telegram's own mark.
  * Pure Java on purpose (no Android classes): the rules are tested on a desktop JVM.
  */
 public final class SolegramScamRules {
@@ -118,26 +133,43 @@ public final class SolegramScamRules {
     /** The verdict of AI (on the device or asked by the user): arg = what it said. */
     public static final int R_AI = 90;
 
+    /** Kinds of evidence: see the class comment. Text is the message's own signs. */
+    public static final int KIND_WEAK = 0, KIND_MEDIUM = 1, KIND_HARD = 2, KIND_TEXT = 3;
+
     public static final class Reason {
         public final int code;
         /** Domain, word, name... shown in the reason; may be null. */
         public final String arg;
         public final int weight;
+        /** {@link #KIND_WEAK}... for links; for accounts {@link #KIND_HARD} marks a strong sign. */
+        public final int kind;
+        /** For accounts: strong signs of one group are one piece of evidence (0 = no group). */
+        final int group;
 
         Reason(int code, String arg, int weight) {
+            this(code, arg, weight, defaultKind(code), 0);
+        }
+
+        Reason(int code, String arg, int weight, int kind, int group) {
             this.code = code;
             this.arg = arg;
             this.weight = weight;
+            this.kind = kind;
+            this.group = group;
+        }
+
+        public boolean isHard() {
+            return kind == KIND_HARD;
         }
 
         @Override
         public String toString() {
-            return code + (arg != null ? "(" + arg + ")" : "") + "+" + weight;
+            return code + (arg != null ? "(" + arg + ")" : "") + "+" + weight + "wmht".charAt(kind);
         }
     }
 
-    /** True for reasons no message context or AI may talk away (a disguised address). */
-    public static boolean isHardReason(int code) {
+    /** The usual kind of a reason (some are stronger or weaker by what exactly was found). */
+    static int defaultKind(int code) {
         switch (code) {
             case R_SCRIPT:
             case R_DATA:
@@ -148,10 +180,22 @@ public final class SolegramScamRules {
             case R_USERINFO:
             case A_SCAM:
             case A_FAKE:
-                return true;
+                return KIND_HARD;
+            case R_BRAND_IN_DOMAIN:
+            case R_BRAND_SUBDOMAIN:
+            case R_TEXT_MISMATCH:
+            case R_IP:
+            case R_FILE:
+            case R_TG_IMPERSONATION:
+                return KIND_MEDIUM;
             default:
-                return false;
+                return code >= R_TEXT_GIFT && code <= R_TEXT_URGENT ? KIND_TEXT : KIND_WEAK;
         }
+    }
+
+    /** True for reasons no message context or AI may talk away (a disguised address), as they usually are. */
+    public static boolean isHardReason(int code) {
+        return defaultKind(code) == KIND_HARD;
     }
 
     // endregion
@@ -160,8 +204,8 @@ public final class SolegramScamRules {
 
     /** {caution, danger} points for links, by sensitivity. */
     private static final int[][] LINK_THRESHOLDS = {{40, 75}, {30, 60}, {20, 50}};
-    /** The same for accounts: a stranger is shown a warning only with several signs together. */
-    private static final int[][] ACCOUNT_THRESHOLDS = {{45, 80}, {35, 65}, {25, 55}};
+    /** The same for accounts (once two strong signs are there). */
+    private static final int[][] ACCOUNT_THRESHOLDS = {{45, 80}, {35, 70}, {25, 55}};
     /** Below this a link gets no mark at all, at any sensitivity (the strict caution threshold). */
     public static final int MARK_FLOOR = 20;
 
@@ -174,19 +218,9 @@ public final class SolegramScamRules {
         return score >= t[1] ? DANGER : score >= t[0] ? CAUTION : SAFE;
     }
 
-    public static int accountLevel(int score, int sensitivity) {
-        final int[] t = ACCOUNT_THRESHOLDS[clampSensitivity(sensitivity)];
-        return score >= t[1] ? DANGER : score >= t[0] ? CAUTION : SAFE;
-    }
-
-    /** Between caution and danger: an on-device AI may raise or lower it. */
+    /** Between caution and danger: an on-device AI may take a second look (and only lower it). */
     public static boolean isBorderlineLink(int score, int sensitivity) {
         return linkLevel(score, sensitivity) == CAUTION;
-    }
-
-    public static boolean isBorderlineAccount(int score, int sensitivity) {
-        final int[] t = ACCOUNT_THRESHOLDS[clampSensitivity(sensitivity)];
-        return score >= t[0] - 15 && score < t[1];
     }
 
     // endregion
@@ -199,14 +233,19 @@ public final class SolegramScamRules {
         public String host;
         /** The host as people read it (Unicode letters instead of xn--). */
         public String displayHost;
-        /** The part of the host that names the site's owner (example.co.uk, user.github.io). */
+        /** The registrable domain: the part of the host that names the site's owner (example.co.uk, user.github.io). */
         public String site;
         /** A big, well known site (or the brand's own): the address itself raises nothing. */
         public boolean trusted;
+        /** A big site where anyone can publish (Google Forms, Telegraph...): the message around it still counts. */
+        public boolean userContent;
+        /** A short or affiliate link: where it goes is not seen. */
+        public boolean shortener;
         /** Telegram username of a t.me link (lowercase), or null. */
         public String telegramUsername;
         /** A Telegram link that is not a username (invite, sticker set...). */
         public boolean telegramService;
+        /** Sum of all the weights (the address alone in its worst light; see {@link #score(LinkReport, TextReport, Context)}). */
         public int score;
         public final ArrayList<Reason> reasons = new ArrayList<>();
         /** Ranges {start, end} in {@link #displayHost} that do the deceiving. */
@@ -217,18 +256,24 @@ public final class SolegramScamRules {
         }
 
         void add(int code, String arg, int weight) {
+            add(code, arg, weight, defaultKind(code));
+        }
+
+        void add(int code, String arg, int weight, int kind) {
             for (int i = 0; i < reasons.size(); i++) {
                 final Reason r = reasons.get(i);
                 if (r.code == code) {
-                    if (r.weight >= weight) {
+                    if (r.weight >= weight && r.kind >= kind) {
                         return;
                     }
                     score -= r.weight;
                     reasons.remove(i);
+                    weight = Math.max(weight, r.weight);
+                    kind = Math.max(kind, r.kind);
                     break;
                 }
             }
-            reasons.add(new Reason(code, arg, weight));
+            reasons.add(new Reason(code, arg, weight, kind, 0));
             score += weight;
         }
 
@@ -243,7 +288,7 @@ public final class SolegramScamRules {
 
         public boolean hasHardReason() {
             for (Reason r : reasons) {
-                if (isHardReason(r.code)) {
+                if (r.kind == KIND_HARD) {
                     return true;
                 }
             }
@@ -253,7 +298,7 @@ public final class SolegramScamRules {
         /** The reasons, the heaviest first. */
         public List<Reason> sortedReasons() {
             final ArrayList<Reason> list = new ArrayList<>(reasons);
-            java.util.Collections.sort(list, (a, b) -> b.weight - a.weight);
+            Collections.sort(list, (a, b) -> b.kind != a.kind && (a.kind == KIND_HARD || b.kind == KIND_HARD) ? b.kind - a.kind : b.weight - a.weight);
             return list;
         }
 
@@ -269,6 +314,67 @@ public final class SolegramScamRules {
         public final ArrayList<Reason> reasons = new ArrayList<>();
     }
 
+    /**
+     * Who sent a link, and where (filled by the app). The rules discount everything but a disguised address by it:
+     * friends share links all the time, strangers who write first rarely mean well.
+     */
+    public static final class Context {
+        /** No message around the link (a bio, a button, a web page): nothing to discount, nothing to add. */
+        public static final Context NONE = new Context();
+
+        /** The user sent it: never marked. */
+        public boolean outgoing;
+        /** A verified or official account sent it, a verified channel, Telegram itself. */
+        public boolean official;
+        /** A contact (or a mutual contact, or someone the user said they know) sent it. */
+        public boolean contact;
+        /** A private chat the user has been talking in. */
+        public boolean conversed;
+        /** A post of a big public channel. */
+        public boolean bigChannel;
+        /** A group or channel the user created. */
+        public boolean ownChat;
+        /** A chat the user joined long ago (or one with a long history). */
+        public boolean longHistory;
+        /** Forwarded into the user's Saved Messages: kept on purpose. */
+        public boolean savedForward;
+        /** A stranger who wrote in a private chat the user never answered in. */
+        public boolean stranger;
+        /** Someone in a group who is not a contact. */
+        public boolean unknownSender;
+
+        /** Bits for a cache key: a report made in one context is not reused in another. */
+        public int key() {
+            return (outgoing ? 1 : 0) | (official ? 2 : 0) | (contact ? 4 : 0) | (conversed ? 8 : 0) | (bigChannel ? 16 : 0)
+                | (ownChat ? 32 : 0) | (longHistory ? 64 : 0) | (savedForward ? 128 : 0) | (stranger ? 256 : 0) | (unknownSender ? 512 : 0);
+        }
+
+        /** How much of a link's soft signs is left (1 = all of it, 0 = none) when the message comes from here. */
+        float trust(boolean combination) {
+            if (official) {
+                return 0f;
+            }
+            float f = 1f;
+            if (contact) {
+                f = Math.min(f, 0.5f);
+            }
+            if (savedForward || bigChannel) {
+                f = Math.min(f, 0.5f);
+            }
+            if (conversed || ownChat) {
+                f = Math.min(f, 0.6f);
+            }
+            if (longHistory) {
+                f = Math.min(f, 0.7f);
+            }
+            // a hacked friend sends bait text with a matching link: that combination outweighs the trust
+            if (combination && f < 1f) {
+                f = Math.max(f, 0.8f);
+            }
+            return f;
+        }
+    }
+
     // endregion
 
     // region Data
@@ -280,8 +386,9 @@ public final class SolegramScamRules {
         final boolean generic;
         /** brand.<country> is the brand's too (google.de, yandex.kz). */
         final boolean anyCountry;
+        /** Registrable domains (ASCII; written Unicode ones are converted). */
         final String[] domains;
-        /** Real, unrelated names one letter away (finance for binance). */
+        /** Real, unrelated names a letter or two away (finance for binance). */
         final String[] exclude;
 
         Brand(String label, String display, boolean generic, boolean anyCountry, String[] domains, String... exclude) {
@@ -289,7 +396,10 @@ public final class SolegramScamRules {
             this.display = display;
             this.generic = generic;
             this.anyCountry = anyCountry;
-            this.domains = domains;
+            this.domains = new String[domains.length];
+            for (int i = 0; i < domains.length; i++) {
+                this.domains[i] = toAscii(domains[i]);
+            }
             this.exclude = exclude;
         }
 
@@ -312,36 +422,47 @@ public final class SolegramScamRules {
     private static final String[] STEAM_DOMAINS = d("steamcommunity.com", "steampowered.com", "steamstatic.com", "steamgames.com", "s.team",
         "valvesoftware.com", "steamdeck.com", "steamchina.com", "steamusercontent.com", "steamserver.net", "steamcontent.com", "steam-chat.com");
     private static final String[] SBER_DOMAINS = d("sberbank.ru", "sberbank.com", "sber.ru", "sberbank-ast.ru", "sberbankins.ru", "sberdevices.ru",
-        "sbermarket.ru", "sbermegamarket.ru", "megamarket.ru", "sberauto.com", "sberhealth.ru", "sbermobile.ru", "sberbank.kz");
-    private static final String[] TINKOFF_DOMAINS = d("tinkoff.ru", "tbank.ru", "tinkoff.com", "tinkoffinsurance.ru", "t-j.ru");
+        "sbermarket.ru", "sbermegamarket.ru", "megamarket.ru", "sberauto.com", "sberhealth.ru", "sbermobile.ru", "sberbank.kz", "sbrf.ru",
+        "sberinsur.ru", "sberleasing.ru", "sbercloud.ru", "sberzvuk.com", "sber.games", "sberbank.by", "sberpravo.ru", "sberclass.ru");
+    private static final String[] TINKOFF_DOMAINS = d("tinkoff.ru", "tbank.ru", "tinkoff.com", "tinkoffinsurance.ru", "t-j.ru", "tbank.com",
+        "tinkoffjournal.ru", "tinkoff-bank.ru", "tcsbank.ru");
     private static final String[] GOOGLE_DOMAINS = d("google.com", "googleapis.com", "gstatic.com", "googleusercontent.com", "googlevideo.com", "ggpht.com",
         "g.co", "withgoogle.com", "google.dev", "googleblog.com", "googlesource.com", "gmail.com", "youtube.com", "youtu.be", "android.com", "blogger.com",
-        "chrome.com", "translate.goog", "googledrive.com", "googlemail.com", "google");
+        "chrome.com", "translate.goog", "googledrive.com", "googlemail.com", "google", "goo.gl", "forms.gle", "g.page", "goo.su", "web.dev",
+        "firebase.google.com", "googletagmanager.com", "google-analytics.com", "doubleclick.net");
     private static final String[] YOUTUBE_DOMAINS = d("youtube.com", "youtu.be", "ytimg.com", "youtube-nocookie.com", "googlevideo.com", "youtubekids.com", "google.com");
     private static final String[] APPLE_DOMAINS = d("apple.com", "icloud.com", "apple.news", "mzstatic.com", "itunes.com", "me.com", "cdn-apple.com", "apple.co");
     private static final String[] META_DOMAINS = d("facebook.com", "fb.com", "fb.me", "fbcdn.net", "meta.com", "messenger.com", "fb.watch", "facebook.net");
     private static final String[] MICROSOFT_DOMAINS = d("microsoft.com", "live.com", "outlook.com", "office.com", "microsoftonline.com", "windows.com", "msn.com",
-        "office365.com", "sharepoint.com", "onedrive.com", "azure.com", "skype.com", "xbox.com", "bing.com", "microsoft365.com", "live.net", "aka.ms");
+        "office365.com", "sharepoint.com", "onedrive.com", "azure.com", "skype.com", "xbox.com", "bing.com", "microsoft365.com", "live.net", "aka.ms",
+        "asp.net", "dot.net", "visualstudio.com", "github.com");
+    private static final String[] YANDEX_DOMAINS = d("yandex.ru", "yandex.com", "ya.ru", "yandex.net", "yastatic.net", "yandex.cloud", "yandexcloud.net",
+        "yandex-team.ru", "ya.cc", "yandex.by", "yandex.kz", "yandex.uz", "dzen.ru", "kinopoisk.ru", "yadi.sk", "go.yandex", "yandex.eu", "yandex.com.tr");
+    private static final String[] VK_DOMAINS = d("vk.com", "vk.ru", "vk.me", "vk.cc", "vk.link", "vkontakte.ru", "vkvideo.ru", "userapi.com", "vk-portal.net",
+        "vkuser.net", "vk.company", "vk-cdn.net", "vk.team", "vkplay.ru", "vk.design", "mail.ru", "ok.ru");
 
     private static final Brand[] BRANDS = {
-        new Brand("telegram", "telegram.org", false, false, TELEGRAM_DOMAINS),
+        new Brand("telegram", "telegram.org", false, false, TELEGRAM_DOMAINS, "telegraf", "telegraph", "telegrams"),
         new Brand("fragment", "fragment.com", true, false, d("fragment.com")),
         new Brand("steamcommunity", "steamcommunity.com", false, false, STEAM_DOMAINS),
         new Brand("steampowered", "steampowered.com", false, false, STEAM_DOMAINS),
         new Brand("steam", "steampowered.com", true, false, STEAM_DOMAINS),
-        new Brand("gosuslugi", "gosuslugi.ru", false, false, d("gosuslugi.ru")),
+        new Brand("gosuslugi", "gosuslugi.ru", false, false, d("gosuslugi.ru", "госуслуги.рф", "gu-st.ru", "gosuslugi41.ru")),
         new Brand("sberbank", "sberbank.ru", false, false, SBER_DOMAINS),
         new Brand("sber", "sberbank.ru", false, false, SBER_DOMAINS),
         new Brand("tinkoff", "tinkoff.ru", false, false, TINKOFF_DOMAINS),
         new Brand("tbank", "tbank.ru", false, false, TINKOFF_DOMAINS),
-        new Brand("vtb", "vtb.ru", false, false, d("vtb.ru", "vtb.com", "vtb24.ru", "vtbcapital.ru", "vtb.am")),
-        new Brand("alfabank", "alfabank.ru", false, false, d("alfabank.ru", "alfabank.com", "alfabank.by", "alfabank.kz")),
-        new Brand("ozon", "ozon.ru", false, false, d("ozon.ru", "ozon.com", "ozone.ru", "ozon.travel", "ozon.kz", "ozon.by")),
+        new Brand("vtb", "vtb.ru", false, false, d("vtb.ru", "vtb.com", "vtb24.ru", "vtbcapital.ru", "vtb.am", "vtb.by", "vtbdirect.ru", "vtbreg.ru")),
+        new Brand("alfabank", "alfabank.ru", false, false, d("alfabank.ru", "alfabank.com", "alfabank.by", "alfabank.kz", "alfa-bank.ru", "alfa-bank.kz", "alfadirect.ru")),
+        new Brand("ozon", "ozon.ru", false, false, d("ozon.ru", "ozon.com", "ozone.ru", "ozon.travel", "ozon.kz", "ozon.by", "ozonbank.ru", "ozon.tech")),
         new Brand("wildberries", "wildberries.ru", false, false, d("wildberries.ru", "wb.ru", "wildberries.by", "wildberries.kz", "wildberries.am",
-            "wildberries.uz", "wbstatic.net", "wbbasket.ru", "wildberries.ge", "wildberries.kg", "wb-bank.ru", "wildberries.com")),
-        new Brand("avito", "avito.ru", false, false, d("avito.ru", "avito.st", "avito.com")),
-        new Brand("yandex", "yandex.ru", false, true, d("yandex.ru", "yandex.com", "ya.ru", "yandex.net", "yastatic.net", "yandex.cloud", "yandexcloud.net", "yandex-team.ru")),
-        new Brand("vk", "vk.com", false, false, d("vk.com", "vk.ru", "vk.me", "vkontakte.ru", "vkvideo.ru", "userapi.com", "vk-portal.net", "vkuser.net", "vk.company", "vk-cdn.net")),
+            "wildberries.uz", "wbstatic.net", "wbbasket.ru", "wildberries.ge", "wildberries.kg", "wb-bank.ru", "wildberries.com", "wbcon.ru")),
+        new Brand("avito", "avito.ru", false, false, d("avito.ru", "avito.st", "avito.com", "avito.tech")),
+        new Brand("youla", "youla.ru", false, false, d("youla.ru", "youla.io")),
+        new Brand("cdek", "cdek.ru", false, false, d("cdek.ru", "cdek.shopping", "cdek.market", "cdek.kz", "cdek.by")),
+        new Brand("yandex", "yandex.ru", false, true, YANDEX_DOMAINS),
+        new Brand("vk", "vk.com", false, false, VK_DOMAINS),
+        new Brand("vkontakte", "vk.com", false, false, VK_DOMAINS),
         new Brand("google", "google.com", false, true, GOOGLE_DOMAINS),
         new Brand("gmail", "gmail.com", false, false, GOOGLE_DOMAINS),
         new Brand("youtube", "youtube.com", false, false, YOUTUBE_DOMAINS),
@@ -355,14 +476,14 @@ public final class SolegramScamRules {
         new Brand("tonkeeper", "tonkeeper.com", false, false, d("tonkeeper.com")),
         new Brand("wallet", "wallet.tg", true, false, d("wallet.tg")),
         new Brand("roblox", "roblox.com", false, false, d("roblox.com", "rbxcdn.com")),
-        new Brand("discord", "discord.com", false, false, d("discord.com", "discord.gg", "discordapp.com", "discordapp.net", "discord.media", "discordstatus.com", "discord.co", "dis.gd")),
+        new Brand("discord", "discord.com", false, false, d("discord.com", "discord.gg", "discordapp.com", "discordapp.net", "discord.media", "discordstatus.com", "discord.co", "dis.gd"), "discogs"),
         new Brand("instagram", "instagram.com", false, false, d("instagram.com", "cdninstagram.com", "instagr.am", "ig.me")),
         new Brand("tiktok", "tiktok.com", false, false, d("tiktok.com", "tiktokcdn.com", "tiktokv.com", "tiktokcdn-us.com")),
         new Brand("facebook", "facebook.com", false, false, META_DOMAINS),
         new Brand("whatsapp", "whatsapp.com", false, false, d("whatsapp.com", "wa.me", "whatsapp.net")),
         new Brand("microsoft", "microsoft.com", false, false, MICROSOFT_DOMAINS),
         new Brand("outlook", "outlook.com", false, false, MICROSOFT_DOMAINS),
-        new Brand("amazon", "amazon.com", false, true, d("amazon.com", "amazonaws.com", "a.co", "amzn.to", "media-amazon.com", "ssl-images-amazon.com", "amazon.co.uk", "amazon.co.jp", "amazon.com.br")),
+        new Brand("amazon", "amazon.com", false, true, d("amazon.com", "a.co", "amzn.to", "media-amazon.com", "ssl-images-amazon.com", "amazon.co.uk", "amazon.co.jp", "amazon.com.br")),
         new Brand("netflix", "netflix.com", false, false, d("netflix.com", "nflxext.com", "nflximg.net", "nflxvideo.net", "netflix.net")),
         new Brand("spotify", "spotify.com", false, false, d("spotify.com", "spotify.link", "scdn.co", "spoti.fi")),
         new Brand("coinbase", "coinbase.com", false, false, d("coinbase.com")),
@@ -370,17 +491,34 @@ public final class SolegramScamRules {
         new Brand("kucoin", "kucoin.com", false, false, d("kucoin.com")),
         new Brand("okx", "okx.com", false, false, d("okx.com")),
         new Brand("epicgames", "epicgames.com", false, false, d("epicgames.com", "unrealengine.com", "fortnite.com")),
-        new Brand("faceit", "faceit.com", false, false, d("faceit.com")),
+        new Brand("faceit", "faceit.com", false, false, d("faceit.com"), "facet"),
         new Brand("github", "github.com", false, false, d("github.com", "githubusercontent.com", "github.dev", "githubassets.com", "github.blog")),
-        new Brand("twitter", "x.com", false, false, d("twitter.com", "x.com", "t.co", "twimg.com")),
+        new Brand("twitter", "x.com", false, false, d("twitter.com", "x.com", "t.co", "twimg.com"), "twister"),
         new Brand("linkedin", "linkedin.com", false, false, d("linkedin.com", "lnkd.in")),
         new Brand("aliexpress", "aliexpress.com", false, false, d("aliexpress.com", "aliexpress.ru", "alicdn.com", "aliexpress.us")),
         new Brand("gazprombank", "gazprombank.ru", false, false, d("gazprombank.ru", "gpb.ru")),
         new Brand("pochtabank", "pochtabank.ru", false, false, d("pochtabank.ru")),
         new Brand("yoomoney", "yoomoney.ru", false, false, d("yoomoney.ru")),
-        new Brand("megafon", "megafon.ru", false, false, d("megafon.ru")),
+        new Brand("megafon", "megafon.ru", false, false, d("megafon.ru"), "megaton"),
         new Brand("kaspi", "kaspi.kz", false, false, d("kaspi.kz")),
+        new Brand("nalog", "nalog.gov.ru", true, false, d("nalog.gov.ru", "nalog.ru")),
     };
+
+    /** Brand names as people write them in Cyrillic domains (госуслуги.online): label -> the brand's Latin label. */
+    private static final Map<String, String> CYRILLIC_BRANDS = new HashMap<>();
+
+    static {
+        final String[][] pairs = {
+            {"госуслуги", "gosuslugi"}, {"госуслуга", "gosuslugi"}, {"сбербанк", "sberbank"}, {"сбер", "sber"}, {"тинькофф", "tinkoff"},
+            {"тинькоф", "tinkoff"}, {"тбанк", "tbank"}, {"втб", "vtb"}, {"альфабанк", "alfabank"}, {"озон", "ozon"}, {"вайлдберриз", "wildberries"},
+            {"валберис", "wildberries"}, {"вб", "wildberries"}, {"авито", "avito"}, {"юла", "youla"}, {"сдэк", "cdek"}, {"яндекс", "yandex"},
+            {"вконтакте", "vkontakte"}, {"вк", "vk"}, {"телеграм", "telegram"}, {"телеграмм", "telegram"}, {"гугл", "google"}, {"ютуб", "youtube"},
+            {"стим", "steam"}, {"бинанс", "binance"}, {"госуслугирф", "gosuslugi"}
+        };
+        for (String[] p : pairs) {
+            CYRILLIC_BRANDS.put(p[0], p[1]);
+        }
+    }
 
     /** {@link #canon} of each brand's name and of its site's name, in the order of {@link #BRANDS}. */
     private static final String[] BRAND_CANON = new String[BRANDS.length];
@@ -393,49 +531,27 @@ public final class SolegramScamRules {
         }
     }
 
-    /** Big, well known sites (as {@link LinkReport#site}): any page there is the site's own. */
-    private static final Set<String> TRUSTED = new HashSet<>(Arrays.asList(
-        "wikipedia.org", "wikimedia.org", "wiktionary.org", "reddit.com", "redd.it", "medium.com", "stackoverflow.com", "stackexchange.com",
-        "habr.com", "vc.ru", "pikabu.ru", "rbc.ru", "ria.ru", "lenta.ru", "kommersant.ru", "meduza.io", "tass.ru", "interfax.ru", "rt.com",
-        "bbc.com", "bbc.co.uk", "cnn.com", "nytimes.com", "theguardian.com", "reuters.com", "bloomberg.com", "forbes.com", "forbes.ru",
-        "yahoo.com", "duckduckgo.com", "zoom.us", "dropbox.com", "notion.so", "notion.site", "figma.com", "canva.com", "cloudflare.com",
-        "soundcloud.com", "twitch.tv", "kick.com", "pinterest.com", "gitlab.com", "bitbucket.org", "npmjs.com", "pypi.org", "docker.com",
-        "kaggle.com", "openai.com", "chatgpt.com", "anthropic.com", "claude.ai", "deepl.com", "ebay.com", "etsy.com", "booking.com",
-        "airbnb.com", "tripadvisor.com", "imdb.com", "steamdb.info", "gog.com", "ea.com", "ubisoft.com", "playstation.com", "nintendo.com",
-        "riotgames.com", "leagueoflegends.com", "blizzard.com", "battle.net", "minecraft.net", "mojang.com", "bitcoin.org", "ethereum.org",
-        "mail.ru", "ok.ru", "dzen.ru", "rutube.ru", "kinopoisk.ru", "2gis.ru", "hh.ru", "cian.ru", "drom.ru", "auto.ru", "lamoda.ru",
-        "dns-shop.ru", "mvideo.ru", "eldorado.ru", "citilink.ru", "rzd.ru", "aeroflot.ru", "tutu.ru", "mos.ru", "pochta.ru", "nalog.gov.ru",
-        "kremlin.ru", "government.ru", "cbr.ru", "mts.ru", "mtsbank.ru", "beeline.ru", "tele2.ru", "t2.ru", "rt.ru", "rostelecom.ru",
-        "domclick.ru", "raiffeisen.ru", "psbank.ru", "rshb.ru", "open.ru", "sovcombank.ru", "otpbank.ru", "rosbank.ru", "qiwi.com",
-        "ton.org", "ton.app", "tonviewer.com", "tonscan.org", "tonapi.io", "getgems.io", "ston.fi", "dedust.io", "coinmarketcap.com",
-        "coingecko.com", "etherscan.io", "opensea.io", "uniswap.org", "ledger.com", "trezor.io", "phantom.app", "blockchain.com",
-        "kraken.com", "htx.com", "huobi.com", "bitget.com", "gate.io", "mexc.com", "archive.org", "substack.com", "patreon.com",
-        "boosty.to", "donationalerts.com", "yookassa.ru", "tilda.cc", "vkvideo.ru", "max.ru", "gosuslugi.ru", "wikia.com", "fandom.com",
-        "quora.com", "tumblr.com", "vimeo.com", "dailymotion.com", "imgur.com", "giphy.com", "tenor.com", "deviantart.com", "behance.net",
-        "dribbble.com", "unsplash.com", "shutterstock.com", "adobe.com", "mozilla.org", "firefox.com", "opera.com", "brave.com",
-        "samsung.com", "xiaomi.com", "mi.com", "huawei.com", "oneplus.com", "sony.com", "lg.com", "nvidia.com", "amd.com", "intel.com",
-        "jetbrains.com", "android.com", "kotlinlang.org", "python.org", "oracle.com", "ibm.com", "salesforce.com", "slack.com",
-        "trello.com", "atlassian.com", "zoom.com", "webex.com", "teams.microsoft.com", "proton.me", "protonmail.com", "tutanota.com",
-        "kaspersky.ru", "kaspersky.com", "drweb.ru", "virustotal.com", "f-droid.org", "apkmirror.com", "4pda.to", "rustore.ru",
-        "lnk.to", "linktr.ee", "taplink.cc", "music.yandex.ru", "zvuk.com", "deezer.com", "tidal.com", "last.fm", "genius.com",
-        "shazam.com", "ivi.ru", "okko.tv", "start.ru", "wink.ru", "premier.one", "kion.ru", "sports.ru", "championat.com", "championat.ru",
-        "rambler.ru", "gazeta.ru", "iz.ru", "rg.ru", "mk.ru", "kp.ru", "aif.ru", "fontanka.ru", "e1.ru", "ngs.ru", "sostav.ru", "tproger.ru",
-        "itch.io", "epicgames.com", "humblebundle.com", "chess.com", "lichess.org", "duolingo.com", "coursera.org", "udemy.com",
-        "stepik.org", "skillbox.ru", "netology.ru", "practicum.yandex.ru", "khanacademy.org", "ted.com", "spotify.com", "music.apple.com",
-        "apps.apple.com", "play.google.com", "telegram.org", "t.me", "wallet.tg", "tribute.tg", "tgstat.ru", "tgstat.com", "combot.org",
-        "x.com", "threads.net", "threads.com", "bsky.app", "mastodon.social", "snapchat.com", "wechat.com", "line.me", "viber.com",
-        "signal.org", "element.io", "matrix.org", "temu.com", "shein.com", "aliexpress.ru", "joom.com", "market.yandex.ru", "megamarket.ru",
-        "detmir.ru", "sportmaster.ru", "leroymerlin.ru", "lemanapro.ru", "ikea.com", "hoff.ru", "vkusvill.ru", "perekrestok.ru", "magnit.ru",
-        "5ka.ru", "samokat.ru", "kuper.ru", "delivery-club.ru", "eda.yandex.ru", "go.yandex", "taxi.yandex.ru", "uber.com", "bolt.eu"
+    /** Hosts of big sites where anyone can publish a page or a form: trusted as sites, but their content is not. */
+    private static final Set<String> USER_CONTENT = new HashSet<>(Arrays.asList(
+        "docs.google.com", "forms.gle", "sites.google.com", "drive.google.com", "googleusercontent.com", "telegra.ph", "graph.org",
+        "teletype.in", "forms.yandex.ru", "disk.yandex.ru", "yadi.sk", "cloud.mail.ru", "dropbox.com", "notion.so", "medium.com",
+        "dzen.ru", "pastebin.com", "linktr.ee", "taplink.cc", "tilda.cc", "vk.com", "web.archive.org"
     ));
 
     /** Short-link services: the real destination is hidden. */
     private static final Set<String> SHORTENERS = new HashSet<>(Arrays.asList(
-        "bit.ly", "bitly.com", "clck.ru", "tinyurl.com", "cutt.ly", "goo.gl", "is.gd", "v.gd", "ow.ly", "buff.ly", "rebrand.ly",
-        "shorturl.at", "tiny.cc", "rb.gy", "bl.ink", "s.id", "t.ly", "short.io", "vk.cc", "u.to", "qps.ru", "surl.li", "gg.gg",
-        "adf.ly", "sh.st", "ouo.io", "bc.vc", "kutt.it", "ya.cc", "x.gd", "bit.do", "shorturl.asia", "tny.im", "inlnk.ru", "clc.to",
+        "bit.ly", "bitly.com", "clck.ru", "tinyurl.com", "cutt.ly", "is.gd", "v.gd", "ow.ly", "buff.ly", "rebrand.ly",
+        "shorturl.at", "tiny.cc", "rb.gy", "bl.ink", "s.id", "t.ly", "short.io", "u.to", "qps.ru", "surl.li", "gg.gg",
+        "adf.ly", "sh.st", "ouo.io", "bc.vc", "kutt.it", "x.gd", "bit.do", "shorturl.asia", "tny.im", "inlnk.ru", "clc.to",
         "cli.re", "l.wl.co", "urlz.fr", "shrtco.de", "t2m.io", "short.gy", "rotf.lol", "tinu.be", "hyperurl.co", "bitly.ws", "trib.al",
-        "lnkd.at", "1url.cz", "2.gp", "ux.nu", "zpr.io", "linkd.in", "link.ru", "kortlink.dk", "go.link"
+        "lnkd.at", "1url.cz", "2.gp", "ux.nu", "zpr.io", "linkd.in", "link.ru", "kortlink.dk", "go.link", "vk.cc", "ya.cc", "goo.su",
+        "amzn.to", "spoti.fi", "t.co", "lnkd.in", "dis.gd"
+    ));
+
+    /** Affiliate redirects of deal channels (they go to the shop they name). */
+    private static final Set<String> AFFILIATE = new HashSet<>(Arrays.asList(
+        "alii.pub", "ali.click", "aliclick.shop", "ali.ski", "fas.st", "kpwfp.com", "alitems.com", "alitems.site", "admitad.com", "lenkmio.com",
+        "got.by", "rcpt.pub", "pxl.leads.su", "leads.su", "cityads.com", "epn.bz", "lmes.ru", "kas.st"
     ));
 
     /** Free hosting and site builders, as public suffixes: user.vercel.app is the user's site, not Vercel's. */
@@ -447,16 +563,32 @@ public final class SolegramScamRules {
         "wordpress.com", "ucoz.ru", "ucoz.net", "narod.ru", "nethouse.ru", "tb.ru", "mya5.ru", "jimdosite.com", "godaddysites.com",
         "myshopify.com", "lovable.app", "bolt.host", "fly.dev", "railway.app", "deno.dev", "codesandbox.io", "stackblitz.io", "ipfs.io",
         "dweb.link", "on.fleek.co", "hpage.com", "free.fr", "altervista.org", "mybluehost.me", "page.link", "typedream.app",
-        "hashnode.dev", "readthedocs.io", "gitbook.io", "notion.site"
+        "hashnode.dev", "readthedocs.io", "gitbook.io", "notion.site", "s3.amazonaws.com", "amazonaws.com", "bandcamp.com", "itch.io",
+        "taplink.ws", "mssg.me", "ru.net", "ru.com"
     ));
 
-    /** Two-part public suffixes (example.co.uk): the owner's name is the label before them. */
+    /**
+     * A compact part of the public suffix list: endings under which every name is someone else's site
+     * (example.co.uk, shop.msk.ru). With {@link #FREE_HOSTING} it gives the registrable domain (eTLD+1).
+     */
     private static final Set<String> MULTI_SUFFIXES = new HashSet<>(Arrays.asList(
-        "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "com.au", "net.au", "org.au", "co.jp", "ne.jp", "or.jp", "com.br", "com.tr",
-        "co.in", "com.cn", "com.hk", "com.tw", "com.sg", "co.kr", "co.il", "co.nz", "co.za", "com.mx", "com.ar", "com.ua", "kiev.ua",
-        "org.ua", "net.ua", "pp.ua", "in.ua", "com.ru", "net.ru", "org.ru", "pp.ru", "msk.ru", "spb.ru", "gov.ru", "edu.ru", "com.kz",
-        "org.kz", "gov.kz", "com.by", "gov.by", "com.pl", "com.es", "com.de", "co.de", "com.pk", "com.ng", "com.eg", "com.sa", "com.vn",
-        "com.ph", "com.my", "co.id", "co.th", "com.co", "com.pe", "com.uy", "com.ec", "com.ve"
+        "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "ltd.uk", "plc.uk", "nhs.uk", "com.au", "net.au", "org.au", "edu.au", "gov.au",
+        "co.jp", "ne.jp", "or.jp", "ac.jp", "go.jp", "com.br", "com.tr", "co.in", "com.cn", "edu.cn", "gov.cn", "com.hk", "com.tw", "com.sg",
+        "co.kr", "ac.kr", "go.kr", "co.il", "co.nz", "co.za", "com.mx", "com.ar", "com.ua", "kiev.ua", "org.ua", "net.ua", "pp.ua", "in.ua",
+        "gov.ua", "com.ru", "net.ru", "org.ru", "pp.ru", "gov.ru", "edu.ru", "ac.ru", "int.ru", "mil.ru", "com.kz", "org.kz", "gov.kz",
+        "edu.kz", "com.by", "gov.by", "com.pl", "com.es", "com.de", "co.de", "com.pk", "com.ng", "com.eg", "com.sa", "com.vn", "com.ph",
+        "com.my", "co.id", "co.th", "com.co", "com.pe", "com.uy", "com.ec", "com.ve", "gov.uz", "com.uz", "spb.su", "msk.su", "gc.ca",
+        "gouv.fr", "europa.eu",
+        // Russian city and region names (RU-CENTER's geographic domains)
+        "msk.ru", "spb.ru", "nov.ru", "nnov.ru", "nsk.ru", "novosibirsk.ru", "e-burg.ru", "yekaterinburg.ru", "kazan.ru", "samara.ru",
+        "perm.ru", "omsk.ru", "chel.ru", "chelyabinsk.ru", "ufa.ru", "rnd.ru", "krasnoyarsk.ru", "voronezh.ru", "vrn.ru", "volgograd.ru",
+        "saratov.ru", "tyumen.ru", "tomsk.ru", "tom.ru", "irkutsk.ru", "khabarovsk.ru", "khv.ru", "vladivostok.ru", "kaluga.ru", "tula.ru",
+        "tver.ru", "ryazan.ru", "lipetsk.ru", "kursk.ru", "penza.ru", "kirov.ru", "izhevsk.ru", "udm.ru", "orenburg.ru", "murmansk.ru",
+        "karelia.ru", "komi.ru", "yakutia.ru", "kuban.ru", "stavropol.ru", "stv.ru", "dagestan.ru", "tatarstan.ru", "bashkiria.ru",
+        "chuvashia.ru", "mordovia.ru", "vladimir.ru", "ivanovo.ru", "kostroma.ru", "yaroslavl.ru", "jar.ru", "smolensk.ru", "bryansk.ru",
+        "belgorod.ru", "tambov.ru", "kurgan.ru", "magadan.ru", "sakhalin.ru", "kamchatka.ru", "amur.ru", "chita.ru", "buryatia.ru",
+        "khakassia.ru", "altai.ru", "kemerovo.ru", "surgut.ru", "yamal.ru", "vologda.ru", "arkhangelsk.ru", "astrakhan.ru", "koenig.ru",
+        "simbirsk.ru", "mari-el.ru", "kchr.ru", "nalchik.ru", "vladikavkaz.ru", "grozny.ru", "adygeya.ru", "tsk.ru", "ptz.ru", "cbg.ru"
     ));
 
     /** Country endings a brand with {@link Brand#anyCountry} may use (google.de, yandex.kz). */
@@ -465,7 +597,7 @@ public final class SolegramScamRules {
         "dk", "cz", "sk", "pt", "gr", "tr", "il", "in", "jp", "cn", "kr", "br", "ar", "mx", "ca", "au", "nz", "ie", "ro", "hu", "bg", "rs",
         "ee", "lv", "lt", "si", "hr", "ae", "sa", "eg", "za", "sg", "hk", "tw", "th", "vn", "id", "my", "ph", "pk", "cl", "co", "pe",
         "co.uk", "com.au", "com.br", "com.tr", "co.jp", "co.in", "com.mx", "com.ar", "co.kr", "com.ua", "co.il", "co.nz", "co.za",
-        "com.sg", "com.hk", "com.tw", "com.kz", "com.by", "com.cn", "com.pl", "com.vn", "co.id", "co.th"
+        "com.sg", "com.hk", "com.tw", "com.kz", "com.by", "com.cn", "com.pl", "com.vn", "co.id", "co.th", "eu"
     ));
 
     /** Endings mostly bought for throwaway sites (+20) and ones that only add to other signs (+10). */
@@ -477,7 +609,14 @@ public final class SolegramScamRules {
     ));
     private static final Set<String> SOFT_RISKY_TLDS = new HashSet<>(Arrays.asList(
         "online", "site", "website", "space", "fun", "shop", "store", "live", "link", "life", "world", "today", "club", "vip", "biz",
-        "cc", "ws", "su", "info", "support", "help", "host", "press", "digital", "network", "center", "app", "services", "sbs", "one", "pro"
+        "cc", "ws", "su", "info", "support", "help", "host", "press", "digital", "network", "center", "app", "services", "one", "pro"
+    ));
+
+    /** Endings a text can show as a site without a scheme (README.md and Node.js are names, not sites). */
+    private static final Set<String> WEB_TLDS = new HashSet<>(Arrays.asList(
+        "com", "ru", "org", "net", "xn--p1ai", "su", "io", "me", "info", "by", "kz", "ua", "uk", "de", "fr", "eu", "us", "app", "dev", "tv",
+        "gg", "co", "ai", "xyz", "top", "online", "site", "store", "shop", "pro", "biz", "link", "live", "club", "ws", "tech", "uz",
+        "am", "ge", "tg", "ph", "fm", "to", "ly", "gl", "gov", "edu", "click", "icu", "cfd", "sbs", "help", "support", "website", "space", "fun"
     ));
 
     /** Words in an address that bait (combined with a brand they say "fake login page"). */
@@ -486,7 +625,13 @@ public final class SolegramScamRules {
         "premium", "gift", "gifts", "free", "bonus", "promo", "prize", "reward", "claim", "airdrop", "giveaway", "nft", "stars", "wallet",
         "unlock", "recovery", "restore", "confirm", "official", "billing", "payment", "payout", "refund", "vote", "voting", "golos",
         "golosovanie", "konkurs", "podarok", "besplatno", "unban", "appeal", "drop", "x2", "double", "invest", "lottery", "lotto", "win",
-        "winner", "compensation", "kompensaciya", "vyplata", "viplata", "trade", "skins", "case"
+        "winner", "compensation", "kompensaciya", "vyplata", "vyplaty", "vyplat", "viplata", "trade", "skins", "case", "dostavka",
+        "oplata", "sdelka", "bezopasnaya", "lk", "cabinet", "kabinet"
+    };
+    /** The same in Cyrillic domains. */
+    private static final String[] LURE_WORDS_CYRILLIC = {
+        "подарок", "подарки", "бесплатно", "выплата", "выплаты", "компенсация", "розыгрыш", "премиум", "вход", "голосование", "конкурс",
+        "бонус", "приз", "доставка", "оплата"
     };
 
     /** Programs that install themselves, by risk. */
@@ -503,26 +648,30 @@ public final class SolegramScamRules {
 
     /** Official Telegram accounts and big official bots: their usernames sound like what scammers use. */
     private static final Set<String> OFFICIAL_USERNAMES = new HashSet<>(Arrays.asList(
-        "telegram", "durov", "botfather", "premium", "premiumbot", "spambot", "notoscam", "stickers", "gif", "vid", "pic", "bing",
-        "wiki", "imdb", "bold", "youtube", "wallet", "cryptobot", "send", "tips", "telegramtips", "contest", "previews", "designers",
+        "telegram", "durov", "durov_russia", "botfather", "premium", "premiumbot", "spambot", "notoscam", "stickers", "gif", "vid", "pic",
+        "bing", "wiki", "imdb", "bold", "youtube", "wallet", "cryptobot", "send", "tips", "telegramtips", "contest", "previews", "designers",
         "botsupport", "botnews", "bottalk", "gamee", "gamebot", "tondev", "toncoin", "ton", "username", "telegramru", "tginfo",
         "jobsbot", "stars", "storiesbot", "verifybot", "telegramarabic", "telegramfrance", "telegrames", "telegramit", "telegramde",
         "tgbetachat", "tgbeta", "durovschat", "fragment", "giftcode", "asmico", "webappbot", "quizbot", "pollbot", "livebot", "like",
-        "vote", "music", "foursquare", "telegraph", "gmailbot", "ifttt", "githubbot", "dropboxbot", "tonkeeper", "tonkeeper_bot"
+        "vote", "music", "foursquare", "telegraph", "gmailbot", "ifttt", "githubbot", "dropboxbot", "tonkeeper", "tonkeeper_bot",
+        "tonkeeper_news", "tonblockchain", "toncoin_rus", "wallet_news", "cryptobotrussian", "telegramdesktop", "android_beta", "tgandroid",
+        "ios_beta", "ru_telegram", "telegram_ru", "username_bot", "premiumbot", "storiesbot", "dropsbot", "giftsbot", "giftchanges"
     ));
 
     /** t.me paths that are not usernames: invites, sticker sets, previews, proxies... */
     private static final Set<String> TELEGRAM_SERVICE_PATHS = new HashSet<>(Arrays.asList(
         "joinchat", "addstickers", "addemoji", "addlist", "addtheme", "setlanguage", "proxy", "socks", "share", "iv", "c", "s",
         "login", "confirmphone", "bg", "invoice", "contact", "boost", "giftcode", "nft", "m", "premium_offer", "stars_topup",
-        "stars", "phone", "story", "a"
+        "stars", "phone", "story", "a", "k", "z", "web"
     ));
 
-    /** Words of a username that promise something or pose as someone: alone they already raise a link. */
+    /** Words of a username that promise something or pose as someone. */
     private static final String[] TG_STRONG_WORDS = {
-        "official", "unban", "verify", "verification", "recovery", "premium", "gift", "gifts", "stars", "nft", "airdrop", "giveaway",
-        "podarok", "podarki", "freestars", "freepremium", "razdacha"
+        "official", "unban", "verify", "verification", "recovery", "airdrop", "giveaway", "podarok", "podarki", "freestars",
+        "freepremium", "free_stars", "free_premium", "razdacha", "claim", "vyplat", "kompensac", "unfreeze", "razblok"
     };
+    /** What scammers promise, but also what honest gift and NFT markets are named after: little alone. */
+    private static final String[] TG_TOPIC_WORDS = {"premium", "gift", "stars", "star", "nft"};
     /** Words businesses use too (shop_support): they count only next to a brand or other signs. */
     private static final String[] TG_MEDIUM_WORDS = {
         "support", "admin", "administrator", "moderator", "security", "secure", "help", "helpdesk", "service", "staff", "team",
@@ -534,13 +683,107 @@ public final class SolegramScamRules {
     /** Other brands scammers pose as. */
     private static final String[] TG_BRAND_WORDS = {
         "tonkeeper", "wallet", "sber", "sberbank", "tinkoff", "tbank", "gosuslugi", "binance", "bybit", "steam", "wildberries", "ozon",
-        "avito", "vtb", "alfabank", "yandex", "metamask", "trustwallet", "okx"
+        "avito", "vtb", "alfabank", "yandex", "metamask", "trustwallet", "okx", "cdek", "youla"
     };
 
     // endregion
 
     private SolegramScamRules() {
     }
+
+    // region Safe domains
+
+    /** Where the list of well known sites comes from (an asset in the app, a file in tests). */
+    public interface Source {
+        InputStream open() throws IOException;
+    }
+
+    /** A few sites that must stay trusted even when the list could not be read. */
+    private static final Set<String> TRUSTED_CORE = new HashSet<>(Arrays.asList(
+        "wikipedia.org", "telegram.org", "t.me", "gosuslugi.ru", "mos.ru", "github.com", "stackoverflow.com", "habr.com", "ya.ru"
+    ));
+
+    private static volatile Source safeSource;
+    private static volatile Set<String> safeDomains;
+    private static final Object safeLock = new Object();
+
+    /** Sets where the list is read from; it is read once, the first time a link is checked. */
+    public static void setSafeDomainSource(Source source) {
+        synchronized (safeLock) {
+            safeSource = source;
+            safeDomains = null;
+        }
+    }
+
+    private static Set<String> safeDomains() {
+        Set<String> set = safeDomains;
+        if (set != null) {
+            return set;
+        }
+        synchronized (safeLock) {
+            if (safeDomains == null) {
+                final HashSet<String> loaded = new HashSet<>(1024);
+                final Source source = safeSource;
+                if (source != null) {
+                    try (InputStream in = source.open(); BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            line = line.trim();
+                            if (line.isEmpty() || line.startsWith("#")) {
+                                continue;
+                            }
+                            final boolean zone = line.startsWith(".");
+                            final String ascii = toAscii(zone ? line.substring(1) : line);
+                            loaded.add(zone ? "." + ascii : ascii);
+                        }
+                    } catch (Throwable ignore) {
+                        // the brands and the core list still work
+                    }
+                }
+                safeDomains = loaded;
+            }
+            return safeDomains;
+        }
+    }
+
+    /** The user's own list of sites to trust (as {@link LinkReport#site} or a host). Set by the app. */
+    private static volatile Set<String> userTrusted = new HashSet<>();
+    /** Telegram usernames the user said are fine (lowercase, no @). */
+    private static volatile Set<String> userTrustedUsernames = new HashSet<>();
+
+    public static void setUserTrusted(Set<String> sites) {
+        userTrusted = sites == null ? new HashSet<>() : sites;
+    }
+
+    public static void setUserTrustedUsernames(Set<String> usernames) {
+        userTrustedUsernames = usernames == null ? new HashSet<>() : usernames;
+    }
+
+    public static boolean isTrustedSite(String site) {
+        return site != null && (TRUSTED_CORE.contains(site) || userTrusted.contains(site) || safeDomains().contains(site));
+    }
+
+    /** A host of a well known site: by its registrable domain, the host itself or a parent, or a trusted zone (.gov.ru). */
+    static boolean isTrustedHost(String host, String site) {
+        if (isTrustedSite(site) || host == null) {
+            return site != null && isTrustedSite(site);
+        }
+        final Set<String> safe = safeDomains();
+        final Set<String> user = userTrusted;
+        String h = host;
+        while (true) {
+            if (safe.contains(h) || user.contains(h) || safe.contains("." + h)) {
+                return true;
+            }
+            final int dot = h.indexOf('.');
+            if (dot < 0) {
+                return false;
+            }
+            h = h.substring(dot + 1);
+        }
+    }
+
+    // endregion
 
     // region Links
 
@@ -567,7 +810,7 @@ public final class SolegramScamRules {
         }
         if (lower.startsWith("tg:") || lower.startsWith("tg://")) {
             // tg://resolve?domain=name is a username link like t.me/name
-            final Matcher m = Pattern.compile("[?&]domain=([a-zA-Z0-9_]{3,64})").matcher(u);
+            final Matcher m = TG_DOMAIN.matcher(u);
             if (lower.startsWith("tg://resolve") && m.find()) {
                 r.host = "t.me";
                 r.displayHost = "t.me";
@@ -603,14 +846,18 @@ public final class SolegramScamRules {
             final String userInfo = authority.substring(0, at);
             authority = authority.substring(at + 1);
             // "https://telegram.org@evil.top": what is read first is not where the link goes
-            r.add(R_USERINFO, userInfo, userInfo.contains(".") ? 55 : 45);
+            if (userInfo.contains(".")) {
+                r.add(R_USERINFO, userInfo, 55, KIND_HARD);
+            } else {
+                r.add(R_USERINFO, userInfo, 30, KIND_MEDIUM); // user:password@ of a developer's link
+            }
         }
         String host = authority;
         if (host.startsWith("[")) {
             r.host = host.toLowerCase(Locale.ROOT);
             r.displayHost = r.host;
             r.site = r.host;
-            r.add(R_IP, r.host, 40);
+            r.add(R_IP, r.host, 35);
             return r;
         }
         final int colon = host.lastIndexOf(':');
@@ -618,7 +865,7 @@ public final class SolegramScamRules {
             final String port = host.substring(colon + 1);
             host = host.substring(0, colon);
             if (!port.isEmpty() && !port.equals("80") && !port.equals("443")) {
-                r.add(R_PORT, port, 10);
+                r.add(R_PORT, port, 10, KIND_WEAK);
             }
         }
         host = host.replace('。', '.').replace('．', '.').replace('｡', '.');
@@ -628,12 +875,7 @@ public final class SolegramScamRules {
         if (host.isEmpty()) {
             return r;
         }
-        String ascii;
-        try {
-            ascii = IDN.toASCII(host, IDN.ALLOW_UNASSIGNED).toLowerCase(Locale.ROOT);
-        } catch (Exception e) {
-            ascii = host.toLowerCase(Locale.ROOT);
-        }
+        final String ascii = toAscii(host);
         String unicode;
         try {
             unicode = IDN.toUnicode(ascii, IDN.ALLOW_UNASSIGNED);
@@ -645,31 +887,29 @@ public final class SolegramScamRules {
 
         if (isIpAddress(ascii)) {
             r.site = ascii;
-            r.add(R_IP, ascii, isPrivateIp(ascii) ? 10 : 40);
+            if (isPrivateIp(ascii)) {
+                r.add(R_IP, ascii, 10, KIND_WEAK); // the home router
+            } else {
+                r.add(R_IP, ascii, 35, KIND_MEDIUM);
+            }
             addFile(r, pathAndQuery, false);
             return r;
         }
 
         final String[] labels = ascii.split("\\.");
         final int siteLabels = siteLabelCount(labels);
-        final StringBuilder siteBuilder = new StringBuilder();
-        for (int i = Math.max(0, labels.length - siteLabels); i < labels.length; i++) {
-            if (siteBuilder.length() > 0) {
-                siteBuilder.append('.');
-            }
-            siteBuilder.append(labels[i]);
-        }
-        final String site = siteBuilder.toString();
+        final String site = joinLast(labels, siteLabels);
         r.site = site;
         final String suffix = labels.length >= 2 ? site.substring(site.indexOf('.') + 1) : "";
         final String tld = labels[labels.length - 1];
         final String hosting = FREE_HOSTING.contains(suffix) ? suffix : null;
-        r.trusted = isTrustedSite(site) || isTrustedSite(ascii) || brandOwned(site);
+        r.trusted = brandOwned(site) || isTrustedHost(ascii, site);
+        r.userContent = r.trusted && (USER_CONTENT.contains(ascii) || USER_CONTENT.contains(site));
 
         // Telegram's own links: the username is what can deceive
         if (site.equals("t.me") || site.equals("telegram.me") || site.equals("telegram.dog")) {
             scoreTelegramPath(r, pathAndQuery);
-            textMismatch(r, shown);
+            textMismatch(r, shown, pathAndQuery);
             return r;
         }
 
@@ -679,23 +919,31 @@ public final class SolegramScamRules {
             if (target != null) {
                 final LinkReport inner = scoreLink(target, null);
                 for (Reason reason : inner.reasons) {
-                    r.add(reason.code, reason.arg, reason.weight);
+                    r.add(reason.code, reason.arg, reason.weight, reason.kind);
+                }
+                if (!inner.trusted) {
+                    r.trusted = false; // the page it leads to is someone else's
+                    r.site = inner.site;
                 }
             }
             addFile(r, pathAndQuery, true);
-            textMismatch(r, shown);
+            textMismatch(r, shown, pathAndQuery);
             return r;
         }
 
         if (SHORTENERS.contains(site) || SHORTENERS.contains(ascii)) {
-            r.add(R_SHORTENER, site, 25);
+            r.shortener = true;
+            r.add(R_SHORTENER, site, 25, KIND_WEAK);
+        } else if (AFFILIATE.contains(site) || AFFILIATE.contains(ascii)) {
+            r.shortener = true;
+            r.add(R_SHORTENER, site, 15, KIND_WEAK);
         }
         if (hosting != null) {
-            r.add(R_FREE_HOSTING, hosting, 15);
+            r.add(R_FREE_HOSTING, hosting, 15, KIND_WEAK);
         }
         final int riskyWeight = RISKY_TLDS.contains(tld) ? 20 : SOFT_RISKY_TLDS.contains(tld) ? 10 : 0;
         if (riskyWeight > 0) {
-            r.add(R_RISKY_TLD, "." + tld, riskyWeight);
+            r.add(R_RISKY_TLD, "." + tld, riskyWeight, KIND_WEAK);
         }
         final String mainLabel = labels.length >= siteLabels ? labels[labels.length - siteLabels] : labels[0];
         final int mainStart = unicodeLabelStart(unicode, labels.length - siteLabels);
@@ -725,11 +973,12 @@ public final class SolegramScamRules {
                 r.add(R_HOMOGRAPH, homograph.display, 80);
                 brandSignal = true;
                 markNonAscii(r, unicode, i);
-            } else if (Integer.bitCount(scripts) > 1) {
+            } else if (Integer.bitCount(scripts & ~SCRIPT_OTHER) > 1) {
                 r.add(R_MIXED_SCRIPT, label, 60);
                 markNonAscii(r, unicode, i);
-            } else if (isAscii(skeleton) && (scripts & SCRIPT_LATIN) == 0 && isAscii(unicodeLabels[unicodeLabels.length - 1])) {
-                // a word written only with look-alike letters (а, е, о, р, с...) reads as Latin: a disguise
+            } else if (isAscii(skeleton) && (scripts & SCRIPT_LATIN) == 0 && label.length() >= 3 && isAscii(unicodeLabels[unicodeLabels.length - 1])
+                && !CYRILLIC_ZONES.contains(unicodeLabels[unicodeLabels.length - 1])) {
+                // a word written only with look-alike letters (а, е, о, р, с...) on a Latin ending reads as Latin: a disguise
                 r.add(R_MIXED_SCRIPT, label, 45);
                 markNonAscii(r, unicode, i);
             }
@@ -737,7 +986,9 @@ public final class SolegramScamRules {
 
         // a brand's name, a letter off it, or with someone else's ending
         if (!brandSignal) {
-            brandSignal = scoreBrandLabel(r, mainLabel, mainUnicode, mainStart, tld, site, unicode);
+            brandSignal = isAscii(mainUnicode)
+                ? scoreBrandLabel(r, mainLabel, mainUnicode, mainStart, site, unicode)
+                : scoreCyrillicBrand(r, mainUnicode, mainStart, site, unicode);
         }
         // a brand's name in the subdomains of another site
         for (int i = 0; i < labels.length - siteLabels && !brandSignal; i++) {
@@ -747,7 +998,7 @@ public final class SolegramScamRules {
             for (String token : tokens(labels[i])) {
                 final Brand b = brandForToken(token, true);
                 if (b != null && !b.generic) {
-                    r.add(R_BRAND_SUBDOMAIN, b.label, 45);
+                    r.add(R_BRAND_SUBDOMAIN, b.label, 25, KIND_MEDIUM);
                     markSite(r, unicode, site);
                     brandSignal = true;
                     break;
@@ -767,23 +1018,55 @@ public final class SolegramScamRules {
                 break;
             }
         }
+        if (lure == null && !isAscii(unicode)) {
+            for (String token : tokens(unicode)) {
+                for (String w : LURE_WORDS_CYRILLIC) {
+                    if (token.startsWith(w)) {
+                        lure = w;
+                        break;
+                    }
+                }
+                if (lure != null) {
+                    break;
+                }
+            }
+        }
+        if (lure == null && brandSignal) {
+            // web-telegram.ru/login: next to a brand's name a login or gift page in the path says the same
+            final Matcher m = PATH_LURE.matcher(pathAndQuery.toLowerCase(Locale.ROOT));
+            if (m.find()) {
+                lure = m.group(1);
+            }
+        }
         if (lure != null) {
-            r.add(R_LURE_WORDS, lure, brandSignal ? 20 : 10);
+            // with a brand it says "fake login page"; alone it is a word honest sites use too
+            if (brandSignal) {
+                r.add(R_LURE_WORDS, lure, 25, KIND_MEDIUM);
+            } else {
+                r.add(R_LURE_WORDS, lure, 15, KIND_WEAK);
+            }
         }
         int subdomains = labels.length - siteLabels;
         if (subdomains > 0 && labels[0].equals("www")) {
             subdomains--;
         }
         if (subdomains >= 4 || ascii.length() > 60) {
-            r.add(R_DEEP_SUBDOMAINS, null, 15);
+            r.add(R_DEEP_SUBDOMAINS, null, 15, KIND_WEAK);
         }
         addFile(r, pathAndQuery, false);
-        textMismatch(r, shown);
+        textMismatch(r, shown, pathAndQuery);
         return r;
     }
 
+    private static final Pattern PATH_LURE = Pattern.compile("^/+(?:[a-z0-9_-]+/)?(login|signin|sign-in|auth|verify|verification|claim|gift|gifts|premium|stars|wallet|connect|restore|recovery|unlock|bonus|prize|vyplata|vyplaty|kompensaciya)(?:[/?#.\\-_]|$)");
+
+    private static final Pattern TG_DOMAIN = Pattern.compile("[?&]domain=([a-zA-Z0-9_]{3,64})");
+
+    /** Endings in Cyrillic: names in them are written in Cyrillic on purpose (госуслуги.рф, президент.рф). */
+    private static final Set<String> CYRILLIC_ZONES = new HashSet<>(Arrays.asList("рф", "рус", "москва", "дети", "онлайн", "сайт", "орг", "ком", "бел", "укр", "қаз", "срб", "мкд"));
+
     /** Scores the brand-like parts of the site's own name. @return whether a brand was found */
-    private static boolean scoreBrandLabel(LinkReport r, String label, String unicodeLabel, int labelStart, String tld, String site, String unicodeHost) {
+    private static boolean scoreBrandLabel(LinkReport r, String label, String unicodeLabel, int labelStart, String site, String unicodeHost) {
         if (label.startsWith("xn--")) {
             return false; // judged by its letters above
         }
@@ -795,29 +1078,68 @@ public final class SolegramScamRules {
                 if (b.anyCountry && COUNTRIES.contains(suffix)) {
                     return false; // google.de
                 }
-                final int weight = b.generic ? 25 : 60;
-                r.add(R_BRAND_TLD, b.display, weight);
+                if (b.generic) {
+                    r.add(R_BRAND_TLD, b.display, 25, KIND_MEDIUM); // steam.games, apple.ru: often someone else's
+                } else {
+                    r.add(R_BRAND_TLD, b.display, 60, KIND_HARD);
+                }
                 markSite(r, unicodeHost, site);
                 return !b.generic || r.has(R_RISKY_TLD);
             }
         }
         for (int k = 0; k < BRANDS.length; k++) {
             final Brand b = BRANDS[k];
-            if (canonLabel.equals(BRAND_CANON[k]) && b.label.length() >= 3) {
-                r.add(R_LOOKALIKE, b.display, 70);
+            if (canonLabel.equals(BRAND_CANON[k]) && b.label.length() >= 3 && !contains(b.exclude, label)) {
+                r.add(R_LOOKALIKE, b.display, 70, KIND_HARD); // digits and letters swapped for look-alikes: t3legram, rnetamask
                 markDiff(r, label, b.label, labelStart);
                 return true;
+            }
+        }
+        // a word of the name written with look-alikes: faceb00k-login, steamc0mmunity-trade
+        final String[] hyphenWords = label.split("-");
+        if (hyphenWords.length > 1) {
+            for (String word : hyphenWords) {
+                final String c = canon(word);
+                for (int k = 0; k < BRANDS.length; k++) {
+                    if (BRANDS[k].label.length() >= 5 && c.equals(BRAND_CANON[k]) && !word.equals(BRANDS[k].label)) {
+                        r.add(R_LOOKALIKE, BRANDS[k].display, 65, KIND_HARD);
+                        markRange(r, labelStart, labelStart + unicodeLabel.length());
+                        return true;
+                    }
+                }
             }
         }
         // one or two letters off (insert, drop, swap, replace)
         final String folded = fold(label);
         for (Brand b : BRANDS) {
-            if (b.label.length() < 6 || contains(b.exclude, label)) {
+            if (b.generic || b.label.length() < 6 || contains(b.exclude, label) || contains(b.exclude, folded)) {
                 continue;
             }
             final int distance = distance(folded, b.label);
-            if (distance == 1 || distance == 2 && b.label.length() >= 9) {
-                r.add(R_LOOKALIKE, b.display, distance == 1 ? 60 : 55);
+            if (distance == 1) {
+                // a dropped, doubled or swapped letter, or one that looks the same, is a disguise; another letter
+                // (megaton, telegraf, twister) is mostly a different word
+                if (visualEdit(folded, b.label)) {
+                    r.add(R_LOOKALIKE, b.display, 60, KIND_HARD);
+                } else {
+                    r.add(R_LOOKALIKE, b.display, 25, KIND_MEDIUM);
+                }
+                markDiff(r, label, b.label, labelStart);
+                return true;
+            }
+            if (distance == 2 && b.label.length() >= 9) {
+                r.add(R_LOOKALIKE, b.display, 25, KIND_MEDIUM);
+                markDiff(r, label, b.label, labelStart);
+                return true;
+            }
+        }
+        // a short brand with a doubled or look-alike letter: ozzon, avlto (a dropped letter would hit too many words)
+        for (Brand b : BRANDS) {
+            if (b.generic || b.label.length() < 4 || b.label.length() >= 6 || contains(b.exclude, label)) {
+                continue;
+            }
+            if (folded.length() >= b.label.length() && distance(folded, b.label) == 1 && visualEdit(folded, b.label)) {
+                r.add(R_LOOKALIKE, b.display, 55, KIND_HARD);
                 markDiff(r, label, b.label, labelStart);
                 return true;
             }
@@ -827,7 +1149,11 @@ public final class SolegramScamRules {
         for (String token : tokens) {
             final Brand b = brandForToken(token, true);
             if (b != null) {
-                r.add(R_BRAND_IN_DOMAIN, b.label, b.generic ? 20 : 35);
+                if (b.generic) {
+                    r.add(R_BRAND_IN_DOMAIN, b.label, 20, KIND_WEAK); // apple-pie-recipes, steam-cleaning
+                } else {
+                    r.add(R_BRAND_IN_DOMAIN, b.label, 25, KIND_MEDIUM);
+                }
                 markRange(r, labelStart, labelStart + unicodeLabel.length());
                 return !b.generic;
             }
@@ -838,12 +1164,47 @@ public final class SolegramScamRules {
                 continue;
             }
             if (label.contains(b.label) || folded.contains(b.label)) {
-                r.add(R_BRAND_IN_DOMAIN, b.label, 30);
+                r.add(R_BRAND_IN_DOMAIN, b.label, 25, KIND_MEDIUM);
                 markRange(r, labelStart, labelStart + unicodeLabel.length());
                 return true;
             }
         }
         return false;
+    }
+
+    /** A brand written in Cyrillic: госуслуги.online, сбербанк-онлайн.рф. */
+    private static boolean scoreCyrillicBrand(LinkReport r, String unicodeLabel, int labelStart, String site, String unicodeHost) {
+        final String exact = CYRILLIC_BRANDS.get(unicodeLabel);
+        if (exact != null) {
+            final Brand b = brandByLabel(exact);
+            if (b != null && !b.owns(site)) {
+                r.add(R_BRAND_TLD, b.display, b.generic ? 25 : 60, b.generic ? KIND_MEDIUM : KIND_HARD);
+                markSite(r, unicodeHost, site);
+                return !b.generic;
+            }
+            return false;
+        }
+        for (String token : unicodeLabel.split("-")) {
+            final String brand = CYRILLIC_BRANDS.get(token);
+            if (brand != null && token.length() >= 3) {
+                final Brand b = brandByLabel(brand);
+                if (b != null) {
+                    r.add(R_BRAND_IN_DOMAIN, b.label, b.generic ? 20 : 25, b.generic ? KIND_WEAK : KIND_MEDIUM);
+                    markRange(r, labelStart, labelStart + unicodeLabel.length());
+                    return !b.generic;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static Brand brandByLabel(String label) {
+        for (Brand b : BRANDS) {
+            if (b.label.equals(label)) {
+                return b;
+            }
+        }
+        return null;
     }
 
     /** The brand a word of an address names (exactly, or written with digits for letters). */
@@ -859,14 +1220,14 @@ public final class SolegramScamRules {
         if (allowCanon && token.length() >= 4) {
             final String c = canon(token);
             for (int k = 0; k < BRANDS.length; k++) {
-                if (BRANDS[k].label.length() >= 4 && c.equals(BRAND_CANON[k])) {
+                if (BRANDS[k].label.length() >= 4 && c.equals(BRAND_CANON[k]) && !contains(BRANDS[k].exclude, token)) {
                     return BRANDS[k];
                 }
             }
             // a letter off a long brand name, as a word: telegrarn-premium
             final String folded = fold(token);
             for (Brand b : BRANDS) {
-                if (b.label.length() >= 7 && !contains(b.exclude, token) && distance(folded, b.label) == 1) {
+                if (b.label.length() >= 7 && !b.generic && !contains(b.exclude, token) && distance(folded, b.label) == 1 && visualEdit(folded, b.label)) {
                     return b;
                 }
             }
@@ -898,8 +1259,8 @@ public final class SolegramScamRules {
         while (path.startsWith("/")) {
             path = path.substring(1);
         }
+        r.trusted = true;
         if (path.isEmpty()) {
-            r.trusted = true;
             return;
         }
         final String[] parts = path.split("/");
@@ -908,14 +1269,12 @@ public final class SolegramScamRules {
             first = first.substring(1);
         }
         if (first.startsWith("+") || first.startsWith("$") || TELEGRAM_SERVICE_PATHS.contains(first.toLowerCase(Locale.ROOT))) {
-            r.trusted = true;
             r.telegramService = true;
             if (first.equalsIgnoreCase("s") && parts.length > 1) {
                 scoreTelegramUsername(r, parts[1].toLowerCase(Locale.ROOT));
             }
             return;
         }
-        r.trusted = true;
         scoreTelegramUsername(r, first.toLowerCase(Locale.ROOT));
     }
 
@@ -924,19 +1283,25 @@ public final class SolegramScamRules {
             return;
         }
         r.telegramUsername = username;
-        if (OFFICIAL_USERNAMES.contains(username)) {
+        if (isTrustedUsername(username)) {
             return;
         }
         final int weight = usernameRisk(username);
         if (weight > 0) {
-            r.add(R_TG_IMPERSONATION, "@" + username, weight);
+            r.add(R_TG_IMPERSONATION, "@" + username, weight, KIND_MEDIUM);
         }
+    }
+
+    /** An official account, or one the user marked as fine. */
+    public static boolean isTrustedUsername(String username) {
+        final String u = username.toLowerCase(Locale.ROOT);
+        return OFFICIAL_USERNAMES.contains(u) || userTrustedUsernames.contains(u);
     }
 
     /** How much a Telegram username poses as staff, an official account or a giveaway (0 = not at all). */
     public static int usernameRisk(String username) {
         final String u = username.toLowerCase(Locale.ROOT);
-        if (OFFICIAL_USERNAMES.contains(u)) {
+        if (isTrustedUsername(u)) {
             return 0;
         }
         final String c = canon(u);
@@ -958,22 +1323,36 @@ public final class SolegramScamRules {
             }
         }
         final boolean strong = containsAny(u, TG_STRONG_WORDS);
-        final boolean medium = containsAny(u, TG_MEDIUM_WORDS);
+        final boolean staff = containsAny(u, TG_MEDIUM_WORDS);
+        int topics = 0;
+        for (String w : TG_TOPIC_WORDS) {
+            if (u.contains(w) && !(w.equals("star") && u.contains("stars"))) {
+                topics++;
+            }
+        }
         int weight;
-        if (telegram && (strong || medium)) {
+        if (telegram && (strong || staff)) {
             weight = 60;
-        } else if (brand && (strong || medium)) {
+        } else if (telegram && topics > 0) {
+            weight = 50; // telegram_premium, telegramgifts: Telegram's own things, but not Telegram's account
+        } else if (brand && (strong || staff)) {
             weight = 45;
-        } else if (telegram) {
-            weight = 30; // named after Telegram or its founder, but not an official account
+        } else if (strong && topics > 0) {
+            weight = 35;
         } else if (strong) {
-            weight = 30;
-        } else if (medium) {
-            weight = 15;
+            weight = 25;
+        } else if (brand && topics > 0) {
+            weight = 25;
+        } else if (telegram) {
+            weight = 20; // named after Telegram or its founder: fan channels too
+        } else if (topics > 0) {
+            weight = topics >= 2 ? 15 : 10; // nft_gifts_market: honest markets have such names
+        } else if (staff) {
+            weight = 10;
         } else {
             weight = 0;
         }
-        if (weight >= 30 && u.endsWith("bot")) {
+        if (weight >= 25 && u.endsWith("bot")) {
             weight += 10;
         }
         return weight;
@@ -991,7 +1370,7 @@ public final class SolegramScamRules {
     }
 
     /** The shown text names a site or @username the link does not go to. */
-    private static void textMismatch(LinkReport r, String shown) {
+    private static void textMismatch(LinkReport r, String shown, String pathAndQuery) {
         if (shown == null || r.host == null) {
             return;
         }
@@ -1001,45 +1380,62 @@ public final class SolegramScamRules {
         }
         if (s.startsWith("@") && s.length() > 1 && s.substring(1).matches("[A-Za-z0-9_]{3,64}")) {
             final String shownName = s.substring(1).toLowerCase(Locale.ROOT);
-            if (r.telegramUsername == null || !r.telegramUsername.equals(shownName)) {
-                r.add(R_TEXT_MISMATCH, s, 40);
+            final boolean official = OFFICIAL_USERNAMES.contains(shownName);
+            if (r.telegramUsername != null) {
+                if (!r.telegramUsername.equals(shownName)) {
+                    r.add(R_TEXT_MISMATCH, s, official ? 50 : 30, official ? KIND_HARD : KIND_MEDIUM);
+                }
+            } else if (!r.telegramService && !pathAndQuery.toLowerCase(Locale.ROOT).contains(shownName)) {
+                // @name over instagram.com/name is the same person; over another site it is not
+                if (official) {
+                    r.add(R_TEXT_MISMATCH, s, 50, KIND_HARD);
+                } else if (!r.trusted) {
+                    r.add(R_TEXT_MISMATCH, s, 25, KIND_MEDIUM);
+                }
             }
             return;
         }
         if (s.contains(" ") || !s.contains(".")) {
-            return;
+            return; // "Read more", "Подробнее": words, not an address
         }
         final Matcher m = SHOWN_HOST.matcher(s);
         if (!m.matches()) {
             return;
         }
-        String shownHost = m.group(1);
-        try {
-            shownHost = IDN.toASCII(shownHost, IDN.ALLOW_UNASSIGNED).toLowerCase(Locale.ROOT);
-        } catch (Exception e) {
-            shownHost = shownHost.toLowerCase(Locale.ROOT);
-        }
+        final String lowerShown = s.toLowerCase(Locale.ROOT);
+        final boolean looksLikeUrl = lowerShown.startsWith("http") || lowerShown.startsWith("www.") || s.indexOf('/') > 0;
+        final String shownHost = toAscii(m.group(1));
         final String[] labels = shownHost.split("\\.");
-        if (labels.length < 2 || !labels[labels.length - 1].matches("[a-z]{2,24}|xn--[a-z0-9-]+")) {
+        final String shownTld = labels[labels.length - 1];
+        if (labels.length < 2 || !shownTld.matches("[a-z]{2,24}|xn--[a-z0-9-]+")) {
             return;
         }
-        final StringBuilder sb = new StringBuilder();
-        final int count = siteLabelCount(labels);
-        for (int i = Math.max(0, labels.length - count); i < labels.length; i++) {
-            if (sb.length() > 0) {
-                sb.append('.');
-            }
-            sb.append(labels[i]);
+        if (!looksLikeUrl && !WEB_TLDS.contains(shownTld)) {
+            return; // README.md, main.py, Vue.js
         }
-        final String shownSite = sb.toString();
-        if (shownSite.equals(r.site) || sameOwner(shownSite, r.site)) {
+        final String shownSite = joinLast(labels, siteLabelCount(labels));
+        if (shownSite.equals(r.site) || sameOwner(shownSite, r.site) || shownHost.equals(r.host)
+            || r.host.endsWith("." + shownSite) || shownHost.endsWith("." + r.site)) {
+            return;
+        }
+        // the same name with another ending (mysite.ru and mysite.com) is the same owner more often than not;
+        // a brand's name on someone else's ending is caught by the brand rules anyway
+        if (siteLabel(shownSite).equals(siteLabel(r.site))) {
             return;
         }
         final boolean shownIsBig = isTrustedSite(shownSite) || brandOwned(shownSite);
         if (r.trusted) {
-            r.add(R_TEXT_MISMATCH, shownSite, 15);
+            if (shownIsBig) {
+                r.add(R_TEXT_MISMATCH, shownSite, 15, KIND_MEDIUM); // a big site, but not the one named
+            }
+        } else if (r.shortener) {
+            if (shownIsBig && !AFFILIATE.contains(r.site)) {
+                r.add(R_TEXT_MISMATCH, shownSite, 35, KIND_MEDIUM); // tinkoff.ru shown, bit.ly behind it
+            }
+        } else if (shownIsBig) {
+            r.add(R_TEXT_MISMATCH, shownSite, 60, KIND_HARD); // sberbank.ru shown, evil.top behind it
         } else {
-            r.add(R_TEXT_MISMATCH, shownSite, shownIsBig ? 65 : 50);
+            r.add(R_TEXT_MISMATCH, shownSite, 30, KIND_MEDIUM);
         }
     }
 
@@ -1055,10 +1451,7 @@ public final class SolegramScamRules {
                 return true;
             }
         }
-        // the same name with another country ending (google.ru and google.com)
-        final String la = a.substring(0, a.indexOf('.') < 0 ? a.length() : a.indexOf('.'));
-        final String lb = b.substring(0, b.indexOf('.') < 0 ? b.length() : b.indexOf('.'));
-        return la.equals(lb) && (isTrustedSite(a) || brandOwned(a)) && (isTrustedSite(b) || brandOwned(b));
+        return false;
     }
 
     private static String redirectTarget(String host, String pathAndQuery) {
@@ -1067,13 +1460,15 @@ public final class SolegramScamRules {
             || lower.startsWith("/away?") || lower.startsWith("/link?"))) {
             return null;
         }
-        final Matcher m = Pattern.compile("[?&](?:q|url|u|to|target|dest|link)=([^&#]+)").matcher(pathAndQuery);
+        final Matcher m = REDIRECT_PARAM.matcher(pathAndQuery);
         if (!m.find()) {
             return null;
         }
         final String value = percentDecode(m.group(1));
         return value.toLowerCase(Locale.ROOT).startsWith("http") ? value : null;
     }
+
+    private static final Pattern REDIRECT_PARAM = Pattern.compile("[?&](?:q|url|u|to|target|dest|link)=([^&#]+)");
 
     private static void addFile(LinkReport r, String pathAndQuery, boolean trusted) {
         String path = pathAndQuery;
@@ -1093,36 +1488,45 @@ public final class SolegramScamRules {
         final String ext = percentDecode(path.substring(dot + 1)).toLowerCase(Locale.ROOT);
         final Integer weight = FILES.get(ext);
         if (weight != null) {
-            r.add(R_FILE, "." + ext, trusted ? 15 : weight);
+            if (trusted) {
+                r.add(R_FILE, "." + ext, 10, KIND_WEAK); // a release on GitHub, an app on 4PDA
+            } else {
+                r.add(R_FILE, "." + ext, weight, KIND_MEDIUM);
+            }
         }
     }
 
-    /** The user's own list of sites to trust (as {@link LinkReport#site} or a host). Set by the app. */
-    private static volatile Set<String> userTrusted = new HashSet<>();
-
-    public static void setUserTrusted(Set<String> sites) {
-        userTrusted = sites == null ? new HashSet<>() : sites;
-    }
-
-    public static boolean isTrustedSite(String site) {
-        return site != null && (TRUSTED.contains(site) || userTrusted.contains(site));
-    }
-
-    /** The site part of a host (the owner's name): what the "trust this site" list keeps. */
+    /** The site part of a host (the registrable domain): what the "trust this site" list keeps. */
     public static String siteOf(String host) {
         if (host == null) {
             return null;
         }
-        String h = host.toLowerCase(Locale.ROOT);
-        try {
-            h = IDN.toASCII(h, IDN.ALLOW_UNASSIGNED).toLowerCase(Locale.ROOT);
-        } catch (Exception ignore) {
-        }
+        final String h = toAscii(host);
         if (isIpAddress(h)) {
             return h;
         }
         final String[] labels = h.split("\\.");
-        final int count = siteLabelCount(labels);
+        return joinLast(labels, siteLabelCount(labels));
+    }
+
+    private static int siteLabelCount(String[] labels) {
+        if (labels.length < 2) {
+            return labels.length;
+        }
+        final String last2 = labels[labels.length - 2] + "." + labels[labels.length - 1];
+        if (labels.length >= 4) {
+            final String last3 = labels[labels.length - 3] + "." + last2;
+            if (FREE_HOSTING.contains(last3) || MULTI_SUFFIXES.contains(last3)) {
+                return 4;
+            }
+        }
+        if (labels.length >= 3 && (MULTI_SUFFIXES.contains(last2) || FREE_HOSTING.contains(last2))) {
+            return 3;
+        }
+        return 2;
+    }
+
+    private static String joinLast(String[] labels, int count) {
         final StringBuilder sb = new StringBuilder();
         for (int i = Math.max(0, labels.length - count); i < labels.length; i++) {
             if (sb.length() > 0) {
@@ -1133,21 +1537,68 @@ public final class SolegramScamRules {
         return sb.toString();
     }
 
-    private static int siteLabelCount(String[] labels) {
-        if (labels.length < 2) {
-            return labels.length;
+    static String toAscii(String host) {
+        try {
+            return IDN.toASCII(host, IDN.ALLOW_UNASSIGNED).toLowerCase(Locale.ROOT);
+        } catch (Exception e) {
+            return host.toLowerCase(Locale.ROOT);
         }
-        final String last2 = labels[labels.length - 2] + "." + labels[labels.length - 1];
-        if (labels.length >= 3 && (MULTI_SUFFIXES.contains(last2) || FREE_HOSTING.contains(last2))) {
-            return 3;
+    }
+
+    // endregion
+
+    // region Scoring in context
+
+    /** Whether the message's words count for this link (a big site stays a big site whatever the text says). */
+    private static boolean textCounts(LinkReport link) {
+        if (link.telegramUsername != null) {
+            return !isTrustedUsername(link.telegramUsername);
         }
-        if (labels.length >= 4) {
-            final String last3 = labels[labels.length - 3] + "." + last2;
-            if (FREE_HOSTING.contains(last3)) {
-                return 4;
+        if (link.telegramService) {
+            return true; // an invite to a chat with "free Premium" around it
+        }
+        return !link.trusted || link.userContent;
+    }
+
+    /**
+     * The score of a link in its message: hard signs as they are; the others only in combination (a cheap ending
+     * counts next to a brand's name, bait in the text or a stranger), and discounted by who sent it.
+     */
+    public static int score(LinkReport link, TextReport text, Context ctx) {
+        if (ctx == null) {
+            ctx = Context.NONE;
+        }
+        if (ctx.outgoing || link == null) {
+            return 0;
+        }
+        int hard = 0, medium = 0, weak = 0, weakCount = 0;
+        for (Reason r : link.reasons) {
+            if (r.kind == KIND_HARD) {
+                hard += r.weight;
+            } else if (r.kind == KIND_MEDIUM) {
+                medium += r.weight;
+            } else {
+                weak += r.weight;
+                weakCount++;
             }
         }
-        return 2;
+        final int t = text != null && textCounts(link) ? text.score : 0;
+        final boolean corroborated = hard > 0 || medium > 0 || t > 0 || ctx.stranger || weakCount >= 2;
+        // bait from someone the user does not know adds to itself
+        final int bonus = (ctx.stranger || ctx.unknownSender) && t > 0 ? 10 : 0;
+        final int soft = medium + (corroborated ? weak : 0) + t + bonus;
+        final float f = ctx.trust(t > 0 && medium + weak > 0);
+        return hard + Math.round(soft * f);
+    }
+
+    /** {@link #score(LinkReport, TextReport, Context)} with nothing known about the sender. */
+    public static int combinedScore(LinkReport link, TextReport text) {
+        return score(link, text, Context.NONE);
+    }
+
+    /** Whether the message's signs were part of the score (to list them with the link's). */
+    public static boolean textCounted(LinkReport link, TextReport text, Context ctx) {
+        return text != null && text.score > 0 && (ctx == null || !ctx.outgoing) && textCounts(link) && (ctx == null || !ctx.official);
     }
 
     // endregion
@@ -1155,31 +1606,71 @@ public final class SolegramScamRules {
     // region Message text
 
     private static final String W = "[\\p{L}\\p{N}_]";
+    /** The end of a word (Java's \b knows only Latin letters). */
+    private static final String E = "(?![\\p{L}\\p{N}])";
 
     private static Pattern p(String regex) {
-        return Pattern.compile(regex.replace("\\w", W));
+        return Pattern.compile(regex.replace("\\w", W).replace("\\E", E));
     }
 
+    private static final String TG_PREMIUM = "(telegram premium|телеграм\\w* премиум|тг премиум|tg premium|премиум[- ]?подписк\\w*|premium subscription|"
+        + "(premium|премиум) (на|for) [0-9]+|stars|звезд\\w* (телеграм\\w*|telegram|тг)|телеграм\\w* звезд\\w*|telegram stars|звезд(ы|у|ами)?\\E|nft|нфт)";
+
     private static final Object[][] TEXT_RULES = {
-        {R_TEXT_GIFT, 20, p("(бесплатн\\w*|в подарок|подар\\w*|дарим|разда(ча|ем|ют|ет)\\w*|розыгрыш\\w*|получи(те)?|забери(те)?|халяв\\w*|free|gift(ed|s)?|giveaway|claim)[^.!?\\n]{0,40}(premium|премиум|stars|звезд\\w*|nft|нфт|telegram|телеграм\\w*|подписк\\w*|подарк\\w*)"), new String[]{"premium", "премиум", "stars", "звезд", "nft", "нфт", "telegram", "телеграм", "подписк", "подарк"}},
-        {R_TEXT_GIFT, 20, p("(premium|премиум|stars|звезд\\w*|nft|нфт)[^.!?\\n]{0,40}(бесплатн\\w*|в подарок|даром|free|gift|giveaway|за подписку)"), new String[]{"premium", "премиум", "stars", "звезд", "nft", "нфт"}},
-        {R_TEXT_VERIFY, 20, p("(подтверд\\w*|верифиц\\w*|верификац\\w*|пройдите проверку|пройди проверку|авторизуй\\w*)[^.!?\\n]{0,30}(аккаунт\\w*|учетн\\w*|личност\\w*|профил\\w*|номер\\w*|кошел\\w*|страниц\\w*)"), new String[]{"подтверд", "верифи", "провер", "авториз"}},
-        {R_TEXT_VERIFY, 20, p("verify (your )?(account|identity|wallet|number|profile)|confirm (your )?(account|identity|wallet)|account verification|verification (is )?required"), new String[]{"verif", "confirm"}},
-        {R_TEXT_BLOCK, 20, p("(аккаунт|учетн\\w* запис\\w*|страниц\\w*|профил\\w*|карт\\w*|кошел\\w*)[^.!?\\n]{0,50}(заблокир\\w*|удален\\w*|будет удал\\w*|огранич\\w*|замороз\\w*|заморож\\w*)"), new String[]{"заблокир", "удален", "удал", "огранич", "замороз", "заморож"}},
-        {R_TEXT_BLOCK, 20, p("(account|wallet|card|profile)[^.!?\\n]{0,30}(will be|has been|is being|may be|is)[^.!?\\n]{0,10}(suspended|blocked|deleted|restricted|locked|banned|frozen|terminated)"), new String[]{"suspend", "block", "delet", "restrict", "lock", "bann", "frozen", "terminat"}},
-        {R_TEXT_CODE, 30, p("(никому не (сообщайте|говорите|передавайте|показывайте)|не сообщайте (его )?никому)[^\\n]{0,40}код"), new String[]{"никому"}},
-        {R_TEXT_CODE, 30, p("(отправ\\w*|пришл\\w*|скин\\w*|продиктуй\\w*|сообщи\\w*|напиши\\w*|перешли\\w*|назови\\w*|скажи\\w*)[^.!?\\n]{0,30}(код\\w*|пароль|cvv|cvc|смс)|код\\w* из (смс|sms|сообщени\\w*|телеграм\\w*)"), new String[]{"код", "пароль", "cvv", "cvc", "смс"}},
-        {R_TEXT_CODE, 30, p("(send|share|give|tell|forward)( me| us)?[^.!?\\n]{0,20}(the |your )?(code|password|cvv|sms)|(login|verification|confirmation|one-time) code"), new String[]{"code", "password", "cvv", "sms"}},
-        {R_TEXT_CRYPTO, 25, p("(^|[^\\p{L}\\p{N}])(x2|х2|x10|х10)([^\\p{L}\\p{N}]|$)|удво\\w*|double (your|the)|airdrop|аирдроп|эйрдроп|эирдроп|seed[- ]?phrase|сид[- ]?фраз\\w*|мнемони\\w*|секретн\\w* фраз\\w*|private key|приватн\\w* ключ\\w*|connect (your )?wallet|подключ\\w* кошел\\w*"), new String[]{"x2", "х2", "x10", "х10", "удво", "double", "airdrop", "дроп", "seed", "сид", "мнемони", "фраз", "private key", "ключ", "wallet", "кошел"}},
-        {R_TEXT_CRYPTO, 25, p("(отправ\\w*|send|переведи\\w*)[^.!?\\n]{0,25}[0-9]+[^.!?\\n]{0,6}(usdt|ton|btc|eth|тон)[^.!?\\n]{0,40}(получ\\w*|верн\\w*|receive|get back|back)"), new String[]{"usdt", "ton", "btc", "eth", "тон"}},
-        {R_TEXT_MONEY, 20, p("(срочно|urgent\\w*|очень нужно|выручи\\w*)[^.!?\\n]{0,50}(деньг\\w*|денег|переве\\w*|перевод\\w*|займ\\w*|одолж\\w*|скин\\w*|money|transfer|send)"), new String[]{"срочно", "urgent", "очень нужно", "выручи"}},
-        {R_TEXT_MONEY, 20, p("(займи|одолжи|переведи|скинь|кинь)( мне)?[^.!?\\n]{0,30}([0-9]|руб|₽|денег|деньг|тыс|косар)|(lend me|can you send|send me|could you send)[^.!?\\n]{0,25}(money|\\$|usd|dollars|[0-9])"), new String[]{"займи", "одолжи", "переведи", "скинь", "кинь", "lend me", "send"}},
-        {R_TEXT_MONEY, 20, p("(номер (вашей |твоей )?карты|данные (вашей |твоей )?карты|card number|cvv|cvc|срок действия карты)"), new String[]{"карт", "card", "cvv", "cvc"}},
-        {R_TEXT_VOTE, 25, p("(проголосу\\w*|голосу\\w*|голос за|голосовани\\w*|vote for|voting)[^\\n]{0,60}(племянниц\\w*|дочк\\w*|доч\\w*|сын\\w*|ребен\\w*|внучк\\w*|подруг\\w*|крестниц\\w*|niece|nephew|daughter|son|kid|конкурс\\w*|contest)"), new String[]{"голос", "vote", "voting"}},
-        {R_TEXT_JOB, 20, p("(легк\\w*|быстр\\w*|пассивн\\w*|дополнительн\\w*)[^.!?\\n]{0,15}(заработ\\w*|деньг\\w*|доход\\w*)|заработ\\w* от [0-9]+|easy money|(earn|make) \\$?[0-9]+[^.!?\\n]{0,25}(day|daily|week|hour)"), new String[]{"заработ", "доход", "деньг", "money", "earn", "make"}},
-        {R_TEXT_JOB, 20, p("[0-9]+ ?(₽|руб\\w*|\\$|usdt|долл\\w*|тыс\\w*)[^.!?\\n]{0,15}в (день|час|неделю)|работа без опыта|удаленн\\w* работ\\w*[^.!?\\n]{0,40}(без опыта|от [0-9]+)"), new String[]{"в день", "в час", "в неделю", "без опыта"}},
-        {R_TEXT_PRIZE, 20, p("(вы выиграли|ты выиграл\\w*|вы стали победител\\w*|you (have )?won|you are (the |a )?winner|ваш приз|your prize|заберите приз|забери приз|claim your (prize|reward))"), new String[]{"выиграл", "победител", "won", "winner", "приз", "prize", "reward"}},
-        {R_TEXT_URGENT, 5, p("(в течение|within|осталось|only) [0-9]+ (час\\w*|минут\\w*|hours?|minutes?)|срочно|немедленно|urgent|immediately|act now"), new String[]{"в течение", "within", "осталось", "only", "срочно", "немедленно", "urgent", "immediately", "act now"}},
+        {R_TEXT_GIFT, 20, p("(бесплатн\\w*|даром|в подарок|дарим|разда(ча|ем|ют|ет|чу)\\w*|розыгрыш\\w*|халяв\\w*|получи(те)?\\E|забери(те)?\\E|активиру\\w*|free|giveaway|claim)[^.!?\\n]{0,40}" + TG_PREMIUM),
+            new String[]{"premium", "премиум", "stars", "звезд", "nft", "нфт"}},
+        {R_TEXT_GIFT, 20, p("(telegram premium|телеграм\\w* премиум|premium|премиум|stars|звезд\\w*|nft|нфт)[^.!?\\n]{0,40}(бесплатн\\w*|даром|в подарок|free|giveaway|за подписку|всем подписчикам)(?=[\\s\\S]*(telegram|телеграм|тг\\E|stars|звезд|nft|нфт|premium|премиум))"),
+            new String[]{"premium", "премиум", "stars", "звезд", "nft", "нфт"}},
+        {R_TEXT_GIFT, 20, p("(бесплатн\\w*|даром|в подарок|дарим|разда(ча|ем|ют|ет|чу)\\w*|халяв\\w*|получи(те)?\\E|забери(те)?\\E|активиру\\w*|free|claim)[^.!?\\n]{0,40}(premium|премиум)"),
+            new String[]{"telegram", "телеграм", "тг ", " tg"}}, // Premium is Telegram's only where Telegram is named
+        {R_TEXT_GIFT, 20, p("(вам|тебе|you)( \\w+)? (отправил\\w*|подарил\\w*|прислал\\w*|sent|gifted)[^.!?\\n]{0,25}(подар\\w*|premium|премиум|звезд\\w*|stars|gift|nft)|(подарок|подарки|gift) (в|от|in|from) (telegram|телеграм\\w*)"),
+            new String[]{"отправил", "подарил", "прислал", "sent", "gifted", "подар", "gift"}},
+        {R_TEXT_VERIFY, 20, p("(подтверд\\w*|верифиц\\w*|верификац\\w*|пройдите проверку|пройди проверку|авторизуй\\w*)[^.!?\\n]{0,30}(аккаунт\\w*|учетн\\w*|личност\\w* (в|на) (telegram|телеграм\\w*|сайт\\w*)|профил\\w*|кошел\\w*|номер\\w* телефон\\w*)"),
+            new String[]{"подтверд", "верифи", "провер", "авториз"}},
+        {R_TEXT_VERIFY, 20, p("verify (your )?(account|identity|wallet|number|profile)|confirm (your )?(account|identity|wallet)|account verification|verification (is )?required"),
+            new String[]{"verif", "confirm"}},
+        {R_TEXT_BLOCK, 20, p("(аккаунт\\w*|учетн\\w* запис\\w*|страниц\\w*|профил\\w*|карт[ауые]\\E|кошел\\w*|номер\\w*)[^.!?\\n]{0,50}(будет|будут|могут быть|может быть|подлежит|подлежат|грозит)[^.!?\\n]{0,15}(заблокир\\w*|удален\\w*|удал\\w*|огранич\\w*|заморож\\w*|блокировк\\w*|деактивир\\w*)"),
+            new String[]{"будет", "будут", "могут", "может", "подлеж", "грозит"}},
+        {R_TEXT_BLOCK, 20, p("(заблокируют|удалят|ограничат|заморозят|деактивируют)[^.!?\\n]{0,40}(аккаунт\\w*|учетн\\w*|страниц\\w*|профил\\w*|карт[ауы]\\E|кошел\\w*)"),
+            new String[]{"заблокируют", "удалят", "ограничат", "заморозят", "деактивируют"}},
+        {R_TEXT_BLOCK, 20, p("(account|wallet|card|profile)[^.!?\\n]{0,30}(will be|may be|is going to be|is about to be)[^.!?\\n]{0,10}(suspended|blocked|deleted|restricted|locked|banned|frozen|terminated|disabled)"),
+            new String[]{"suspend", "block", "delet", "restrict", "lock", "bann", "frozen", "terminat", "disabl"}},
+        {R_TEXT_CODE, 30, p("(никому не (сообщайте|говорите|передавайте|показывайте)|не сообщайте (его )?никому|do not (give|share) (this|the) code)[^\\n]{0,40}(код|code)"),
+            new String[]{"никому", "do not"}},
+        {R_TEXT_CODE, 30, p("(отправ\\w*|пришл\\w*|скин\\w*|кин\\w*|продиктуй\\w*|сообщи\\w*|напиши\\w*|перешли\\w*|назови\\w*|скажи\\w*|дай\\w*|send|share|give|tell|forward)[^.!?\\n]{0,40}"
+            + "(код\\w* (из|с|в) (смс|sms|сообщени\\w*|телеграм\\w*|telegram|тг|приложени\\w*|банк\\w*)|(смс|sms)[- ]?код\\w*|код\\w* подтвержд\\w*|код\\w* верифик\\w*|проверочн\\w* код\\w*|"
+            + "код\\w*,? (который|что) (при\\w*|долж\\w*)|cvv2?|cvc|пароль от (телеграм\\w*|telegram|аккаунт\\w*|госуслуг\\w*|банк\\w*|почт\\w*|облачн\\w*)|облачн\\w* пароль|"
+            + "(login|verification|confirmation|security|one[- ]time|sms) code|(your|ur) password)"),
+            new String[]{"код", "пароль", "cvv", "cvc", "code", "password"}},
+        {R_TEXT_CRYPTO, 25, p("(^|[^\\p{L}\\p{N}])(x2|х2|x3|х3|x5|х5|x10|х10)\\E[^.!?\\n]{0,40}(usdt|ton\\E|тон\\w*|btc|eth|крипт\\w*|депозит\\w*|вклад\\w*|деньг\\w*|прибыл\\w*|profit|invest\\w*|инвест\\w*)"
+            + "|(usdt|ton\\E|btc|eth|депозит\\w*|вклад\\w*|деньг\\w*|инвест\\w*)[^.!?\\n]{0,40}(^|[^\\p{L}\\p{N}])(x2|х2|x3|х3|x5|х5|x10|х10)\\E"),
+            new String[]{"x2", "х2", "x3", "х3", "x5", "х5", "x10", "х10"}},
+        {R_TEXT_CRYPTO, 25, p("удво\\w*[^.!?\\n]{0,20}(депозит|вклад|деньг|сумм|средств|usdt|ton|тон|btc|eth|крипт|инвест)|double (your|the) (money|deposit|crypto|btc|eth|usdt|ton|investment)"),
+            new String[]{"удво", "double"}},
+        {R_TEXT_CRYPTO, 30, p("(введи\\w*|отправ\\w*|пришл\\w*|скин\\w*|укажи\\w*|вставь\\w*|импортир\\w*|enter|send|share|import|paste)[^.!?\\n]{0,30}(seed|сид[- ]?фраз\\w*|мнемони\\w*|секретн\\w* фраз\\w*|private key|приватн\\w* ключ\\w*|recovery phrase|фраз\\w* восстановлени\\w*)"),
+            new String[]{"seed", "сид", "мнемони", "фраз", "private key", "ключ", "recovery phrase"}},
+        {R_TEXT_CRYPTO, 25, p("(connect|подключи(те)?\\E)[^.!?\\n]{0,10}(your )?(wallet|кошел\\w*)[^.!?\\n]{0,40}(получ\\w*|claim|airdrop|бонус\\w*|reward|награ\\w*|nft|нфт)|airdrop|аирдроп|эйрдроп|эирдроп"),
+            new String[]{"wallet", "кошел", "airdrop", "дроп"}},
+        {R_TEXT_CRYPTO, 25, p("(отправ\\w*|send|переведи\\w*)[^.!?\\n]{0,25}[0-9]+[^.!?\\n]{0,6}(usdt|ton|btc|eth|тон)[^.!?\\n]{0,40}(получ\\w*|верн\\w*|receive|get back|back)"),
+            new String[]{"usdt", "ton", "btc", "eth", "тон"}},
+        {R_TEXT_MONEY, 20, p("(срочно|urgent\\w*|очень нужн\\w*|выручи\\w*)[^.!?\\n]{0,50}(деньг\\w*|денег|[0-9]+ ?(₽|р\\.|руб\\w*|тыс\\w*|к\\E|\\$|usd|долл\\w*|евро)|на карту|займ\\w*|одолж\\w*|money|transfer \\$?[0-9])"),
+            new String[]{"срочно", "urgent", "очень нужн", "выручи"}},
+        {R_TEXT_MONEY, 20, p("(займи|одолжи|переведи|скинь|кинь|перекинь)( мне| пожалуйста| плиз)?[^.!?\\n]{0,30}([0-9]+ ?(₽|р\\E|руб\\w*|тыс\\w*|к\\E|косар\\w*|\\$|usd|долл\\w*|евро)|денег|деньг\\w*|на карту)"
+            + "|(lend me|can you send|send me|could you send)[^.!?\\n]{0,25}(money|\\$[0-9]|[0-9]+ ?(usd|dollars|\\$|eur))"),
+            new String[]{"займи", "одолжи", "переведи", "скинь", "кинь", "lend me", "send"}},
+        {R_TEXT_MONEY, 20, p("((номер|данные|реквизиты|срок действия) (вашей |твоей )?(банковской )?карты|cvv|cvc|код с обратной стороны|card number|card details)"),
+            new String[]{"карт", "card", "cvv", "cvc", "обратной"}},
+        {R_TEXT_VOTE, 25, p("(проголосу\\w*|голосу\\w*|голос за|голосовани\\w*|vote for|voting)[^\\n]{0,60}(племянниц\\w*|племянник\\w*|дочк\\w*|доч\\w*|сын\\w*|ребен\\w*|внучк\\w*|внук\\w*|подруг\\w*|крестниц\\w*|niece|nephew|daughter|son\\E|kid|конкурс\\w*|contest)"),
+            new String[]{"голос", "vote", "voting"}},
+        {R_TEXT_JOB, 20, p("(легк\\w*|быстр\\w*|пассивн\\w*)[^.!?\\n]{0,15}(заработ\\w*|деньг\\w*|доход\\w*)|заработ\\w* от [0-9]+|easy money|(earn|make) \\$?[0-9]+[^.!?\\n]{0,25}(day|daily|week|hour)"),
+            new String[]{"заработ", "доход", "деньг", "money", "earn", "make"}},
+        {R_TEXT_JOB, 20, p("[0-9]+ ?(₽|руб\\w*|\\$|usdt|долл\\w*|тыс\\w*)[^.!?\\n]{0,15}в (день|час|неделю)|работа без опыта|удаленн\\w* работ\\w*[^.!?\\n]{0,40}(без опыта|от [0-9]+)"),
+            new String[]{"в день", "в час", "в неделю", "без опыта"}},
+        {R_TEXT_PRIZE, 20, p("(вы|ты) (выиграли|выиграл\\w*|стали победител\\w*|стал\\w* победител\\w*)[^.!?\\n]{0,40}(приз\\w*|подар\\w*|iphone|айфон\\w*|деньг\\w*|руб\\w*|₽|\\$|сертификат\\w*|розыгрыш\\w*|лотере\\w*|бонус\\w*|автомобил\\w*|машин\\w*|premium|премиум)"
+            + "|you (have )?won|you are (the |a )?winner|заберите (ваш )?приз|забери (свой )?приз|claim your (prize|reward)"),
+            new String[]{"выиграл", "победител", "won", "winner", "приз", "prize", "reward"}},
+        {R_TEXT_URGENT, 5, p("(в течение|within|осталось|only) [0-9]+ (час\\w*|минут\\w*|hours?|minutes?)|срочно|немедленно|urgent|immediately|act now"),
+            new String[]{"в течение", "within", "осталось", "only", "срочно", "немедленно", "urgent", "immediately", "act now"}},
     };
 
     private static final int TEXT_CAP = 40;
@@ -1201,7 +1692,7 @@ public final class SolegramScamRules {
             if (((Pattern) rule[2]).matcher(s).find()) {
                 seen.add(code);
                 final int weight = (Integer) rule[1];
-                t.reasons.add(new Reason(code, null, weight));
+                t.reasons.add(new Reason(code, null, weight, KIND_TEXT, 0));
                 t.score += weight;
             }
         }
@@ -1214,23 +1705,6 @@ public final class SolegramScamRules {
         return t;
     }
 
-    /**
-     * The score of a link inside a message: the address, plus the message's signs when the link goes somewhere
-     * unknown (a big site stays a big site whatever the text says).
-     */
-    public static int combinedScore(LinkReport link, TextReport text) {
-        if (text == null || text.score == 0) {
-            return link.score;
-        }
-        if (link.trusted && link.telegramUsername == null && !link.telegramService) {
-            return link.score;
-        }
-        if (link.telegramUsername != null && OFFICIAL_USERNAMES.contains(link.telegramUsername)) {
-            return link.score;
-        }
-        return link.score + text.score;
-    }
-
     // endregion
 
     // region Accounts
@@ -1238,6 +1712,12 @@ public final class SolegramScamRules {
     /** What is known about a stranger (filled by the app from Telegram's data). */
     public static final class Account {
         public boolean scam, fake, verified, official, bot, contact, deleted;
+        /** A mutual contact; a bot or account verified by a third party Telegram trusts (the badge). */
+        public boolean mutualContact, botVerified;
+        /** A long chat (more than about 50 messages), or the user has written there a lot. */
+        public boolean longHistory;
+        /** The user has answered in the chat. */
+        public boolean conversed;
         public String firstName, lastName;
         /** The usernames, without @. */
         public String[] usernames;
@@ -1257,42 +1737,115 @@ public final class SolegramScamRules {
         public Map<String, String> contactNames;
     }
 
+    /** Groups of strong signs: two in one group are one piece of evidence. */
+    private static final int G_NAME = 1, G_USERNAME = 2, G_CHECKMARK = 3, G_CLONE = 4, G_TEXT = 5, G_COLD = 6, G_AI = 7;
+
     public static final class AccountReport {
         public int score;
         public final ArrayList<Reason> reasons = new ArrayList<>();
         /** Telegram itself marked it (scam / fake): always dangerous. */
         public boolean flagged;
+        /** AI on the phone said it looks fine: never more than caution. */
+        public boolean aiSafe;
 
         void add(int code, String arg, int weight) {
-            reasons.add(new Reason(code, arg, weight));
+            add(code, arg, weight, KIND_WEAK, 0);
+        }
+
+        void add(int code, String arg, int weight, int kind, int group) {
+            reasons.add(new Reason(code, arg, weight, kind, group));
             score += weight;
+        }
+
+        /** What AI made of the first messages. */
+        public void addAi(String note, int level) {
+            if (level == DANGER) {
+                add(R_AI, note, 30, KIND_HARD, G_AI);
+            } else if (level == CAUTION) {
+                add(R_AI, note, 10, KIND_MEDIUM, 0);
+            } else {
+                aiSafe = true;
+                score -= 15;
+            }
+        }
+
+        /** Independent strong signs. */
+        public int strongSigns() {
+            int mask = 0;
+            for (Reason r : reasons) {
+                if (r.kind == KIND_HARD && r.group > 0) {
+                    mask |= 1 << r.group;
+                }
+            }
+            return Integer.bitCount(mask);
+        }
+
+        public int mediumSigns() {
+            int n = 0;
+            for (Reason r : reasons) {
+                if (r.kind == KIND_MEDIUM) {
+                    n++;
+                }
+            }
+            return n;
         }
 
         public List<Reason> sortedReasons() {
             final ArrayList<Reason> list = new ArrayList<>(reasons);
-            java.util.Collections.sort(list, (a, b) -> b.weight - a.weight);
+            Collections.sort(list, (a, b) -> a.kind != b.kind ? b.kind % 3 - a.kind % 3 : b.weight - a.weight);
             return list;
         }
 
         @Override
         public String toString() {
-            return score + " " + sortedReasons();
+            return score + " s" + strongSigns() + " m" + mediumSigns() + " " + sortedReasons();
         }
     }
 
-    private static final String[][] NAME_WORDS = {
-        // word, weight
-        {"durov", "40"}, {"дуров", "40"},
-        {"telegram", "35"}, {"телеграм", "35"}, {"telegrarn", "35"}, {"support", "35"}, {"поддержк", "35"}, {"служба", "30"},
-        {"администрац", "35"}, {"administrator", "35"}, {"администратор", "30"}, {"admin", "30"}, {"админ", "30"},
-        {"модератор", "30"}, {"moderator", "30"}, {"official", "30"}, {"официальн", "30"}, {"security", "30"}, {"безопасност", "30"},
-        {"уведомлен", "25"}, {"notification", "25"}, {"верификац", "25"}, {"verification", "25"},
-        {"госуслуг", "30"}, {"gosuslug", "30"}, {"сбербанк", "30"}, {"sberbank", "30"}, {"тинькоф", "30"}, {"tinkoff", "30"},
-        {"т-банк", "30"}, {"tbank", "30"}, {"втб", "25"}, {"альфа-банк", "30"}, {"альфабанк", "30"}, {"alfabank", "30"},
-        {"центробанк", "30"}, {"центральный банк", "30"}, {"цб рф", "30"}, {"wildberries", "25"}, {"вайлдберриз", "25"},
-        {"fragment", "20"}, {"binance", "25"}, {"bybit", "25"}, {"wallet", "20"}, {"кошелек", "15"}, {"банк", "15"}, {"bank", "15"},
-        {"полиция", "25"}, {"фсб", "30"}, {"мвд", "25"}, {"следователь", "25"},
+    /**
+     * The level of a stranger: Telegram's mark, or at least two independent strong signs (on strict, one strong and
+     * two lesser ones). One odd thing about a new contact is never enough.
+     */
+    public static int accountLevel(AccountReport r, int sensitivity) {
+        if (r == null) {
+            return SAFE;
+        }
+        if (r.flagged) {
+            return DANGER;
+        }
+        final int s = clampSensitivity(sensitivity);
+        final int strong = r.strongSigns();
+        final boolean show = strong >= 2 || s == SENSITIVITY_STRICT && strong >= 1 && r.mediumSigns() >= 2;
+        if (!show) {
+            return SAFE;
+        }
+        final int[] t = ACCOUNT_THRESHOLDS[s];
+        final int level = r.score >= t[1] || strong >= 3 ? DANGER : CAUTION;
+        return r.aiSafe ? Math.min(level, CAUTION) : level;
+    }
+
+    /** One strong sign and their first messages to read: an on-device AI may take a second look. */
+    public static boolean isBorderlineAccount(AccountReport r, int sensitivity) {
+        return r != null && !r.flagged && r.strongSigns() == 1 && accountLevel(r, sensitivity) == SAFE;
+    }
+
+    /** Words of staff: harmless alone (a shop's support), telling next to Telegram, a bank or the state. */
+    private static final String[] NAME_STAFF = {
+        "support", "поддержк", "служба", "администрац", "administrator", "администратор", "admin", "админ", "модератор", "moderator",
+        "official", "официальн", "security", "безопасност", "уведомлен", "notification", "верификац", "verification", "отдел", "сотрудник"
     };
+    /** Who scammers pose as. */
+    private static final String[] NAME_AUTHORITY = {
+        "telegram", "телеграм", "telegrarn", "госуслуг", "gosuslug", "сбербанк", "sberbank", "сбер", "sber", "тинькоф", "tinkoff", "т-банк",
+        "tbank", "втб", "vtb", "альфа-банк", "альфабанк", "alfabank", "центробанк", "центральный банк", "цб рф", "банк россии", "wildberries",
+        "вайлдберриз", "fragment", "binance", "bybit", "полиция", "фсб", "мвд", "следователь", "прокуратур", "соцфонд", "пенсионн", "налогов",
+        "fns", "фнс", "росфинмониторинг", "озон", "ozon", "авито", "avito", "сдэк", "cdek", "госуслуги", "банк", "bank", "wallet", "кошелек"
+    };
+    /** Telegram and its founder: posing as them needs no staff word. */
+    private static final String[] NAME_TELEGRAM = {"telegram", "телеграм", "telegrarn", "pavel durov", "павел дуров", "durov official"};
+
+    /** What a fake "Telegram ..." account offers: Telegram Premium, Telegram Gifts. */
+    private static final String[] NAME_TOPIC = {"premium", "премиум", "stars", "звезд", "gift", "подар", "nft", "нфт"};
 
     private static final String[] CHECKMARKS = {"✅", "✔", "☑", "✓", "🗸", "verified", "верифицирован"};
 
@@ -1304,35 +1857,43 @@ public final class SolegramScamRules {
         }
         if (a.scam) {
             r.flagged = true;
-            r.add(A_SCAM, null, 100);
+            r.add(A_SCAM, null, 100, KIND_HARD, 0);
         }
         if (a.fake) {
             r.flagged = true;
-            r.add(A_FAKE, null, 100);
+            r.add(A_FAKE, null, 100, KIND_HARD, 0);
         }
         if (r.flagged) {
             return r;
         }
-        if (a.verified || a.official || a.contact || a.deleted) {
+        // people and accounts that are never warned about
+        if (a.verified || a.official || a.botVerified || a.contact || a.mutualContact || a.deleted || a.longHistory
+            || a.conversed && a.commonChats > 0) {
             return r;
+        }
+        if (a.usernames != null) {
+            for (String u : a.usernames) {
+                if (u != null && OFFICIAL_USERNAMES.contains(u.toLowerCase(Locale.ROOT))) {
+                    return r;
+                }
+            }
         }
         final String name = ((a.firstName == null ? "" : a.firstName) + " " + (a.lastName == null ? "" : a.lastName)).trim();
         final String lowerName = name.toLowerCase(Locale.ROOT).replace('ё', 'е');
         final String skeletonName = skeleton(lowerName);
-        String nameWord = null;
-        int nameWeight = 0, nameWords = 0;
-        for (String[] w : NAME_WORDS) {
-            if (lowerName.contains(w[0]) || skeletonName.contains(w[0])) {
-                nameWords++;
-                if (Integer.parseInt(w[1]) > nameWeight) {
-                    nameWord = w[0];
-                    nameWeight = Integer.parseInt(w[1]);
-                }
-            }
-        }
-        if (nameWord != null) {
-            // "Служба безопасности Сбербанка": a staff word and a brand say more than one of them
-            r.add(A_NAME_IMPERSONATION, nameWord, nameWeight + Math.min(20, 10 * (nameWords - 1)));
+        final String staff = firstIn(lowerName, skeletonName, NAME_STAFF);
+        final String authority = firstIn(lowerName, skeletonName, NAME_AUTHORITY);
+        final String telegram = firstIn(lowerName, skeletonName, NAME_TELEGRAM);
+        final boolean topic = telegram != null && firstIn(lowerName, skeletonName, NAME_TOPIC) != null;
+        if (staff != null && authority != null || topic) {
+            // "Служба безопасности Сбербанка", "Telegram Support"
+            r.add(A_NAME_IMPERSONATION, authority != null ? authority : telegram, 45, KIND_HARD, G_NAME);
+        } else if (telegram != null) {
+            r.add(A_NAME_IMPERSONATION, telegram, telegram.contains(" ") ? 40 : 25, telegram.contains(" ") ? KIND_HARD : KIND_MEDIUM, G_NAME);
+        } else if (authority != null && !authority.equals("банк") && !authority.equals("bank") && !authority.equals("wallet") && !authority.equals("кошелек")) {
+            r.add(A_NAME_IMPERSONATION, authority, 20, KIND_MEDIUM, 0);
+        } else if (staff != null) {
+            r.add(A_NAME_IMPERSONATION, staff, a.bot ? 5 : 15, a.bot ? KIND_WEAK : KIND_MEDIUM, 0); // a shop's support bot
         }
         int usernameWeight = 0;
         String usernameArg = null;
@@ -1348,70 +1909,90 @@ public final class SolegramScamRules {
                 }
             }
         }
-        if (usernameWeight >= 30) {
-            // a name and a username saying the same count a bit more than one of them
-            r.add(A_USERNAME_IMPERSONATION, usernameArg, nameWord != null ? 15 : Math.min(40, usernameWeight));
+        if (usernameWeight >= 45) {
+            r.add(A_USERNAME_IMPERSONATION, usernameArg, 30, KIND_HARD, G_USERNAME);
+        } else if (usernameWeight >= 25) {
+            r.add(A_USERNAME_IMPERSONATION, usernameArg, 15, KIND_MEDIUM, 0);
         }
         for (String mark : CHECKMARKS) {
             if (lowerName.contains(mark)) {
-                r.add(A_FAKE_CHECKMARK, null, 30);
+                r.add(A_FAKE_CHECKMARK, null, 30, KIND_HARD, G_CHECKMARK);
                 break;
             }
         }
-        if (a.contactNames != null && !a.contactNames.isEmpty()) {
+        // someone copying a contact: the same full name (a first name alone is shared by thousands)
+        boolean clone = false;
+        if (a.contactNames != null && !a.contactNames.isEmpty() && a.firstName != null && a.lastName != null
+            && !a.firstName.trim().isEmpty() && !a.lastName.trim().isEmpty()) {
             final String key = normalizeName(a.firstName, a.lastName);
-            final String contact = key.length() >= 5 ? a.contactNames.get(key) : null;
+            final String contact = key.length() >= 8 && key.contains(" ") ? a.contactNames.get(key) : null;
             if (contact != null) {
-                final boolean full = key.contains(" ");
-                r.add(A_CONTACT_NAME, contact, full && key.length() >= 8 ? 45 : 25);
+                r.add(A_CONTACT_NAME, contact, 35, KIND_HARD, G_CLONE);
+                clone = true;
             }
         }
         if (a.commonChats == 0) {
-            r.add(A_NO_COMMON_GROUPS, null, 10);
+            r.add(A_NO_COMMON_GROUPS, null, 5);
         }
         if (a.usernames == null || a.usernames.length == 0) {
-            r.add(A_NO_USERNAME, null, 5);
+            r.add(A_NO_USERNAME, null, 3);
         }
         if (!a.hasPhoto) {
-            r.add(A_NO_PHOTO, null, 5);
+            r.add(A_NO_PHOTO, null, 3);
         }
         int monthsOld = -1;
         if (a.registrationMonth != null && !a.bot) {
             monthsOld = monthsSince(a.registrationMonth, now);
             if (monthsOld >= 0 && monthsOld <= 1) {
-                r.add(A_NEW_ACCOUNT, a.registrationMonth, 30);
+                r.add(A_NEW_ACCOUNT, a.registrationMonth, 15, KIND_MEDIUM, 0);
             } else if (monthsOld >= 0 && monthsOld <= 3) {
-                r.add(A_NEW_ACCOUNT, a.registrationMonth, 20);
+                r.add(A_NEW_ACCOUNT, a.registrationMonth, 10, KIND_MEDIUM, 0);
             } else if (monthsOld >= 0 && monthsOld <= 6) {
-                r.add(A_NEW_ACCOUNT, a.registrationMonth, 10);
+                r.add(A_NEW_ACCOUNT, a.registrationMonth, 5);
             }
         }
         final int nameDays = a.nameChangeDate > 0 ? (int) Math.max(0, (now - a.nameChangeDate) / 86400L) : -1;
         final int photoDays = a.photoChangeDate > 0 ? (int) Math.max(0, (now - a.photoChangeDate) / 86400L) : -1;
         if (nameDays >= 0 && nameDays <= 7) {
-            r.add(A_NAME_CHANGED, String.valueOf(nameDays), 20);
+            r.add(A_NAME_CHANGED, String.valueOf(nameDays), 12, KIND_MEDIUM, 0);
         } else if (nameDays >= 0 && nameDays <= 30) {
-            r.add(A_NAME_CHANGED, String.valueOf(nameDays), 12);
+            r.add(A_NAME_CHANGED, String.valueOf(nameDays), 6);
         }
         if (photoDays >= 0 && photoDays <= 7) {
-            r.add(A_PHOTO_CHANGED, String.valueOf(photoDays), 12);
-        } else if (photoDays >= 0 && photoDays <= 30) {
             r.add(A_PHOTO_CHANGED, String.valueOf(photoDays), 6);
+        } else if (photoDays >= 0 && photoDays <= 30) {
+            r.add(A_PHOTO_CHANGED, String.valueOf(photoDays), 3);
         }
         if (monthsOld >= 0 && monthsOld <= 3 && (nameDays >= 0 && nameDays <= 30 || photoDays >= 0 && photoDays <= 30)) {
-            r.add(A_FRESH_AND_CHANGED, null, 15);
+            // one more face of "someone made up a person": the same piece of evidence as a copied contact's name
+            r.add(A_FRESH_AND_CHANGED, null, clone ? 10 : 25, KIND_HARD, G_CLONE);
         }
         if (a.wroteFirst && a.firstMessagesLinks > 0) {
-            r.add(A_FIRST_LINKS, null, 15);
+            if (a.commonChats == 0) {
+                r.add(A_FIRST_LINKS, null, 20, KIND_HARD, G_COLD); // a cold message with links from nowhere
+            } else {
+                r.add(A_FIRST_LINKS, null, 10, KIND_MEDIUM, 0);
+            }
         }
         if (a.firstMessages != null) {
             final TextReport t = scoreText(a.firstMessages);
+            final boolean strong = a.wroteFirst && t.score >= 20;
             for (Reason reason : t.reasons) {
-                r.reasons.add(reason);
+                // listed with their own weights; the sum is added once below (capped as the text's score is)
+                r.reasons.add(new Reason(reason.code, null, reason.weight, strong ? KIND_HARD : KIND_MEDIUM, strong ? G_TEXT : 0));
             }
-            r.score += a.wroteFirst ? t.score : t.score / 2;
+            r.score += strong ? t.score : t.score / 2;
         }
         return r;
+    }
+
+    private static String firstIn(String lower, String skeleton, String[] words) {
+        for (String w : words) {
+            if (lower.contains(w) || skeleton.contains(w)) {
+                return w;
+            }
+        }
+        return null;
     }
 
     /** A name as compared with the contacts' names: lowercase, letters only, look-alike letters as Latin. */
@@ -1453,6 +2034,59 @@ public final class SolegramScamRules {
     }
 
     // endregion
+
+    /** Pairs of letters that read alike at a glance (after {@link #fold}): one swapped for the other is a disguise. */
+    private static final String[] VISUAL_PAIRS = {"il", "ij", "lj", "uv", "nm", "nh", "ce", "co", "eo", "ae", "ao", "gq", "pq", "bd", "vy", "kx", "uw", "vw"};
+
+    /** A one-letter edit that deceives the eye: a dropped or doubled letter, two swapped, or a look-alike letter. */
+    static boolean visualEdit(String label, String brand) {
+        final int n = label.length(), m = brand.length();
+        if (n == m) {
+            int first = -1, second = -1, diffs = 0;
+            for (int i = 0; i < n; i++) {
+                if (label.charAt(i) != brand.charAt(i)) {
+                    if (first < 0) {
+                        first = i;
+                    } else {
+                        second = i;
+                    }
+                    diffs++;
+                }
+            }
+            if (diffs == 2) {
+                return second == first + 1 && label.charAt(first) == brand.charAt(second) && label.charAt(second) == brand.charAt(first);
+            }
+            if (diffs != 1) {
+                return false;
+            }
+            final char a = label.charAt(first), b = brand.charAt(first);
+            for (String pair : VISUAL_PAIRS) {
+                if (pair.charAt(0) == a && pair.charAt(1) == b || pair.charAt(0) == b && pair.charAt(1) == a) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (n == m + 1) {
+            // a letter added: doubled (telegramm, wildberriess) or a hyphen
+            for (int i = 0; i < n; i++) {
+                if (i >= m || label.charAt(i) != brand.charAt(i)) {
+                    final char extra = label.charAt(i);
+                    return extra == '-' || i > 0 && label.charAt(i - 1) == extra || i + 1 < n && label.charAt(i + 1) == extra;
+                }
+            }
+            return false;
+        }
+        if (n == m - 1) {
+            // a letter dropped inside the name (wildberies, telgram); not at its end (megafo, faceit -> facet is excluded)
+            for (int i = 0; i < m; i++) {
+                if (i >= n || label.charAt(i) != brand.charAt(i)) {
+                    return i > 0 && i < m - 1;
+                }
+            }
+        }
+        return false;
+    }
 
     // region Text helpers
 

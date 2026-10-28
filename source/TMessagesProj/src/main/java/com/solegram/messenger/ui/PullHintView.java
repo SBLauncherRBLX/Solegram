@@ -34,6 +34,7 @@ public class PullHintView extends View {
 
     private final Paint circlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Drawable icon;
+    private int iconColor;
     private final AnimatedFloat armed = new AnimatedFloat(this, 0, 220, CubicBezierInterpolator.EASE_OUT_QUINT);
     private float progress;
 
@@ -70,7 +71,11 @@ public class PullHintView extends View {
         canvas.drawCircle(cx, cy, r, circlePaint);
 
         final int iconColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), 0xFFFFFFFF, a);
-        icon.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
+        if (iconColor != this.iconColor || icon.getColorFilter() == null) {
+            // a new filter only when the colour changes (it stays put while the pull is held)
+            this.iconColor = iconColor;
+            icon.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
+        }
         final int half = (int) (dp(12) * (0.6f + 0.4f * eased));
         icon.setBounds((int) cx - half, (int) cy - half, (int) cx + half, (int) cy + half);
         icon.setAlpha((int) (255 * t));

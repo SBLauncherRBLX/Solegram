@@ -54,8 +54,9 @@ import java.util.List;
 /**
  * Profile links as buttons: a capsule per link with the platform's mark in its colour and the platform's name,
  * wrapping onto more rows. With liquid glass on, the capsules are glass (a light fill, a rim lit from above,
- * a soft shadow); otherwise plain soft capsules. Tap opens, long press copies; on the own profile a last
- * capsule opens the editor. Everything is measured when the links change, nothing is made while drawing.
+ * a soft shadow); otherwise plain soft capsules. Tap opens, long press copies; on the own profile a last,
+ * neutral capsule (a pencil, no brand circle) opens the editor. Everything is measured when the links change,
+ * nothing is made while drawing.
  */
 public class SolegramProfileLinksView extends View {
 
@@ -69,7 +70,11 @@ public class SolegramProfileLinksView extends View {
         }
     }
 
-    private static final float CHIP_HEIGHT = 34, GAP = 8, ICON = 24, SIDE = 16, VERTICAL = 8;
+    private static final float CHIP_HEIGHT = 32, GAP = 8, ICON = 22, SIDE = 16, VERTICAL = 8;
+    /** Room around the mark (left), between mark and name, and after the name. */
+    private static final float MARK_PAD = 5, TEXT_PAD = 7, END_PAD = 13;
+    /** The edit capsule: a bare pencil instead of a brand circle. */
+    private static final float EDIT_ICON = 18, EDIT_PAD = 10;
 
     private final Theme.ResourcesProvider resourcesProvider;
     private final ArrayList<Chip> chips = new ArrayList<>();
@@ -79,6 +84,7 @@ public class SolegramProfileLinksView extends View {
     private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint circlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF tmp = new RectF();
     private final AccessHelper accessHelper;
 
@@ -115,7 +121,7 @@ public class SolegramProfileLinksView extends View {
             icon = d == null ? null : d.mutate();
             brand = link != null && !link.platform.isWebsite() ? link.platform.color : Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
             fullLabel = label = link != null ? link.label() : LocaleController.getString(R.string.Edit);
-            if (icon != null) {
+            if (icon != null && link != null) {
                 // white on the brand colour, dark on a light one (Snapchat)
                 final boolean lightBrand = ColorUtils.calculateLuminance(brand) > 0.6;
                 icon.setColorFilter(new PorterDuffColorFilter(lightBrand ? 0xFF000000 : 0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
@@ -140,10 +146,12 @@ public class SolegramProfileLinksView extends View {
     public SolegramProfileLinksView(Context context, Theme.ResourcesProvider resourcesProvider) {
         super(context);
         this.resourcesProvider = resourcesProvider;
-        textPaint.setTextSize(dp(14));
+        textPaint.setTextSize(dp(13.5f));
         textPaint.setTypeface(AndroidUtilities.bold());
         rimPaint.setStyle(Paint.Style.STROKE);
         rimPaint.setStrokeWidth(Math.max(1, dpf2(1f)));
+        outlinePaint.setStyle(Paint.Style.STROKE);
+        outlinePaint.setStrokeWidth(Math.max(1, dpf2(1f)));
         accessHelper = new AccessHelper(this);
         ViewCompat.setAccessibilityDelegate(this, accessHelper);
     }
@@ -224,7 +232,7 @@ public class SolegramProfileLinksView extends View {
         }
         laidOutWidth = width;
         final float left = dp(SIDE), right = width - dp(SIDE), h = dp(CHIP_HEIGHT);
-        final float maxText = Math.max(dp(40), right - left - dp(5 + ICON + 7 + 14));
+        final float maxText = Math.max(dp(40), right - left - dp(MARK_PAD + ICON + TEXT_PAD + END_PAD));
         float x = left, y = dp(VERTICAL);
         final boolean rtl = LocaleController.isRTL;
         for (Chip c : chips) {
@@ -236,7 +244,7 @@ public class SolegramProfileLinksView extends View {
             }
             c.label = label;
             c.labelWidth = tw;
-            final float w = dp(5 + ICON + 7 + 14) + tw;
+            final float w = (c.link == null ? dp(EDIT_PAD + EDIT_ICON + 6 + END_PAD) : dp(MARK_PAD + ICON + TEXT_PAD + END_PAD)) + tw;
             if (x > left && x + w > right) {
                 x = left;
                 y += h + dp(GAP);
@@ -286,12 +294,13 @@ public class SolegramProfileLinksView extends View {
                 final float s = 1f - 0.05f * c.press;
                 canvas.scale(s, s, r.centerX(), r.centerY());
             }
+            final boolean edit = c.link == null;
             if (glass) {
                 // glass: a light body lifted by a soft shadow, a whisper of the brand, the rim lit from above
                 shadowPaint.setColor(bg);
                 canvas.drawRoundRect(r, radius, radius, shadowPaint);
                 final int body = dark ? ColorUtils.compositeColors(0x14FFFFFF, bg) : ColorUtils.compositeColors(0xB3FFFFFF, bg);
-                fillPaint.setColor(ColorUtils.blendARGB(body, c.brand, dark ? 0.12f : 0.07f));
+                fillPaint.setColor(edit ? body : ColorUtils.blendARGB(body, c.brand, dark ? 0.09f : 0.05f));
                 canvas.drawRoundRect(r, radius, radius, fillPaint);
                 if (c.rim == null) {
                     c.rim = new LinearGradient(0, r.top, 0, r.bottom,
@@ -302,8 +311,14 @@ public class SolegramProfileLinksView extends View {
                 tmp.set(r);
                 tmp.inset(rimPaint.getStrokeWidth() / 2f, rimPaint.getStrokeWidth() / 2f);
                 canvas.drawRoundRect(tmp, radius, radius, rimPaint);
+            } else if (edit) {
+                // the editor's capsule: an outline only, it is not one of the links
+                outlinePaint.setColor(ColorUtils.setAlphaComponent(text, dark ? 0x38 : 0x2E));
+                tmp.set(r);
+                tmp.inset(outlinePaint.getStrokeWidth() / 2f, outlinePaint.getStrokeWidth() / 2f);
+                canvas.drawRoundRect(tmp, radius, radius, outlinePaint);
             } else {
-                fillPaint.setColor(ColorUtils.blendARGB(ColorUtils.compositeColors(ColorUtils.setAlphaComponent(text, dark ? 0x14 : 0x0B), bg), c.brand, dark ? 0.10f : 0.06f));
+                fillPaint.setColor(ColorUtils.blendARGB(ColorUtils.compositeColors(ColorUtils.setAlphaComponent(text, dark ? 0x14 : 0x0B), bg), c.brand, dark ? 0.08f : 0.05f));
                 canvas.drawRoundRect(r, radius, radius, fillPaint);
             }
             if (c.press > 0) {
@@ -311,25 +326,52 @@ public class SolegramProfileLinksView extends View {
                 pressPaint.setAlpha((int) (Color.alpha(selector) * c.press));
                 canvas.drawRoundRect(r, radius, radius, pressPaint);
             }
-            // the mark: white on the brand colour (dark on a light one), lifted a little on a dark page
-            final float iconSize = dp(ICON);
-            final float cx = LocaleController.isRTL ? r.right - dp(5) - iconSize / 2f : r.left + dp(5) + iconSize / 2f;
             final float cy = r.centerY();
-            int circle = c.brand;
-            if (dark && ColorUtils.calculateLuminance(circle) < 0.03) {
-                circle = ColorUtils.blendARGB(circle, 0xFFFFFFFF, 0.16f);
+            final float tx;
+            if (edit) {
+                // a bare pencil in the secondary text colour
+                final float iconSize = dp(EDIT_ICON);
+                final float cx = LocaleController.isRTL ? r.right - dp(EDIT_PAD) - iconSize / 2f : r.left + dp(EDIT_PAD) + iconSize / 2f;
+                if (c.icon != null) {
+                    c.icon.setColorFilter(editIconColor(text));
+                    final int half = (int) (iconSize / 2f);
+                    c.icon.setBounds((int) cx - half, (int) cy - half, (int) cx + half, (int) cy + half);
+                    c.icon.draw(canvas);
+                }
+                tx = LocaleController.isRTL ? r.right - dp(EDIT_PAD + EDIT_ICON + 6) - c.labelWidth : r.left + dp(EDIT_PAD + EDIT_ICON + 6);
+            } else {
+                // the mark: white on the brand colour (dark on a light one), lifted a little on a dark page
+                final float iconSize = dp(ICON);
+                final float cx = LocaleController.isRTL ? r.right - dp(MARK_PAD) - iconSize / 2f : r.left + dp(MARK_PAD) + iconSize / 2f;
+                int circle = c.brand;
+                if (dark && ColorUtils.calculateLuminance(circle) < 0.03) {
+                    circle = ColorUtils.blendARGB(circle, 0xFFFFFFFF, 0.16f);
+                }
+                circlePaint.setColor(circle);
+                canvas.drawCircle(cx, cy, iconSize / 2f, circlePaint);
+                if (c.icon != null) {
+                    final int half = dp(6.5f);
+                    c.icon.setBounds((int) cx - half, (int) cy - half, (int) cx + half, (int) cy + half);
+                    c.icon.draw(canvas);
+                }
+                tx = LocaleController.isRTL ? r.right - dp(MARK_PAD + ICON + TEXT_PAD) - c.labelWidth : r.left + dp(MARK_PAD + ICON + TEXT_PAD);
             }
-            circlePaint.setColor(circle);
-            canvas.drawCircle(cx, cy, iconSize / 2f, circlePaint);
-            if (c.icon != null) {
-                final int half = dp(c.link == null ? 8 : 7);
-                c.icon.setBounds((int) cx - half, (int) cy - half, (int) cx + half, (int) cy + half);
-                c.icon.draw(canvas);
-            }
-            final float tx = LocaleController.isRTL ? r.right - dp(5 + ICON + 7) - c.labelWidth : r.left + dp(5 + ICON + 7);
             canvas.drawText(c.label, tx, cy - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
             canvas.restore();
         }
+    }
+
+    private PorterDuffColorFilter editFilter;
+    private int editFilterColor;
+
+    /** The pencil's filter in the secondary text colour, made again only when the theme changes. */
+    private PorterDuffColorFilter editIconColor(int text) {
+        final int color = ColorUtils.setAlphaComponent(text, 0x99);
+        if (editFilter == null || editFilterColor != color) {
+            editFilterColor = color;
+            editFilter = new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN);
+        }
+        return editFilter;
     }
 
     // region Touch

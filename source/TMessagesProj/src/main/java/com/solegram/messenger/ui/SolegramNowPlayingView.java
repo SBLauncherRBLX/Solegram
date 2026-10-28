@@ -83,6 +83,17 @@ public class SolegramNowPlayingView extends View {
     private final Matrix coverMatrix = new Matrix();
     private BitmapShader washShader, coverShader;
     private Bitmap coverShaderBitmap;
+    // the card redraws every frame while music plays (equalizer, progress): what each frame would otherwise
+    // allocate again is kept until its inputs change
+    private final Path markPath = new Path();
+    private LinearGradient washFade, coverFill;
+    private float washFadeLeft, washFadeRight, coverFillLeft, coverFillTop;
+    private int washFadeBase, coverFillTint;
+    private boolean washFadeDark;
+    private String timeText;
+    private long timeKey = -1;
+    private CharSequence titleSource, titleShown, artistSource, artistShown;
+    private float titleWidth = -1, artistWidth = -1;
     private float contentAlpha = 1f;
     private ValueAnimator fadeAnimator;
     // the progress line glides to a new place after a seek, and follows the song exactly while it plays
@@ -228,8 +239,15 @@ public class SolegramNowPlayingView extends View {
             canvas.clipPath(clip);
             canvas.drawRect(card, washPaint);
             // the left side stays calmer under the cover, the text side clear for reading
-            fillPaint.setShader(new LinearGradient(card.left, 0, card.right, 0,
-                ColorUtils.setAlphaComponent(base, dark ? 0x10 : 0x30), ColorUtils.setAlphaComponent(base, dark ? 0x60 : 0x90), Shader.TileMode.CLAMP));
+            if (washFade == null || washFadeLeft != card.left || washFadeRight != card.right || washFadeBase != base || washFadeDark != dark) {
+                washFadeLeft = card.left;
+                washFadeRight = card.right;
+                washFadeBase = base;
+                washFadeDark = dark;
+                washFade = new LinearGradient(card.left, 0, card.right, 0,
+                    ColorUtils.setAlphaComponent(base, dark ? 0x10 : 0x30), ColorUtils.setAlphaComponent(base, dark ? 0x60 : 0x90), Shader.TileMode.CLAMP);
+            }
+            fillPaint.setShader(washFade);
             canvas.drawRect(card, fillPaint);
             fillPaint.setShader(null);
             canvas.restore();
@@ -250,7 +268,7 @@ public class SolegramNowPlayingView extends View {
 
         if (track == null) {
             artistPaint.setColor(grayColor);
-            final CharSequence empty = emptyText == null ? "" : TextUtils.ellipsize(emptyText, artistPaint, textWidth, TextUtils.TruncateAt.END);
+            final CharSequence empty = emptyText == null ? "" : ellipsizeArtist(emptyText, textWidth);
             canvas.drawText(empty, 0, empty.length(), textLeft, card.centerY() + dp(5), artistPaint);
             selector.draw(canvas);
             return;
@@ -272,7 +290,12 @@ public class SolegramNowPlayingView extends View {
         final boolean showProgress = self && !track.remote && track.duration > 0;
         if (showProgress) {
             final long position = track.currentPosition();
-            final String time = format(position) + " / " + format(track.duration);
+            final long key = (position / 1000) * 1_000_000L + track.duration / 1000;
+            if (key != timeKey || timeText == null) {
+                timeKey = key;
+                timeText = format(position) + " / " + format(track.duration);
+            }
+            final String time = timeText;
             timePaint.setColor(grayColor);
             timePaint.setAlpha(alpha);
             canvas.drawText(time, textRight - timePaint.measureText(time), statusBaseline, timePaint);
@@ -280,7 +303,12 @@ public class SolegramNowPlayingView extends View {
 
         titlePaint.setColor(textColor);
         titlePaint.setAlpha(alpha);
-        final CharSequence title = TextUtils.ellipsize(track.title, titlePaint, textWidth, TextUtils.TruncateAt.END);
+        if (titleShown == null || titleSource != track.title || titleWidth != textWidth) {
+            titleSource = track.title;
+            titleWidth = textWidth;
+            titleShown = TextUtils.ellipsize(track.title, titlePaint, textWidth, TextUtils.TruncateAt.END);
+        }
+        final CharSequence title = titleShown;
         // a new song's lines rise into place as they fade in
         final float rise = dp(8) * (1f - contentAlpha);
         canvas.drawText(title, 0, title.length(), textLeft, card.top + dp(showProgress ? 46 : 50) + rise, titlePaint);
@@ -288,7 +316,7 @@ public class SolegramNowPlayingView extends View {
         if (!TextUtils.isEmpty(track.artist)) {
             artistPaint.setColor(grayColor);
             artistPaint.setAlpha(alpha);
-            final CharSequence artist = TextUtils.ellipsize(track.artist, artistPaint, textWidth, TextUtils.TruncateAt.END);
+            final CharSequence artist = ellipsizeArtist(track.artist, textWidth);
             canvas.drawText(artist, 0, artist.length(), textLeft, card.top + dp(showProgress ? 65 : 70) + rise * 1.4f, artistPaint);
         }
 
@@ -333,8 +361,14 @@ public class SolegramNowPlayingView extends View {
             coverPaint.setShader(null);
         } else {
             // no cover (someone else's track, or the player gives none): a cover of the track's colour
-            coverPaint.setShader(new LinearGradient(cover.left, cover.top, cover.right, cover.bottom,
-                ColorUtils.blendARGB(tint, Color.WHITE, 0.25f), ColorUtils.blendARGB(tint, Color.BLACK, 0.25f), Shader.TileMode.CLAMP));
+            if (coverFill == null || coverFillLeft != cover.left || coverFillTop != cover.top || coverFillTint != tint) {
+                coverFillLeft = cover.left;
+                coverFillTop = cover.top;
+                coverFillTint = tint;
+                coverFill = new LinearGradient(cover.left, cover.top, cover.right, cover.bottom,
+                    ColorUtils.blendARGB(tint, Color.WHITE, 0.25f), ColorUtils.blendARGB(tint, Color.BLACK, 0.25f), Shader.TileMode.CLAMP);
+            }
+            coverPaint.setShader(coverFill);
             coverPaint.setAlpha(track == null ? 0x80 : alpha);
             canvas.drawRoundRect(cover, r, r, coverPaint);
             coverPaint.setShader(null);
@@ -367,7 +401,7 @@ public class SolegramNowPlayingView extends View {
         if (track != null && track.source == SolegramNowPlaying.SOURCE_SPOTIFY) {
             markPaint.setStyle(Paint.Style.STROKE);
             markPaint.setStrokeCap(Paint.Cap.ROUND);
-            final Path p = new Path();
+            final Path p = markPath;
             for (int i = 0; i < 3; i++) {
                 final float w = r * (1.18f - i * 0.22f);
                 final float y = cy - r * 0.32f + i * r * 0.31f;
@@ -421,6 +455,16 @@ public class SolegramNowPlayingView extends View {
             canvas.drawRoundRect(tmp, w / 2f, w / 2f, barPaint);
         }
         return playing;
+    }
+
+    /** The artist line (or the empty card's text), ellipsized again only when the text or the width changes. */
+    private CharSequence ellipsizeArtist(CharSequence text, float width) {
+        if (artistShown == null || artistSource != text || artistWidth != width) {
+            artistSource = text;
+            artistWidth = width;
+            artistShown = TextUtils.ellipsize(text, artistPaint, width, TextUtils.TruncateAt.END);
+        }
+        return artistShown;
     }
 
     private static String format(long ms) {

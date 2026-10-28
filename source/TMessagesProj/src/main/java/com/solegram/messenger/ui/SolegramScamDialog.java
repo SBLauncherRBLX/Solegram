@@ -15,9 +15,13 @@ import android.text.style.UnderlineSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
+
+import com.solegram.messenger.SolegramGlass;
 import com.solegram.messenger.SolegramScamGuard;
 import com.solegram.messenger.SolegramScamRules;
 
@@ -27,7 +31,7 @@ import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Cells.CheckBoxCell;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
@@ -37,19 +41,22 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
 /**
- * The warning before a suspicious link opens: the real site in big letters with the deceiving part in colour,
- * why it looks wrong, and "Don't open" as the main answer. "Check with AI" asks for a second opinion right here.
+ * The warning before a suspicious link opens, and the details of a suspicious stranger. One calm layout on the
+ * dialog's reading glass: an icon and a verdict capsule, the real site in big letters with the deceiving part in
+ * colour, a short "what looks wrong" card, one line of advice, then the answers: "Don't open" as the main one,
+ * "Check with AI" and "Open anyway" beside each other, and a quiet "Not a scam" that trusts the site for good.
+ * Amber says "be careful", red only "this is a scam".
  */
 public final class SolegramScamDialog {
 
-    private static final int[] ORANGE = {0xFFFF9500, 0xFFFF9F0A};
-    private static final int[] RED = {0xFFFF3B30, 0xFFFF453A};
     private static final int MAX_REASONS = 5;
 
     private SolegramScamDialog() {
     }
 
-    /** @param open opens the link (after "Open anyway") */
+    // region Link
+
+    /** @param open opens the link (after "Open anyway" or "Not a scam") */
     public static void show(BaseFragment fragment, SolegramScamGuard.Link link, Runnable open) {
         final Context context = fragment.getParentActivity();
         if (context == null) {
@@ -61,40 +68,31 @@ public final class SolegramScamDialog {
         final int accent = SolegramScamGuard.levelColor(level);
         final int textColor = Theme.getColor(Theme.key_dialogTextBlack, rp);
         final int grayColor = Theme.getColor(Theme.key_dialogTextGray3, rp);
+        final int blue = Theme.getColor(Theme.key_featuredStickers_addButton, rp);
         final AlertDialog[] dialog = new AlertDialog[1];
 
-        final LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(22), dp(22), dp(10));
+        final LinearLayout root = column(context);
+        root.setPadding(dp(20), dp(22), dp(20), dp(12));
 
-        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, level == SolegramScamRules.DANGER ? RED : ORANGE, 52);
-        root.addView(icon, LayoutHelper.createLinear(52, 52, Gravity.CENTER_HORIZONTAL));
+        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, SolegramScamGuard.levelTileColors(level), 56);
+        root.addView(icon, LayoutHelper.createLinear(56, 56, Gravity.CENTER_HORIZONTAL));
 
-        final TextView title = text(context, getString(R.string.SG_ScamLinkTitle), 19, textColor);
+        final TextView title = text(context, getString(R.string.SG_ScamLinkTitle), 20, textColor);
         title.setTypeface(AndroidUtilities.bold());
         title.setGravity(Gravity.CENTER);
         root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 0));
 
-        final TextView verdict = text(context, getString(level == SolegramScamRules.DANGER ? R.string.SG_ScamLevelDanger : R.string.SG_ScamLevelCaution), 14, accent);
-        verdict.setGravity(Gravity.CENTER);
-        root.addView(verdict, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 3, 0, 0));
+        final TextView verdict = capsule(context, getString(level == SolegramScamRules.DANGER ? R.string.SG_ScamLevelDanger : R.string.SG_ScamLevelCaution), accent);
+        root.addView(verdict, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 8, 0, 0));
 
         // the site, as big as a name: what the user is about to trust
-        final LinearLayout card = new LinearLayout(context);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(14), dp(12));
-        final GradientDrawable cardBg = new GradientDrawable();
-        cardBg.setCornerRadius(dp(18));
-        cardBg.setColor(Theme.multAlpha(textColor, 0.06f));
-        card.setBackground(cardBg);
-
+        final LinearLayout card = card(context, textColor);
         final TextView domain = text(context, headline(report, accent), 21, textColor);
         domain.setTypeface(AndroidUtilities.bold());
         domain.setGravity(Gravity.CENTER);
         domain.setMaxLines(3);
         domain.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(domain, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-
         final String full = report.url;
         if (!TextUtils.isEmpty(full) && !full.equals(domain.getText().toString())) {
             final TextView url = text(context, full, 12.5f, grayColor);
@@ -103,100 +101,115 @@ public final class SolegramScamDialog {
             url.setEllipsize(TextUtils.TruncateAt.MIDDLE);
             card.addView(url, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
         }
-        root.addView(card, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 16, 0, 0));
-
         if (report.site != null && report.displayHost != null && report.telegramUsername == null && !report.site.equals(report.host)
             && !report.site.equals(report.displayHost)) {
             final TextView owner = text(context, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.SG_ScamRealSite, report.site)), 13, grayColor);
             owner.setGravity(Gravity.CENTER);
-            root.addView(owner, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
+            card.addView(owner, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
+        }
+        root.addView(card, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 18, 0, 0));
+
+        // what looks wrong
+        final View why = reasonsCard(context, link.reasons(), accent, textColor, grayColor);
+        if (why != null) {
+            root.addView(why, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
         }
 
-        // why
-        final List<SolegramScamRules.Reason> reasons = link.reasons();
-        final LinearLayout list = new LinearLayout(context);
-        list.setOrientation(LinearLayout.VERTICAL);
-        for (int i = 0; i < reasons.size() && i < MAX_REASONS; i++) {
-            list.addView(reasonRow(context, SolegramScamGuard.reasonText(reasons.get(i)), accent, textColor),
-                LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, i == 0 ? 0 : 8, 0, 0));
-        }
-        if (list.getChildCount() > 0) {
-            root.addView(list, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 2, 16, 2, 0));
-        }
+        final TextView hint = text(context, getString(level == SolegramScamRules.DANGER ? R.string.SG_ScamHintDanger : R.string.SG_ScamHintCaution), 13, grayColor);
+        hint.setGravity(Gravity.CENTER);
+        hint.setLineSpacing(dp(1), 1f);
+        root.addView(hint, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 6, 12, 6, 0));
 
         // what AI said (Gemini Nano may have looked already)
         final TextView ai = text(context, "", 14, textColor);
         ai.setPadding(dp(14), dp(10), dp(14), dp(10));
+        ai.setLineSpacing(dp(1), 1f);
         final GradientDrawable aiBg = new GradientDrawable();
         aiBg.setCornerRadius(dp(16));
-        aiBg.setColor(Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton, rp), 0.1f));
+        aiBg.setColor(Theme.multAlpha(blue, 0.1f));
         ai.setBackground(aiBg);
         ai.setVisibility(View.GONE);
-        root.addView(ai, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 0));
+        root.addView(ai, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
         if (link.aiLevel >= 0) {
             ai.setText(SolegramScamGuard.verdictLine(link));
             ai.setVisibility(View.VISIBLE);
-        }
-
-        // "trust this site": only for web sites (a Telegram username is not a site)
-        final boolean canTrust = report.site != null && report.telegramUsername == null && !report.telegramService && report.host != null;
-        final CheckBoxCell trust = canTrust ? new CheckBoxCell(context, 1, rp) : null;
-        if (trust != null) {
-            trust.setText(getString(R.string.SG_ScamTrustSite), "", false, false);
-            trust.setPadding(LocaleController.isRTL ? dp(8) : 0, 0, LocaleController.isRTL ? 0 : dp(8), 0);
-            trust.setBackground(Theme.getSelectorDrawable(false));
-            trust.setOnClickListener(v -> trust.setChecked(!trust.isChecked(), true));
-            root.addView(trust, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, -14, 8, -14, 0));
         }
 
         // the safe answer is the big one
         final ButtonWithCounterView dontOpen = new ButtonWithCounterView(context, rp);
         dontOpen.setText(getString(R.string.SG_ScamDontOpen), false);
         dontOpen.setOnClickListener(v -> dismiss(dialog));
-        root.addView(dontOpen, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, trust != null ? 10 : 18, 0, 0));
+        root.addView(dontOpen, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 18, 0, 0));
 
-        final TextView askAi = flatButton(context, getString(R.string.SG_ScamCheckAi), Theme.getColor(Theme.key_featuredStickers_addButton, rp), rp);
+        final LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView askAi = flatButton(context, getString(R.string.SG_ScamCheckAi), blue);
+        final TextView openAnyway = flatButton(context, getString(R.string.SG_ScamOpenAnyway),
+            level == SolegramScamRules.DANGER ? Theme.getColor(Theme.key_text_RedBold, rp) : accent);
+        row.addView(askAi, LayoutHelper.createLinear(0, 44, 1f, 0, 0, 4, 0));
+        row.addView(openAnyway, LayoutHelper.createLinear(0, 44, 1f, 4, 0, 0, 0));
+        root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 0, 8, 0, 0));
         askAi.setOnClickListener(v -> {
             askAi.setEnabled(false);
+            SolegramMotion.fadeTo(askAi, 0.6f);
             askAi.setText(getString(R.string.SG_ScamAiChecking));
             SolegramScamGuard.askAi(link, (answer, error) -> {
                 askAi.setEnabled(true);
+                SolegramMotion.fadeTo(askAi, 1f);
                 askAi.setText(getString(R.string.SG_ScamCheckAi));
                 if (answer == null && error == null) {
                     return; // declined the online service
                 }
+                SolegramMotion.beginLayoutTransition(root);
                 ai.setText(answer != null ? answer : error);
                 ai.setVisibility(View.VISIBLE);
                 if (answer != null) {
                     askAi.setVisibility(View.GONE);
-                    final int now = Math.max(SolegramScamRules.CAUTION, link.level());
-                    verdict.setTextColor(SolegramScamGuard.levelColor(now));
-                    verdict.setText(getString(link.level() == SolegramScamRules.SAFE ? R.string.SG_ScamAiSafe
-                        : now == SolegramScamRules.DANGER ? R.string.SG_ScamLevelDanger : R.string.SG_ScamLevelCaution));
+                    final int now = link.level();
+                    final int shown = Math.max(SolegramScamRules.CAUTION, now);
+                    styleCapsule(verdict, now == SolegramScamRules.SAFE ? blue : SolegramScamGuard.levelColor(shown));
+                    verdict.setText(getString(now == SolegramScamRules.SAFE ? R.string.SG_ScamAiSafe
+                        : shown == SolegramScamRules.DANGER ? R.string.SG_ScamLevelDanger : R.string.SG_ScamLevelCaution));
                 }
             });
         });
         if (link.aiLevel >= 0) {
             askAi.setVisibility(View.GONE);
         }
-        root.addView(askAi, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 0, 6, 0, 0));
-
-        final TextView openAnyway = flatButton(context, getString(R.string.SG_ScamOpenAnyway), Theme.getColor(Theme.key_text_RedBold, rp), rp);
         openAnyway.setOnClickListener(v -> {
-            if (trust != null && trust.isChecked()) {
-                SolegramScamGuard.trustSite(report.site);
-            }
             dismiss(dialog);
             open.run();
         });
-        root.addView(openAnyway, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 0, 0, 0, 0));
 
-        final AlertDialog.Builder builder = new AlertDialog.Builder(context, rp);
-        builder.setView(root);
-        builder.setCustomViewOffset(0);
-        dialog[0] = builder.create();
-        dialog[0].solegramReadingGlass(); // a warning to read: denser glass, as the plugin report
-        fragment.showDialog(dialog[0]);
+        // "not a scam": the site (or the Telegram account) is trusted from now on, and the link opens
+        final boolean canTrustUser = report.telegramUsername != null;
+        final boolean canTrustSite = !canTrustUser && report.site != null && !report.telegramService && report.host != null;
+        if (canTrustSite || canTrustUser) {
+            final TextView notScam = flatButton(context, getString(R.string.SG_ScamNotScam), grayColor);
+            notScam.setTypeface(null);
+            notScam.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            notScam.setBackground(Theme.createRadSelectorDrawable(Theme.multAlpha(grayColor, 0.1f), 14, 14));
+            notScam.setOnClickListener(v -> {
+                final String name;
+                if (canTrustUser) {
+                    SolegramScamGuard.trustUsername(report.telegramUsername);
+                    name = "@" + report.telegramUsername;
+                } else {
+                    SolegramScamGuard.trustSite(report.site);
+                    name = report.site;
+                }
+                dismiss(dialog);
+                BulletinFactory.of(fragment).createSimpleBulletin(R.raw.done, canTrustUser
+                    ? LocaleController.formatString(R.string.SG_ScamTrustedUserDone, name)
+                    : LocaleController.formatString(R.string.SG_ScamTrustedSiteDone, name)).show();
+                open.run();
+            });
+            root.addView(notScam, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 40, 0, 2, 0, 0));
+        }
+
+        SolegramMotion.pressable(askAi, SolegramMotion.PRESS_BUTTON);
+        SolegramMotion.pressable(openAnyway, SolegramMotion.PRESS_BUTTON);
+        present(fragment, context, rp, root, dialog);
     }
 
     /** The host (or @username) with the deceiving letters in the warning colour. */
@@ -223,6 +236,133 @@ public final class SolegramScamDialog {
         return sb;
     }
 
+    // endregion
+
+    // region Account
+
+    /**
+     * Why a stranger looks like a scammer, with Block, Report and "Not a scammer".
+     *
+     * @param name   the stranger's name, as the chat shows it
+     * @param block  asks to block (and report) them
+     * @param report opens Telegram's report sheet
+     * @param known  the user knows them: no more warnings
+     */
+    public static void showAccount(BaseFragment fragment, SolegramScamGuard.AccountRisk risk, @Nullable String name, Runnable block, Runnable report, Runnable known) {
+        final Context context = fragment.getParentActivity();
+        if (context == null || risk == null) {
+            return;
+        }
+        final Theme.ResourcesProvider rp = fragment.getResourceProvider();
+        final int level = Math.max(SolegramScamRules.CAUTION, risk.level);
+        final int accent = SolegramScamGuard.levelColor(level);
+        final int textColor = Theme.getColor(Theme.key_dialogTextBlack, rp);
+        final int grayColor = Theme.getColor(Theme.key_dialogTextGray3, rp);
+        final AlertDialog[] dialog = new AlertDialog[1];
+
+        final LinearLayout root = column(context);
+        root.setPadding(dp(20), dp(22), dp(20), dp(12));
+
+        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, SolegramScamGuard.levelTileColors(level), 56);
+        root.addView(icon, LayoutHelper.createLinear(56, 56, Gravity.CENTER_HORIZONTAL));
+
+        final TextView title = text(context, getString(R.string.SG_ScamBannerTitle), 20, textColor);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 0));
+
+        if (!TextUtils.isEmpty(name)) {
+            final TextView who = text(context, name, 15, grayColor);
+            who.setGravity(Gravity.CENTER);
+            who.setSingleLine(true);
+            who.setEllipsize(TextUtils.TruncateAt.END);
+            root.addView(who, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+        }
+        final TextView verdict = capsule(context, getString(level == SolegramScamRules.DANGER ? R.string.SG_ScamLevelDanger : R.string.SG_ScamLevelCaution), accent);
+        root.addView(verdict, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 8, 0, 0));
+
+        final View why = reasonsCard(context, risk.reasonsToShow(), accent, textColor, grayColor);
+        if (why != null) {
+            root.addView(why, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 18, 0, 0));
+        }
+        final TextView hint = text(context, getString(R.string.SG_ScamAccountHint), 13, grayColor);
+        hint.setGravity(Gravity.CENTER);
+        hint.setLineSpacing(dp(1), 1f);
+        root.addView(hint, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 6, 12, 6, 0));
+
+        final ButtonWithCounterView blockButton = new ButtonWithCounterView(context, rp);
+        blockButton.setText(getString(R.string.SG_ScamBlock), false);
+        blockButton.setOnClickListener(v -> {
+            dismiss(dialog);
+            block.run();
+        });
+        root.addView(blockButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 18, 0, 0));
+
+        final LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView reportButton = flatButton(context, getString(R.string.SG_ScamReport), accent);
+        final TextView notScammer = flatButton(context, getString(R.string.SG_ScamNotScammer), grayColor);
+        row.addView(reportButton, LayoutHelper.createLinear(0, 44, 1f, 0, 0, 4, 0));
+        row.addView(notScammer, LayoutHelper.createLinear(0, 44, 1f, 4, 0, 0, 0));
+        root.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 0, 8, 0, 0));
+        reportButton.setOnClickListener(v -> {
+            dismiss(dialog);
+            report.run();
+        });
+        notScammer.setOnClickListener(v -> {
+            dismiss(dialog);
+            known.run();
+        });
+        SolegramMotion.pressable(reportButton, SolegramMotion.PRESS_BUTTON);
+        SolegramMotion.pressable(notScammer, SolegramMotion.PRESS_BUTTON);
+        present(fragment, context, rp, root, dialog);
+    }
+
+    // endregion
+
+    // region Parts
+
+    private static void present(BaseFragment fragment, Context context, Theme.ResourcesProvider rp, LinearLayout root, AlertDialog[] dialog) {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(context, rp);
+        builder.setView(root);
+        builder.setCustomViewOffset(0);
+        dialog[0] = builder.create();
+        dialog[0].solegramReadingGlass(); // a warning to read: denser glass, as the plugin report
+        fragment.showDialog(dialog[0]);
+        // the parts settle in one after another on a soft spring (none of it in power saving)
+        root.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                root.getViewTreeObserver().removeOnPreDrawListener(this);
+                SolegramMotion.staggerIn(root);
+                return true;
+            }
+        });
+    }
+
+    /** A "what looks wrong" card: the reasons with a dot of the level's colour. */
+    @Nullable
+    private static View reasonsCard(Context context, List<SolegramScamRules.Reason> reasons, int accent, int textColor, int grayColor) {
+        if (reasons == null || reasons.isEmpty()) {
+            return null;
+        }
+        final LinearLayout card = card(context, textColor);
+        final TextView header = text(context, getString(R.string.SG_ScamWhy), 13, grayColor);
+        header.setTypeface(AndroidUtilities.bold());
+        card.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6));
+        int shown = 0;
+        for (int i = 0; i < reasons.size() && shown < MAX_REASONS; i++) {
+            final String reason = SolegramScamGuard.reasonText(reasons.get(i));
+            if (TextUtils.isEmpty(reason)) {
+                continue;
+            }
+            card.addView(reasonRow(context, reason, accent, textColor),
+                LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, shown == 0 ? 0 : 7, 0, 0));
+            shown++;
+        }
+        return shown > 0 ? card : null;
+    }
+
     private static View reasonRow(Context context, String reason, int accent, int textColor) {
         final LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -231,19 +371,61 @@ public final class SolegramScamDialog {
         dotBg.setShape(GradientDrawable.OVAL);
         dotBg.setColor(accent);
         dot.setBackground(dotBg);
-        row.addView(dot, LayoutHelper.createLinear(6, 6, Gravity.TOP, 0, 8, 10, 0));
+        row.addView(dot, LayoutHelper.createLinear(7, 7, Gravity.TOP, 0, 7, 10, 0));
         final TextView text = text(context, reason, 14.5f, textColor);
         text.setLineSpacing(dp(1), 1f);
         row.addView(text, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
         return row;
     }
 
-    private static TextView flatButton(Context context, String label, int color, Theme.ResourcesProvider rp) {
+    /**
+     * A card on the dialog's glass: a faint tint of the text colour and the hairline rim of Solegram's glass menus,
+     * so it reads as a layer of the same glass rather than a grey box.
+     */
+    private static LinearLayout card(Context context, int textColor) {
+        final LinearLayout card = column(context);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        final boolean dark = Theme.isCurrentThemeDark();
+        final GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(SolegramGlass.MENU_RADIUS_DP));
+        bg.setColor(Theme.multAlpha(textColor, dark ? 0.08f : 0.05f));
+        bg.setStroke(Math.max(1, dp(SolegramGlass.MENU_RIM_WIDTH_DP) / 2), dark ? SolegramGlass.MENU_RIM_TOP_DARK : Theme.multAlpha(textColor, 0.07f));
+        card.setBackground(bg);
+        return card;
+    }
+
+    /** The verdict as a small tinted capsule. */
+    private static TextView capsule(Context context, String label, int color) {
+        final TextView view = text(context, label, 13, color);
+        view.setTypeface(AndroidUtilities.bold());
+        view.setPadding(dp(12), dp(4), dp(12), dp(5));
+        styleCapsule(view, color);
+        return view;
+    }
+
+    private static void styleCapsule(TextView view, int color) {
+        view.setTextColor(color);
+        final GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(14));
+        bg.setColor(Theme.multAlpha(color, 0.14f));
+        view.setBackground(bg);
+    }
+
+    private static TextView flatButton(Context context, String label, int color) {
         final TextView view = text(context, label, 15, color);
         view.setTypeface(AndroidUtilities.bold());
         view.setGravity(Gravity.CENTER);
-        view.setBackground(Theme.createRadSelectorDrawable(Theme.multAlpha(color, 0.12f), 12, 12));
+        view.setSingleLine(true);
+        view.setEllipsize(TextUtils.TruncateAt.END);
+        view.setPadding(dp(8), 0, dp(8), 0);
+        view.setBackground(Theme.createRadSelectorDrawable(Theme.multAlpha(color, 0.12f), 14, 14));
         return view;
+    }
+
+    private static LinearLayout column(Context context) {
+        final LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        return layout;
     }
 
     private static TextView text(Context context, CharSequence value, float size, int color) {
@@ -262,4 +444,6 @@ public final class SolegramScamDialog {
             }
         }
     }
+
+    // endregion
 }

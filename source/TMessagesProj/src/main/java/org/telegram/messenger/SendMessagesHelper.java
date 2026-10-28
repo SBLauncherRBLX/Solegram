@@ -7657,6 +7657,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         return sendingMessages.indexOfKey(mid) >= 0 || editingMessages.indexOfKey(mid) >= 0;
     }
 
+    /** Solegram: a message of this account is on its way to the server now (bulk loads such as the Feed wait for it). UI thread. */
+    public boolean isSendingAnyMessage() {
+        return sendingMessages.size() > 0;
+    }
+
 
     public boolean isSendingPaidMessage(int mid, int index) {
         DelayedMessage delayedMessage = null;

@@ -7,7 +7,9 @@ package com.solegram.messenger.ui;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -43,15 +45,12 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
 /**
- * "Possibly a scammer" at the top of a private chat with a risky stranger: the main reasons, and Block, Report or
- * "I know them" (no more warnings about that person). It sits in the chat's glass top panel, so it is calm glass
- * like the panels Telegram puts there. Never blocks anyone by itself.
+ * "Possibly a scammer" at the top of a private chat with a risky stranger: one line, the main reason and "Details".
+ * The details (all the reasons, Block, Report, "Not a scammer") open in the warning dialog. It sits in the chat's glass
+ * top panel, so it is calm glass like the panels Telegram puts there. Never blocks anyone by itself.
  */
 @SuppressLint("ViewConstructor")
 public class SolegramScamBanner extends LinearLayout implements NotificationCenter.NotificationCenterDelegate {
-
-    private static final int[] ORANGE = {0xFFFF9500, 0xFFFF9F0A};
-    private static final int[] RED = {0xFFFF3B30, 0xFFFF453A};
 
     private final BaseFragment fragment;
     private final int account;
@@ -62,10 +61,12 @@ public class SolegramScamBanner extends LinearLayout implements NotificationCent
 
     private final View icon;
     private final TextView title;
-    private final TextView reasons;
-    private final TextView block, report, known;
+    private final TextView reason;
+    private final TextView more;
     private int shownLevel = -1;
     private boolean wantVisible;
+    @Nullable
+    private SolegramScamGuard.AccountRisk risk;
 
     private final Runnable update = this::update;
 
@@ -82,95 +83,83 @@ public class SolegramScamBanner extends LinearLayout implements NotificationCent
         this.resourcesProvider = resourcesProvider;
         this.messages = messages;
         this.onVisible = onVisible;
-        setOrientation(VERTICAL);
-        setPadding(dp(12), dp(10), dp(12), dp(10));
+        setOrientation(HORIZONTAL);
+        setGravity(Gravity.CENTER_VERTICAL);
+        setPadding(dp(12), dp(8), dp(10), dp(8));
 
-        final LinearLayout top = new LinearLayout(context);
-        top.setOrientation(HORIZONTAL);
-        icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, ORANGE, 34);
-        top.addView(icon, LayoutHelper.createLinear(34, 34, Gravity.TOP, 0, 1, 10, 0));
+        icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, SolegramScamGuard.levelTileColors(SolegramScamRules.CAUTION), 30);
+        addView(icon, LayoutHelper.createLinear(30, 30, Gravity.CENTER_VERTICAL, 0, 0, 10, 0));
 
         final LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(VERTICAL);
         title = new TextView(context);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14.5f);
         title.setTypeface(AndroidUtilities.bold());
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         texts.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        reasons = new TextView(context);
-        reasons.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-        reasons.setMaxLines(3);
-        reasons.setEllipsize(TextUtils.TruncateAt.END);
-        texts.addView(reasons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
-        top.addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
-        addView(top, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        reason = new TextView(context);
+        reason.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        reason.setSingleLine(true);
+        reason.setEllipsize(TextUtils.TruncateAt.END);
+        texts.addView(reason, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 1, 0, 0));
+        addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER_VERTICAL));
 
-        final LinearLayout buttons = new LinearLayout(context);
-        buttons.setOrientation(HORIZONTAL);
-        block = pill(context);
-        report = pill(context);
-        known = pill(context);
-        block.setText(getString(R.string.SG_ScamBlock));
-        report.setText(getString(R.string.SG_ScamReport));
-        known.setText(getString(R.string.SG_ScamKnown));
-        buttons.addView(block, LayoutHelper.createLinear(0, 32, 1f, 0, 0, 6, 0));
-        buttons.addView(report, LayoutHelper.createLinear(0, 32, 1f, 0, 0, 6, 0));
-        buttons.addView(known, LayoutHelper.createLinear(0, 32, 1f));
-        addView(buttons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 32, 0, 10, 0, 0));
+        more = new TextView(context);
+        more.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        more.setTypeface(AndroidUtilities.bold());
+        more.setGravity(Gravity.CENTER);
+        more.setSingleLine(true);
+        more.setPadding(dp(12), 0, dp(12), 0);
+        more.setText(getString(R.string.SG_ScamMore));
+        addView(more, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 30, Gravity.CENTER_VERTICAL, 8, 0, 0, 0));
 
-        block.setOnClickListener(v -> {
-            final TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
-            if (user == null) {
+        more.setOnClickListener(v -> showDetails());
+        setOnClickListener(v -> showDetails());
+        SolegramMotion.pressable(more, SolegramMotion.PRESS_BUTTON);
+        updateColors();
+    }
+
+    /** All the reasons and the answers, in the warning dialog. */
+    private void showDetails() {
+        final SolegramScamGuard.AccountRisk r = risk;
+        if (r == null) {
+            return;
+        }
+        final TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
+        SolegramScamDialog.showAccount(fragment, r, user != null ? UserObject.getUserName(user) : null, () -> {
+            final TLRPC.User u = MessagesController.getInstance(account).getUser(userId);
+            if (u == null) {
                 return;
             }
-            AlertsCreator.showBlockReportSpamAlert(fragment, userId, user, null, null, false, null, param -> {
+            AlertsCreator.showBlockReportSpamAlert(fragment, userId, u, null, null, false, null, param -> {
                 if (param == 1) {
                     fragment.finishFragment();
                 } else {
                     update();
                 }
             }, resourcesProvider);
-        });
-        report.setOnClickListener(v -> ReportBottomSheet.openChat(fragment, userId));
-        known.setOnClickListener(v -> {
+        }, () -> ReportBottomSheet.openChat(fragment, userId), () -> {
             SolegramScamGuard.markKnown(account, userId);
             setWanted(false);
-            final TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
+            final TLRPC.User u = MessagesController.getInstance(account).getUser(userId);
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.done,
-                LocaleController.formatString(R.string.SG_ScamKnownDone, UserObject.getFirstName(user))).show();
+                LocaleController.formatString(R.string.SG_ScamKnownDone, UserObject.getFirstName(u))).show();
         });
-        updateColors();
-    }
-
-    private TextView pill(Context context) {
-        final TextView view = new TextView(context);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-        view.setTypeface(AndroidUtilities.bold());
-        view.setGravity(Gravity.CENTER);
-        view.setSingleLine(true);
-        view.setEllipsize(TextUtils.TruncateAt.END);
-        view.setPadding(dp(4), 0, dp(4), 0);
-        return view;
-    }
-
-    /** A tinted capsule with a ripple of the same colour. */
-    private void stylePill(TextView view, int color) {
-        view.setTextColor(color);
-        final GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(16));
-        bg.setColor(Theme.multAlpha(color, 0.12f));
-        final android.graphics.drawable.Drawable ripple = Theme.createRadSelectorDrawable(Theme.multAlpha(color, 0.18f), 16, 16);
-        view.setBackground(new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{bg, ripple}));
     }
 
     public void updateColors() {
         final int accent = SolegramScamGuard.levelColor(shownLevel == SolegramScamRules.DANGER ? SolegramScamRules.DANGER : SolegramScamRules.CAUTION);
         title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
-        reasons.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
-        stylePill(block, SolegramScamGuard.levelColor(SolegramScamRules.DANGER));
-        stylePill(report, accent);
-        stylePill(known, Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
+        reason.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
+        // a tinted capsule with a ripple of the same colour
+        more.setTextColor(accent);
+        final GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(15));
+        bg.setColor(Theme.multAlpha(accent, 0.13f));
+        final Drawable ripple = Theme.createRadSelectorDrawable(Theme.multAlpha(accent, 0.18f), 15, 15);
+        more.setBackground(new LayerDrawable(new Drawable[]{bg, ripple}));
+        setBackground(Theme.getSelectorDrawable(Theme.multAlpha(accent, 0.08f), false));
     }
 
     /** Checks again (soon, once: several notifications come together). */
@@ -182,21 +171,24 @@ public class SolegramScamBanner extends LinearLayout implements NotificationCent
     public void update() {
         AndroidUtilities.cancelRunOnUIThread(update);
         @Nullable final List<MessageObject> list = messages != null ? messages.run() : null;
-        final SolegramScamGuard.AccountRisk risk = SolegramScamGuard.accountRisk(account, userId, list);
-        if (risk == null || risk.level == SolegramScamRules.SAFE) {
+        final SolegramScamGuard.AccountRisk r = SolegramScamGuard.accountRisk(account, userId, list);
+        risk = r;
+        if (r == null || r.level == SolegramScamRules.SAFE) {
             setWanted(false);
-            if (risk != null) {
-                SolegramScamGuard.autoCheckAccount(account, risk, list, this::scheduleUpdate);
+            if (r != null) {
+                SolegramScamGuard.autoCheckAccount(account, r, list, this::scheduleUpdate);
             }
             return;
         }
-        shownLevel = risk.level;
-        new PluginSecurityTileColors(risk.level == SolegramScamRules.DANGER ? RED : ORANGE).apply(icon);
+        if (shownLevel != r.level) {
+            shownLevel = r.level;
+            new TileColors(SolegramScamGuard.levelTileColors(r.level)).apply(icon);
+        }
         updateColors(); // also follows a theme change
-        title.setText(getString(R.string.SG_ScamBannerTitle));
-        reasons.setText(risk.summary(3));
+        title.setText(getString(r.level == SolegramScamRules.DANGER ? R.string.SG_ScamLevelDanger : R.string.SG_ScamBannerTitle));
+        reason.setText(r.mainReason());
         setWanted(true);
-        SolegramScamGuard.autoCheckAccount(account, risk, list, this::scheduleUpdate);
+        SolegramScamGuard.autoCheckAccount(account, r, list, this::scheduleUpdate);
     }
 
     private void setWanted(boolean visible) {
@@ -253,10 +245,10 @@ public class SolegramScamBanner extends LinearLayout implements NotificationCent
     }
 
     /** Recolours a settings-style tile (made by PluginSecuritySheet.tileIcon). */
-    private static final class PluginSecurityTileColors {
+    private static final class TileColors {
         final int[] colors;
 
-        PluginSecurityTileColors(int[] colors) {
+        TileColors(int[] colors) {
             this.colors = colors;
         }
 

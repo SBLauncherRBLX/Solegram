@@ -235,6 +235,10 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     @Keep
     private int appIconSelectorRow;
     private int appIconShadowRow;
+    // Solegram: themed icons and the seasonal switch
+    private int appIconThemedHeaderRow;
+    private int appIconThemedSelectorRow;
+    private int appIconSeasonalRow;
 
     private int rowCount;
 
@@ -609,6 +613,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         appIconHeaderRow = -1;
         appIconSelectorRow = -1;
         appIconShadowRow = -1;
+        appIconThemedHeaderRow = -1;
+        appIconThemedSelectorRow = -1;
+        appIconSeasonalRow = -1;
         lastShadowRow = -1;
 
         defaultThemes.clear();
@@ -673,6 +680,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
             appIconHeaderRow = rowCount++;
             appIconSelectorRow = rowCount++;
+            appIconThemedHeaderRow = rowCount++;
+            appIconThemedSelectorRow = rowCount++;
+            appIconSeasonalRow = rowCount++;
             appIconShadowRow = rowCount++;
 
             swipeGestureHeaderRow = rowCount++;
@@ -1125,6 +1135,12 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 editor.commit();
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(!send);
+                }
+            } else if (position == appIconSeasonalRow) {
+                boolean on = !LauncherIconController.isSeasonalEnabled();
+                LauncherIconController.setSeasonalEnabled(on);
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(on);
                 }
             } else if (position == raiseToSpeakRow) {
                 SharedConfig.toggleRaiseToSpeak();
@@ -2064,6 +2080,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         private final static int TYPE_SAVE_TO_GALLERY = 19;
         private final static int TYPE_APP_ICON = 20;
         private final static int TYPE_CHOOSE_COLOR = 21;
+        private final static int TYPE_APP_ICON_THEMED = 22;
 
         private Context mContext;
         private boolean first = true;
@@ -2082,7 +2099,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             int type = holder.getItemViewType();
             return type == 0 || type == TYPE_TEXT_SETTING || type == TYPE_THEME_TYPE || type == TYPE_TEXT_CHECK ||
                     type == TYPE_NIGHT_THEME || type == TYPE_THEME_LIST || type == TYPE_THEME_ACCENT_LIST ||
-                    type == TYPE_TEXT_PREFERENCE || type == 18 || type == TYPE_APP_ICON || type == TYPE_CHOOSE_COLOR;
+                    type == TYPE_TEXT_PREFERENCE || type == 18 || type == TYPE_APP_ICON || type == TYPE_APP_ICON_THEMED || type == TYPE_CHOOSE_COLOR;
         }
 
         private void showOptionsForTheme(Theme.ThemeInfo themeInfo) {
@@ -2460,6 +2477,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 case TYPE_APP_ICON:
                     view = new AppIconsSelectorCell(mContext, ThemeActivity.this, currentAccount);
                     break;
+                case TYPE_APP_ICON_THEMED:
+                    view = new AppIconsSelectorCell(mContext, ThemeActivity.this, currentAccount, true);
+                    break;
                 case TYPE_CHOOSE_COLOR:
                     view = new PeerColorActivity.ChangeNameColorCell(currentAccount, 0, mContext, getResourceProvider());
                     break;
@@ -2582,6 +2602,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         headerCell.setText(getString("SelectTheme", R.string.SelectTheme));
                     } else if (position == appIconHeaderRow) {
                         headerCell.setText(getString(R.string.AppIcon));
+                    } else if (position == appIconThemedHeaderRow) {
+                        headerCell.setText(getString(R.string.SG_IconsThemed));
                     } else if (position == otherHeaderRow) {
                         headerCell.setText(getString("OtherSettings", R.string.OtherSettings));
                     } else if (position == mediaSoundHeaderRow) {
@@ -2620,6 +2642,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         textCheckCell.setTextAndValueAndCheck(getString(R.string.ShowSensitiveContent), getString(R.string.ShowSensitiveContentInfo), getMessagesController().showSensitiveContent(), true, true);
                     } else if (position == chatBlurRow) {
                         textCheckCell.setTextAndCheck(getString("BlurInChat", R.string.BlurInChat), SharedConfig.chatBlurEnabled(), true);
+                    } else if (position == appIconSeasonalRow) {
+                        textCheckCell.setTextAndValueAndCheck(getString(R.string.SG_SeasonalIcon), getString(R.string.SG_SeasonalIconInfo), LauncherIconController.isSeasonalEnabled(), true, false);
                     }
                     break;
                 }
@@ -2746,14 +2770,15 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             } else if (position == scheduleHeaderRow || position == automaticHeaderRow || position == preferedHeaderRow ||
                     position == settingsRow || position == themeHeaderRow || position == textSizeHeaderRow ||
                     position == chatListHeaderRow || position == bubbleRadiusHeaderRow || position == swipeGestureHeaderRow ||
-                    position == selectThemeHeaderRow || position == appIconHeaderRow || position == mediaSoundHeaderRow ||
+                    position == selectThemeHeaderRow || position == appIconHeaderRow || position == appIconThemedHeaderRow || position == mediaSoundHeaderRow ||
                     position == otherHeaderRow) {
                 return TYPE_HEADER;
             } else if (position == automaticBrightnessRow) {
                 return TYPE_BRIGHTNESS;
             } else if (position == scheduleLocationRow || position == sendByEnterRow ||
                     position == raiseToSpeakRow || position == raiseToListenRow || position == pauseOnRecordRow ||
-                    position == directShareRow || position == chatBlurRow || position == pauseOnMediaRow || position == nextMediaTapRow || position == sensitiveContentRow) {
+                    position == directShareRow || position == chatBlurRow || position == pauseOnMediaRow || position == nextMediaTapRow || position == sensitiveContentRow ||
+                    position == appIconSeasonalRow) {
                 return TYPE_TEXT_CHECK;
             } else if (position == textSizeRow) {
                 return TYPE_TEXT_SIZE;
@@ -2780,6 +2805,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 return TYPE_SAVE_TO_GALLERY;
             } else if (position == appIconSelectorRow) {
                 return TYPE_APP_ICON;
+            } else if (position == appIconThemedSelectorRow) {
+                return TYPE_APP_ICON_THEMED;
             } else if (position == changeUserColor) {
                 return TYPE_CHOOSE_COLOR;
             }

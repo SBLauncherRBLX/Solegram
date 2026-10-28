@@ -46,14 +46,12 @@ import org.telegram.ui.Components.TranscribeButton;
 import org.telegram.ui.LaunchActivity;
 
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
@@ -1450,9 +1448,13 @@ public final class SolegramTranscriber {
             + "Content-Type: " + mime + "\r\n\r\n").getBytes(StandardCharsets.UTF_8);
         final byte[] tail = ("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
 
-        final HttpURLConnection c = (HttpURLConnection) new URL(transcriptionsUrl(SolegramConfig.aiBaseUrl)).openConnection();
+        final String url = transcriptionsUrl(SolegramConfig.aiBaseUrl);
+        // the key and the voice go to the user's service: https, or plain http only inside the local network
+        SolegramNet.checkPrivateEndpoint(url);
+        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         connection.set(c);
         try {
+            c.setInstanceFollowRedirects(false); // the key is never carried to another address
             c.setRequestMethod("POST");
             c.setConnectTimeout(15000);
             c.setReadTimeout(120000);
@@ -1489,7 +1491,7 @@ public final class SolegramTranscriber {
             if (code < 200 || code >= 300) {
                 throw new AiException(LocaleController.formatString(R.string.SG_TranscribeFailedCode, String.valueOf(code)));
             }
-            final String body = read(c.getInputStream()).trim();
+            final String body = SolegramNet.readString(c.getInputStream(), 2 * 1024 * 1024).trim();
             if (body.startsWith("{")) {
                 return new JSONObject(body).optString("text", "").trim();
             }
@@ -1499,15 +1501,5 @@ public final class SolegramTranscriber {
         }
     }
 
-    private static String read(InputStream in) throws IOException {
-        final StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append('\n');
-            }
-        }
-        return sb.toString();
-    }
     // endregion
 }

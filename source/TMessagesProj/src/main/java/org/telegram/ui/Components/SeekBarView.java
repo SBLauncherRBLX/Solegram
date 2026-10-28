@@ -311,17 +311,17 @@ public class SeekBarView extends FrameLayout {
                 }
             }
             if (pressed) {
-                if (ev.getAction() == MotionEvent.ACTION_UP) {
-                    if (twoSided) {
-                        float w = (getMeasuredWidth() - selectorWidth) / 2;
-                        if (thumbX >= w) {
-                            setSeekBarDrag(false, (thumbX - w) / w);
-                        } else {
-                            setSeekBarDrag(false, -Math.max(0.01f, 1.0f - (w - thumbX) / w));
-                        }
+                // Solegram: a drag taken over by a parent (ACTION_CANCEL) ends where the thumb was left, as a
+                // lifted finger does: otherwise the value shown and the value kept could differ
+                if (twoSided) {
+                    float w = (getMeasuredWidth() - selectorWidth) / 2;
+                    if (thumbX >= w) {
+                        setSeekBarDrag(false, (thumbX - w) / w);
                     } else {
-                        setSeekBarDrag(true, (float) thumbX / (float) (getMeasuredWidth() - selectorWidth));
+                        setSeekBarDrag(false, -Math.max(0.01f, 1.0f - (w - thumbX) / w));
                     }
+                } else {
+                    setSeekBarDrag(true, (float) thumbX / (float) (getMeasuredWidth() - selectorWidth));
                 }
                 if (Build.VERSION.SDK_INT >= 21 && hoverDrawable != null) {
                     hoverDrawable.setState(StateSet.NOTHING);

@@ -98,7 +98,7 @@ public class SolegramProfileLinksSheet extends BottomSheet {
     private final TextView counter;
     private final TextView warning;
     private final Choice columnChoice, rowChoice;
-    private final ButtonWithCounterView saveButton;
+    private final ActionButton saveButton;
 
     // adding or changing a link
     private final TextView addButton;
@@ -247,8 +247,12 @@ public class SolegramProfileLinksSheet extends BottomSheet {
         textField.setMaxLines(4);
         textField.setFilters(new InputFilter[]{new InputFilter.LengthFilter(Math.max(limit, 70))});
         textField.setText(parsed.text);
-        textField.setBackground(Theme.createRoundRectDrawable(dp(14), ColorUtils.setAlphaComponent(textColor, 0x0B)));
-        textField.setPadding(dp(14), dp(11), dp(14), dp(11));
+        // Telegram's input look: a soft rounded field whose outline takes the accent while typing
+        final FieldBackground textBackground = new FieldBackground(textColor, accent);
+        textField.setBackground(textBackground);
+        textField.setPadding(dp(14), dp(12), dp(14), dp(12));
+        textField.hintLayoutOffset = LocaleController.isRTL ? 0 : dp(14); // the hint is drawn by the field itself, without the padding
+        textField.setOnFocusChangeListener((v, focused) -> textBackground.setFocused(focused));
         textField.addTextChangedListener(watcher(this::refresh));
         content.addView(textField, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 16, 0, 16, 0));
 
@@ -324,7 +328,8 @@ public class SolegramProfileLinksSheet extends BottomSheet {
         final LinearLayout inputLine = new LinearLayout(context);
         inputLine.setOrientation(LinearLayout.HORIZONTAL);
         inputLine.setGravity(Gravity.CENTER_VERTICAL);
-        inputLine.setBackground(Theme.createRoundRectDrawable(dp(12), getThemedColor(Theme.key_dialogBackground)));
+        final FieldBackground inputBackground = new FieldBackground(textColor, accent);
+        inputLine.setBackground(inputBackground);
         inputLine.setPadding(dp(12), 0, dp(12), 0);
         inputPrefix = text(context, "", 16, grayColor);
         inputPrefix.setSingleLine(true);
@@ -342,6 +347,7 @@ public class SolegramProfileLinksSheet extends BottomSheet {
             return false;
         });
         inputField.addTextChangedListener(watcher(this::hideInputError));
+        inputField.setOnFocusChangeListener((v, focused) -> inputBackground.setFocused(focused));
         inputLine.addView(inputField, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
         inputPanel.addView(inputLine, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
         inputError = text(context, "", 13, getThemedColor(Theme.key_text_RedRegular));
@@ -366,7 +372,7 @@ public class SolegramProfileLinksSheet extends BottomSheet {
         content.addView(choices, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 42, 16, 0, 16, 0));
         content.addView(text(context, getString(R.string.SG_ProfileLinksLayoutInfo), 13, grayColor), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 22, 8, 22, 0));
 
-        saveButton = new ButtonWithCounterView(context, resourcesProvider);
+        saveButton = new ActionButton(context, resourcesProvider);
         saveButton.setText(getString(onApply != null ? R.string.SG_ProfileLinksApply : R.string.SG_ProfileLinksSave), false);
         saveButton.setOnClickListener(v -> save());
         root.addView(saveButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 10, 16, 16));
@@ -747,6 +753,134 @@ public class SolegramProfileLinksSheet extends BottomSheet {
                 canvas.drawRoundRect(rect, r, r, stroke);
             }
             super.onDraw(canvas);
+        }
+    }
+
+    /**
+     * The look of a text field in Solegram's sheets: a soft fill with a hairline, the hairline turning to the
+     * accent while the field has the focus (as Telegram's outlined inputs). Nothing is made while drawing.
+     */
+    static final class FieldBackground extends Drawable {
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF rect = new android.graphics.RectF();
+        private final int fillColor, idleStroke, accent;
+        private float focus;
+        private android.animation.ValueAnimator animator;
+
+        FieldBackground(int textColor, int accent) {
+            final boolean dark = ColorUtils.calculateLuminance(textColor) > 0.5;
+            this.fillColor = ColorUtils.setAlphaComponent(textColor, dark ? 0x12 : 0x0A);
+            this.idleStroke = ColorUtils.setAlphaComponent(textColor, dark ? 0x1A : 0x17);
+            this.accent = accent;
+            fill.setColor(fillColor);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeWidth(Math.max(1, AndroidUtilities.dpf2(1f)));
+            stroke.setColor(idleStroke);
+        }
+
+        void setFocused(boolean value) {
+            if (animator != null) {
+                animator.cancel();
+            }
+            if (LiteMode.isPowerSaverApplied()) {
+                focus = value ? 1f : 0f;
+                apply();
+                return;
+            }
+            animator = android.animation.ValueAnimator.ofFloat(focus, value ? 1f : 0f);
+            animator.addUpdateListener(a -> {
+                focus = (float) a.getAnimatedValue();
+                apply();
+            });
+            animator.setDuration(SolegramMotion.FAST);
+            animator.setInterpolator(SolegramMotion.EASE_OUT);
+            animator.start();
+        }
+
+        private void apply() {
+            stroke.setColor(ColorUtils.blendARGB(idleStroke, accent, focus));
+            stroke.setStrokeWidth(Math.max(1, AndroidUtilities.dpf2(1f + 0.5f * focus)));
+            fill.setColor(ColorUtils.blendARGB(fillColor, ColorUtils.setAlphaComponent(accent, 0x0C), focus));
+            invalidateSelf();
+        }
+
+        @Override
+        public void draw(@androidx.annotation.NonNull Canvas canvas) {
+            rect.set(getBounds());
+            final float r = Math.min(dp(14), rect.height() / 2f);
+            canvas.drawRoundRect(rect, r, r, fill);
+            final float half = stroke.getStrokeWidth() / 2f;
+            rect.inset(half, half);
+            canvas.drawRoundRect(rect, r - half, r - half, stroke);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return android.graphics.PixelFormat.TRANSLUCENT;
+        }
+    }
+
+    /**
+     * The main button of Solegram's sheets: the accent fill, and when it can't be pressed a neutral grey with
+     * dimmed text (Telegram's button only halves its text, which left a pink-washed button with pale words).
+     */
+    public static class ActionButton extends ButtonWithCounterView {
+        private final int accentFill, neutralFill, accentText, neutralText;
+        private float shown = 1f;
+        private boolean on = true;
+        private android.animation.ValueAnimator animator;
+
+        public ActionButton(Context context, Theme.ResourcesProvider resourcesProvider) {
+            super(context, resourcesProvider);
+            accentFill = Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
+            accentText = Theme.getColor(Theme.key_featuredStickers_buttonText, resourcesProvider);
+            final int text = Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider);
+            final boolean dark = ColorUtils.calculateLuminance(Theme.getColor(Theme.key_dialogBackground, resourcesProvider)) < 0.5;
+            neutralFill = ColorUtils.setAlphaComponent(text, dark ? 0x24 : 0x14);
+            neutralText = text;
+        }
+
+        @Override
+        public void setEnabled(boolean enabled) {
+            super.setEnabled(enabled);
+            if (on == enabled) {
+                return;
+            }
+            on = enabled;
+            if (animator != null) {
+                animator.cancel();
+            }
+            if (!isAttachedToWindow() || LiteMode.isPowerSaverApplied()) {
+                shown = enabled ? 1f : 0f;
+                applyColors();
+                return;
+            }
+            animator = android.animation.ValueAnimator.ofFloat(shown, enabled ? 1f : 0f);
+            animator.addUpdateListener(a -> {
+                shown = (float) a.getAnimatedValue();
+                applyColors();
+            });
+            animator.setDuration(SolegramMotion.NORMAL);
+            animator.setInterpolator(SolegramMotion.EASE_OUT);
+            animator.start();
+        }
+
+        private void applyColors() {
+            final Drawable background = getBackground();
+            if (background instanceof android.graphics.drawable.ShapeDrawable) {
+                ((android.graphics.drawable.ShapeDrawable) background).getPaint().setColor(ColorUtils.blendARGB(neutralFill, accentFill, shown));
+                background.invalidateSelf();
+            }
+            setTextColor(ColorUtils.blendARGB(neutralText, accentText, shown));
         }
     }
 

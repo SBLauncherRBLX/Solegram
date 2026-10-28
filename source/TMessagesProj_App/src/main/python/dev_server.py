@@ -2,7 +2,9 @@
 
 Listens on 127.0.0.1:42690 (reach it with `adb forward tcp:42690 tcp:42690`). The stream carries
 consecutive UTF-8 JSON objects: {"@": command, "#": request id, ...}; every answer repeats "#".
-Only started when plugin developer mode is enabled in Solegram settings.
+Only started when plugin developer mode is enabled in Solegram settings. Every app on the phone can reach
+127.0.0.1, so a connection may do more than "ping" only after the user allowed it on the phone
+(PluginDevGate); a connection that was refused is closed.
 """
 import enum
 import json
@@ -19,6 +21,7 @@ from log_utils import get_logger
 __all__ = ["DevServer", "DebuggerPlatform"]
 
 _PC = jclass("com.solegram.messenger.plugins.PluginsController")
+_Gate = jclass("com.solegram.messenger.plugins.PluginDevGate")
 _InstallCallback = jclass("com.solegram.messenger.plugins.PluginsController$InstallCallback")
 _File = jclass("java.io.File")
 
@@ -111,6 +114,7 @@ class DevServer:
     def _client(cls, conn):
         decoder = json.JSONDecoder()
         buffer = ""
+        approved = False
         conn.settimeout(None)
         with conn:
             while cls._running:
@@ -121,6 +125,8 @@ class DevServer:
                 if not chunk:
                     return
                 buffer += chunk.decode("utf-8", "replace")
+                if len(buffer) > 16 * 1024 * 1024:
+                    return  # a plugin is far smaller: someone is only filling the memory
                 while True:
                     buffer = buffer.lstrip()
                     if not buffer:
@@ -130,10 +136,22 @@ class DevServer:
                     except json.JSONDecodeError:
                         break
                     buffer = buffer[end:]
-                    response = cls._handle(message)
+                    command = message.get("@") if isinstance(message, dict) else None
+                    if command != "ping":
+                        # blocks until the user answers on the phone (at most a minute)
+                        approved = approved or bool(_Gate.approve())
+                        if approved:
+                            _Gate.touch()
+                    if command != "ping" and not approved:
+                        req_id = message.get("#") if isinstance(message, dict) else None
+                        response = {"error": "Not allowed on the device: open Solegram and allow the connection", "#": req_id}
+                    else:
+                        response = cls._handle(message)
                     try:
                         conn.sendall(json.dumps(response, ensure_ascii=False).encode("utf-8"))
                     except OSError:
+                        return
+                    if command != "ping" and not approved:
                         return
 
     @classmethod

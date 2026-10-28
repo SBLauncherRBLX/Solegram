@@ -837,6 +837,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         final float w = Math.max(dp(8), pillW + (lensW - pillW) * a) * (1f + stretch);
         final float h = Math.max(dp(8), tabH + (lensH - tabH) * a) * (1f - stretch * 0.15f);
         final float r = h / 2f;
+        // how fast the glass slides (0..1): a moving drop bends the picture a little more, like liquid
+        lensFlow = lensRich ? Math.min(1f, Math.abs(lensX.velocity) / dp(1800)) : 0f;
         lensRect.set(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
         lensPath.rewind();
         lensPath.addRoundRect(lensRect, r, r, Path.Direction.CW);
@@ -909,6 +911,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     private final android.graphics.Rect lensBarPadding = new android.graphics.Rect();
     private final RectF lensBar = new RectF();
+    private float lensFlow;
 
     private boolean drawShaderLens(Canvas canvas, float cx, float cy, float w, float h, float on) {
         if (lensShaderFailed || Build.VERSION.SDK_INT < 33 || !canvas.isHardwareAccelerated() || getWidth() <= 0 || getHeight() <= 0) {
@@ -928,7 +931,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             if (lensBar.width() <= 0 || lensBar.height() <= 0) {
                 lensBar.set(0, 0, getWidth(), getHeight());
             }
-            ((LensShader) lensShader).draw(canvas, getWidth(), getHeight(), cx, cy, w, h, on, lensBar, lensContent);
+            ((LensShader) lensShader).draw(canvas, getWidth(), getHeight(), cx, cy, w, h, on, lensFlow, lensBar, lensContent);
             return true;
         } catch (Throwable e) {
             FileLog.e(e);
@@ -938,7 +941,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         }
     }
 
-    /** The liquid controls' lens shader (solegram_lens_shader) over the tabs. */
+    /** The tab bar's lens shader (solegram_tab_lens_shader) over the tabs. */
     @RequiresApi(33)
     private static final class LensShader {
         private final RenderNode node = new RenderNode("solegramTabLens");
@@ -947,8 +950,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         private RenderEffect effect;
         private final float[] last = new float[10];
         private boolean lastDark;
+        private int lastDispersion = -1;
 
-        void draw(Canvas canvas, int viewW, int viewH, float cx, float cy, float w, float h, float a, RectF bar, Utilities.Callback<Canvas> content) {
+        void draw(Canvas canvas, int viewW, int viewH, float cx, float cy, float w, float h, float a, float flow, RectF bar, Utilities.Callback<Canvas> content) {
             // the tabs under the lens (child render nodes by reference: cheap, and their changes show at once)
             node.setPosition(0, 0, viewW, viewH);
             final RecordingCanvas rc = node.beginRecording(viewW, viewH);
@@ -959,9 +963,12 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             }
             // the effect takes the uniforms when it is made: a new one only when the lens changed
             final boolean dark = Theme.isCurrentThemeDark();
+            final int dispersion = com.solegram.messenger.SolegramConfig.glassDispersion;
             if (effect == null || last[0] != cx || last[1] != cy || last[2] != w || last[3] != h || last[4] != a || lastDark != dark
-                || last[5] != bar.left || last[6] != bar.top || last[7] != bar.right || last[8] != bar.bottom) {
+                || last[5] != bar.left || last[6] != bar.top || last[7] != bar.right || last[8] != bar.bottom
+                || last[9] != flow || lastDispersion != dispersion) {
                 lastDark = dark;
+                lastDispersion = dispersion;
                 last[0] = cx;
                 last[1] = cy;
                 last[2] = w;
@@ -971,14 +978,17 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                 last[6] = bar.top;
                 last[7] = bar.right;
                 last[8] = bar.bottom;
-                // clear glass: sharp magnified middle, a strongly bending rim band with colour fringes
-                final float band = Math.min(w, h) / 2f * 0.24f;
+                last[9] = flow;
+                // clear glass: a sharp middle magnified a little, a wide rounded bevel that draws the picture
+                // out to the rim and smears it along the edge, with rainbow fringes there. The glass's own
+                // dispersion setting drives the fringes, never below a clear rainbow on the lens
+                final float band = Math.min(w, h) / 2f * 0.45f * (1f + 0.08f * flow);
                 shader.setFloatUniform("center", cx, cy);
                 shader.setFloatUniform("halfSize", w / 2f, h / 2f);
-                shader.setFloatUniform("magnify", 1f + 0.3f * a);
+                shader.setFloatUniform("magnify", 1f + (0.15f + 0.03f * flow) * a);
                 shader.setFloatUniform("band", band);
-                shader.setFloatUniform("bend", band * 1.7f * a);
-                shader.setFloatUniform("dispersion", 0.9f * a);
+                shader.setFloatUniform("bend", band * (0.6f + 0.06f * flow) * a);
+                shader.setFloatUniform("dispersion", (0.6f + 0.6f * dispersion / 100f) * (1f + 0.25f * flow) * a);
                 shader.setFloatUniform("light", 0.9f * a);
                 shader.setFloatUniform("shade", 0.16f * a);
                 shader.setFloatUniform("dp", AndroidUtilities.density);

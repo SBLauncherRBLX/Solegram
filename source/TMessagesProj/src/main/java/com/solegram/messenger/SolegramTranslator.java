@@ -19,11 +19,8 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.Components.Bulletin;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -133,15 +130,8 @@ public final class SolegramTranslator {
             if (code != 200) {
                 throw new IllegalStateException("translate http " + code);
             }
-            final StringBuilder sb = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                final char[] buf = new char[4096];
-                int n;
-                while ((n = reader.read(buf)) != -1) {
-                    sb.append(buf, 0, n);
-                }
-            }
-            final JSONArray sentences = new JSONArray(sb.toString()).getJSONArray(0);
+            // a chunk is a few KB of text: its answer is far below the cap
+            final JSONArray sentences = new JSONArray(SolegramNet.readString(connection.getInputStream(), 1024 * 1024)).getJSONArray(0);
             final StringBuilder result = new StringBuilder();
             for (int i = 0; i < sentences.length(); i++) {
                 final JSONArray s = sentences.optJSONArray(i);

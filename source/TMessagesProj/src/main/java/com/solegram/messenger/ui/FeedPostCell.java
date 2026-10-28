@@ -67,6 +67,7 @@ public class FeedPostCell extends View {
     private final Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF card = new RectF();
     private final RectF mediaRect = new RectF();
+    private final RectF badgeRect = new RectF();
     private final Path playPath = new Path();
 
     private FeedController.Post post;
@@ -320,7 +321,8 @@ public class FeedPostCell extends View {
             if (extraItems > 0) {
                 final String badge = "+" + extraItems;
                 final float bw = badgePaint.measureText(badge) + dp(16);
-                final RectF b = new RectF(mediaRect.right - bw - dp(8), mediaRect.top + dp(8), mediaRect.right - dp(8), mediaRect.top + dp(34));
+                final RectF b = badgeRect;
+                b.set(mediaRect.right - bw - dp(8), mediaRect.top + dp(8), mediaRect.right - dp(8), mediaRect.top + dp(34));
                 overlayPaint.setColor(0x88000000);
                 canvas.drawRoundRect(b, dp(13), dp(13), overlayPaint);
                 canvas.drawText(badge, b.left + dp(8), b.bottom - dp(8), badgePaint);

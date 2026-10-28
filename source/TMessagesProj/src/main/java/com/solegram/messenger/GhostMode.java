@@ -6,6 +6,7 @@
 package com.solegram.messenger;
 
 import org.telegram.messenger.AccountInstance;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.UserConfig;
@@ -16,6 +17,7 @@ import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stories;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
@@ -72,11 +74,27 @@ public final class GhostMode {
             || request instanceof TLRPC.TL_messages_forwardMessages;
     }
 
-    /** Called after an outgoing message request completed. */
+    /** Accounts and dialogs waiting for the follow-up of {@link #afterSend}; UI thread only. */
+    private static final HashSet<Integer> offlinePending = new HashSet<>();
+    private static final HashSet<String> readPending = new HashSet<>();
+    /** The follow-ups of a burst of sends (an album, a forward of many messages) go out once, after it. */
+    private static final long AFTER_SEND_DELAY = 400;
+
+    /**
+     * Called after an outgoing message request completed. That is on the network thread, so the follow-up
+     * requests are made on the UI thread (where the dialogs live), and once per burst instead of once per message.
+     */
     public static void afterSend(int account, TLObject request) {
         if (SolegramConfig.ghostOffline) {
             // The server marks the account online after any activity: push it back offline.
-            sendOffline(account);
+            AndroidUtilities.runOnUIThread(() -> {
+                if (offlinePending.add(account)) {
+                    AndroidUtilities.runOnUIThread(() -> {
+                        offlinePending.remove(account);
+                        sendOffline(account);
+                    }, AFTER_SEND_DELAY);
+                }
+            });
         }
         if (SolegramConfig.ghostNoRead && SolegramConfig.ghostReadOnInteract) {
             TLRPC.InputPeer peer = null;
@@ -90,7 +108,16 @@ public final class GhostMode {
                 peer = ((TLRPC.TL_messages_sendInlineBotResult) request).peer;
             }
             if (peer != null) {
-                readDialog(account, DialogObject.getPeerDialogId(peer));
+                final long dialogId = DialogObject.getPeerDialogId(peer);
+                final String key = account + "_" + dialogId;
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (readPending.add(key)) {
+                        AndroidUtilities.runOnUIThread(() -> {
+                            readPending.remove(key);
+                            readDialog(account, dialogId);
+                        }, AFTER_SEND_DELAY);
+                    }
+                });
             }
         }
     }

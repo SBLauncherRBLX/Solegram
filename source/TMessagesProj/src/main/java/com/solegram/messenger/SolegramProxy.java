@@ -578,7 +578,12 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
                 fastest = info;
             }
         }
-        if (fastest != null) {
+        final SharedConfig.ProxyInfo current = SharedConfig.currentProxy;
+        final boolean keepCurrent = !byUser && current != null && current != fastest && SharedConfig.isProxyEnabled()
+            && keep.contains(key(current.settings)) && isConnected();
+        if (fastest != null && !keepCurrent) {
+            // a background refresh that found the proxy in use among the good ones leaves it on: switching would
+            // reconnect every socket and hold up messages being sent right now for a few milliseconds of ping
             select(fastest, true);
         }
         for (SharedConfig.ProxyInfo info : new ArrayList<>(SharedConfig.proxyList)) {
@@ -692,6 +697,10 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
         if (isConnected()) {
             if (phase == PHASE_TRYING) {
                 onLiveConnected();
+            } else if (!byUser && (phase == PHASE_DOWNLOADING || phase == PHASE_CHECKING)) {
+                // the connection came back by itself while auto mode was still looking (a short drop, a tunnel):
+                // finishing the search would move a working, often direct, connection to a public proxy for good
+                cancel();
             }
             AndroidUtilities.cancelRunOnUIThread(stuckCheck);
             stuckScheduled = false;

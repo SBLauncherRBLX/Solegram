@@ -476,22 +476,26 @@ public class ConnectionsManager extends BaseController {
                     if (resp != null) {
                         resp.networkType = networkType;
                     }
-                    // Solegram: plugin post_request hooks and ghost-mode follow-ups.
-                    final com.solegram.messenger.SolegramHooks.PostResult solegramPost = com.solegram.messenger.SolegramHooks.postRequest(currentAccount, object, resp, error);
-                    if (solegramPost != null) {
-                        if (solegramPost.cancel) {
-                            return;
-                        }
-                        resp = solegramPost.response;
-                        error = solegramPost.error;
-                    }
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.d("java received " + resp + (error != null ? " error = " + error : "") + " messageId = 0x" + Long.toHexString(requestMsgId));
-                        FileLog.dumpResponseAndRequest(currentAccount, object, resp, error, requestMsgId, finalStartRequestTime, requestToken);
-                    }
-                    final TLObject finalResponse = resp;
-                    final TLRPC.TL_error finalError = error;
+                    final TLObject receivedResponse = resp;
+                    final TLRPC.TL_error receivedError = error;
                     Utilities.stageQueue.postRunnable(() -> {
+                        TLObject finalResponse = receivedResponse;
+                        TLRPC.TL_error finalError = receivedError;
+                        // Solegram: plugin post_request hooks and ghost-mode follow-ups. Run here, on the stage queue
+                        // just before the callback, not on the network thread: a Python hook (or its wait for the GIL)
+                        // there would stall every socket of the account, so no message could go out meanwhile.
+                        final com.solegram.messenger.SolegramHooks.PostResult solegramPost = com.solegram.messenger.SolegramHooks.postRequest(currentAccount, object, finalResponse, finalError);
+                        if (solegramPost != null) {
+                            if (solegramPost.cancel) {
+                                return;
+                            }
+                            finalResponse = solegramPost.response;
+                            finalError = solegramPost.error;
+                        }
+                        if (BuildVars.LOGS_ENABLED) {
+                            FileLog.d("java received " + finalResponse + (finalError != null ? " error = " + finalError : "") + " messageId = 0x" + Long.toHexString(requestMsgId));
+                            FileLog.dumpResponseAndRequest(currentAccount, object, finalResponse, finalError, requestMsgId, finalStartRequestTime, requestToken);
+                        }
                         if (onComplete != null) {
                             onComplete.run(finalResponse, finalError);
                         } else if (onCompleteTimestamp != null) {

@@ -60,6 +60,8 @@ final class UpdateInstaller {
             if (requireChecksum && (TextUtils.isEmpty(info.sha256) || info.size <= 0)) {
                 return "no checksum";
             }
+            info.verifiedSha256 = null;
+            // a published checksum is checked before the file is even parsed
             if (!TextUtils.isEmpty(info.sha256) && !info.sha256.equals(GithubUpdater.sha256(apk))) {
                 return "sha256";
             }
@@ -84,6 +86,12 @@ final class UpdateInstaller {
             if (!sameSigner(own, archive)) {
                 return "signature";
             }
+            // the bytes whose signature was just checked: commit() installs exactly these, or nothing
+            final String checked = GithubUpdater.sha256(apk);
+            if (!TextUtils.isEmpty(info.sha256) && !info.sha256.equals(checked)) {
+                return "sha256";
+            }
+            info.verifiedSha256 = checked;
             return null;
         } catch (Throwable e) {
             return e.getClass().getSimpleName();
@@ -143,6 +151,11 @@ final class UpdateInstaller {
      * system wants a confirmation after all. Background thread.
      */
     static void commit(File apk, UpdateController.UpdateInfo info) throws Exception {
+        // what verify() checked (the signature included), or at least the checksum update.json published
+        final String expected = !TextUtils.isEmpty(info.verifiedSha256) ? info.verifiedSha256 : info.sha256;
+        if (TextUtils.isEmpty(expected)) {
+            throw new SecurityException("not verified");
+        }
         final Context context = ApplicationLoader.applicationContext;
         final PackageInstaller installer = context.getPackageManager().getPackageInstaller();
         // a session left from an earlier try (abandoned, or one the user never confirmed) holds a copy of the APK
@@ -175,7 +188,8 @@ final class UpdateInstaller {
                 }
                 session.fsync(out);
             }
-            if (!TextUtils.isEmpty(info.sha256) && !info.sha256.equals(hex(digest.digest()))) {
+            final String written = hex(digest.digest());
+            if (!expected.equals(written) || !TextUtils.isEmpty(info.sha256) && !info.sha256.equals(written)) {
                 throw new SecurityException("sha256 changed");
             }
             final Intent status = new Intent(context, UpdateReceiver.class)
@@ -194,6 +208,24 @@ final class UpdateInstaller {
                 } catch (Throwable ignore) {
                 }
             }
+        }
+    }
+
+    /**
+     * The confirmation the system put into an install result is opened only when it really is the system's: an
+     * activity of another app (the package installer), never one of ours that an intent could be steered to.
+     */
+    static boolean isSystemConfirmation(Intent confirm) {
+        if (confirm == null) {
+            return false;
+        }
+        try {
+            final Context context = ApplicationLoader.applicationContext;
+            final android.content.ComponentName target = confirm.resolveActivity(context.getPackageManager());
+            return target != null && !context.getPackageName().equals(target.getPackageName())
+                && (confirm.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION)) == 0;
+        } catch (Throwable e) {
+            return false;
         }
     }
 

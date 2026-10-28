@@ -5,6 +5,7 @@
 
 package com.solegram.messenger;
 
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.SparseArray;
 
@@ -15,6 +16,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
@@ -55,6 +57,11 @@ public class FeedController {
     private static final int POSTS_PER_CHANNEL = 10;
     private static final int PARALLEL = 3;
     private static final long FRESH_MS = 3 * 60 * 1000L;
+    /** While a message is being sent the next request waits (in steps of YIELD_STEP), but never longer than YIELD_MAX. */
+    private static final long YIELD_STEP = 250;
+    private static final long YIELD_MAX = 3000;
+    /** Answers arriving close together update the list once. */
+    private static final long REBUILD_DELAY = 200;
 
     private static final SparseArray<FeedController> instances = new SparseArray<>();
 
@@ -78,6 +85,12 @@ public class FeedController {
     private int generation;
     private int pendingRequests;
     private ArrayList<TLRPC.Chat> queue;
+    private long yieldingSince;
+    private boolean rebuildScheduled;
+    private final Runnable rebuildRunnable = () -> {
+        rebuildScheduled = false;
+        rebuild();
+    };
 
     private FeedController(int account) {
         this.account = account;
@@ -228,6 +241,20 @@ public class FeedController {
             }
             return;
         }
+        // the Feed is a bulk load of up to CHANNELS_LIMIT histories on the connection messages go out on:
+        // it waits while the user sends something, so the message is not queued behind it
+        if (SendMessagesHelper.getInstance(account).isSendingAnyMessage()) {
+            final long now = SystemClock.elapsedRealtime();
+            if (yieldingSince == 0) {
+                yieldingSince = now;
+            }
+            if (now - yieldingSince < YIELD_MAX) {
+                AndroidUtilities.runOnUIThread(() -> requestNext(gen), YIELD_STEP);
+                return;
+            }
+        } else {
+            yieldingSince = 0;
+        }
         final TLRPC.Chat chat = queue.remove(0);
         final TLRPC.TL_messages_getHistory req = new TLRPC.TL_messages_getHistory();
         req.peer = MessagesController.getInputPeer(chat);
@@ -249,7 +276,7 @@ public class FeedController {
                     }
                 }
                 byChannel.put(chat.id, buildChannelPosts(chat, list));
-                rebuild();
+                scheduleRebuild();
             } else if (error != null) {
                 FileLog.d("feed: " + chat.id + " " + error.text);
             }
@@ -269,7 +296,17 @@ public class FeedController {
             }
         }
         postsByKey.keySet().retainAll(alive);
+        AndroidUtilities.cancelRunOnUIThread(rebuildRunnable);
+        rebuildScheduled = false;
         rebuild();
+    }
+
+    /** Up to CHANNELS_LIMIT answers come in a few seconds: the list (sorted, diffed and bound again) follows at most every REBUILD_DELAY. */
+    private void scheduleRebuild() {
+        if (!rebuildScheduled) {
+            rebuildScheduled = true;
+            AndroidUtilities.runOnUIThread(rebuildRunnable, REBUILD_DELAY);
+        }
     }
 
     /** One channel's messages as posts (album items folded into one); MessageObjects are made once here. */

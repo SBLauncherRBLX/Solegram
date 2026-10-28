@@ -153,7 +153,7 @@ public class SolegramFiltersActivity extends UniversalFragment {
 
         items.add(UItem.asHeader(getString(R.string.SG_FiltersTransfer)));
         items.add(tile(UItem.asButton(ID_EXPORT, R.drawable.msg_shareout, getString(R.string.SG_FiltersExport)), TILE_TEAL));
-        items.add(tile(UItem.asButton(ID_IMPORT, R.drawable.msg_photo_settings, getString(R.string.SG_FiltersImport)), TILE_CYAN));
+        items.add(tile(UItem.asButton(ID_IMPORT, R.drawable.msg_download, getString(R.string.SG_FiltersImport)), TILE_CYAN));
         items.add(UItem.asShadow(getString(R.string.SG_FiltersTransferInfo)));
     }
 

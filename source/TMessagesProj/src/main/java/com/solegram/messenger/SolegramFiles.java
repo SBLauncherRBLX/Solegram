@@ -136,7 +136,27 @@ public final class SolegramFiles {
         return true;
     }
 
-    /** Called from AndroidUtilities.openForView. */
+    /**
+     * Called from AndroidUtilities.openForView(MessageObject): an installer or a program from a chat asks first
+     * (SolegramSecurity); then plugins and .plugin files. The rest stays Telegram's.
+     */
+    public static boolean tryOpen(File file, String fileName, MessageObject message, Activity activity,
+                                  String mimeType, org.telegram.ui.ActionBar.Theme.ResourcesProvider resourcesProvider, boolean restrict) {
+        if (file == null || !file.exists()) {
+            return false;
+        }
+        if (!restrict && activity != null && SolegramSecurity.needsWarning(fileName != null ? fileName : file.getName(), message)) {
+            SolegramSecurity.confirmOpen(activity, fileName != null ? fileName : file.getName(), message, () -> {
+                if (!tryOpen(file, fileName, message, activity)) {
+                    org.telegram.messenger.AndroidUtilities.openForView(file, fileName, mimeType, activity, resourcesProvider, false);
+                }
+            });
+            return true;
+        }
+        return tryOpen(file, fileName, message, activity);
+    }
+
+    /** Plugins' own file types and .plugin files. */
     public static boolean tryOpen(File file, String fileName, MessageObject message, Activity activity) {
         if (file == null || !file.exists()) {
             return false;

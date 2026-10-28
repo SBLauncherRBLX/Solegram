@@ -778,6 +778,7 @@ public class PluginsController {
 
     public void applyDevMode() {
         boolean enabled = SolegramConfig.pluginsDevMode;
+        PluginDevGate.reset(); // a dev connection allowed before must be allowed again
         pluginsQueue.postRunnable(() -> {
             if (engine == null || engineFailed) {
                 return;

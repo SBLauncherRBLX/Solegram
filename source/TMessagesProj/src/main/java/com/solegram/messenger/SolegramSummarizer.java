@@ -24,10 +24,8 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.LaunchActivity;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -336,11 +334,16 @@ public final class SolegramSummarizer {
             body.put("referrer", "solegram");
         }
 
+        if (own) {
+            // the key and the message go to the user's service: https, or plain http only inside the local network
+            SolegramNet.checkPrivateEndpoint(url);
+        }
         final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         try {
             c.setRequestMethod("POST");
             c.setConnectTimeout(15000);
             c.setReadTimeout(60000);
+            c.setInstanceFollowRedirects(false); // the key is never carried to another address
             c.setDoOutput(true);
             c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             c.setRequestProperty("Accept", "application/json");
@@ -358,7 +361,7 @@ public final class SolegramSummarizer {
             if (code < 200 || code >= 300) {
                 throw new IOException("AI service answered " + code);
             }
-            final JSONObject response = new JSONObject(read(c.getInputStream()));
+            final JSONObject response = new JSONObject(SolegramNet.readString(c.getInputStream(), 2 * 1024 * 1024));
             final JSONObject message = response.getJSONArray("choices").getJSONObject(0).getJSONObject("message");
             return message.isNull("content") ? "" : message.optString("content", "");
         } finally {
@@ -785,16 +788,5 @@ public final class SolegramSummarizer {
             result = result.substring(0, MAX_OUTPUT).trim() + "…";
         }
         return result;
-    }
-
-    private static String read(InputStream in) throws IOException {
-        final StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append('\n');
-            }
-        }
-        return sb.toString();
     }
 }

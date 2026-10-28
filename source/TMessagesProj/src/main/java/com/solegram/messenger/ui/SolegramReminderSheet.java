@@ -61,7 +61,6 @@ import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.PermissionRequest;
 import org.telegram.ui.Components.ScaleStateListAnimator;
-import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -95,7 +94,7 @@ public class SolegramReminderSheet extends BottomSheet {
     private final TextView statusText;
     private final TextView regenerate;
     private final TextView summary;
-    private final ButtonWithCounterView createButton;
+    private final SolegramProfileLinksSheet.ActionButton createButton;
 
     private final ArrayList<Choice> whenChoices = new ArrayList<>();
     private final Choice[] repeatChoices = new Choice[3];
@@ -275,7 +274,7 @@ public class SolegramReminderSheet extends BottomSheet {
         summary = text(context, "", 14, grayColor);
         summary.setGravity(Gravity.CENTER);
         root.addView(summary, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 12, 20, 0));
-        createButton = new ButtonWithCounterView(context, resourcesProvider);
+        createButton = new SolegramProfileLinksSheet.ActionButton(context, resourcesProvider);
         createButton.setText(getString(R.string.SG_ReminderCreate), false);
         createButton.setOnClickListener(v -> createReminder());
         root.addView(createButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 10, 16, 16));
@@ -785,8 +784,14 @@ public class SolegramReminderSheet extends BottomSheet {
         }
     }
 
-    /** Two lines of text that are not there yet: soft bars with a light passing over them. */
+    /**
+     * Two lines of text that are not there yet: soft bars with a light passing over them (still bars when
+     * animations are reduced). Nothing is made while drawing.
+     */
     private static class Shimmer extends View {
+
+        /** Top, bottom (dp) and width share of each bar. */
+        private static final float[][] BARS = {{7, 19, 0.72f}, {31, 41, 0.94f}, {48, 58, 0.58f}};
 
         private final Paint bar = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint light = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -815,20 +820,24 @@ public class SolegramReminderSheet extends BottomSheet {
                 return;
             }
             final float w = getWidth();
-            final float x = ((SystemClock.uptimeMillis() % 1500) / 1500f) * (w + dp(320)) - dp(160);
-            matrix.setTranslate(x, 0);
-            gradient.setLocalMatrix(matrix);
+            final boolean moving = org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAGS_CHAT);
+            if (moving) {
+                final float x = ((SystemClock.uptimeMillis() % 1500) / 1500f) * (w + dp(320)) - dp(160);
+                matrix.setTranslate(x, 0);
+                gradient.setLocalMatrix(matrix);
+            }
             final float r = dp(6);
-            final float[][] bars = {{dp(7), dp(19), 0.72f}, {dp(31), dp(41), 0.94f}, {dp(48), dp(58), 0.58f}};
-            for (float[] b : bars) {
-                if (b[1] > getHeight()) {
+            for (float[] b : BARS) {
+                if (dp(b[1]) > getHeight()) {
                     break;
                 }
-                rect.set(0, b[0], w * b[2], b[1]);
+                rect.set(0, dp(b[0]), w * b[2], dp(b[1]));
                 canvas.drawRoundRect(rect, r, r, bar);
-                canvas.drawRoundRect(rect, r, r, light);
+                if (moving) {
+                    canvas.drawRoundRect(rect, r, r, light);
+                }
             }
-            if (getVisibility() == VISIBLE && getAlpha() > 0) {
+            if (moving && getVisibility() == VISIBLE && getAlpha() > 0) {
                 invalidate();
             }
         }

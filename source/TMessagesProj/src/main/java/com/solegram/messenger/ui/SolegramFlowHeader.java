@@ -281,17 +281,40 @@ public class SolegramFlowHeader extends FrameLayout {
     }
 
     /** Older Android: large soft blobs of the palette drift slowly over a diagonal gradient. */
+    // the blobs animate every frame: their gradients are made once per palette (a unit circle moved and scaled
+    // by a matrix) instead of four new shaders per frame
+    private LinearGradient blobBase;
+    private int blobBaseW, blobBaseH, blobBaseC1, blobBaseC2;
+    private final RadialGradient[] blobShaders = new RadialGradient[3];
+    private final int[] blobColors = new int[3];
+    private final android.graphics.Matrix blobMatrix = new android.graphics.Matrix();
+
     private void drawBlobs(Canvas canvas, int w, int h, float t) {
-        blobPaint.setShader(new LinearGradient(0, 0, w, h, palette[0], palette[2], Shader.TileMode.CLAMP));
+        if (blobBase == null || blobBaseW != w || blobBaseH != h || blobBaseC1 != palette[0] || blobBaseC2 != palette[2]) {
+            blobBaseW = w;
+            blobBaseH = h;
+            blobBaseC1 = palette[0];
+            blobBaseC2 = palette[2];
+            blobBase = new LinearGradient(0, 0, w, h, palette[0], palette[2], Shader.TileMode.CLAMP);
+        }
+        blobPaint.setShader(blobBase);
         canvas.drawRect(0, 0, w, h, blobPaint);
-        drawBlob(canvas, w * (0.25f + 0.2f * (float) Math.sin(t * 0.21f)), h * (0.35f + 0.2f * (float) Math.cos(t * 0.17f)), w * 0.6f, palette[1]);
-        drawBlob(canvas, w * (0.75f + 0.2f * (float) Math.cos(t * 0.15f + 1.3f)), h * (0.45f + 0.25f * (float) Math.sin(t * 0.19f + 0.4f)), w * 0.55f, palette[3]);
-        drawBlob(canvas, w * (0.5f + 0.3f * (float) Math.sin(t * 0.12f + 2.1f)), h * (0.8f + 0.15f * (float) Math.cos(t * 0.23f + 1.0f)), w * 0.5f, palette[0]);
+        drawBlob(canvas, 0, w * (0.25f + 0.2f * (float) Math.sin(t * 0.21f)), h * (0.35f + 0.2f * (float) Math.cos(t * 0.17f)), w * 0.6f, palette[1]);
+        drawBlob(canvas, 1, w * (0.75f + 0.2f * (float) Math.cos(t * 0.15f + 1.3f)), h * (0.45f + 0.25f * (float) Math.sin(t * 0.19f + 0.4f)), w * 0.55f, palette[3]);
+        drawBlob(canvas, 2, w * (0.5f + 0.3f * (float) Math.sin(t * 0.12f + 2.1f)), h * (0.8f + 0.15f * (float) Math.cos(t * 0.23f + 1.0f)), w * 0.5f, palette[0]);
     }
 
-    private void drawBlob(Canvas canvas, float cx, float cy, float r, int color) {
-        blobPaint.setShader(new RadialGradient(cx, cy, r, new int[]{color, ColorUtils.setAlphaComponent(color, 0x80), color & 0x00FFFFFF},
-            new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
+    private void drawBlob(Canvas canvas, int index, float cx, float cy, float r, int color) {
+        RadialGradient shader = blobShaders[index];
+        if (shader == null || blobColors[index] != color) {
+            blobColors[index] = color;
+            blobShaders[index] = shader = new RadialGradient(0, 0, 1, new int[]{color, ColorUtils.setAlphaComponent(color, 0x80), color & 0x00FFFFFF},
+                new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
+        }
+        blobMatrix.setScale(r, r);
+        blobMatrix.postTranslate(cx, cy);
+        shader.setLocalMatrix(blobMatrix);
+        blobPaint.setShader(shader);
         canvas.drawCircle(cx, cy, r, blobPaint);
     }
     // endregion

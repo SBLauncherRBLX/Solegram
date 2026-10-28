@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram New Year launcher icon (themed set, raster layers rendered by the icon generator) -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/sg_icon_bg_newyear" />
+    <foreground android:drawable="@mipmap/sg_icon_fg_newyear" />
+    <monochrome android:drawable="@drawable/sg_icon_mono_newyear" />
+</adaptive-icon>

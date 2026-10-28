@@ -1121,6 +1121,7 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
         containerView.addView(optionsButton, LayoutHelper.createFrame(40, 40, Gravity.TOP | Gravity.RIGHT, 0, 5, 5, 0));
         optionsButton.addSubItem(1, R.drawable.msg_share, LocaleController.getString(R.string.StickersShare));
         optionsButton.addSubItem(2, R.drawable.msg_link, LocaleController.getString(R.string.CopyLink));
+        optionsButton.addSubItem(91, R.drawable.msg_soledrop, LocaleController.getString(R.string.SG_SoleDrop)); // Solegram: the set by SoleDrop
 
         optionsButton.setOnClickListener(v -> {
             checkOptions();
@@ -1334,6 +1335,15 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
             stickersUrl = "https://" + MessagesController.getInstance(currentAccount).linkPrefix + "/addemoji/" + stickerSet.set.short_name;
         } else {
             stickersUrl = "https://" + MessagesController.getInstance(currentAccount).linkPrefix + "/addstickers/" + stickerSet.set.short_name;
+        }
+        if (id == 91) {
+            // Solegram: the set goes to a phone held close (as a link, through Telegram)
+            final BaseFragment target = parentFragment != null ? parentFragment : LaunchActivity.getSafeLastFragment();
+            dismiss();
+            if (target != null && stickerSet.set != null) {
+                com.solegram.messenger.soledrop.SoleDrop.open(target, com.solegram.messenger.soledrop.SoleDropItem.stickers(stickerSet.set));
+            }
+            return;
         }
         if (id == 1) {
             Context context = parentActivity;

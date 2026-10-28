@@ -945,6 +945,9 @@ public final class AutoUpdater {
                     confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
                 } catch (Throwable ignore) {
                 }
+                if (!UpdateInstaller.isSystemConfirmation(confirm)) {
+                    confirm = null; // then the installer for the file is offered instead
+                }
                 askToInstall(info, confirm);
                 break;
             }
@@ -1112,15 +1115,9 @@ public final class AutoUpdater {
         return true;
     }
 
+    /** The notes of the installed version: the update sheet's look (icon, title, notes as a list), not a plain alert. */
     private static void showChangelog(BaseFragment fragment, String version, String changelog) {
-        if (fragment.getParentActivity() == null) {
-            return;
-        }
-        final AlertDialog.Builder builder = new AlertDialog.Builder(fragment.getParentActivity(), fragment.getResourceProvider());
-        builder.setTitle(LocaleController.getString(R.string.SG_WhatsNew) + " · " + version);
-        builder.setMessage(changelog);
-        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
-        fragment.showDialog(builder.create());
+        UpdateSheet.showChangelog(fragment, version, changelog);
     }
 
     /** For the settings: what the updater is doing, or null. */

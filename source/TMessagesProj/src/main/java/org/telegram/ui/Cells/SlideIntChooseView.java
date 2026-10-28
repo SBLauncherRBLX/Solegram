@@ -82,15 +82,9 @@ public class SlideIntChooseView extends FrameLayout {
         maxText.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         addView(maxText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 25, Gravity.TOP, 22, 13, 22, 0));
 
-        seekBarView = new SeekBarView(context, resourcesProvider) {
-            @Override
-            public boolean onTouchEvent(MotionEvent event) {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    getParent().requestDisallowInterceptTouchEvent(true);
-                }
-                return super.onTouchEvent(event);
-            }
-        };
+        // Solegram: the list may still scroll when a vertical swipe starts on the slider; a horizontal drag
+        // claims the touch itself (SeekBarView asks the parents not to intercept once it moved sideways)
+        seekBarView = new SeekBarView(context, resourcesProvider);
         seekBarView.setReportChanges(true);
         seekBarView.setDelegate(new SeekBarView.SeekBarViewDelegate() {
             @Override

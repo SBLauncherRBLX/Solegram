@@ -54,6 +54,8 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
         public String sha256;
         /** GitHub source: a link that always serves the newest APK, for downloading in the browser. */
         public String latestUrl;
+        /** SHA-256 of the file as UpdateInstaller.verify checked it (signature included); only those bytes are installed. Not saved. */
+        public String verifiedSha256;
     }
 
     private static final long AUTO_CHECK_INTERVAL = 6 * 60 * 60 * 1000L;
@@ -206,7 +208,11 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
     private void finishCheck(BaseFragment fragment, boolean manual, UpdateInfo found, String error) {
         AndroidUtilities.runOnUIThread(() -> {
             checking = false;
-            SolegramConfig.putLong("lastUpdateCheck", System.currentTimeMillis());
+            // written directly: putLong re-reads every setting and bumps SolegramConfig.version, which makes each
+            // open chat lay out all its messages again on resume - for a time stamp that changes no message
+            final long now = System.currentTimeMillis();
+            SolegramConfig.prefs().edit().putLong("lastUpdateCheck", now).apply();
+            SolegramConfig.lastUpdateCheck = now;
             if (error != null) {
                 AutoUpdater.onCheckFinished(null, error);
                 if (manual && fragment != null) {

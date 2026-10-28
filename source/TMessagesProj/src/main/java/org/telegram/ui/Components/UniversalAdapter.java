@@ -876,6 +876,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 slideView.setOptions(item.intValue, item.texts);
                 slideView.setMinAllowedIndex((int) item.longValue);
                 slideView.setCallback(index -> {
+                    item.intValue = index; // Solegram: a cell bound again (after scrolling) shows the new choice
                     if (item.intCallback != null) {
                         item.intCallback.run(index);
                     }
@@ -883,7 +884,14 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 break;
             case VIEW_TYPE_INTSLIDE:
                 SlideIntChooseView slideIntChooseView = (SlideIntChooseView) holder.itemView;
-                slideIntChooseView.set(item.intValue, (SlideIntChooseView.Options) item.object, item.intCallback);
+                // Solegram: the item keeps the value the slider was moved to, so a cell bound again after scrolling
+                // shows it (the item list is built once, with the value it had then)
+                slideIntChooseView.set(item.intValue, (SlideIntChooseView.Options) item.object, value -> {
+                    item.intValue = value;
+                    if (item.intCallback != null) {
+                        item.intCallback.run(value);
+                    }
+                });
                 slideIntChooseView.setMinValueAllowed((int) item.longValue);
                 break;
             case VIEW_TYPE_QUICK_REPLY:

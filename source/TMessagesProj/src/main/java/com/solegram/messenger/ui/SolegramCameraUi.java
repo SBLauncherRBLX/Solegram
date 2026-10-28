@@ -144,7 +144,9 @@ public final class SolegramCameraUi {
 
     static final int YELLOW = 0xFFFFD60A;
     private static final int BUTTON = 40;
-    private static final int BUTTON_GAP = 10;
+    private static final int BUTTON_GAP = 14;
+    /** One line weight for every glyph of the top row (in the 24-unit icon box), a lighter one for inner details. */
+    private static final float STROKE = 1.6f, STROKE_THIN = 1.15f;
 
     private static final int FLASH = 0, HDR = 1, TIMER = 2, ASPECT = 3, GRID = 4;
 
@@ -204,20 +206,18 @@ public final class SolegramCameraUi {
             final CamButton button = new CamButton(context, type);
             button.setOnClickListener(v -> onButton(type));
             buttons[i] = button;
-            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(BUTTON), dp(BUTTON));
-            lp.leftMargin = lp.rightMargin = dp(BUTTON_GAP) / 2;
-            lp.topMargin = lp.bottomMargin = dp(BUTTON_GAP) / 2;
-            topBar.addView(button, lp);
+            topBar.addView(button, new LinearLayout.LayoutParams(dp(BUTTON), dp(BUTTON)));
         }
         overlay.addView(topBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         toast = new TextView(context);
         toast.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         toast.setTypeface(AndroidUtilities.bold());
+        toast.setLetterSpacing(0.02f);
         toast.setTextColor(0xFFFFFFFF);
         toast.setGravity(Gravity.CENTER);
-        toast.setPadding(dp(12), 0, dp(12), 0);
-        toast.setBackground(new PlainPill(0x8C000000, 0));
+        toast.setPadding(dp(14), 0, dp(14), 0);
+        toast.setBackground(new PlainPill(0xA31C1C1E, 0x1AFFFFFF));
         toast.setAlpha(0f);
         toast.setVisibility(View.GONE);
         overlay.addView(toast, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(28)));
@@ -311,6 +311,22 @@ public final class SolegramCameraUi {
         fade(thumb, value ? 0f : 1f);
         if (value) {
             toast.setVisibility(View.GONE);
+        }
+    }
+
+    /** The top row across (portrait) or down the side (landscape), the gaps only between the buttons. */
+    private void setBarOrientation(boolean portrait) {
+        final int orientation = portrait ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL;
+        if (topBar.getOrientation() == orientation && topBar.getTag() != null) {
+            return;
+        }
+        topBar.setTag(Boolean.TRUE);
+        topBar.setOrientation(orientation);
+        final int half = dp(BUTTON_GAP) / 2;
+        for (CamButton button : buttons) {
+            final LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) button.getLayoutParams();
+            lp.leftMargin = lp.rightMargin = portrait ? half : 0;
+            lp.topMargin = lp.bottomMargin = portrait ? 0 : half;
         }
     }
 
@@ -751,14 +767,18 @@ public final class SolegramCameraUi {
 
     // region Glass
 
-    /** Background of a round control: live liquid glass over the preview, or a clean dark circle. */
+    /**
+     * Background of a round control: live liquid glass over the preview, or a clean dark circle. Both get a soft
+     * light from above ({@link Sheen}): over the black bars around a 4:3 or 1:1 frame there is nothing for the
+     * glass to bend, and the lit edge is what still shows it as glass, as on iOS.
+     */
     Drawable background(View view, int radius) {
         if (glass != null) {
             final BlurredBackgroundDrawable drawable = glass.create(view);
             drawable.setRadius(radius);
-            return drawable;
+            return new android.graphics.drawable.LayerDrawable(new Drawable[]{drawable, new Sheen(0x2EFFFFFF, 0x0DFFFFFF)});
         }
-        return new PlainPill(0x52000000, 0x24FFFFFF);
+        return new android.graphics.drawable.LayerDrawable(new Drawable[]{new PlainPill(0x61232326, 0x2EFFFFFF), new Sheen(0x1FFFFFFF, 0)});
     }
 
     /**
@@ -781,7 +801,7 @@ public final class SolegramCameraUi {
                 }
                 // no hash: a camera frame changes every time, the recording is one reference anyway
             });
-            final float radius = dpf2(9f) * SolegramGlass.blurScale();
+            final float radius = dpf2(9f); // a fixed light blur: the camera picture under the buttons stays readable as glass
             if (SolegramGlass.vibrancy()) {
                 source.setBlur(radius, RenderNodeEffects.getSaturationX2RenderEffect());
             } else {
@@ -790,11 +810,13 @@ public final class SolegramCameraUi {
             factory = new BlurredBackgroundDrawableViewFactory(source);
             factory.setSourceRootView(new ViewPositionWatcher(root), root);
             factory.setLiquidGlassEffectAllowed(true);
+            // a neutral grey body rather than a dark one: over the black bars a dark tint was black, a flat circle;
+            // grey reads as glass there and still lets the white icons stand out over a bright scene
             provider = new BlurredBackgroundProviderBuilder(null)
-                .setBackgroundColor((r, isDark) -> Color.argb(Math.round(255 * 0.30f * SolegramGlass.alpha(true)), 0x18, 0x19, 0x1E))
-                .setStrokeColorTop(0x47FFFFFF, 0x47FFFFFF)
-                .setStrokeColorBottom(0x17FFFFFF, 0x17FFFFFF)
-                .setShadowColor(0x2E000000, 0x2E000000)
+                .setBackgroundColor((r, isDark) -> Color.argb(Math.round(255 * Math.max(0.22f, Math.min(0.42f, 0.36f * SolegramGlass.alpha(true) / 0.85f))), 0x5C, 0x5C, 0x63))
+                .setStrokeColorTop(0x6BFFFFFF, 0x6BFFFFFF)
+                .setStrokeColorBottom(0x24FFFFFF, 0x24FFFFFF)
+                .setShadowColor(0x38000000, 0x38000000)
                 .setShadowLayer(dpf2(6f), 0, dpf2(1.5f))
                 .setStrokeWidth(dpf2(1f), dpf2(0.8f))
                 .build();
@@ -872,6 +894,62 @@ public final class SolegramCameraUi {
             if (stroke.getColor() != 0) {
                 rect.inset(stroke.getStrokeWidth() / 2f, stroke.getStrokeWidth() / 2f);
                 canvas.drawRoundRect(rect, r, r, stroke);
+            }
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
+    /**
+     * The light on a round control: a soft glow over its upper part fading out before the middle, and a faint
+     * lower edge. The gradient is made when the size changes, never while drawing.
+     */
+    static final class Sheen extends Drawable {
+        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint low = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private final int topColor;
+
+        Sheen(int topColor, int lowColor) {
+            this.topColor = topColor;
+            low.setStyle(Paint.Style.STROKE);
+            low.setStrokeWidth(dpf2(0.8f));
+            low.setColor(lowColor);
+        }
+
+        @Override
+        protected void onBoundsChange(@NonNull android.graphics.Rect bounds) {
+            super.onBoundsChange(bounds);
+            if (bounds.height() > 0) {
+                glow.setShader(new android.graphics.LinearGradient(0, bounds.top, 0, bounds.top + bounds.height() * 0.55f,
+                    topColor, topColor & 0x00FFFFFF, android.graphics.Shader.TileMode.CLAMP));
+            }
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            rect.set(getBounds());
+            if (rect.isEmpty()) {
+                return;
+            }
+            final float r = Math.min(rect.width(), rect.height()) / 2f;
+            canvas.drawRoundRect(rect, r, r, glow);
+            if (low.getColor() != 0 && Math.abs(rect.width() - rect.height()) < dpf2(1f)) {
+                final float inset = dpf2(1.2f);
+                rect.inset(inset, inset);
+                // round buttons only, the lower part: light bounced back inside the glass
+                canvas.drawArc(rect, 25, 130, false, low);
             }
         }
 
@@ -977,26 +1055,43 @@ public final class SolegramCameraUi {
             final boolean portrait = w < h;
             final int inset = host.controlsInset();
             lastInset = inset;
-            topBar.setOrientation(portrait ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+            setBarOrientation(portrait);
+            safeInsets(safe);
             final int barW = topBar.getMeasuredWidth(), barH = topBar.getMeasuredHeight();
-            int barBottom;
             if (portrait) {
-                final int y = AndroidUtilities.statusBarHeight + dp(4);
+                // under the status bar and a camera cutout, with the room of a camera app's top row
+                final int y = Math.max(AndroidUtilities.statusBarHeight, safe.top) + dp(8);
                 topBar.layout((w - barW) / 2, y, (w + barW) / 2, y + barH);
-                barBottom = y + barH;
+                final int barBottom = y + barH;
                 final int tw = toast.getMeasuredWidth(), th = toast.getMeasuredHeight();
-                toast.layout((w - tw) / 2, barBottom + dp(6), (w + tw) / 2, barBottom + dp(6) + th);
+                toast.layout((w - tw) / 2, barBottom + dp(10), (w + tw) / 2, barBottom + dp(10) + th);
                 final int pw = zoomPill.getMeasuredWidth(), ph = zoomPill.getMeasuredHeight();
-                final int pb = h - inset - dp(6);
+                final int pb = h - inset - dp(10);
                 zoomPill.layout((w - pw) / 2, pb - ph, (w + pw) / 2, pb);
             } else {
-                final int x = dp(12);
+                // beside a cutout on the left; the shutter panel takes the right
+                final int x = safe.left + dp(14);
                 topBar.layout(x, (h - barH) / 2, x + barW, (h + barH) / 2);
                 final int tw = toast.getMeasuredWidth(), th = toast.getMeasuredHeight();
-                toast.layout((w - tw) / 2, dp(16), (w + tw) / 2, dp(16) + th);
+                final int ty = Math.max(safe.top, dp(4)) + dp(14);
+                toast.layout((w - tw) / 2, ty, (w + tw) / 2, ty + th);
                 final int pw = zoomPill.getMeasuredWidth(), ph = zoomPill.getMeasuredHeight();
-                final int pr = w - inset - dp(6);
+                final int pr = w - inset - dp(10);
                 zoomPill.layout(pr - pw, (h - ph) / 2, pr, (h + ph) / 2);
+            }
+        }
+
+        private final android.graphics.Rect safe = new android.graphics.Rect();
+
+        /** The display cutout's safe insets of this window (none before Android 9 or without a cutout). */
+        private void safeInsets(android.graphics.Rect out) {
+            out.setEmpty();
+            if (Build.VERSION.SDK_INT >= 28) {
+                final android.view.WindowInsets insets = getRootWindowInsets();
+                final android.view.DisplayCutout cutout = insets != null ? insets.getDisplayCutout() : null;
+                if (cutout != null) {
+                    out.set(cutout.getSafeInsetLeft(), cutout.getSafeInsetTop(), cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
+                }
             }
         }
 
@@ -1004,7 +1099,7 @@ public final class SolegramCameraUi {
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             final int w = MeasureSpec.getSize(widthMeasureSpec), h = MeasureSpec.getSize(heightMeasureSpec);
             final boolean portrait = w < h;
-            topBar.setOrientation(portrait ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+            setBarOrientation(portrait);
             zoomPill.setVertical(!portrait);
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }
@@ -1332,11 +1427,15 @@ public final class SolegramCameraUi {
         }
     }
 
-    /** A round control of the top row; draws its own icon so it can turn with the phone. */
+    /**
+     * A round control of the top row; draws its own icon so it can turn with the phone. Every glyph is drawn in a
+     * 24-unit box with one line weight ({@link #STROKE}); "off" is a slash cut out of the glyph, as on iOS.
+     */
     @SuppressLint("ViewConstructor")
     private final class CamButton extends View {
         private final int type;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint cutPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private final RectF rect = new RectF();
@@ -1351,8 +1450,14 @@ public final class SolegramCameraUi {
             ScaleStateListAnimator.apply(this, .12f, 1.5f);
             paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setStrokeJoin(Paint.Join.ROUND);
+            // a faint shadow keeps the white glyphs apart from a bright scene behind the glass
+            paint.setShadowLayer(dpf2(1.2f), 0, 0, 0x30000000);
+            cutPaint.setStyle(Paint.Style.STROKE);
+            cutPaint.setStrokeCap(Paint.Cap.ROUND);
+            cutPaint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT));
             textPaint.setTypeface(AndroidUtilities.bold());
             textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setShadowLayer(dpf2(1.2f), 0, 0, 0x30000000);
         }
 
         void rotateIcon(float target) {
@@ -1392,6 +1497,22 @@ public final class SolegramCameraUi {
             }
         }
 
+        /** How much of the "off" slash shows: the flash when off, HDR and the grid fading with their state. */
+        private float slash(float on) {
+            switch (type) {
+                case FLASH: {
+                    final CameraSession session = session();
+                    final String mode = session != null ? session.getCurrentFlashMode() : Camera.Parameters.FLASH_MODE_OFF;
+                    return Camera.Parameters.FLASH_MODE_OFF.equals(mode) || mode == null ? 1f : 0f;
+                }
+                case HDR:
+                case GRID:
+                    return 1f - on;
+                default:
+                    return 0f;
+            }
+        }
+
         @Override
         protected void onDraw(Canvas canvas) {
             final float on = activeT.set(isOn() ? 1 : 0);
@@ -1402,80 +1523,91 @@ public final class SolegramCameraUi {
             // icons are drawn in a 24-unit box centred in the button
             final float u = dpf2(1f);
             canvas.translate(cx - 12 * u, cy - 12 * u);
+            final float slash = slash(on);
+            // the slash is cut out of the glyph: drawn in a layer of the icon's own small box
+            final int layer = slash > 0f ? canvas.saveLayer(0, 0, 24 * u, 24 * u, null) : -1;
             paint.setColor(color);
-            paint.setStrokeWidth(1.7f * u);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(STROKE * u);
+            textPaint.setColor(color);
+            textPaint.setLetterSpacing(0f);
             switch (type) {
                 case FLASH:
                     drawFlash(canvas, u, color);
                     break;
-                case HDR:
-                    textPaint.setTextSize(10.5f * u);
-                    textPaint.setColor(color);
-                    canvas.drawText("HDR", 12 * u, 12 * u - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
-                    if (on < 1) {
-                        drawSlash(canvas, u, 1f - on);
+                case HDR: {
+                    // a kerned label; on, a frame closes around it
+                    textPaint.setTextSize(9f * u);
+                    textPaint.setLetterSpacing(0.05f);
+                    canvas.drawText("HDR", 12 * u + 0.3f * u, 12 * u - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
+                    if (on > 0f) {
+                        paint.setStrokeWidth(STROKE_THIN * u);
+                        paint.setAlpha((int) (255 * on));
+                        final float grow = 0.85f + 0.15f * on;
+                        rect.set(12 * u - 11.5f * u * grow, 12 * u - 7.5f * u * grow, 12 * u + 11.5f * u * grow, 12 * u + 7.5f * u * grow);
+                        canvas.drawRoundRect(rect, 3.5f * u, 3.5f * u, paint);
                     }
                     break;
+                }
                 case TIMER:
                     drawTimer(canvas, u, color, on);
                     break;
                 case ASPECT: {
                     if (SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_FULL) {
                         // full screen: the four corners of the screen, opened out
-                        paint.setStyle(Paint.Style.STROKE);
-                        paint.setStrokeWidth(1.7f * u);
-                        final float l = 5.5f * u, t = 4.5f * u, r = 18.5f * u, b = 19.5f * u, k = 4.5f * u;
+                        final float l = 5f, t = 4.5f, r = 19f, b = 19.5f, k = 4.5f;
                         path.rewind();
-                        path.moveTo(l, t + k);
-                        path.lineTo(l, t);
-                        path.lineTo(l + k, t);
-                        path.moveTo(r - k, t);
-                        path.lineTo(r, t);
-                        path.lineTo(r, t + k);
-                        path.moveTo(r, b - k);
-                        path.lineTo(r, b);
-                        path.lineTo(r - k, b);
-                        path.moveTo(l + k, b);
-                        path.lineTo(l, b);
-                        path.lineTo(l, b - k);
+                        path.moveTo(l * u, (t + k) * u);
+                        path.lineTo(l * u, t * u);
+                        path.lineTo((l + k) * u, t * u);
+                        path.moveTo((r - k) * u, t * u);
+                        path.lineTo(r * u, t * u);
+                        path.lineTo(r * u, (t + k) * u);
+                        path.moveTo(r * u, (b - k) * u);
+                        path.lineTo(r * u, b * u);
+                        path.lineTo((r - k) * u, b * u);
+                        path.moveTo((l + k) * u, b * u);
+                        path.lineTo(l * u, b * u);
+                        path.lineTo(l * u, (b - k) * u);
                         canvas.drawPath(path, paint);
                         break;
                     }
                     final String text = aspectName(SolegramConfig.cameraAspect);
-                    textPaint.setTextSize((text.length() > 3 ? 9.5f : 10.5f) * u);
-                    textPaint.setColor(color);
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setStrokeWidth(1.3f * u);
-                    final float w = SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_1_1 ? 14 : SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_16_9 ? 21 : 18;
-                    final float h = SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_1_1 ? 14 : SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_16_9 ? 12 : 14;
+                    textPaint.setTextSize((text.length() > 3 ? 8f : 8.5f) * u);
+                    paint.setStrokeWidth(STROKE_THIN * u);
+                    final float w = SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_1_1 ? 15 : SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_16_9 ? 21 : 19;
+                    final float h = SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_1_1 ? 15 : SolegramConfig.cameraAspect == SolegramConfig.CAMERA_ASPECT_16_9 ? 13 : 15;
                     rect.set((24 - w) / 2f * u, (24 - h) / 2f * u, (24 + w) / 2f * u, (24 + h) / 2f * u);
-                    canvas.drawRoundRect(rect, 2.5f * u, 2.5f * u, paint);
+                    canvas.drawRoundRect(rect, 3f * u, 3f * u, paint);
                     canvas.drawText(text, 12 * u, 12 * u - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
                     break;
                 }
                 case GRID: {
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setStrokeWidth(1.5f * u);
-                    rect.set(5 * u, 5 * u, 19 * u, 19 * u);
-                    canvas.drawRoundRect(rect, 2.5f * u, 2.5f * u, paint);
-                    paint.setStrokeWidth(1.1f * u);
+                    rect.set(4.5f * u, 4.5f * u, 19.5f * u, 19.5f * u);
+                    canvas.drawRoundRect(rect, 3f * u, 3f * u, paint);
+                    paint.setStrokeWidth(STROKE_THIN * u);
                     for (int i = 1; i <= 2; i++) {
-                        final float p = (5 + 14 * i / 3f) * u;
-                        canvas.drawLine(p, 5 * u, p, 19 * u, paint);
-                        canvas.drawLine(5 * u, p, 19 * u, p, paint);
-                    }
-                    if (on < 1) {
-                        drawSlash(canvas, u, 1f - on);
+                        final float p = (4.5f + 15 * i / 3f) * u;
+                        canvas.drawLine(p, 4.5f * u, p, 19.5f * u, paint);
+                        canvas.drawLine(4.5f * u, p, 19.5f * u, p, paint);
                     }
                     break;
                 }
             }
+            if (layer != -1) {
+                drawSlash(canvas, u, slash);
+                canvas.restoreToCount(layer);
+            }
             canvas.restore();
         }
 
+        /** The "off" slash: a clear gap cut along it, then the line in white. */
         private void drawSlash(Canvas canvas, float u, float alpha) {
+            cutPaint.setStrokeWidth((STROKE + 2.4f) * u);
+            cutPaint.setAlpha((int) (255 * alpha));
+            canvas.drawLine(4.5f * u, 4.5f * u, 19.5f * u, 19.5f * u, cutPaint);
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(1.7f * u);
+            paint.setStrokeWidth(STROKE * u);
             paint.setColor(ColorUtils.setAlphaComponent(0xFFFFFFFF, (int) (255 * alpha)));
             canvas.drawLine(4.5f * u, 4.5f * u, 19.5f * u, 19.5f * u, paint);
         }
@@ -1496,10 +1628,11 @@ public final class SolegramCameraUi {
                 path.quadTo(10 * u, 21 * u, 10 * u, 20 * u);
                 path.lineTo(10 * u, 13 * u);
                 path.close();
-                paint.setStyle(Paint.Style.FILL);
+                paint.setStyle(Paint.Style.FILL_AND_STROKE);
+                paint.setStrokeWidth(0.8f * u);
                 canvas.drawPath(path, paint);
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(1.5f * u);
+                paint.setStrokeWidth(STROKE * u);
                 canvas.drawLine(12 * u, 3 * u, 12 * u, 6 * u, paint);
                 canvas.drawLine(7 * u, 5 * u, 8.6f * u, 7.4f * u, paint);
                 canvas.drawLine(17 * u, 5 * u, 15.4f * u, 7.4f * u, paint);
@@ -1516,41 +1649,46 @@ public final class SolegramCameraUi {
             path.lineTo(12.6f * u, 10.2f * u);
             path.close();
             paint.setStyle(on ? Paint.Style.FILL_AND_STROKE : Paint.Style.STROKE);
-            paint.setStrokeWidth(1.5f * u);
+            paint.setStrokeWidth((on ? 1f : STROKE) * u);
             canvas.drawPath(path, paint);
             if (auto) {
-                textPaint.setTextSize(8.5f * u);
-                textPaint.setColor(color);
-                canvas.drawText("A", 20 * u, 22 * u, textPaint);
-            } else if (!on) {
-                drawSlash(canvas, u, 1f);
+                // "A" on a small dark disc, so it reads where it meets the bolt
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFFFFFFFF);
+                canvas.drawCircle(19.5f * u, 19.5f * u, 4.6f * u, paint);
+                textPaint.setTextSize(7f * u);
+                textPaint.setColor(0xFF1C1C1E);
+                canvas.drawText("A", 19.5f * u, 19.5f * u - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
+                paint.setColor(color);
             }
         }
 
         private void drawTimer(Canvas canvas, float u, int color, float on) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(1.6f * u);
             final float r = 7.5f;
             canvas.drawCircle(12 * u, 13.5f * u, r * u, paint);
-            canvas.drawLine(10 * u, 3.6f * u, 14 * u, 3.6f * u, paint);
+            canvas.drawLine(10 * u, 3.4f * u, 14 * u, 3.4f * u, paint);
             canvas.drawLine(12 * u, 13.5f * u, 12 * u, 9.5f * u, paint);
-            canvas.drawLine(18.3f * u, 6.6f * u, 19.6f * u, 5.3f * u, paint);
+            canvas.drawLine(18.2f * u, 6.7f * u, 19.5f * u, 5.4f * u, paint);
             if (SolegramConfig.cameraTimer > 0) {
+                // the seconds on a yellow tag over the dial's corner
                 final String text = Integer.toString(SolegramConfig.cameraTimer);
-                textPaint.setTextSize(8.5f * u);
+                textPaint.setTextSize(7.5f * u);
                 final float tw = textPaint.measureText(text);
-                rect.set(20 * u - tw / 2f - 2.5f * u, 15.5f * u, 20 * u + tw / 2f + 2.5f * u, 23.5f * u);
+                rect.set(19.5f * u - tw / 2f - 2.6f * u, 15.6f * u, 19.5f * u + tw / 2f + 2.6f * u, 23.2f * u);
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(ColorUtils.setAlphaComponent(YELLOW, (int) (255 * on)));
-                canvas.drawRoundRect(rect, 4 * u, 4 * u, paint);
+                canvas.drawRoundRect(rect, 3.8f * u, 3.8f * u, paint);
                 textPaint.setColor(ColorUtils.setAlphaComponent(0xFF000000, (int) (255 * on)));
-                canvas.drawText(text, 20 * u, 22.3f * u, textPaint);
+                canvas.drawText(text, 19.5f * u, rect.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
                 paint.setColor(color);
             }
         }
     }
 
-    /** Zoom steps over the shutter (1x, 2x when the camera reaches it); the current one shows the exact zoom. */
+    /**
+     * Zoom steps over the shutter (1x, 2x when the camera reaches it), as on iOS: each step a small dark circle in
+     * the glass capsule, the current one a bigger circle gliding between them with its exact zoom in yellow ("1.4×").
+     */
     @SuppressLint("ViewConstructor")
     private final class ZoomPill extends View {
         private final float[] presets = {1f, 2f};
@@ -1560,20 +1698,23 @@ public final class SolegramCameraUi {
         private boolean vertical;
         private float textRotation;
         private final Paint chipPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final AnimatedFloat selectT = new AnimatedFloat(this, 0, 260, CubicBezierInterpolator.EASE_OUT_QUINT);
         private android.animation.ValueAnimator zoomAnimator;
         private final StringBuilder label = new StringBuilder(8);
 
-        private static final int CHIP = 34, PAD = 3;
+        private static final int CHIP = 34, DOT = 26, PAD = 4, GAP = 6;
 
         ZoomPill(Context context) {
             super(context);
             setBackground(background(this, dp(CHIP + PAD * 2) / 2));
-            chipPaint.setColor(0x73000000);
+            chipPaint.setColor(0x8F000000);
+            dotPaint.setColor(0x47000000);
             textPaint.setTypeface(AndroidUtilities.bold());
             textPaint.setTextAlign(Paint.Align.CENTER);
             textPaint.setTextSize(dp(12));
+            textPaint.setShadowLayer(dpf2(1f), 0, 0, 0x30000000);
             setVisibility(View.GONE);
         }
 
@@ -1630,13 +1771,13 @@ public final class SolegramCameraUi {
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            final int along = dp(CHIP) * count + dp(PAD) * 2 + dp(4) * (count - 1);
+            final int along = dp(CHIP) * count + dp(PAD) * 2 + dp(GAP) * (count - 1);
             final int across = dp(CHIP + PAD * 2);
             setMeasuredDimension(vertical ? across : along, vertical ? along : across);
         }
 
         private float chipCenter(int i) {
-            return dp(PAD) + dp(CHIP) / 2f + i * (dp(CHIP) + dp(4));
+            return dp(PAD) + dp(CHIP) / 2f + i * (dp(CHIP) + dp(GAP));
         }
 
         @Override
@@ -1645,13 +1786,16 @@ public final class SolegramCameraUi {
             final int sel = selected(ratio);
             final float pos = selectT.set(sel);
             final float across = (vertical ? getWidth() : getHeight()) / 2f;
-            // the dark chip glides to the current step
-            final float c = AndroidUtilities.lerp(chipCenter(0), chipCenter(Math.max(0, count - 1)), count > 1 ? pos / (count - 1) : 0);
-            if (vertical) {
-                canvas.drawCircle(across, c, dp(CHIP) / 2f, chipPaint);
-            } else {
-                canvas.drawCircle(c, across, dp(CHIP) / 2f, chipPaint);
+            // the small circles of the steps, fading where the big one lies over them
+            for (int i = 0; i < count; i++) {
+                final float covered = Math.max(0f, 1f - Math.abs(pos - i));
+                dotPaint.setAlpha((int) (0x47 * (1f - covered)));
+                final float c = chipCenter(i);
+                canvas.drawCircle(vertical ? across : c, vertical ? c : across, dp(DOT) / 2f, dotPaint);
             }
+            // the current step's circle glides to it
+            final float c = AndroidUtilities.lerp(chipCenter(0), chipCenter(Math.max(0, count - 1)), count > 1 ? pos / (count - 1) : 0);
+            canvas.drawCircle(vertical ? across : c, vertical ? c : across, dp(CHIP) / 2f, chipPaint);
             for (int i = 0; i < count; i++) {
                 final boolean current = i == sel;
                 label.setLength(0);
@@ -1665,7 +1809,7 @@ public final class SolegramCameraUi {
                     label.append('×');
                 }
                 textPaint.setColor(current ? YELLOW : 0xFFFFFFFF);
-                textPaint.setTextSize(current ? dp(12.5f) : dp(11));
+                textPaint.setTextSize(current ? dp(13) : dp(11.5f));
                 final float x = vertical ? across : chipCenter(i), y = vertical ? chipCenter(i) : across;
                 canvas.save();
                 canvas.rotate(textRotation, x, y);
@@ -1683,7 +1827,7 @@ public final class SolegramCameraUi {
                 return true;
             }
             final float along = vertical ? event.getY() : event.getX();
-            int index = (int) ((along - dp(PAD)) / (dp(CHIP) + dp(4)));
+            int index = (int) ((along - dp(PAD)) / (dp(CHIP) + dp(GAP)));
             index = Math.max(0, Math.min(count - 1, index));
             final CameraSession session = session();
             if (session == null) {
@@ -1789,13 +1933,15 @@ public final class SolegramCameraUi {
 
         ModeSwitch(Context context) {
             super(context);
+            // the iOS camera's mode words: small caps, spaced out, the current one yellow
             paint.setTypeface(AndroidUtilities.bold());
-            paint.setTextSize(dp(13));
+            paint.setTextSize(dp(12.5f));
+            paint.setLetterSpacing(0.09f);
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setShadowLayer(dpf2(2), 0, 0, 0x40000000);
             labels = new String[] {
-                LocaleController.getString(R.string.StoryPhoto).toUpperCase(),
-                LocaleController.getString(R.string.StoryVideo).toUpperCase()
+                LocaleController.getString(R.string.SG_CamModePhoto),
+                LocaleController.getString(R.string.SG_CamModeVideo)
             };
             for (int i = 0; i < 2; i++) {
                 widths[i] = paint.measureText(labels[i]);
@@ -1829,7 +1975,7 @@ public final class SolegramCameraUi {
         }
 
         private float spacing() {
-            return (widths[0] + widths[1]) / 2f + dp(22);
+            return (widths[0] + widths[1]) / 2f + dp(24);
         }
 
         @Override
@@ -1844,7 +1990,7 @@ public final class SolegramCameraUi {
             final float cy = getHeight() / 2f - (paint.descent() + paint.ascent()) / 2f;
             for (int i = 0; i < 2; i++) {
                 final float selected = Math.max(0f, Math.min(1f, i == 0 ? 1f - t : t));
-                paint.setColor(ColorUtils.blendARGB(0xB3FFFFFF, YELLOW, selected));
+                paint.setColor(ColorUtils.blendARGB(0xFFFFFFFF, YELLOW, selected));
                 canvas.drawText(labels[i], cx + i * spacing(), cy, paint);
             }
             canvas.restore();
