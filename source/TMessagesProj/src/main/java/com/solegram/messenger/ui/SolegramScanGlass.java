@@ -5,6 +5,7 @@
 
 package com.solegram.messenger.ui;
 
+import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
 
 import android.graphics.Canvas;
@@ -12,6 +13,7 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
+import android.view.Gravity;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,6 +27,7 @@ import org.telegram.messenger.camera.CameraView;
 import org.telegram.messenger.utils.RenderNodeEffects;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.RenderNodeWithHash;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
 import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
@@ -70,13 +73,35 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
             if (button == null) {
                 continue;
             }
-            final Drawable body;
-            if (liquid && glass.factory != null) {
-                body = new LayerDrawable(new Drawable[]{glass.factory.create(button, glass.provider), new SolegramCameraUi.Sheen(0x2EFFFFFF, 0x0DFFFFFF)});
+            final BlurredBackgroundDrawable glassBody = liquid && glass.factory != null ? glass.factory.create(button, glass.provider) : null;
+            final LayerDrawable body;
+            if (glassBody != null) {
+                body = new LayerDrawable(new Drawable[]{glassBody, new SolegramCameraUi.Sheen(0x2EFFFFFF, 0x0DFFFFFF)});
             } else {
                 body = new LayerDrawable(new Drawable[]{new SolegramCameraUi.PlainPill(0x61232326, 0x2EFFFFFF), new SolegramCameraUi.Sheen(0x1FFFFFFF, 0)});
             }
+            // always a circle: the largest one that fits the button, in its middle (the back button is not square)
+            final View.OnLayoutChangeListener round = (v, l, t, r, b, ol, ot, or, ob) -> {
+                final int w = r - l, h = b - t;
+                if (w <= 0 || h <= 0) {
+                    return;
+                }
+                final int size = Math.min(Math.min(w, h), dp(60));
+                for (int i = 0; i < body.getNumberOfLayers(); i++) {
+                    body.setLayerSize(i, size, size);
+                    body.setLayerGravity(i, Gravity.CENTER);
+                }
+                if (glassBody != null) {
+                    glassBody.setRadius(size / 2f);
+                }
+                body.setBounds(0, 0, w, h);
+                v.invalidate();
+            };
+            button.addOnLayoutChangeListener(round);
             button.setBackground(body);
+            if (button.getWidth() > 0) {
+                round.onLayoutChange(button, button.getLeft(), button.getTop(), button.getRight(), button.getBottom(), 0, 0, 0, 0);
+            }
             SolegramMotion.pressable(button, SolegramMotion.PRESS_BUTTON);
         }
         if (liquid) {
