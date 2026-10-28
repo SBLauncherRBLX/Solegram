@@ -154,7 +154,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     private FrameLayout bottom;
     private FrameLayout tilesScroll;
     private LinearLayout tilesRow;
-    private org.telegram.ui.MainTabsLayout tilesBar;
+    private HorizontalScrollView tilesStrip;
     private final org.telegram.ui.Components.glass.GlassTabView[] tabViews = new org.telegram.ui.Components.glass.GlassTabView[6];
     private LinearLayout buttons;
     private SoleDropButton primaryButton, secondaryButton;
@@ -531,30 +531,39 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     };
 
     /**
-     * What to send: Solegram's own bottom tab bar, the same glass, tabs and liquid lens of choice as the main
-     * screen, with a tab for each kind of thing.
+     * What to send: a glass bar like Solegram's bottom tab bar, its tabs at their full size in a row that scrolls
+     * (six tabs would have to shrink to fit); the chosen one is lit in the theme's colour, with no bubble.
      */
     private void buildTiles(Context context) {
         final Theme.ResourcesProvider rp = getResourceProvider();
         tilesScroll = new FrameLayout(context);
         tilesScroll.setClipChildren(false);
         tilesScroll.setClipToPadding(false);
-        tilesBar = new org.telegram.ui.MainTabsLayout(context, rp);
-        tilesBar.setClipChildren(false);
-        final int pad = dp(org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN + 4);
-        tilesBar.setPadding(pad, pad, pad, pad);
-        tilesBar.setMinTabsWidth(dp(288));
+        final int margin = dp(org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN);
+        final FrameLayout bar = new FrameLayout(context);
+        bar.setBackground(glass.createTabs(bar, dp(32), margin));
+        tilesStrip = new HorizontalScrollView(context);
+        tilesStrip.setHorizontalScrollBarEnabled(false);
+        tilesStrip.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        tilesStrip.setClipToPadding(false);
+        tilesStrip.setPadding(dp(6), 0, dp(6), 0);
+        final LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < TILE_TYPES.length; i++) {
             final org.telegram.ui.Components.glass.GlassTabView tab = org.telegram.ui.Components.glass.GlassTabView.createMainTab(context, rp, TILE_ICONS[i], TILE_NAMES[i]);
+            tab.setSkipDrawSelector(true);
+            // a bigger icon and the label at its usual size: the row scrolls instead of squeezing them
+            tab.solegramSetRoomy(28, 12.5f, 40);
             final int type = TILE_TYPES[i];
             tab.setOnClickListener(v -> chooseTile(type));
             tab.setContentDescription(getString(TILE_NAMES[i]));
+            SolegramMotion.pressable(tab, SolegramMotion.PRESS_BUTTON);
             tabViews[i] = tab;
-            tilesBar.addView(tab);
-            tilesBar.setViewVisible(tab, true, false);
+            row.addView(tab, LayoutHelper.createLinear(84, 68));
         }
-        tilesBar.setBackground(glass.createTabs(tilesBar, dp(org.telegram.ui.DialogsActivity.MAIN_TABS_HEIGHT / 2f), dp(org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN - 0.334f)));
-        tilesScroll.addView(tilesBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, org.telegram.ui.DialogsActivity.MAIN_TABS_BAR_HEIGHT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        tilesStrip.addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        bar.addView(tilesStrip, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 68, Gravity.CENTER_VERTICAL));
+        tilesScroll.addView(bar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 68 + org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN * 2, Gravity.BOTTOM));
         bottom.addView(tilesScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 6, 0, 6, 0));
         updateTiles(false);
     }
@@ -564,16 +573,26 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     }
 
     private void updateTiles(boolean animated) {
-        if (tilesBar == null) {
-            return;
-        }
         for (int i = 0; i < TILE_TYPES.length; i++) {
-            if (TILE_TYPES[i] == item.type && tabViews[i] != null) {
-                tilesBar.setTabSelected(tabViews[i], animated);
-                return;
+            final org.telegram.ui.Components.glass.GlassTabView tab = tabViews[i];
+            if (tab == null) {
+                continue;
+            }
+            final boolean selected = TILE_TYPES[i] == item.type;
+            tab.setSelected(selected, animated);
+            if (selected && tilesStrip != null) {
+                // the chosen tab comes fully into view
+                tilesStrip.post(() -> {
+                    final int left = tab.getLeft() - dp(16), right = tab.getRight() + dp(16) - tilesStrip.getWidth();
+                    final int x = tilesStrip.getScrollX();
+                    if (left < x) {
+                        tilesStrip.smoothScrollTo(Math.max(0, left), 0);
+                    } else if (right > x) {
+                        tilesStrip.smoothScrollTo(right, 0);
+                    }
+                });
             }
         }
-        tilesBar.setTabSelected(null, animated);
     }
 
     private void chooseTile(int type) {

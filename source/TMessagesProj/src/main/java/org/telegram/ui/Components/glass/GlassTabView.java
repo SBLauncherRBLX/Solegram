@@ -133,11 +133,23 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     private boolean hasGestureSelectedOverride;
     private float gestureSelectedOverride;
     private boolean skipDrawSelector;
+    private int solegramIconDp = 24;
 
     public void setGestureSelectedOverride(float gestureSelectedOverride, boolean allow) {
         this.gestureSelectedOverride = gestureSelectedOverride;
         this.hasGestureSelectedOverride = allow;
         invalidate();
+    }
+
+    /** Solegram: a roomier tab outside the tab bar (a row that scrolls): a bigger icon and text, placed for it. */
+    public void solegramSetRoomy(int iconDp, float textSizeDp, float textTopDp) {
+        solegramIconDp = iconDp;
+        if (tabAnimation != null) {
+            setTabAnimation(tabAnimation); // the Lottie icon is drawn again at its new size
+        }
+        imageView.setLayoutParams(LayoutHelper.createFrame(iconDp, iconDp, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 8, 0, 0));
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, textSizeDp);
+        textView.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 4, textTopDp, 4, 0));
     }
 
     public void setSkipDrawSelector(boolean skipDrawSelector) {
@@ -334,7 +346,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             boolean update = lastIsSelected != isSelected;
             if (lastIconAnimationRaw != animationToSet) {
                 lastIconAnimationRaw = animationToSet;
-                imageView.setAnimation(animationToSet, 24, 24);
+                imageView.setAnimation(animationToSet, solegramIconDp, solegramIconDp);
                 update = true;
             }
 
@@ -372,7 +384,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             if (lastIconAnimationRaw != animationToSet) {
                 lastIconAnimationRaw = animationToSet;
 
-                imageView.setAnimation(animationToSet, 24, 24);
+                imageView.setAnimation(animationToSet, solegramIconDp, solegramIconDp);
                 imageView.getAnimatedDrawable().setPlayInDirectionOfCustomEndFrame(false);
                 if (animated) {
                     imageView.getAnimatedDrawable().setCurrentFrame(0);
@@ -385,7 +397,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         }
 
         if (imageView.getAnimatedDrawable() == null) {
-            imageView.setAnimation(tabAnimation.iconToFilled, 24, 24);
+            imageView.setAnimation(tabAnimation.iconToFilled, solegramIconDp, solegramIconDp);
         }
 
         final RLottieDrawable drawable = imageView.getAnimatedDrawable();
