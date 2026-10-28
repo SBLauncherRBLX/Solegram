@@ -55,7 +55,7 @@ public class SoleDropButton extends TextView {
         if (primary) {
             setTextColor(0xFFFFFFFF);
             setWillNotDraw(false);
-            glow.setColor(0xFFFF5C8A); // hidden under the fill: only its shadow shows
+            glow.setColor(SoleDropPalette.PINK); // hidden under the fill: only its shadow shows
         } else {
             setTextColor(SoleDropPalette.text(resourcesProvider));
             if (glass != null) {

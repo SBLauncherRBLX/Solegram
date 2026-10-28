@@ -105,8 +105,10 @@ public class SoleDropCardView extends FrameLayout {
         });
         setElevation(dp(10));
         if (Build.VERSION.SDK_INT >= 28) {
-            setOutlineSpotShadowColor(0xFF6B2F7A);
-            setOutlineAmbientShadowColor(0xFF6B2F7A);
+            // the card's shadow is a deep shade of the theme's accent
+            final int shade = androidx.core.graphics.ColorUtils.blendARGB(SoleDropPalette.VIOLET, 0xFF000000, 0.45f);
+            setOutlineSpotShadowColor(shade);
+            setOutlineAmbientShadowColor(shade);
         }
 
         column = new LinearLayout(context);

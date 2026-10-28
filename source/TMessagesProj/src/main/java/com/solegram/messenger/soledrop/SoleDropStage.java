@@ -58,7 +58,7 @@ public class SoleDropStage extends View {
     private RenderEffect auraEffect;
     private BlurMaskFilter auraBlur;
     private float auraBlurRadius;
-    private int builtWidth, builtHeight, builtBg;
+    private int builtWidth, builtHeight, builtBg, builtAccent;
     private boolean dark;
 
     /** The card the aura breathes around (null: no aura) and how much of the aura shows (0..1). */
@@ -161,12 +161,13 @@ public class SoleDropStage extends View {
     private void build(int w, int h) {
         final int bg = SoleDropPalette.background(resourcesProvider);
         dark = SoleDropPalette.dark(resourcesProvider);
-        if (w == builtWidth && h == builtHeight && bg == builtBg && auraShader != null) {
+        if (w == builtWidth && h == builtHeight && bg == builtBg && builtAccent == SoleDropPalette.PINK && auraShader != null) {
             return;
         }
         builtWidth = w;
         builtHeight = h;
         builtBg = bg;
+        builtAccent = SoleDropPalette.PINK;
         bgPaint.setColor(bg);
         // the sunset sits at the top edge, where the other phone comes from, and dissolves into the page
         final float a = dark ? 0.30f : 0.16f;
@@ -181,7 +182,7 @@ public class SoleDropStage extends View {
         auraShader = new SweepGradient(0, 0, SoleDropPalette.SWEEP, null);
         auraPaint.setShader(auraShader);
         glowPaint.setShader(new RadialGradient(0, 0, 1f,
-            new int[]{0xFFFFFFFF, ColorUtils.setAlphaComponent(SoleDropPalette.PINK, 0x80), 0x00FF4F8B},
+            new int[]{0xFFFFFFFF, ColorUtils.setAlphaComponent(SoleDropPalette.PINK, 0x80), SoleDropPalette.PINK & 0x00FFFFFF},
             new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
         glassVersion++;
     }

@@ -76,9 +76,9 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
             final BlurredBackgroundDrawable glassBody = liquid && glass.factory != null ? glass.factory.create(button, glass.provider) : null;
             final LayerDrawable body;
             if (glassBody != null) {
-                body = new LayerDrawable(new Drawable[]{glassBody, new SolegramCameraUi.Sheen(0x2EFFFFFF, 0x0DFFFFFF)});
+                body = new LayerDrawable(new Drawable[]{glassBody});
             } else {
-                body = new LayerDrawable(new Drawable[]{new SolegramCameraUi.PlainPill(0x61232326, 0x2EFFFFFF), new SolegramCameraUi.Sheen(0x1FFFFFFF, 0)});
+                body = new LayerDrawable(new Drawable[]{new SolegramCameraUi.PlainPill(0x61232326, 0x2EFFFFFF)});
             }
             // always a circle: the largest one that fits the button, in its middle (the back button is not square)
             final View.OnLayoutChangeListener round = (v, l, t, r, b, ol, ot, or, ob) -> {
@@ -120,7 +120,7 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
                 drawPreview(canvas);
             }
         });
-        final float radius = dpf2(9f) * SolegramGlass.blurScale();
+        final float radius = dpf2(18f);
         if (SolegramGlass.vibrancy()) {
             source.setBlur(radius, RenderNodeEffects.getSaturationX2RenderEffect());
         } else {

@@ -1536,5 +1536,6 @@
     <string name="SG_SoleDropExpired">Время вышло</string>
     <string name="SG_SoleDropConfirmOther">Друг подтверждает приём. Поднесите телефоны ещё раз.</string>
     <string name="SG_SoleDropCodeRetry">Нажмите, чтобы попробовать снова</string>
+    <string name="SG_SoleDropWhat">Что передать</string>
     <!-- SOLEGRAM END -->
 </resources>

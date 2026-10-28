@@ -68,6 +68,7 @@ public class SoleDropQrSheet extends BottomSheet {
 
     private SoleDropQrSheet(Context context, int account, Theme.ResourcesProvider rp) {
         super(context, false, rp);
+        SoleDropPalette.refresh(rp);
         this.account = account;
         fixNavigationBar();
         SolegramMotion.springSheet(this);

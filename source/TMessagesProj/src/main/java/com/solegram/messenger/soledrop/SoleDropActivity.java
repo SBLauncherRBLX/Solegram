@@ -152,7 +152,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     private TextView pillText, pillAction;
     private Runnable pillActionRunnable;
     private FrameLayout bottom;
-    private HorizontalScrollView tilesScroll;
+    private FrameLayout tilesScroll;
     private LinearLayout tilesRow;
     private final ArrayList<Tile> tiles = new ArrayList<>();
     private LinearLayout buttons;
@@ -297,6 +297,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     @Override
     public View createView(Context context) {
         final Theme.ResourcesProvider rp = getResourceProvider();
+        SoleDropPalette.refresh(rp);
         actionBar.setAddToContainer(false);
         root = new Root(context);
         fragmentView = root;
@@ -308,21 +309,19 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         root.getViewTreeObserver().addOnPreDrawListener(glassSync);
 
         // header: close, the name with its drop, and the code (QR) for phones without NFC
-        closeButton = circleButton(context, R.drawable.ic_close_white, getString(R.string.Close));
+        // as every Solegram screen: the back arrow in a glass bubble, the title beside it
+        closeButton = circleButton(context, R.drawable.ic_ab_back, getString(R.string.Back));
         closeButton.setOnClickListener(v -> finishFragment());
         root.addView(closeButton);
         titleView = new TextView(context);
         titleView.setText(getString(R.string.SG_SoleDrop));
-        titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+        titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 21);
         titleView.setTypeface(AndroidUtilities.bold());
         titleView.setTextColor(SoleDropPalette.text(rp));
-        titleView.setGravity(Gravity.CENTER);
+        titleView.setGravity(Gravity.CENTER_VERTICAL);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(TextUtils.TruncateAt.END);
         titleView.setCompoundDrawablePadding(dp(6));
-        final Drawable drop = ContextCompat.getDrawable(context, R.drawable.sg_soledrop_logo);
-        if (drop != null) {
-            drop.setBounds(0, 0, dp(22), dp(22));
-            titleView.setCompoundDrawables(drop, null, null, null);
-        }
         root.addView(titleView);
         if (mode == MODE_SEND) {
             qrButton = circleButton(context, R.drawable.msg_qrcode, getString(R.string.SG_SoleDropCode));
@@ -460,7 +459,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             if (qrButton != null) {
                 qrButton.measure(circle, circle);
             }
-            titleView.measure(MeasureSpec.makeMeasureSpec(w - dp(140), MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(44), MeasureSpec.EXACTLY));
+            titleView.measure(MeasureSpec.makeMeasureSpec(w - dp(150), MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(44), MeasureSpec.EXACTLY));
             hintBlock.measure(exactW, MeasureSpec.makeMeasureSpec(h, MeasureSpec.AT_MOST));
             peerView.measure(MeasureSpec.makeMeasureSpec(dp(232), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.AT_MOST));
             final int cardW = Math.min(w - dp(64), dp(300));
@@ -483,7 +482,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             if (qrButton != null) {
                 layoutAt(qrButton, w - dp(10) - qrButton.getMeasuredWidth(), top + (bar - qrButton.getMeasuredHeight()) / 2);
             }
-            layoutAt(titleView, (w - titleView.getMeasuredWidth()) / 2, top + (bar - titleView.getMeasuredHeight()) / 2);
+            layoutAt(titleView, dp(10) + closeButton.getMeasuredWidth() + dp(6), top + (bar - titleView.getMeasuredHeight()) / 2);
             final int zoneTop = top + bar;
             layoutAt(hintBlock, 0, zoneTop + dp(4));
             layoutAt(peerView, (w - peerView.getMeasuredWidth()) / 2, zoneTop);
@@ -521,32 +520,61 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         R.string.SG_SoleDropPhoto, R.string.SG_SoleDropLocation, R.string.SG_SoleDropLink
     };
 
+    /** Solegram's tile colours (as in its settings), one per kind of thing to send. */
+    private static int tileColor(int type) {
+        switch (type) {
+            case SoleDropProtocol.ITEM_STARS:
+                return 0xFFFFB800;
+            case SoleDropProtocol.ITEM_GIFT:
+                return 0xFFFF2D55;
+            case SoleDropProtocol.ITEM_PHOTO:
+                return 0xFF34C759;
+            case SoleDropProtocol.ITEM_LOCATION:
+                return 0xFF30B0C7;
+            case SoleDropProtocol.ITEM_LINK:
+                return 0xFF5856D6;
+            default:
+                return 0xFF007AFF;
+        }
+    }
+
+    /** A kind of thing to send: a coloured Solegram tile with a white glyph and the name under it. */
     private final class Tile extends LinearLayout {
         final int type;
         final ImageView icon;
         final TextView label;
         private boolean selected;
+        private final android.graphics.drawable.GradientDrawable selection = new android.graphics.drawable.GradientDrawable();
 
         Tile(Context context, int type, int name) {
             super(context);
             this.type = type;
             setOrientation(VERTICAL);
             setGravity(Gravity.CENTER);
-            setBackground(glass.create(this, dp(22), dp(6)));
+            selection.setCornerRadius(dp(18));
+            setBackground(selection);
             icon = new ImageView(context);
             icon.setScaleType(ImageView.ScaleType.CENTER);
             final Drawable d = ContextCompat.getDrawable(context, SoleDropItem.icon(type));
             if (d != null) {
-                icon.setImageDrawable(d.mutate());
+                final Drawable glyph = d.mutate();
+                glyph.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
+                icon.setImageDrawable(glyph);
             }
-            addView(icon, LayoutHelper.createLinear(40, 40, Gravity.CENTER_HORIZONTAL));
+            final int color = tileColor(type);
+            final android.graphics.drawable.GradientDrawable tile = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.14f), color});
+            tile.setCornerRadius(dp(11));
+            icon.setBackground(tile);
+            addView(icon, LayoutHelper.createLinear(38, 38, Gravity.CENTER_HORIZONTAL));
             label = new TextView(context);
-            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12.5f);
             label.setGravity(Gravity.CENTER);
             label.setSingleLine(true);
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setText(getString(name));
-            addView(label, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 4, 4, 0));
+            addView(label, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 6, 4, 0));
             setContentDescription(getString(name));
             SolegramMotion.pressable(this, SolegramMotion.PRESS_BUTTON);
             setOnClickListener(v -> chooseTile(this.type));
@@ -556,36 +584,45 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         void setSelectedTile(boolean selected) {
             this.selected = selected;
             final Theme.ResourcesProvider rp = getResourceProvider();
-            final android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, selected ? SoleDropPalette.BUTTON
-                : new int[]{ColorUtils.setAlphaComponent(SoleDropPalette.PINK, 0x22), ColorUtils.setAlphaComponent(SoleDropPalette.VIOLET, 0x22)});
-            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            icon.setBackground(bg);
-            if (icon.getDrawable() != null) {
-                icon.getDrawable().setColorFilter(new PorterDuffColorFilter(selected ? 0xFFFFFFFF : SoleDropPalette.PINK, PorterDuff.Mode.SRC_IN));
-            }
+            // the chosen one: a soft veil and a thin rim in the theme's accent
+            selection.setColor(selected ? ColorUtils.setAlphaComponent(SoleDropPalette.PINK, SoleDropPalette.dark(rp) ? 0x26 : 0x1A) : 0);
+            selection.setStroke(dp(1.5f), selected ? ColorUtils.setAlphaComponent(SoleDropPalette.PINK, 0xB0) : 0);
             label.setTextColor(selected ? SoleDropPalette.text(rp) : SoleDropPalette.gray(rp));
             label.setTypeface(selected ? AndroidUtilities.bold() : android.graphics.Typeface.DEFAULT);
             setSelected(selected);
         }
     }
 
+    /** What to send: a Solegram section card with its accent header and the six tiles in two rows. */
     private void buildTiles(Context context) {
-        tilesScroll = new HorizontalScrollView(context);
-        tilesScroll.setHorizontalScrollBarEnabled(false);
-        tilesScroll.setClipToPadding(false);
-        tilesScroll.setPadding(dp(10), 0, dp(10), 0);
+        tilesScroll = new FrameLayout(context);
+        tilesScroll.setBackground(glass.create(tilesScroll, dp(24), dp(6)));
+        final LinearLayout column = new LinearLayout(context);
+        column.setOrientation(LinearLayout.VERTICAL);
+        final TextView header = new TextView(context);
+        header.setText(getString(R.string.SG_SoleDropWhat));
+        header.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        header.setTypeface(AndroidUtilities.bold());
+        header.setTextColor(SoleDropPalette.PINK);
+        column.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 14, 20, 6));
         tilesRow = new LinearLayout(context);
-        tilesRow.setOrientation(LinearLayout.HORIZONTAL);
+        tilesRow.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout row = null;
         for (int i = 0; i < TILE_TYPES.length; i++) {
+            if (i % 3 == 0) {
+                row = new LinearLayout(context);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                tilesRow.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 80));
+            }
             final Tile tile = new Tile(context, TILE_TYPES[i], TILE_NAMES[i]);
             tiles.add(tile);
-            tilesRow.addView(tile, LayoutHelper.createLinear(88, 92, 2, 0, 2, 0));
+            row.addView(tile, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, 3, 2, 3, 2));
         }
-        tilesScroll.addView(tilesRow);
-        bottom.addView(tilesScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 92, Gravity.BOTTOM));
+        column.addView(tilesRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 8, 0, 8, 10));
+        tilesScroll.addView(column, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        bottom.addView(tilesScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 14, 0, 14, 0));
         updateTiles();
-        // the row comes up tile after tile
+        // the rows come up one after the other
         tilesRow.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             @Override
             public boolean onPreDraw() {

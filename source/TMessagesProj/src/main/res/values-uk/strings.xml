@@ -1549,5 +1549,6 @@
     <string name="SG_SoleDropExpired">Time is up</string>
     <string name="SG_SoleDropConfirmOther">Your friend is accepting. Hold the phones together again.</string>
     <string name="SG_SoleDropCodeRetry">Tap to try again</string>
+    <string name="SG_SoleDropWhat">What to send</string>
     <!-- SOLEGRAM END -->
 </resources>
