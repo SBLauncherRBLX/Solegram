@@ -151,6 +151,10 @@ public class CameraScanActivity extends BaseFragment {
 
     private boolean needGalleryButton;
 
+    /** Solegram: the next scanner gets the camera's liquid glass buttons (set by SoleDrop just before it opens one). */
+    public static boolean solegramGlassNext;
+    private boolean solegramGlass;
+
     private int currentType;
 
     public static final int TYPE_MRZ = 0;
@@ -251,6 +255,8 @@ public class CameraScanActivity extends BaseFragment {
     public CameraScanActivity(int type) {
         super();
         currentType = type;
+        solegramGlass = solegramGlassNext;
+        solegramGlassNext = false;
         if (isQr()) {
             Utilities.globalQueue.postRunnable(() -> {
                 qrReader = new QRCodeReader();
@@ -737,7 +743,13 @@ public class CameraScanActivity extends BaseFragment {
                     return;
                 }
                 CameraSessionWrapper session = cameraView.getCameraSession();
-                if (session != null) {
+                if (session != null && !(flashButton.getBackground() instanceof ShapeDrawable)) {
+                    // Solegram glass buttons: the torch shows as a yellow glyph, as on the camera
+                    final boolean on = flashButton.getTag() == null;
+                    flashButton.setTag(on ? 1 : null);
+                    flashButton.setColorFilter(on ? new android.graphics.PorterDuffColorFilter(0xFFFFD60A, android.graphics.PorterDuff.Mode.SRC_IN) : null);
+                    session.setCurrentFlashMode(on ? Camera.Parameters.FLASH_MODE_TORCH : Camera.Parameters.FLASH_MODE_OFF);
+                } else if (session != null) {
                     ShapeDrawable shapeDrawable = (ShapeDrawable) flashButton.getBackground();
                     if (flashAnimator != null) {
                         flashAnimator.cancel();
@@ -770,6 +782,14 @@ public class CameraScanActivity extends BaseFragment {
         AndroidUtilities.lockOrientation(getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         fragmentView.setKeepScreenOn(true);
 
+        if (solegramGlass && fragmentView instanceof ViewGroup) {
+            // Solegram: the round buttons as the camera's, liquid glass over what the camera sees
+            final View back = actionBar != null ? actionBar.getBackButton() : null;
+            if (back != null) {
+                back.setPadding(0, 0, 0, 0);
+            }
+            com.solegram.messenger.ui.SolegramScanGlass.apply((ViewGroup) fragmentView, () -> cameraView, flashButton, galleryButton, back);
+        }
         return fragmentView;
     }
 

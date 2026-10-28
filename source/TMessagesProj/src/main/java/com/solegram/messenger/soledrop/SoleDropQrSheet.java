@@ -118,15 +118,24 @@ public class SoleDropQrSheet extends BottomSheet {
         }
         progress.setVisibility(View.VISIBLE);
         qrView.setAlpha(0.15f);
+        expiresView.setOnClickListener(null);
         SoleDropIdentity.refresh(account, () -> {
             final String fresh = SoleDropIdentity.link(account);
             if (fresh != null) {
                 render(fresh);
             } else {
-                expiresView.setText(getString(R.string.SG_SoleDropCodeFailed));
-                progress.setVisibility(View.GONE);
+                failed();
             }
         });
+    }
+
+    /** No code: say why and let a tap try again. */
+    private void failed() {
+        progress.setVisibility(View.GONE);
+        qrView.setAlpha(0.15f);
+        final String why = SoleDropIdentity.lastError;
+        expiresView.setText(getString(R.string.SG_SoleDropCodeFailed) + (TextUtils.isEmpty(why) ? "" : " (" + why + ")") + "\n" + getString(R.string.SG_SoleDropCodeRetry));
+        expiresView.setOnClickListener(v -> load(true));
     }
 
     private final Runnable renew = () -> load(true);
@@ -138,16 +147,33 @@ public class SoleDropQrSheet extends BottomSheet {
         final int size = dp(220);
         Utilities.globalQueue.postRunnable(() -> {
             Bitmap bitmap = null;
-            try {
-                final HashMap<EncodeHintType, Object> hints = new HashMap<>();
-                hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
-                hints.put(EncodeHintType.MARGIN, 0);
-                bitmap = new TelegramQRCodeWriter().encode(link, size, size, hints, null, 0.75f, 0x00FFFFFF, 0xFF000000);
-            } catch (Throwable ignore) {
+            // the same steps as Telegram's own QR screen: a small fixed version first (room for the logo), then any
+            final HashMap<EncodeHintType, Object> hints = new HashMap<>();
+            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
+            hints.put(EncodeHintType.MARGIN, 0);
+            for (int version = 3; version <= 6 && bitmap == null; version++) {
+                try {
+                    hints.put(EncodeHintType.QR_VERSION, version);
+                    bitmap = new TelegramQRCodeWriter().encode(link, size, size, hints, null, 0.75f, 0xFFFFFFFF, 0xFF000000);
+                } catch (Throwable ignore) {
+                }
+            }
+            if (bitmap == null) {
+                try {
+                    hints.remove(EncodeHintType.QR_VERSION);
+                    bitmap = new TelegramQRCodeWriter().encode(link, size, size, hints, null, 0.75f, 0xFFFFFFFF, 0xFF000000);
+                } catch (Throwable e) {
+                    org.telegram.messenger.FileLog.e(e);
+                }
             }
             final Bitmap qr = bitmap;
             AndroidUtilities.runOnUIThread(() -> {
+                if (qr == null) {
+                    failed();
+                    return;
+                }
                 progress.setVisibility(View.GONE);
+                expiresView.setOnClickListener(null);
                 qrView.set(qr, name, username != null ? "@" + username : null);
                 qrView.animate().alpha(1f).setDuration(SolegramMotion.NORMAL).start();
                 final int left = SoleDropIdentity.expiresIn(account);

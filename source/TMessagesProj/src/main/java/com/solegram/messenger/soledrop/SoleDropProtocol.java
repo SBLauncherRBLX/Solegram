@@ -351,14 +351,14 @@ public final class SoleDropProtocol {
         return true;
     }
 
-    /** Contact tokens are url-safe base64. */
+    /** Contact tokens are url-safe base64; plain base64 and url escapes are accepted too, so a new format still works. */
     public static boolean isToken(String s) {
         if (s.length() < 8 || s.length() > MAX_TOKEN) {
             return false;
         }
         for (int i = 0; i < s.length(); i++) {
             final char c = s.charAt(i);
-            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '=')) {
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '=' || c == '+' || c == '/' || c == '.' || c == '~' || c == '%')) {
                 return false;
             }
         }

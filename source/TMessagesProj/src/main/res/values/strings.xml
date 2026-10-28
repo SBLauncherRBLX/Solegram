@@ -12820,5 +12820,6 @@
     <string name="SG_SoleDropTapAgainInfo">Within a minute: only then your friend gets your Telegram contact.</string>
     <string name="SG_SoleDropExpired">Time is up</string>
     <string name="SG_SoleDropConfirmOther">Your friend is accepting. Hold the phones together again.</string>
+    <string name="SG_SoleDropCodeRetry">Tap to try again</string>
     <!-- SOLEGRAM END -->
 </resources>

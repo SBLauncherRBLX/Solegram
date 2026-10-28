@@ -1615,12 +1615,15 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     // region The code (QR), for phones without NFC
 
     private void showCodeOptions() {
-        if (qrButton == null || state != S_IDLE) {
+        if (qrButton == null || state == S_SENDING || getParentActivity() == null) {
             return;
         }
-        ItemOptions.makeOptions(this, qrButton)
-            .add(R.drawable.msg_qrcode, getString(R.string.SG_SoleDropScan), this::scanCode)
-            .add(R.drawable.msg_soledrop, getString(R.string.SG_SoleDropMyCode), () -> SoleDropQrSheet.show(this, currentAccount))
+        // my code can be shown at any moment; scanning starts a new transfer, so only while nothing is going on
+        final ItemOptions options = ItemOptions.makeOptions(this, qrButton);
+        if (state == S_IDLE) {
+            options.add(R.drawable.msg_qrcode, getString(R.string.SG_SoleDropScan), this::scanCode);
+        }
+        options.add(R.drawable.msg_soledrop, getString(R.string.SG_SoleDropMyCode), () -> SoleDropQrSheet.show(this, currentAccount))
             .setGravity(Gravity.RIGHT)
             .show();
     }
@@ -1629,6 +1632,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         if (state != S_IDLE || getParentActivity() == null) {
             return;
         }
+        CameraScanActivity.solegramGlassNext = true;
         CameraScanActivity.showAsSheet(this, false, CameraScanActivity.TYPE_QR, new CameraScanActivity.CameraScanActivityDelegate() {
             @Override
             public void didFindQr(String text) {

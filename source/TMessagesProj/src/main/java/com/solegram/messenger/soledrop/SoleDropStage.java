@@ -10,14 +10,19 @@ import static org.telegram.messenger.AndroidUtilities.dpf2;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
+import android.graphics.RecordingCanvas;
 import android.graphics.RectF;
+import android.graphics.RenderEffect;
+import android.graphics.RenderNode;
 import android.graphics.Shader;
 import android.graphics.SweepGradient;
+import android.os.Build;
 import android.os.SystemClock;
 import android.view.View;
 
@@ -49,6 +54,10 @@ public class SoleDropStage extends View {
     private final Matrix matrix = new Matrix();
     private final RectF rect = new RectF();
     private SweepGradient auraShader;
+    private RenderNode auraNode;
+    private RenderEffect auraEffect;
+    private BlurMaskFilter auraBlur;
+    private float auraBlurRadius;
     private int builtWidth, builtHeight, builtBg;
     private boolean dark;
 
@@ -229,26 +238,68 @@ public class SoleDropStage extends View {
         if (auraBoost > 0) {
             auraBoost = Math.max(0, auraBoost - dt * 1.6f);
         }
-        final float spread = dp(14) + dp(10) * breath + dp(16) * boost;
+        final float spread = (dp(16) + dp(8) * breath + dp(14) * boost) * scale;
         final float radius = dp(26) * scale;
         final float cx = rect.centerX(), cy = rect.centerY();
         matrix.setRotate(breathing ? (t * 24f) % 360f : 0f);
         matrix.postTranslate(cx, cy);
         auraShader.setLocalMatrix(matrix);
-        final float base = (dark ? 0.30f : 0.22f) * (0.65f + 0.35f * breath) + 0.4f * boost;
-        // soft light: rings around the card, wide and faint outside, a brighter line close to the edge
-        final int layers = 7;
-        for (int i = layers - 1; i >= 0; i--) {
-            final float f = (i + 1f) / layers;
-            final float inset = -spread * f * scale;
-            final float width = spread / layers * 1.8f * scale;
-            final float a = base * (1f - f) * (1f - f) * 1.6f + (i == 0 ? base * 0.5f : 0f);
-            auraPaint.setStrokeWidth(width);
-            auraPaint.setAlpha((int) (255 * Math.min(1f, a) * auraAlpha));
-            canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset,
-                radius - inset, radius - inset, auraPaint);
+        final float base = (dark ? 0.62f : 0.48f) * (0.7f + 0.3f * breath) + 0.35f * boost;
+        final int alpha = (int) (255 * Math.min(1f, base) * auraAlpha);
+        // one soft band of light hugging the card, blurred as a whole: no rings, no steps
+        final float band = spread * 0.9f;
+        final float out = band * 0.5f;
+        if (Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated()) {
+            drawAuraNode(canvas, rect, radius, band, out, spread, alpha);
+        } else if (Build.VERSION.SDK_INT >= 28 && canvas.isHardwareAccelerated()) {
+            final float blur = Math.max(1f, spread * 0.75f);
+            if (auraBlur == null || Math.abs(auraBlurRadius - blur) > dp(2)) {
+                auraBlurRadius = blur;
+                auraBlur = new BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL);
+            }
+            auraPaint.setMaskFilter(auraBlur);
+            auraPaint.setStrokeWidth(band);
+            auraPaint.setAlpha(alpha);
+            canvas.drawRoundRect(rect.left - out, rect.top - out, rect.right + out, rect.bottom + out, radius + out, radius + out, auraPaint);
+            auraPaint.setMaskFilter(null);
+        } else {
+            // older phones: many thin rings with a gaussian falloff read as one soft glow
+            final int layers = 18;
+            for (int i = layers - 1; i >= 0; i--) {
+                final float f = (i + 0.5f) / layers;
+                final float inset = -spread * 1.3f * f;
+                final float a = (float) Math.exp(-f * f * 4.5f) * 0.32f;
+                auraPaint.setStrokeWidth(spread * 1.3f / layers + 1f);
+                auraPaint.setAlpha((int) (alpha * a));
+                canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset,
+                    radius - inset, radius - inset, auraPaint);
+            }
         }
         return breathing || auraBoost > 0;
+    }
+    @android.annotation.TargetApi(31)
+    private void drawAuraNode(Canvas canvas, RectF card, float radius, float band, float out, float spread, int alpha) {
+        if (auraNode == null) {
+            auraNode = new RenderNode("soledrop-aura");
+        }
+        final float blur = Math.max(1f, spread * 0.8f);
+        if (auraEffect == null || Math.abs(auraBlurRadius - blur) > dp(1)) {
+            auraBlurRadius = blur;
+            auraEffect = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.DECAL);
+            auraNode.setRenderEffect(auraEffect);
+        }
+        // the node covers the card with room for the light and its blur on every side
+        final float pad = out + band + blur * 3f;
+        final int left = (int) Math.floor(card.left - pad), top = (int) Math.floor(card.top - pad);
+        final int right = (int) Math.ceil(card.right + pad), bottom = (int) Math.ceil(card.bottom + pad);
+        auraNode.setPosition(left, top, right, bottom);
+        final RecordingCanvas c = auraNode.beginRecording(right - left, bottom - top);
+        c.translate(-left, -top);
+        auraPaint.setStrokeWidth(band);
+        auraPaint.setAlpha(alpha);
+        c.drawRoundRect(card.left - out, card.top - out, card.right + out, card.bottom + out, radius + out, radius + out, auraPaint);
+        auraNode.endRecording();
+        canvas.drawRenderNode(auraNode);
     }
     // endregion
 

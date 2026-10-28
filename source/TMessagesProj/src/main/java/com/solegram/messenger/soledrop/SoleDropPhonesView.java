@@ -58,7 +58,7 @@ public class SoleDropPhonesView extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        setMeasuredDimension(dp(220), dp(76));
+        setMeasuredDimension(dp(260), dp(96));
     }
 
     private void build() {
@@ -95,8 +95,10 @@ public class SoleDropPhonesView extends View {
         final float contact = t >= 0.32f && t < 0.74f ? (t - 0.32f) / 0.42f : -1f;
         final float phoneW = dp(84), phoneH = dp(46);
         final float cy = h / 2f;
-        final float meet = w / 2f;
         final float gap = dp(30) * (1f - in);
+        // the whole scene (this phone, the gap at its widest, the friend's phone) sits in the middle of the view,
+        // so neither phone nor the light from the meeting edges is cut at a side
+        final float meet = w / 2f - dp(15);
 
         // this phone: its top edge to the right, the screen lights up while touching
         final float light = contact >= 0f ? (float) Math.sin(Math.min(1f, contact * 1.6f) * Math.PI / 2) * (1f - Math.max(0f, contact - 0.7f) / 0.3f) : 0f;

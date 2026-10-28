@@ -146,9 +146,25 @@ public final class SoleDropIdentity {
         requesting[account] = true;
         ConnectionsManager.getInstance(account).sendRequest(new TLRPC.TL_contacts_exportContactToken(), (res, err) -> AndroidUtilities.runOnUIThread(() -> {
             requesting[account] = false;
+            lastError = err != null ? err.text : null;
             if (res instanceof TLRPC.TL_exportedContactToken) {
                 final TLRPC.TL_exportedContactToken t = (TLRPC.TL_exportedContactToken) res;
-                final String token = SoleDropProtocol.tokenFromLink(t.url);
+                String token = SoleDropProtocol.tokenFromLink(t.url);
+                if (token == null && !TextUtils.isEmpty(t.url)) {
+                    // an unexpected link format: the last part of the link is still the token, and the link itself
+                    // is what the QR code needs
+                    String tail = t.url.trim();
+                    final int cut = tail.indexOf('?') >= 0 && tail.contains("token=") ? tail.indexOf("token=") + 6 : tail.lastIndexOf('/') + 1;
+                    tail = tail.substring(Math.max(0, cut));
+                    final int amp = tail.indexOf('&');
+                    if (amp >= 0) {
+                        tail = tail.substring(0, amp);
+                    }
+                    token = tail.isEmpty() ? null : tail;
+                    if (token == null) {
+                        lastError = "BAD_LINK";
+                    }
+                }
                 if (token != null) {
                     prefs().edit()
                         .putLong("uid_" + account, uid)
@@ -165,6 +181,10 @@ public final class SoleDropIdentity {
         }));
     }
 
+    /** Why the last token request failed (Telegram's error text), null when it worked. */
+    @Nullable
+    public static String lastError;
+
     /** The contact link of the account (for the QR code), null while there is no fresh token. */
     @Nullable
     public static String link(int account) {
@@ -172,7 +192,12 @@ public final class SoleDropIdentity {
         if (p.getInt("expires_" + account, 0) <= now()) {
             return null;
         }
-        return p.getString("url_" + account, null);
+        final String url = p.getString("url_" + account, null);
+        if (!TextUtils.isEmpty(url)) {
+            return url;
+        }
+        final String token = p.getString("token_" + account, null);
+        return TextUtils.isEmpty(token) ? null : "https://t.me/contact/" + token;
     }
 
     public static int expiresIn(int account) {
