@@ -1603,5 +1603,6 @@
     <string name="SG_MeaningFlood">Telegram попросил подождать %1$d с перед новым поиском. Показано то, что уже нашлось.</string>
     <string name="SG_MeaningInChat">Чат: %1$s</string>
     <string name="SG_MeaningHow">Поиск по смыслу дополняет вопрос похожими словами и ранжирует то, что находит Telegram. Он не видит картинки, голосовые и секретные чаты, а переписку, где нет ни одного похожего слова, может пропустить.</string>
+    <string name="SG_MeaningMenu">Поиск по смыслу</string>
     <!-- SOLEGRAM END -->
 </resources>

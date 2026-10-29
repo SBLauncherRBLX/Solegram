@@ -206,6 +206,10 @@ public final class SolegramUi {
         if (SolegramConfig.markAllReadInMenu) {
             io.add(R.drawable.msg_markread, LocaleController.getString(R.string.SG_MarkAllRead), () -> markAllRead(fragment));
         }
+        if (SolegramMeaningSearch.enabled()) {
+            // search by meaning, also straight from the menu: ask in your own words
+            io.add(R.drawable.msg_search, LocaleController.getString(R.string.SG_MeaningMenu), () -> fragment.presentFragment(new com.solegram.messenger.ui.SolegramMeaningSearchActivity("")));
+        }
         io.add(R.drawable.msg_soledrop, LocaleController.getString(R.string.SG_SoleDrop), () -> com.solegram.messenger.soledrop.SoleDrop.open(fragment, null));
         io.add(R.drawable.sg_settings_mark, LocaleController.getString(R.string.SG_SettingsTitle), () -> fragment.presentFragment(new SolegramSettingsActivity()));
         addPluginItems(io, fragment, PluginMenuItem.DRAWER_MENU, baseContext(fragment));

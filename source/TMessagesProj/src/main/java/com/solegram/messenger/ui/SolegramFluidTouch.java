@@ -75,7 +75,7 @@ public final class SolegramFluidTouch {
     private static final int[] location = new int[2];
 
     public static boolean enabled() {
-        return SolegramConfig.fluidTouch && SolegramMotion.enabled();
+        return false; // fluid touch is switched off for now (the code stays for a later version)
     }
 
     /** The stretch of a held view, for whoever else sets its scale (the press spring keeps it). */

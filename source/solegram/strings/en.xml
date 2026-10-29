@@ -1349,4 +1349,5 @@
     <string name="SG_MeaningFlood">Telegram asked to wait %1$d s before searching more. Showing what was found.</string>
     <string name="SG_MeaningInChat">Chat: %1$s</string>
     <string name="SG_MeaningHow">Search by meaning widens your question with related words and ranks what Telegram finds. It does not read pictures, voice messages or secret chats, and a conversation that shares no word with the question can still be missed.</string>
+    <string name="SG_MeaningMenu">Search by meaning</string>
 </resources>
