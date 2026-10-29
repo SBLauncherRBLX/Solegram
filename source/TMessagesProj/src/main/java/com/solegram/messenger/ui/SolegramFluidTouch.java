@@ -59,6 +59,8 @@ public final class SolegramFluidTouch {
     private static float downX, downY;
     /** Where the element was before it was taken (it may already be moved by its own layout or animation). */
     private static float baseTX, baseTY;
+    private static float basePX, basePY;
+    private static boolean hadPivot;
     private static boolean released = true;
     private static int touchSlop;
     /** How far the element may go (px) and how it stretches, set for its size when it is taken. */
@@ -94,7 +96,9 @@ public final class SolegramFluidTouch {
         if (child == null || child != target) {
             return false;
         }
-        final float px = child.getLeft() + child.getWidth() / 2f, py = child.getTop() + child.getHeight() / 2f;
+        // exactly as the view itself is drawn: moved, then scaled round the view's own pivot (some views keep a
+        // pivot at an edge for their animations), so the bubble and what is in it go and stretch as one
+        final float px = child.getLeft() + child.getPivotX(), py = child.getTop() + child.getPivotY();
         canvas.translate(child.getTranslationX() - baseTX, child.getTranslationY() - baseTY);
         canvas.scale(child.getScaleX(), child.getScaleY(), px, py);
         return true;
@@ -235,6 +239,14 @@ public final class SolegramFluidTouch {
         canStretch = view.getStateListAnimator() == null || SolegramMotion.pressDriven(view);
         baseTX = view.getTranslationX();
         baseTY = view.getTranslationY();
+        // stretch from the middle, whatever pivot the view keeps for its own animations (given back when let go)
+        basePX = view.getPivotX();
+        basePY = view.getPivotY();
+        hadPivot = android.os.Build.VERSION.SDK_INT < 28 || view.isPivotSet();
+        if (view.getScaleX() == 1f && view.getScaleY() == 1f) {
+            view.setPivotX(view.getWidth() / 2f);
+            view.setPivotY(view.getHeight() / 2f);
+        }
         touchSlop = ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
         // small things move further for their size, wide rows only a little
         maxShiftX = Math.min(dp(9), Math.max(dp(4), view.getWidth() * 0.06f));
@@ -342,6 +354,18 @@ public final class SolegramFluidTouch {
         }
     }
 
+    private static void restorePivot(View view) {
+        if (view.getScaleX() != 1f || view.getScaleY() != 1f) {
+            return; // still pressed by something else: its pivot stays where it scales from now
+        }
+        if (hadPivot) {
+            view.setPivotX(basePX);
+            view.setPivotY(basePY);
+        } else if (android.os.Build.VERSION.SDK_INT >= 28) {
+            view.resetPivot();
+        }
+    }
+
     private static void reclip() {
         for (int i = 0; i < unclippedCount; i++) {
             final ViewGroup g = unclipped[i];
@@ -412,6 +436,7 @@ public final class SolegramFluidTouch {
             applyScale(view);
             invalidateOwner(view);
             target = null;
+            restorePivot(view);
             reclip();
             return;
         }
@@ -433,6 +458,7 @@ public final class SolegramFluidTouch {
                 if (target == view) {
                     stretchX = stretchY = 1f;
                     target = null;
+                    restorePivot(view);
                     reclip();
                 }
                 if (back == a) {
