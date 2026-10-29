@@ -668,6 +668,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             if (solegramLiquidPopup != null && solegramLiquidPopup.isClosing()) {
                 return true; // Solegram: flowing back, its items no longer take taps
             }
+            com.solegram.messenger.ui.SolegramFluidTouch.onTouch(getRootView(), ev); // Solegram: fluid touch only watches
             return super.dispatchTouchEvent(ev);
         }
 

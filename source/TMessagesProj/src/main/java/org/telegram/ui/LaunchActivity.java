@@ -6742,6 +6742,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     @Override
     protected void onPause() {
+        com.solegram.messenger.ui.SolegramFluidTouch.releaseNow(); // Solegram: never leave a held element or its light behind
         super.onPause();
         isResumed = false;
         com.solegram.messenger.plugins.PluginsController.getInstance().dispatchAppEvent(com.solegram.messenger.plugins.PluginsController.APP_EVENT_PAUSE);
@@ -8471,6 +8472,14 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     public boolean dispatchTouchEvent(MotionEvent ev) {
         com.solegram.messenger.ui.SolegramFluidTouch.onTouch(this, ev); // Solegram: fluid touch only watches
         return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (!hasFocus) {
+            com.solegram.messenger.ui.SolegramFluidTouch.releaseNow(); // Solegram: a menu or dialog opened over the held element
+        }
     }
 
     @Override

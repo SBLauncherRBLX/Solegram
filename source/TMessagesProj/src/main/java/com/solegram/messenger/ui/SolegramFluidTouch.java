@@ -100,25 +100,43 @@ public final class SolegramFluidTouch {
         return true;
     }
 
+    /** How far a held view is moved from its place now (0 when it is not held). */
+    public static float heldDX(@Nullable View v) {
+        return v != null && v == target ? v.getTranslationX() - baseTX : 0;
+    }
+
+    public static float heldDY(@Nullable View v) {
+        return v != null && v == target ? v.getTranslationY() - baseTY : 0;
+    }
+
     /** Called for every touch event of the activity's window before it is dispatched; it only watches. */
     public static void onTouch(Activity activity, MotionEvent event) {
-        if (activity == null || event == null) {
+        if (activity != null && activity.getWindow() != null) {
+            onTouch(activity.getWindow().getDecorView(), event);
+        }
+    }
+
+    /**
+     * The same for any other window (a dialog, a sheet, a popup menu): {@code root} is that window's root view.
+     * Only watches, never takes the touch.
+     */
+    public static void onTouch(@Nullable View root, MotionEvent event) {
+        if (root == null || event == null) {
             return;
         }
         final int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
-            release(false);
+            releaseNow();
             if (!enabled()) {
                 return;
             }
-            final View root = activity.getWindow() != null ? activity.getWindow().getDecorView() : null;
-            final View found = root != null ? find(root, event.getRawX(), event.getRawY()) : null;
+            final View found = find(root, event.getRawX(), event.getRawY());
             if (found != null) {
                 take(found, event.getRawX(), event.getRawY());
             }
             return;
         }
-        if (target == null || released) {
+        if (target == null || released || target.getRootView() != root.getRootView()) {
             return;
         }
         switch (action) {
@@ -131,6 +149,20 @@ public final class SolegramFluidTouch {
                 release(true);
                 break;
         }
+    }
+
+    /**
+     * Lets go of everything at once: the window lost focus (a menu or a dialog opened over it), the screen
+     * changed, or a new touch began. No light is ever left behind.
+     */
+    public static void releaseNow() {
+        release(false);
+        for (int i = lights.size() - 1; i >= 0; i--) {
+            final Glow g = lights.get(i);
+            g.fadeTo(0f, 0);
+            g.detach();
+        }
+        lights.clear();
     }
 
     // region Finding the element under the finger
@@ -174,6 +206,10 @@ public final class SolegramFluidTouch {
             }
         }
         final ViewGroup parent = view.getParent() instanceof ViewGroup ? (ViewGroup) view.getParent() : null;
+        if (parent instanceof org.telegram.ui.ActionBar.ActionBarMenu && (view.isClickable() || view.isLongClickable())) {
+            // the header's buttons share one bubble of glass: they all move and stretch together, as one
+            return fits(parent) ? parent : KEEP_STILL;
+        }
         // a row of a list (lists handle the clicks of their rows), or anything clickable
         if (parent instanceof RecyclerView || parent instanceof AbsListView || (view.isClickable() || view.isLongClickable()) && view.isEnabled()) {
             return fits(view) ? view : KEEP_STILL; // a whole screen or a big card that takes the touch stays still
@@ -204,12 +240,15 @@ public final class SolegramFluidTouch {
         maxShiftX = Math.min(dp(9), Math.max(dp(4), view.getWidth() * 0.06f));
         maxShiftY = Math.min(dp(7), Math.max(dp(3), view.getHeight() * 0.10f));
         view.getLocationOnScreen(location);
-        glow = new Glow(Theme.isCurrentThemeDark());
+        glow = new Glow(Theme.isCurrentThemeDark(), view);
         glow.setBounds(0, 0, view.getWidth(), view.getHeight());
         glow.setShape(view);
+        unclip(view);
+        view.addOnAttachStateChangeListener(detachWatch);
         glow.moveTo(rawX - location[0], rawY - location[1]);
         try {
             view.getOverlay().add(glow);
+            lights.add(glow);
         } catch (Exception e) {
             glow = null;
         }
@@ -261,6 +300,60 @@ public final class SolegramFluidTouch {
         view.setScaleY(base * stretchY);
     }
 
+    /** A parent that knows the real shape of a child's glass or card (a header's bubbles, a list's cards). */
+    public interface Shape {
+        /** The held child's shape in the child's own coordinates; false when this parent does not shape it. */
+        boolean fluidShape(View child, android.graphics.Path outInChild);
+    }
+
+    /** Every light on screen, so none is ever left behind. */
+    private static final java.util.ArrayList<Glow> lights = new java.util.ArrayList<>();
+
+    private static final View.OnAttachStateChangeListener detachWatch = new View.OnAttachStateChangeListener() {
+        @Override
+        public void onViewAttachedToWindow(@NonNull View v) {
+        }
+
+        @Override
+        public void onViewDetachedFromWindow(@NonNull View v) {
+            if (v == target) {
+                releaseNow(); // a row recycled or a screen closed under the finger
+            }
+        }
+    };
+
+    /** Parents that clipped the element (it moves and grows a little past its box): restored when let go. */
+    private static final ViewGroup[] unclipped = new ViewGroup[4];
+    private static final boolean[] unclippedChildren = new boolean[4], unclippedPadding = new boolean[4];
+    private static int unclippedCount;
+
+    private static void unclip(View view) {
+        reclip();
+        View p = view.getParent() instanceof View ? (View) view.getParent() : null;
+        for (int i = 0; i < unclipped.length && p instanceof ViewGroup; i++) {
+            final ViewGroup g = (ViewGroup) p;
+            unclipped[i] = g;
+            unclippedChildren[i] = g.getClipChildren();
+            unclippedPadding[i] = g.getClipToPadding();
+            g.setClipChildren(false);
+            g.setClipToPadding(false);
+            unclippedCount = i + 1;
+            p = g.getParent() instanceof View ? (View) g.getParent() : null;
+        }
+    }
+
+    private static void reclip() {
+        for (int i = 0; i < unclippedCount; i++) {
+            final ViewGroup g = unclipped[i];
+            if (g != null) {
+                g.setClipChildren(unclippedChildren[i]);
+                g.setClipToPadding(unclippedPadding[i]);
+            }
+            unclipped[i] = null;
+        }
+        unclippedCount = 0;
+    }
+
     /** The parent may draw the element's glass (a header's bubbles): it is drawn again with the element. */
     private static void invalidateOwner(View view) {
         // the button's own bar or its grandparent (a header's menu) may draw the glass behind it
@@ -308,20 +401,18 @@ public final class SolegramFluidTouch {
         final float fromSX = stretchX, fromSY = stretchY;
         final Glow light = glow;
         glow = null;
+        view.removeOnAttachStateChangeListener(detachWatch);
         if (light != null) {
-            light.fadeTo(0f, animated ? 320 : 0, () -> {
-                try {
-                    view.getOverlay().remove(light);
-                } catch (Exception ignore) {
-                }
-            });
+            light.fadeTo(0f, animated ? 260 : 0, light::detach);
         }
         if (!animated || !view.isAttachedToWindow()) {
             view.setTranslationX(bx);
             view.setTranslationY(by);
             stretchX = stretchY = 1f;
             applyScale(view);
+            invalidateOwner(view);
             target = null;
+            reclip();
             return;
         }
         final ValueAnimator a = ValueAnimator.ofFloat(1f, 0f);
@@ -342,6 +433,7 @@ public final class SolegramFluidTouch {
                 if (target == view) {
                     stretchX = stretchY = 1f;
                     target = null;
+                    reclip();
                 }
                 if (back == a) {
                     back = null;
@@ -366,8 +458,23 @@ public final class SolegramFluidTouch {
         @Nullable
         private ValueAnimator fade;
 
-        Glow(boolean dark) {
+        private final java.lang.ref.WeakReference<View> host;
+
+        Glow(boolean dark, View host) {
             strength = dark ? 0.20f : 0.42f;
+            this.host = new java.lang.ref.WeakReference<>(host);
+        }
+
+        /** Takes the light off its element for good. */
+        void detach() {
+            lights.remove(this);
+            final View v = host.get();
+            if (v != null) {
+                try {
+                    v.getOverlay().remove(this);
+                } catch (Exception ignore) {
+                }
+            }
         }
 
         @Override
@@ -385,6 +492,15 @@ public final class SolegramFluidTouch {
         void setShape(View view) {
             clipPath.rewind();
             final Rect b = getBounds();
+            // the parent (or its parent) may know the real shape: a header's bubble, a list's card
+            View owner = view.getParent() instanceof View ? (View) view.getParent() : null;
+            for (int i = 0; i < 2 && owner != null; i++) {
+                if (owner instanceof Shape && ((Shape) owner).fluidShape(view, clipPath) && !clipPath.isEmpty()) {
+                    return;
+                }
+                clipPath.rewind();
+                owner = owner.getParent() instanceof View ? (View) owner.getParent() : null;
+            }
             final Drawable bg = view.getBackground();
             final android.graphics.Path glass = glassPath(bg);
             if (glass != null && !glass.isEmpty()) {
@@ -410,7 +526,9 @@ public final class SolegramFluidTouch {
                 final float r = Math.min(b.width(), b.height()) / 2f;
                 clipPath.addCircle(b.exactCenterX(), b.exactCenterY(), r, android.graphics.Path.Direction.CW);
             } else {
-                clipPath.addRect(b.left, b.top, b.right, b.bottom, android.graphics.Path.Direction.CW);
+                // a button drawn by its own code (no outline to ask): its corners are rounded, so the light is too
+                final float r = Math.min(b.height() / 2f, dp(12));
+                clipPath.addRoundRect(b.left, b.top, b.right, b.bottom, r, r, android.graphics.Path.Direction.CW);
             }
         }
 

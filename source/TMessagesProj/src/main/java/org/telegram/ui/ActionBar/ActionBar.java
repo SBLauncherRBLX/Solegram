@@ -80,7 +80,7 @@ import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
 import me.vkryl.android.animator.ReplaceAnimator;
 
-public class ActionBar extends FrameLayout implements FactorAnimator.Target, Theme.Colorable {
+public class ActionBar extends FrameLayout implements FactorAnimator.Target, Theme.Colorable, com.solegram.messenger.ui.SolegramFluidTouch.Shape {
 
     public static class ActionBarMenuOnItemClick {
         public void onItemClick(int id) {
@@ -343,6 +343,42 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     }
 
     /** Solegram: the menu's bubble, drawn by the menu under its buttons (in the menu's coordinates). */
+    /**
+     * Solegram: draws a bubble the way fluid touch moves and stretches the view it belongs to; the glass takes what
+     * it shows from where the bubble is now, so its refraction changes as it moves instead of freezing.
+     */
+    private void solegramDrawFluid(Canvas canvas, BlurredBackgroundDrawable drawable, View owner) {
+        final int count = canvas.save();
+        final boolean held = com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, owner);
+        if (held && !solegramManualGlassOffset) {
+            final float ox = drawable.getSourceOffsetX(), oy = drawable.getSourceOffsetY();
+            drawable.setSourceOffset(ox + com.solegram.messenger.ui.SolegramFluidTouch.heldDX(owner), oy + com.solegram.messenger.ui.SolegramFluidTouch.heldDY(owner));
+            drawable.draw(canvas);
+            drawable.setSourceOffset(ox, oy);
+        } else {
+            drawable.draw(canvas);
+        }
+        canvas.restoreToCount(count);
+    }
+
+    /** Solegram, fluid touch: the real shape of a button's bubble, so the light under the finger stays inside it. */
+    @Override
+    public boolean fluidShape(View child, android.graphics.Path out) {
+        if (child == backButtonImageView && glassDrawableBack != null && !glassDrawableBack.getBounds().isEmpty()) {
+            out.set(glassDrawableBack.getPath());
+            out.offset(-child.getLeft(), -child.getTop());
+            return !out.isEmpty();
+        }
+        if (child == menu && glassDrawableMenu != null && !glassDrawableMenu.getBounds().isEmpty()) {
+            out.set(glassDrawableMenu.getPath());
+            if (!solegramButtonsGlass) {
+                out.offset(-child.getLeft(), -child.getTop()); // drawn by the bar, in the bar's frame
+            }
+            return !out.isEmpty();
+        }
+        return false;
+    }
+
     void solegramDrawMenuBubble(Canvas canvas) {
         if (!solegramButtonsGlass || glassDrawableMenu == null || menu == null || glassOnlyBack || doNotDrawGlassMenu) {
             return;
@@ -426,15 +462,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         if (glassDrawableMenu.getAlpha() != alpha255) {
             glassDrawableMenu.setAlpha(alpha255);
         }
-        // fluid touch: a held button takes its bubble with it
-        final int fluid = canvas.save();
-        for (int i = 0, n = menu.getChildCount(); i < n; i++) {
-            if (com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, menu.getChildAt(i))) {
-                break;
-            }
-        }
+        // fluid touch moves the whole menu (its buttons share this bubble): the bubble goes with it, and the glass
+        // follows the menu's real position, so what it shows keeps changing as it moves
         glassDrawableMenu.draw(canvas);
-        canvas.restoreToCount(fluid);
     }
 
     /**
@@ -2631,31 +2661,14 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         // Solegram: the button bubbles of a plain header give way to the selection bar and the search field
         if (glassDrawableBack != null && hasBackButton && !solegramButtonsGlass) {
             glassDrawableBack.setBounds(0, t, s + p * 2, b);
-            final int fluid = canvas.save();
-            com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, backButtonImageView); // fluid touch: the bubble follows its button
-            glassDrawableBack.draw(canvas);
-            canvas.restoreToCount(fluid);
+            solegramDrawFluid(canvas, glassDrawableBack, backButtonImageView); // fluid touch: the bubble follows its button
         }
         if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !doNotDrawGlassMenu && !solegramButtonsGlass) {
             {
                 glassDrawableMenu.setBounds(getWidth() - Math.max(s, menuWidth) - p * 2, t, getWidth(), b);
             }
             glassDrawableMenu.setAlpha(hasForcedMenuWidth ? 255 : (int) (255 * animatorHasMenuItems.getFloatValue()));
-            final int fluid = canvas.save();
-            if (menu != null) {
-                for (int i = 0, n = menu.getChildCount(); i < n; i++) {
-                    final View child = menu.getChildAt(i);
-                    // the menu's buttons are in the menu's frame: move the canvas there first
-                    canvas.translate(menu.getX(), menu.getY());
-                    if (com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, child)) {
-                        canvas.translate(-menu.getX(), -menu.getY());
-                        break;
-                    }
-                    canvas.translate(-menu.getX(), -menu.getY());
-                }
-            }
-            glassDrawableMenu.draw(canvas);
-            canvas.restoreToCount(fluid);
+            solegramDrawFluid(canvas, glassDrawableMenu, menu); // fluid touch: the bubble follows its buttons
         }
 
         if (blurredBackground && actionBarColor != Color.TRANSPARENT) {
@@ -2681,10 +2694,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                     glassDrawableBack.setAlpha(alpha255);
                 }
                 // fluid touch: the bubble goes and stretches with its button
-                final int fluid = canvas.save();
-                com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, backButtonImageView);
-                glassDrawableBack.draw(canvas);
-                canvas.restoreToCount(fluid);
+                solegramDrawFluid(canvas, glassDrawableBack, backButtonImageView);
             }
         }
 

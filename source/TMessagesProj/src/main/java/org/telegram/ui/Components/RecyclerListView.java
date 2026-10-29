@@ -96,7 +96,7 @@ import java.util.List;
 import java.util.Objects;
 
 @SuppressWarnings("JavaReflectionMemberAccess")
-public class RecyclerListView extends RecyclerView implements IBlur3Capture {
+public class RecyclerListView extends RecyclerView implements IBlur3Capture, com.solegram.messenger.ui.SolegramFluidTouch.Shape {
     public final static int SECTIONS_TYPE_SIMPLE = 0,
             SECTIONS_TYPE_STICKY_HEADERS = 1,
             SECTIONS_TYPE_DATE = 2,
@@ -3448,6 +3448,27 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         );
         if (AndroidUtilities.rectTmp.bottom < AndroidUtilities.rectTmp.top) return;
         drawSectionBackground.run(canvas, AndroidUtilities.rectTmp, sectionRadius, sectionRadius, from.getAlpha());
+    }
+
+    /** Solegram, fluid touch: a row of a rounded section card has the card's corners where it ends the card. */
+    @Override
+    public boolean fluidShape(View child, android.graphics.Path out) {
+        if (sectionRadius <= 0 || isViewTypeSection == null || getAdapter() == null || child.getParent() != this) {
+            return false;
+        }
+        final int position = getChildAdapterPosition(child);
+        if (position == NO_POSITION) {
+            return false;
+        }
+        final Adapter<?> adapter = getAdapter();
+        if (!Boolean.TRUE.equals(isViewTypeSection.run(adapter.getItemViewType(position)))) {
+            return false;
+        }
+        final boolean top = position == 0 || !Boolean.TRUE.equals(isViewTypeSection.run(adapter.getItemViewType(position - 1)));
+        final boolean bottom = position == adapter.getItemCount() - 1 || !Boolean.TRUE.equals(isViewTypeSection.run(adapter.getItemViewType(position + 1)));
+        final float rt = top ? sectionRadius : 0, rb = bottom ? sectionRadius : 0;
+        out.addRoundRect(0, 0, child.getWidth(), child.getHeight(), new float[]{rt, rt, rt, rt, rb, rb, rb, rb}, android.graphics.Path.Direction.CW);
+        return true;
     }
 
     private boolean hasAbove(View view, int index) {

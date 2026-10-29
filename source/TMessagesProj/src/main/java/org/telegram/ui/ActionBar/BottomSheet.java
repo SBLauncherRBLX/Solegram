@@ -2094,6 +2094,9 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
         if (dismissed) {
             return false;
         }
+        if (getWindow() != null) {
+            com.solegram.messenger.ui.SolegramFluidTouch.onTouch(getWindow().getDecorView(), ev); // Solegram: fluid touch only watches
+        }
         return super.dispatchTouchEvent(ev);
     }
 

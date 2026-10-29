@@ -1632,6 +1632,14 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     }
 
     @Override
+    public boolean dispatchTouchEvent(@androidx.annotation.NonNull android.view.MotionEvent ev) {
+        if (getWindow() != null) {
+            com.solegram.messenger.ui.SolegramFluidTouch.onTouch(getWindow().getDecorView(), ev); // Solegram: fluid touch only watches
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
     public void dismiss() {
         if (overridenDissmissListener != null) {
             Utilities.Callback<Runnable> listener = overridenDissmissListener;
