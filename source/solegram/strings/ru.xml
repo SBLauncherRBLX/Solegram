@@ -1285,4 +1285,6 @@
     <string name="SG_SoleDropWhat">Что передать</string>
     <string name="SG_UpdateCheckAuto">Проверять обновления автоматически</string>
     <string name="SG_UpdateCheckAutoInfo">Solegram сообщит о новой версии, а установите её вы сами</string>
+    <string name="SG_FluidTouch">Живое касание</string>
+    <string name="SG_FluidTouchInfo">Кнопки и строки чуть тянутся за пальцем и растягиваются, а под пальцем мягкий свет</string>
 </resources>

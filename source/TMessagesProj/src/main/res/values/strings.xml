@@ -12824,5 +12824,7 @@
     <string name="SG_SoleDropWhat">What to send</string>
     <string name="SG_UpdateCheckAuto">Check for updates automatically</string>
     <string name="SG_UpdateCheckAutoInfo">Solegram tells you about a new version, you install it yourself</string>
+    <string name="SG_FluidTouch">Fluid touch</string>
+    <string name="SG_FluidTouchInfo">Buttons and rows follow the finger a little and stretch toward it, with a soft light under the finger</string>
     <!-- SOLEGRAM END -->
 </resources>

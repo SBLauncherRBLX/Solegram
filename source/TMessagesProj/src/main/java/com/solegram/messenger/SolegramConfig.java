@@ -172,6 +172,8 @@ public class SolegramConfig {
     // region Animations
     public static boolean smoothTransitions = true;
     public static boolean pressScale = true;
+    /** Fluid touch: what the finger holds follows it and stretches, with a light under the finger. */
+    public static boolean fluidTouch = true;
     public static boolean animateLists = true;
     public static boolean neutralOverscroll = true;
     // endregion
@@ -417,6 +419,7 @@ public class SolegramConfig {
 
         smoothTransitions = p.getBoolean("smoothTransitions", true);
         pressScale = p.getBoolean("pressScale", true);
+        fluidTouch = p.getBoolean("fluidTouch", true);
         animateLists = p.getBoolean("animateLists", true);
         neutralOverscroll = p.getBoolean("neutralOverscroll", true);
 
@@ -663,6 +666,7 @@ public class SolegramConfig {
             case "scamNano":
             case "smoothTransitions":
             case "pressScale":
+            case "fluidTouch":
             case "animateLists":
             case "neutralOverscroll":
             case "cameraEnhance":

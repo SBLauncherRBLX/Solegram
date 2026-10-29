@@ -8468,6 +8468,12 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        com.solegram.messenger.ui.SolegramFluidTouch.onTouch(this, ev); // Solegram: fluid touch only watches
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
         if (event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_UP || event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_DOWN) {

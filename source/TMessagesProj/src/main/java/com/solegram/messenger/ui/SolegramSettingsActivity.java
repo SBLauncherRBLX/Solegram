@@ -176,6 +176,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_MAIN_TITLE = 113;
     private static final int ID_SMOOTH_TRANSITIONS = 114;
     private static final int ID_PRESS_SCALE = 115;
+    private static final int ID_FLUID_TOUCH = 199;
     private static final int ID_ANIMATE_LISTS = 116;
     private static final int ID_NEUTRAL_OVERSCROLL = 117;
     private static final int ID_TYPING_ANIMATION = 118;
@@ -495,6 +496,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asHeader(getString(R.string.SG_Animations)));
         items.add(UItem.asButtonCheck(ID_SMOOTH_TRANSITIONS, getString(R.string.SG_SmoothTransitions), getString(R.string.SG_SmoothTransitionsInfo)).setChecked(SolegramConfig.smoothTransitions));
         items.add(UItem.asButtonCheck(ID_PRESS_SCALE, getString(R.string.SG_PressScale), getString(R.string.SG_PressScaleInfo)).setChecked(SolegramConfig.pressScale));
+        items.add(UItem.asButtonCheck(ID_FLUID_TOUCH, getString(R.string.SG_FluidTouch), getString(R.string.SG_FluidTouchInfo)).setChecked(SolegramConfig.fluidTouch));
         items.add(UItem.asButtonCheck(ID_ANIMATE_LISTS, getString(R.string.SG_AnimateLists), getString(R.string.SG_AnimateListsInfo)).setChecked(SolegramConfig.animateLists));
         items.add(UItem.asButtonCheck(ID_NEUTRAL_OVERSCROLL, getString(R.string.SG_NeutralOverscroll), getString(R.string.SG_NeutralOverscrollInfo)).setChecked(SolegramConfig.neutralOverscroll));
         items.add(UItem.asButtonCheck(ID_TYPING_ANIMATION, getString(R.string.SG_TypingAnimation), getString(R.string.SG_TypingAnimationInfo)).setChecked(SolegramConfig.typingAnimation));
@@ -923,6 +925,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_APPEARANCE, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
         {PAGE_APPEARANCE, ID_SMOOTH_TRANSITIONS, R.string.SG_SmoothTransitions, -1},
         {PAGE_APPEARANCE, ID_PRESS_SCALE, R.string.SG_PressScale, -1},
+        {PAGE_APPEARANCE, ID_FLUID_TOUCH, R.string.SG_FluidTouch, -1},
         {PAGE_APPEARANCE, ID_ANIMATE_LISTS, R.string.SG_AnimateLists, -1},
         {PAGE_APPEARANCE, ID_NEUTRAL_OVERSCROLL, R.string.SG_NeutralOverscroll, -1},
         {PAGE_APPEARANCE, ID_TYPING_ANIMATION, R.string.SG_TypingAnimation, -1},
@@ -2117,6 +2120,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_PRESS_SCALE:
                 toggleCheck(view, "pressScale");
+                return;
+            case ID_FLUID_TOUCH:
+                toggleCheck(view, "fluidTouch");
                 return;
             case ID_ANIMATE_LISTS:
                 toggleCheck(view, "animateLists");

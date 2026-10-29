@@ -169,8 +169,9 @@ public final class SolegramMotion {
         public void onAnimationUpdate(DynamicAnimation animation, float value, float velocity) {
             final View view = ref.get();
             if (view != null) {
-                view.setScaleX(value);
-                view.setScaleY(value);
+                // a held element may also be stretched toward the finger (fluid touch): the press keeps that
+                view.setScaleX(value * SolegramFluidTouch.stretchX(view));
+                view.setScaleY(value * SolegramFluidTouch.stretchY(view));
             }
         }
     }
@@ -215,6 +216,17 @@ public final class SolegramMotion {
             force.setStiffness(380f).setDampingRatio(rich() ? 0.55f : 1f);
         }
         p.spring.animateToFinalPosition(target);
+    }
+
+    /** The press scale a view is at now (1 when it was never pressed through here). */
+    public static float pressValue(@Nullable View view) {
+        final Press p = view != null ? presses.get(view) : null;
+        return p != null ? p.holder.getValue() : 1f;
+    }
+
+    /** Whether the press scale of this view is driven here (and not by a state list animator). */
+    public static boolean pressDriven(@Nullable View view) {
+        return view != null && presses.containsKey(view);
     }
 
     /** A recycled or reused view must not keep a half-finished press (only views pressed through here are touched). */
