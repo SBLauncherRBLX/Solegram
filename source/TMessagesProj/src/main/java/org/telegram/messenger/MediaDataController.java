@@ -5263,6 +5263,7 @@ public class MediaDataController extends BaseController {
                         loading = false;
                         loaded = true;
                         hints = hintsNew;
+                        com.solegram.messenger.SolegramHiddenChats.filterHints(currentAccount, hints); // Solegram: no hidden chats
                         inlineBots = inlineBotsNew;
                         guestBots = guestsBotsNew;
                         webapps = webappsNew;
@@ -5321,6 +5322,7 @@ public class MediaDataController extends BaseController {
                                     break;
                                 }
                             }
+                            com.solegram.messenger.SolegramHiddenChats.filterHints(currentAccount, hints); // Solegram: no hidden chats
                             getUserConfig().ratingLoadTime = (int) (System.currentTimeMillis() / 1000);
                         }
                     }
@@ -5589,6 +5591,9 @@ public class MediaDataController extends BaseController {
             }
             double dtFinal = dt;
             AndroidUtilities.runOnUIThread(() -> {
+                if (com.solegram.messenger.SolegramHiddenChats.isHidden(currentAccount, dialogId)) {
+                    return; // Solegram: a hidden chat does not climb into the suggestions
+                }
                 TLRPC.TL_topPeer peer = null;
                 for (int a = 0; a < hints.size(); a++) {
                     TLRPC.TL_topPeer p = hints.get(a);

@@ -603,6 +603,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuSubItem readItem;
     @Nullable
     private ActionBarMenuSubItem blockItem;
+    /** Solegram: "Hide chat" in the menu of the selected chats. */
+    private ActionBarMenuSubItem solegramHideItem;
 
     private float additionalFloatingTranslation;
     private float floatingButtonPanOffset;
@@ -724,6 +726,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private final static int add_to_folder = 109;
     private final static int remove_from_folder = 110;
     private final static int community_ungroup = 111;
+    private final static int solegram_hide = 112;
 
     private final static int ARCHIVE_ITEM_STATE_PINNED = 0;
     private final static int ARCHIVE_ITEM_STATE_SHOWED = 1;
@@ -3639,6 +3642,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 scrollToTop(true, true);
             }
         });
+        // Solegram: holding the title of the chats screen opens the hidden chats (behind the phone's lock)
+        if (initialDialogsType == DIALOGS_TYPE_DEFAULT && !onlySelect && folderId == 0 && communityId == 0 && !inPreviewMode) {
+            actionBar.setOnLongClickListener(v -> {
+                if (!com.solegram.messenger.SolegramHiddenChats.gestureEnabled() || actionBar.isSearchFieldVisible()
+                    || actionBar.isActionModeShowed() || searching || getParentActivity() == null) {
+                    return false;
+                }
+                com.solegram.messenger.SolegramHiddenChats.open(this); // the long press itself gives the haptic tick
+                return true;
+            });
+        }
 
         if (
             (initialDialogsType == DIALOGS_TYPE_DEFAULT && !onlySelect || initialDialogsType == DIALOGS_TYPE_FORWARD) &&
@@ -4109,6 +4123,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     hideActionMode(false);
                 } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block || id == archive2 || id == pin2) {
                     performSelectedDialogsAction(selectedDialogs, id, true, false);
+                } else if (id == solegram_hide) {
+                    solegramHideChats(new ArrayList<>(selectedDialogs));
+                    hideActionMode(true);
                 }
             }
         });
@@ -6914,6 +6931,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         readItem = otherItem.addSubItem(read, R.drawable.msg_markread, LocaleController.getString(R.string.MarkAsRead));
         clearItem = otherItem.addSubItem(clear, R.drawable.msg_clear, LocaleController.getString(R.string.ClearHistory));
         blockItem = otherItem.addSubItem(block, R.drawable.msg_block, LocaleController.getString(R.string.BlockUser));
+        solegramHideItem = otherItem.addSubItem(solegram_hide, R.drawable.msg_archive_hide, LocaleController.getString(R.string.SG_HideChat));
 
         muteItem.setOnLongClickListener(e -> {
             performSelectedDialogsAction(selectedDialogs, mute, true, true);
@@ -9196,6 +9214,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             previewMenu[0].addView(muteItem);
         }
 
+        if (!isCommunityCell && communityId == 0 && com.solegram.messenger.SolegramHiddenChats.canHide(currentAccount, dialogId)) {
+            // Solegram: hide the chat from every list of this device
+            ActionBarMenuSubItem hideItem = new ActionBarMenuSubItem(getParentActivity(), false, false);
+            hideItem.setTextAndIcon(LocaleController.getString(R.string.SG_HideChat), R.drawable.msg_archive_hide);
+            hideItem.setMinimumWidth(160);
+            hideItem.setOnClickListener(e -> {
+                finishPreviewFragment();
+                final ArrayList<Long> ids = new ArrayList<>();
+                ids.add(dialogId);
+                AndroidUtilities.runOnUIThread(() -> solegramHideChats(ids), 100);
+            });
+            previewMenu[0].addView(hideItem);
+        }
+
         if (!isCommunityCell) {
             ActionBarMenuSubItem deleteItem = new ActionBarMenuSubItem(getParentActivity(), false, true);
             deleteItem.setIconColor(getThemedColor(Theme.key_text_RedRegular));
@@ -9248,6 +9280,26 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return true;
         }
         return false;
+    }
+
+    /**
+     * Solegram: hides these chats on this device (nothing changes on the server) and says how to get to them,
+     * with an undo.
+     */
+    private void solegramHideChats(ArrayList<Long> ids) {
+        final int hidden = com.solegram.messenger.SolegramHiddenChats.hide(currentAccount, ids);
+        if (hidden == 0) {
+            return;
+        }
+        final String text = hidden == 1 ? LocaleController.getString(R.string.SG_HiddenChatDone)
+            : LocaleController.formatString(R.string.SG_HiddenChatsDone, hidden);
+        final String hint = LocaleController.getString(com.solegram.messenger.SolegramHiddenChats.gestureEnabled()
+            ? R.string.SG_HiddenOpenHint : R.string.SG_HiddenOpenHintSettings);
+        BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_hide, text, hint, LocaleController.getString(R.string.Undo), () -> {
+            for (Long id : ids) {
+                com.solegram.messenger.SolegramHiddenChats.unhide(currentAccount, id);
+            }
+        }).show();
     }
 
     private boolean isFloatingButtonWanted() {
@@ -10403,6 +10455,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     pin2Item.setVisibility(View.GONE);
                 }
             }
+        }
+        if (solegramHideItem != null) {
+            // Solegram: chats of the main list and the archive (not Saved Messages, the promoted channel, communities)
+            boolean canHide = count > 0 && communitiesCount == 0 && communityId == 0;
+            for (int a = 0; canHide && a < count; a++) {
+                canHide = com.solegram.messenger.SolegramHiddenChats.canHide(currentAccount, selectedDialogs.get(a));
+            }
+            solegramHideItem.setVisibility(canHide ? View.VISIBLE : View.GONE);
         }
         if (blockItem != null) {
             if (cantBlockCount != 0) {

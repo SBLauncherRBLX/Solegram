@@ -85,6 +85,21 @@ public final class SolegramFluidTouch {
         return view == target ? stretchY : 1f;
     }
 
+    /**
+     * For a parent that draws a held child's glass itself (the header draws its buttons' bubbles): moves and
+     * stretches the canvas the way the child is moved and stretched now, around the child's centre. Returns
+     * false (and leaves the canvas alone) when the child is not held.
+     */
+    public static boolean applyTo(android.graphics.Canvas canvas, @Nullable View child) {
+        if (child == null || child != target) {
+            return false;
+        }
+        final float px = child.getLeft() + child.getWidth() / 2f, py = child.getTop() + child.getHeight() / 2f;
+        canvas.translate(child.getTranslationX() - baseTX, child.getTranslationY() - baseTY);
+        canvas.scale(child.getScaleX(), child.getScaleY(), px, py);
+        return true;
+    }
+
     /** Called for every touch event of the activity's window before it is dispatched; it only watches. */
     public static void onTouch(Activity activity, MotionEvent event) {
         if (activity == null || event == null) {
@@ -191,6 +206,7 @@ public final class SolegramFluidTouch {
         view.getLocationOnScreen(location);
         glow = new Glow(Theme.isCurrentThemeDark());
         glow.setBounds(0, 0, view.getWidth(), view.getHeight());
+        glow.setShape(view);
         glow.moveTo(rawX - location[0], rawY - location[1]);
         try {
             view.getOverlay().add(glow);
@@ -221,6 +237,7 @@ public final class SolegramFluidTouch {
         final float sy = maxShiftY * dy / (Math.abs(dy) + k);
         view.setTranslationX(baseTX + sx);
         view.setTranslationY(baseTY + sy);
+        invalidateOwner(view);
         // and stretches toward it, a little thinner across (as a drop of liquid pulled by a finger)
         final float nx = Math.abs(sx) / maxShiftX, ny = Math.abs(sy) / maxShiftY;
         final float pullX = dp(7) / (float) Math.max(view.getWidth(), dp(40));
@@ -242,6 +259,18 @@ public final class SolegramFluidTouch {
         final float base = SolegramMotion.pressValue(view);
         view.setScaleX(base * stretchX);
         view.setScaleY(base * stretchY);
+    }
+
+    /** The parent may draw the element's glass (a header's bubbles): it is drawn again with the element. */
+    private static void invalidateOwner(View view) {
+        // the button's own bar or its grandparent (a header's menu) may draw the glass behind it
+        if (view.getParent() instanceof View) {
+            final View parent = (View) view.getParent();
+            parent.invalidate();
+            if (parent.getParent() instanceof View) {
+                ((View) parent.getParent()).invalidate();
+            }
+        }
     }
 
     /** Is there something under the element that scrolls this way (it would take the gesture)? */
@@ -300,6 +329,7 @@ public final class SolegramFluidTouch {
             final float t = (float) an.getAnimatedValue();
             view.setTranslationX(bx + fromX * t);
             view.setTranslationY(by + fromY * t);
+            invalidateOwner(view);
             if (target == view) {
                 stretchX = 1f + (fromSX - 1f) * t;
                 stretchY = 1f + (fromSY - 1f) * t;
@@ -331,6 +361,7 @@ public final class SolegramFluidTouch {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Matrix matrix = new Matrix();
         private final float strength;
+        private final android.graphics.Path clipPath = new android.graphics.Path();
         private float x, y, alpha;
         @Nullable
         private ValueAnimator fade;
@@ -342,9 +373,62 @@ public final class SolegramFluidTouch {
         @Override
         protected void onBoundsChange(@NonNull Rect bounds) {
             super.onBoundsChange(bounds);
-            // the light's size follows the element: a button gets a halo, a row a soft spot
-            final float r = Math.max(dp(40), Math.min(dp(120), Math.max(bounds.width(), bounds.height()) * 0.55f));
-            paint.setShader(new RadialGradient(0, 0, r, new int[]{0xFFFFFFFF, 0x80FFFFFF, 0x00FFFFFF}, new float[]{0f, 0.35f, 1f}, Shader.TileMode.CLAMP));
+            // one soft spot of the same size on every element: big enough to read under a finger, never a floodlight
+            final float r = dp(46);
+            paint.setShader(new RadialGradient(0, 0, r, new int[]{0xFFFFFFFF, 0x99FFFFFF, 0x33FFFFFF, 0x00FFFFFF}, new float[]{0f, 0.3f, 0.65f, 1f}, Shader.TileMode.CLAMP));
+        }
+
+        /**
+         * The light only on the element's own shape: its glass (the path the glass is drawn in), its outline (a
+         * rounded button), a circle for a small icon button whose bubble a parent draws, or else its box.
+         */
+        void setShape(View view) {
+            clipPath.rewind();
+            final Rect b = getBounds();
+            final Drawable bg = view.getBackground();
+            final android.graphics.Path glass = glassPath(bg);
+            if (glass != null && !glass.isEmpty()) {
+                clipPath.set(glass);
+                return;
+            }
+            final android.graphics.Outline outline = new android.graphics.Outline();
+            final android.view.ViewOutlineProvider provider = view.getOutlineProvider();
+            final Rect rect = new Rect();
+            if (provider != null) {
+                try {
+                    provider.getOutline(view, outline);
+                    if (outline.getRect(rect) && !rect.isEmpty()) {
+                        final float radius = Math.max(0, outline.getRadius());
+                        clipPath.addRoundRect(rect.left, rect.top, rect.right, rect.bottom, radius, radius, android.graphics.Path.Direction.CW);
+                        return;
+                    }
+                } catch (Exception ignore) {
+                }
+            }
+            if (b.height() <= dp(72) && b.width() <= b.height() * 1.4f) {
+                // an icon button (a header's, a toolbar's): its bubble is a circle round its middle
+                final float r = Math.min(b.width(), b.height()) / 2f;
+                clipPath.addCircle(b.exactCenterX(), b.exactCenterY(), r, android.graphics.Path.Direction.CW);
+            } else {
+                clipPath.addRect(b.left, b.top, b.right, b.bottom, android.graphics.Path.Direction.CW);
+            }
+        }
+
+        @Nullable
+        private static android.graphics.Path glassPath(@Nullable Drawable bg) {
+            if (bg instanceof org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable) {
+                return ((org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable) bg).getPath();
+            }
+            if (bg instanceof android.graphics.drawable.LayerDrawable) {
+                final android.graphics.drawable.LayerDrawable layers = (android.graphics.drawable.LayerDrawable) bg;
+                for (int i = 0; i < layers.getNumberOfLayers(); i++) {
+                    final android.graphics.Path p = glassPath(layers.getDrawable(i));
+                    if (p != null && !p.isEmpty()) {
+                        return p;
+                    }
+                }
+            }
+            return null;
         }
 
         void moveTo(float x, float y) {
@@ -393,7 +477,11 @@ public final class SolegramFluidTouch {
                 return;
             }
             final int count = canvas.save();
-            canvas.clipRect(getBounds());
+            if (!clipPath.isEmpty()) {
+                canvas.clipPath(clipPath);
+            } else {
+                canvas.clipRect(getBounds());
+            }
             matrix.setTranslate(x, y);
             paint.getShader().setLocalMatrix(matrix);
             paint.setAlpha((int) (255 * strength * alpha));

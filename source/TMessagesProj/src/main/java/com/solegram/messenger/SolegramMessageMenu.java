@@ -340,6 +340,9 @@ public final class SolegramMessageMenu {
     public static final int ACTION_SOLEDROP = 19993;
     /** Profile menu: the account, group or channel goes by SoleDrop. */
     public static final int PROFILE_SOLEDROP = 20990;
+    /** Profile menu: the chat is hidden from the lists of this device (or shown again). */
+    public static final int PROFILE_HIDE = 20991;
+    private static final Map<ProfileActivity, org.telegram.ui.ActionBar.ActionBarMenuSubItem> hideItems = java.util.Collections.synchronizedMap(new WeakHashMap<>());
 
     private static List<MessageObject> soleDropMessages(MessageObject message, MessageObject.GroupedMessages group) {
         return group != null && !group.messages.isEmpty() ? group.messages : java.util.Collections.singletonList(message);
@@ -449,6 +452,14 @@ public final class SolegramMessageMenu {
         profileContexts.put(profile, ctx);
         if (otherItem != null && ctx.get("dialog_id") instanceof Long && (Long) ctx.get("dialog_id") != 0) {
             otherItem.addSubItem(PROFILE_SOLEDROP, R.drawable.msg_soledrop, LocaleController.getString(R.string.SG_SoleDropSendVia));
+            final long dialogId = (Long) ctx.get("dialog_id");
+            final int account = profile.getCurrentAccount();
+            hideItems.remove(profile);
+            if (SolegramHiddenChats.isHidden(account, dialogId)) {
+                hideItems.put(profile, otherItem.addSubItem(PROFILE_HIDE, R.drawable.msg_archive_show, LocaleController.getString(R.string.SG_UnhideChat)));
+            } else if (SolegramHiddenChats.canHide(account, dialogId)) {
+                hideItems.put(profile, otherItem.addSubItem(PROFILE_HIDE, R.drawable.msg_archive_hide, LocaleController.getString(R.string.SG_HideChat)));
+            }
         }
         if (otherItem == null || !PluginsController.isEngineAvailable()) {
             return;
@@ -464,6 +475,13 @@ public final class SolegramMessageMenu {
     }
 
     public static boolean onProfileItem(ProfileActivity profile, int id) {
+        if (id == PROFILE_HIDE) {
+            final Map<String, Object> ctx = profileContexts.get(profile);
+            if (ctx != null && ctx.get("dialog_id") instanceof Long) {
+                toggleHidden(profile, (Long) ctx.get("dialog_id"));
+            }
+            return true;
+        }
         if (id == PROFILE_SOLEDROP) {
             final Map<String, Object> ctx = profileContexts.get(profile);
             if (ctx != null && ctx.get("dialog_id") instanceof Long) {
@@ -484,6 +502,35 @@ public final class SolegramMessageMenu {
         return true;
     }
     // endregion
+
+    /** Hides the chat of a profile, or brings it back to the list; the menu item follows. */
+    private static void toggleHidden(ProfileActivity profile, long dialogId) {
+        final int account = profile.getCurrentAccount();
+        final boolean hide = !SolegramHiddenChats.isHidden(account, dialogId);
+        if (hide) {
+            final ArrayList<Long> ids = new ArrayList<>();
+            ids.add(dialogId);
+            if (SolegramHiddenChats.hide(account, ids) == 0) {
+                return;
+            }
+        } else {
+            SolegramHiddenChats.unhide(account, dialogId);
+        }
+        final org.telegram.ui.ActionBar.ActionBarMenuSubItem item = hideItems.get(profile);
+        if (item != null) {
+            item.setTextAndIcon(LocaleController.getString(hide ? R.string.SG_UnhideChat : R.string.SG_HideChat),
+                hide ? R.drawable.msg_archive_show : R.drawable.msg_archive_hide);
+        }
+        final org.telegram.ui.Components.BulletinFactory bulletins = org.telegram.ui.Components.BulletinFactory.of(profile);
+        if (hide) {
+            bulletins.createSimpleBulletin(R.raw.chats_hide, LocaleController.getString(R.string.SG_HiddenChatDone),
+                LocaleController.getString(SolegramHiddenChats.gestureEnabled() ? R.string.SG_HiddenOpenHint : R.string.SG_HiddenOpenHintSettings),
+                LocaleController.getString(R.string.Undo), () -> toggleHidden(profile, dialogId)).show();
+        } else {
+            bulletins.createSimpleBulletin(R.raw.chats_unhide, LocaleController.getString(R.string.SG_HiddenChatShown),
+                LocaleController.getString(R.string.Undo), () -> toggleHidden(profile, dialogId)).show();
+        }
+    }
 
     static boolean isEmpty(CharSequence s) {
         return TextUtils.isEmpty(s);

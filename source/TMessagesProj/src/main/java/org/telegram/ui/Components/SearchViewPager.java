@@ -82,6 +82,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
     protected final ViewPagerAdapter viewPagerAdapter;
     public FrameLayout searchContainer;
     public final @NonNull RecyclerListView searchListView;
+    /** Solegram: "search by meaning" for what is typed (chats page of the normal chat list only). */
+    private com.solegram.messenger.ui.SolegramMeaningPill solegramMeaningPill;
     public StickerEmptyView emptyView;
     private DefaultItemAnimator itemAnimator;
     public DialogsSearchAdapter dialogsSearchAdapter;
@@ -375,6 +377,18 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         searchContainer.addView(searchListView);
         searchContainer.addView(noMediaFiltersSearchView);
         searchListView.setEmptyView(emptyView);
+        if (type == 1 && initialDialogsType == DialogsActivity.DIALOGS_TYPE_DEFAULT) {
+            solegramMeaningPill = new com.solegram.messenger.ui.SolegramMeaningPill(context, () -> blurredBackgroundDrawableFactory,
+                q -> parent.presentFragment(new com.solegram.messenger.ui.SolegramMeaningSearchActivity(q)), shown -> {
+                    // the results make room for the pill (or take it back); a list at the top stays at the top
+                    final boolean atTop = searchLayoutManager.findFirstVisibleItemPosition() <= 0;
+                    setPagesPadding(pagesPaddingTop, pagesPaddingBottom, false);
+                    if (atTop) {
+                        searchLayoutManager.scrollToPositionWithOffset(0, 0);
+                    }
+                });
+            searchContainer.addView(solegramMeaningPill, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, com.solegram.messenger.ui.SolegramMeaningPill.HEIGHT_DP, Gravity.TOP, 12, 0, 12, 0));
+        }
 
         channelsSearchContainer = new FrameLayout(context);
 
@@ -683,6 +697,9 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             emptyView.subtitle.setText(LocaleController.formatString(R.string.NoResultFoundFor2, query));
         }
         long forumDialogId = dialogsSearchAdapter.delegate != null ? dialogsSearchAdapter.delegate.getSearchForumDialogId() : 0;
+        if (solegramMeaningPill != null && view == searchContainer) {
+            solegramMeaningPill.setQuery(currentSearchFilters.isEmpty() && forumDialogId == 0 ? query : null);
+        }
         long dialogId = position == 0 ? 0 : forumDialogId;
         long minDate = 0;
         long maxDate = 0;
@@ -1276,7 +1293,18 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
 
 
         // setPagesPaddings(searchContainer, searchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
-        searchListView.setPadding(0, pagesPaddingTop, 0, pagesPaddingBottom, doNotRequestLayout);
+        final int solegramPill = solegramMeaningPill != null && solegramMeaningPill.isWanted() ? AndroidUtilities.dp(com.solegram.messenger.ui.SolegramMeaningPill.SPACE_DP) : 0;
+        searchListView.setPadding(0, pagesPaddingTop + solegramPill, 0, pagesPaddingBottom, doNotRequestLayout);
+        if (solegramMeaningPill != null) {
+            final MarginLayoutParams pillParams = (MarginLayoutParams) solegramMeaningPill.getLayoutParams();
+            final int pillTop = pagesPaddingTop + AndroidUtilities.dp(2);
+            if (pillParams.topMargin != pillTop) {
+                pillParams.topMargin = pillTop;
+                if (!doNotRequestLayout) {
+                    solegramMeaningPill.requestLayout();
+                }
+            }
+        }
         noMediaFiltersSearchView.setPagesPaddings(pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         {
             MarginLayoutParams mlp = (MarginLayoutParams) emptyView.getLayoutParams();

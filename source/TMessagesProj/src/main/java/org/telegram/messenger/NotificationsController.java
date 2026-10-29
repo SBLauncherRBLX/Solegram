@@ -1283,6 +1283,10 @@ public class NotificationsController extends BaseController implements Notificat
 
                     settingsCache.put(dialogId, value);
                 }
+                // Solegram: hidden chats set to "no notifications" stay silent (the chat itself is not muted)
+                if (value && com.solegram.messenger.SolegramHiddenChats.silences(currentAccount, originalDialogId)) {
+                    value = false;
+                }
 
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d("NotificationsController: process new messages, value is " + value + " ("+dialogId+", "+isChannel+", "+messageObject.isReactionPush+", "+messageObject.isStoryReactionPush+")");
@@ -1792,6 +1796,8 @@ public class NotificationsController extends BaseController implements Notificat
             if (!controller.showBadgeNumber) {
                 continue;
             }
+            // Solegram: unread messages of hidden chats do not show on the app icon
+            final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(a);
 
             if (controller.showBadgeMessages) {
                 if (controller.showBadgeMuted) {
@@ -1805,7 +1811,7 @@ public class NotificationsController extends BaseController implements Notificat
                                     continue;
                                 }
                             }
-                            if (dialog != null) {
+                            if (dialog != null && !com.solegram.messenger.SolegramHiddenChats.contains(solegramHidden, dialog.id)) {
                                 count += MessagesController.getInstance(a).getDialogUnreadCount(dialog);
                             }
                         }
@@ -1813,7 +1819,7 @@ public class NotificationsController extends BaseController implements Notificat
                         FileLog.e(e);
                     }
                 } else {
-                    count += controller.total_unread_count;
+                    count += controller.total_unread_count - controller.solegramHiddenPushCount(solegramHidden, true);
                 }
             } else {
                 if (controller.showBadgeMuted) {
@@ -1826,7 +1832,7 @@ public class NotificationsController extends BaseController implements Notificat
                                     continue;
                                 }
                             }
-                            if (MessagesController.getInstance(a).getDialogUnreadCount(dialog) != 0) {
+                            if (MessagesController.getInstance(a).getDialogUnreadCount(dialog) != 0 && !com.solegram.messenger.SolegramHiddenChats.contains(solegramHidden, dialog.id)) {
                                 count++;
                             }
                         }
@@ -1835,9 +1841,30 @@ public class NotificationsController extends BaseController implements Notificat
                         FileLog.e(e, false);
                     }
                 } else {
-                    count += controller.pushDialogs.size();
+                    count += controller.pushDialogs.size() - controller.solegramHiddenPushCount(solegramHidden, false);
                 }
             }
+        }
+        return Math.max(0, count);
+    }
+
+    /** Solegram: what the hidden chats add to the badge: their unread messages, or how many of them have some. */
+    private int solegramHiddenPushCount(long[] hidden, boolean messages) {
+        if (hidden == null) {
+            return 0;
+        }
+        int count = 0;
+        try {
+            for (int i = 0, n = pushDialogs.size(); i < n; i++) {
+                final long dialogId = pushDialogs.keyAt(i);
+                if (com.solegram.messenger.SolegramHiddenChats.contains(hidden, dialogId)) {
+                    final Integer value = pushDialogs.valueAt(i);
+                    // as total_unread_count counts them: a forum by itself, any other chat by its messages
+                    count += !messages || getMessagesController().isForum(dialogId) ? 1 : (value != null ? value : 0);
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e(e, false); // read from another queue without a lock, as the counts above
         }
         return count;
     }
@@ -1858,6 +1885,16 @@ public class NotificationsController extends BaseController implements Notificat
     public String getShortStringForMessage(MessageObject messageObject, String[] userName, boolean[] preview) {
         if (AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter) {
             return LocaleController.getString(R.string.NotificationHiddenMessage);
+        }
+        // Solegram: a hidden chat set to "without text": no sender, no picture, no text
+        if (com.solegram.messenger.SolegramHiddenChats.masks(currentAccount, messageObject.getDialogId())) {
+            if (userName != null) {
+                userName[0] = null;
+            }
+            if (preview != null) {
+                preview[0] = false;
+            }
+            return LocaleController.getString(R.string.SG_HiddenNotifText);
         }
         long dialogId = messageObject.messageOwner.dialog_id;
         long chat_id = messageObject.messageOwner.peer_id.chat_id != 0 ? messageObject.messageOwner.peer_id.chat_id : messageObject.messageOwner.peer_id.channel_id;
@@ -2546,6 +2583,12 @@ public class NotificationsController extends BaseController implements Notificat
     private String getStringForMessage(MessageObject messageObject, boolean shortMessage, boolean[] text, boolean[] preview) {
         if (AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter) {
             return LocaleController.getString(R.string.YouHaveNewMessage);
+        }
+        if (com.solegram.messenger.SolegramHiddenChats.masks(currentAccount, messageObject.getDialogId())) {
+            if (preview != null) {
+                preview[0] = false;
+            }
+            return LocaleController.getString(R.string.SG_HiddenNotifText); // Solegram: hidden chat, "without text"
         }
         if (messageObject.isStoryPush || messageObject.isStoryMentionPush) {
             return "!" + messageObject.messageOwner.message;
@@ -4305,8 +4348,13 @@ public class NotificationsController extends BaseController implements Notificat
                 chatName = UserObject.getUserName(user);
             }
             boolean passcode = AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter;
+            // Solegram: a hidden chat set to "without text" shows the app's name, not the chat's
+            final boolean solegramMasked = com.solegram.messenger.SolegramHiddenChats.masks(currentAccount, dialog_id);
+            if (solegramMasked) {
+                chatName = LocaleController.getString(R.string.AppName);
+            }
             final boolean allowSummary = !"samsung".equalsIgnoreCase(Build.MANUFACTURER);
-            if (DialogObject.isEncryptedDialog(dialog_id) || allowSummary && pushDialogs.size() > 1 || passcode) {
+            if (DialogObject.isEncryptedDialog(dialog_id) || allowSummary && pushDialogs.size() > 1 || passcode || solegramMasked) {
                 if (passcode) {
                     if (chatId != 0) {
                         name = LocaleController.getString(R.string.NotificationHiddenChatName);
@@ -4618,7 +4666,7 @@ public class NotificationsController extends BaseController implements Notificat
                         intent.putExtra("userId", userId);
                     }
                 }
-                if (AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter) {
+                if (AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter || solegramMasked) {
                     photoPath = null;
                 } else {
                     if (pushDialogs.size() == 1 && Build.VERSION.SDK_INT < 28) {
@@ -4637,6 +4685,12 @@ public class NotificationsController extends BaseController implements Notificat
                 if (pushDialogs.size() == 1 && dialog_id != globalSecretChatId) {
                     intent.putExtra("encId", DialogObject.getEncryptedChatId(dialog_id));
                 }
+            }
+            if (solegramMasked) {
+                // Solegram: a tap opens the app, not the hidden chat (it opens behind the lock only)
+                intent.removeExtra("chatId");
+                intent.removeExtra("userId");
+                intent.removeExtra("encId");
             }
             intent.putExtra("currentAccount", currentAccount);
             PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT);
@@ -4973,6 +5027,7 @@ public class NotificationsController extends BaseController implements Notificat
 
         long selfUserId = getUserConfig().getClientUserId();
         boolean waitingForPasscode = AndroidUtilities.needShowPasscode() || SharedConfig.isWaitingForPasscodeEnter;
+        final boolean solegramWaitingForPasscode = waitingForPasscode;
         boolean passcode = SharedConfig.passcodeHash.length() > 0;
         FileLog.d("showExtraNotifications: passcode="+passcode+" waitingForPasscode=" + waitingForPasscode + " selfUserId=" + selfUserId + " useSummaryNotification=" + useSummaryNotification);
 
@@ -5008,6 +5063,10 @@ public class NotificationsController extends BaseController implements Notificat
                 maxId = messageObjects.get(0).getId();
                 lastMessageObject = messageObjects.get(0);
             }
+            // Solegram: a hidden chat set to "without text" is shown as while the passcode is asked for:
+            // no name, no picture, no text, no reply (and the app's name as its title, below)
+            final boolean solegramMasked = !dialogKey.story && com.solegram.messenger.SolegramHiddenChats.masks(currentAccount, dialogId);
+            waitingForPasscode = solegramWaitingForPasscode || solegramMasked;
 
             Integer internalId = oldIdsWear.get(dialogKey.dialogId);
             if (dialogKey.story) {
@@ -5163,6 +5222,9 @@ public class NotificationsController extends BaseController implements Notificat
                 }
                 photoPath = null;
                 canReply = false;
+            }
+            if (solegramMasked) {
+                name = LocaleController.getString(R.string.AppName);
             }
 
             if (photoPath != null) {
@@ -5593,6 +5655,13 @@ public class NotificationsController extends BaseController implements Notificat
             if (topicId != 0) {
                 intent.putExtra("topicId", topicId);
             }
+            if (solegramMasked) {
+                // Solegram: a tap opens the app, not the hidden chat
+                intent.removeExtra("chatId");
+                intent.removeExtra("userId");
+                intent.removeExtra("encId");
+                intent.removeExtra("topicId");
+            }
             intent.putExtra("currentAccount", currentAccount);
             PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT);
 
@@ -5795,7 +5864,8 @@ public class NotificationsController extends BaseController implements Notificat
         for (int a = 0, size = holders.size(); a < size; a++) {
             NotificationHolder holder = holders.get(a);
             ids.clear();
-            if (Build.VERSION.SDK_INT >= 29 && !DialogObject.isEncryptedDialog(holder.dialogId)) {
+            // Solegram: no conversation shortcut (name, picture) for a hidden chat shown "without text"
+            if (Build.VERSION.SDK_INT >= 29 && !DialogObject.isEncryptedDialog(holder.dialogId) && !(!holder.story && com.solegram.messenger.SolegramHiddenChats.masks(currentAccount, holder.dialogId))) {
                 String shortcutId = createNotificationShortcut(holder.notification, holder.dialogId, holder.name, holder.user, holder.chat, personCache.get(holder.dialogId), !holder.story);
                 if (shortcutId != null) {
                     ids.add(shortcutId);

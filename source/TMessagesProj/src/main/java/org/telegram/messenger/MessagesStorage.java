@@ -2777,9 +2777,14 @@ public class MessagesStorage extends BaseController {
 */
             cursor = database.queryFinalized("SELECT did, folder_id, unread_count, unread_count_i FROM dialogs WHERE unread_count > 0 OR flags > 0 UNION ALL " +
                     "SELECT did, folder_id, unread_count, unread_count_i FROM dialogs WHERE unread_count_i > 0");
+            // Solegram: hidden chats count in no unread counter (chat list, folders, archive, the Chats tab)
+            final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
             while (cursor.next()) {
                 int folderId = cursor.intValue(1);
                 long did = cursor.longValue(0);
+                if (com.solegram.messenger.SolegramHiddenChats.contains(solegramHidden, did)) {
+                    continue;
+                }
                 int unread;
                 int mentions = 0;
                 if (isForum(did, FORUM_TYPE_CHAT | FORUM_TYPE_BOT | FORUM_TYPE_DIRECT)) {
@@ -6060,6 +6065,8 @@ public class MessagesStorage extends BaseController {
         ArrayList<Integer> encryptedToLoad = new ArrayList<>();
         LongSparseArray<Integer> dialogsByFolders = new LongSparseArray<>();
         LongSparseArray<Integer> newUnreadDialogs = new LongSparseArray<>();
+        // Solegram: hidden chats were never counted (calcUnreadCounters), so they are neither added nor taken away
+        final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
 
         for (int b = 0; b < 2; b++) {
             LongSparseIntArray array = b == 0 ? dialogsToUpdate : dialogsToUpdateMentions;
@@ -6072,6 +6079,9 @@ public class MessagesStorage extends BaseController {
                     continue;
                 }
                 long did = array.keyAt(a);
+                if (com.solegram.messenger.SolegramHiddenChats.contains(solegramHidden, did)) {
+                    continue;
+                }
                 if (read) {
                     if (b == 0) {
                         dialogsWithUnread.remove(did);

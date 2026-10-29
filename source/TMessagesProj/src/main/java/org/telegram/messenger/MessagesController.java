@@ -1311,6 +1311,10 @@ public class MessagesController extends BaseController implements NotificationCe
             if (neverShow.contains(dialogId)) {
                 return false;
             }
+            // Solegram: a hidden chat is in no folder of this device (local only, the folder itself is not changed)
+            if (d != null && com.solegram.messenger.SolegramHiddenChats.isHidden(accountInstance.getCurrentAccount(), d.id)) {
+                return false;
+            }
             if (alwaysShow.contains(dialogId)) {
                 return true;
             }
@@ -12728,6 +12732,46 @@ public class MessagesController extends BaseController implements NotificationCe
         getNotificationsController().deleteAllNotificationChannels();
     }
 
+    /** Solegram: a hidden chat older than the loaded part of the chat list is fetched for the hidden chats screen. */
+    public void solegramLoadDialog(long dialogId) {
+        if (dialogId != 0 && !DialogObject.isEncryptedDialog(dialogId) && dialogs_dict.get(dialogId) == null) {
+            loadUnknownDialog(getInputPeer(dialogId), 0);
+        }
+    }
+
+    /**
+     * Solegram: the pinned chats of a folder in their order, the hidden ones included (they are left out of
+     * {@link #getDialogs}), for the pinned order sent to the server. The list itself when none is hidden.
+     */
+    private ArrayList<TLRPC.Dialog> solegramWithHiddenPinned(int folderId, ArrayList<TLRPC.Dialog> visible) {
+        final long[] hidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
+        if (hidden == null) {
+            return visible;
+        }
+        ArrayList<TLRPC.Dialog> pinned = null;
+        for (long id : hidden) {
+            final TLRPC.Dialog d = dialogs_dict.get(id);
+            if (d instanceof TLRPC.TL_dialog && d.pinned && d.folder_id == folderId) {
+                if (pinned == null) {
+                    pinned = new ArrayList<>();
+                }
+                pinned.add(d);
+            }
+        }
+        if (pinned == null) {
+            return visible;
+        }
+        for (int a = 0, N = visible.size(); a < N; a++) {
+            final TLRPC.Dialog d = visible.get(a);
+            if (d.pinned && !(d instanceof TLRPC.TL_dialogFolder)) {
+                pinned.add(d);
+            }
+        }
+        // the order of the chat list: the higher pinnedNum first
+        Collections.sort(pinned, (d1, d2) -> Integer.compare(d2.pinnedNum, d1.pinnedNum));
+        return pinned;
+    }
+
     protected void loadUnknownDialog(final TLRPC.InputPeer peer, long taskId) {
         if (peer == null) {
             return;
@@ -17203,7 +17247,8 @@ public class MessagesController extends BaseController implements NotificationCe
 
         long newTaskId;
         if (taskId == 0) {
-            ArrayList<TLRPC.Dialog> dialogs = getDialogs(folderId);
+            // Solegram: pinned hidden chats keep their place (with force, the server unpins whatever is left out)
+            ArrayList<TLRPC.Dialog> dialogs = solegramWithHiddenPinned(folderId, getDialogs(folderId));
             if (dialogs.isEmpty()) {
                 return;
             }
@@ -22458,8 +22503,14 @@ public class MessagesController extends BaseController implements NotificationCe
                 isLeftPromoChannel = false;
             }
         }
+        // Solegram: hidden chats stay in allDialogs / dialogs_dict (the hidden chats screen reads them there)
+        // but go into none of the lists built here: folders, forward, pickers, the unread count
+        final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
         for (int a = 0, N = allDialogs.size(); a < N; a++) {
             TLRPC.Dialog d = allDialogs.get(a);
+            if (solegramHidden != null && d instanceof TLRPC.TL_dialog && com.solegram.messenger.SolegramHiddenChats.contains(solegramHidden, d.id)) {
+                continue;
+            }
             if (d instanceof TLRPC.TL_dialog) {
                 ArrayList<MessageObject> messageObjects = dialogMessage.get(d.id);
                 if (messageObjects != null) {

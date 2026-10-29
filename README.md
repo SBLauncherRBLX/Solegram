@@ -20,10 +20,10 @@ Solegram — неофициальный клиент. Он не связан с 
 
 ## Скачать
 
-**[⬇ Скачать Solegram 2.6.1 (APK, 60 МБ)](https://github.com/SBLauncherRBLX/Solegram/raw/main/apk/Solegram-2.6.1-b53-release.apk)**
+**[⬇ Скачать Solegram 2.7.0 (APK, 60 МБ)](https://github.com/SBLauncherRBLX/Solegram/raw/main/apk/Solegram-2.7.0-b54-release.apk)**
 
-Файл: `apk/Solegram-2.6.1-b53-release.apk`, SHA-256
-`809e84c0c7d0ee62b68e5882f9e2c27bcc7cfdf3a621d11f7f3180c8b59d825c`.
+Файл: `apk/Solegram-2.7.0-b54-release.apk`, SHA-256
+`0d953a1d60f566e48c6e8164797bb1b833f695e84ce2b2d41dc1901c00c5f219`.
 
 Постоянная ссылка на последнюю версию (не меняется от выпуска к выпуску):
 https://github.com/SBLauncherRBLX/Solegram/raw/main/apk/Solegram-latest.apk
@@ -32,7 +32,7 @@ https://github.com/SBLauncherRBLX/Solegram/raw/main/apk/Solegram-latest.apk
 ## Установка
 
 1. Откройте ссылку «Скачать» выше в браузере телефона, затем нажмите на скачанный
-   `Solegram-2.6.1-b53-release.apk`, чтобы установить (разрешите установку из неизвестных
+   `Solegram-2.7.0-b54-release.apk`, чтобы установить (разрешите установку из неизвестных
    источников, если Android спросит).
 2. Войдите в аккаунт как обычно. Ключи Telegram API (api_id/api_hash) уже встроены в приложение —
    вводить ничего не нужно (с 1.3.8; ключи, введённые в прежних версиях, продолжают работать).

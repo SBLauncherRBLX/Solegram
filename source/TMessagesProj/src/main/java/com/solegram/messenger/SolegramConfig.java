@@ -95,6 +95,10 @@ public class SolegramConfig {
     public static int aiSummaryLanguage = 0;
     /** The user agreed once that message text goes to the free AI service when a summary is asked for. */
     public static boolean aiConsent = false;
+    /** "Search by meaning" in the search of the chat list (SolegramMeaningSearch). */
+    public static boolean meaningSearch = true;
+    /** Gemini Nano reorders the best results of a search by meaning, where it is on the phone. */
+    public static boolean meaningRerank = true;
     /** Voice and round video transcription without Premium (on the device, or the user's own AI service). */
     public static boolean transcribe = true;
     /** SolegramTranscriber.ENGINE_*: 0 = auto, 1 = on the device, 2 = the user's AI service. */
@@ -384,6 +388,8 @@ public class SolegramConfig {
         aiModel = p.getString("aiModel", "");
         aiSummaryLanguage = p.getInt("aiSummaryLanguage", 0);
         aiConsent = p.getBoolean("aiConsent", false);
+        meaningSearch = p.getBoolean("meaningSearch", true);
+        meaningRerank = p.getBoolean("meaningRerank", true);
         transcribe = p.getBoolean("transcribe", true);
         transcribeEngine = clamp(p.getInt("transcribeEngine", 0), 0, 2);
         transcribeModel = p.getString("transcribeModel", "");
@@ -649,6 +655,8 @@ public class SolegramConfig {
             case "glassHeaderButtons":
             case "aiSummary":
             case "aiSummaryButton":
+            case "meaningSearch":
+            case "meaningRerank":
             case "transcribe":
             case "glassCallScreen":
             case "liquidMotion":

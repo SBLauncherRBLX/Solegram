@@ -63,6 +63,7 @@ public class SolegramSecurityActivity extends UniversalFragment {
     private static final int ID_NOTIF_PREVIEW = 2;
     private static final int ID_WARN_FILES = 3;
     private static final int ID_CHECKUP = 4;
+    private static final int ID_HIDDEN_CHATS = 5;
 
     private static final int ID_CHECK_PASSCODE = 11;
     private static final int ID_CHECK_2FA = 12;
@@ -154,6 +155,11 @@ public class SolegramSecurityActivity extends UniversalFragment {
             getString(previewShown() ? R.string.SG_SecNotifPreviewOn : R.string.SG_SecNotifPreviewOff)), TILE_RED)
             .setSolegramSubtitle(getString(R.string.SG_SecNotifPreviewInfo)));
         items.add(UItem.asShadow(getString(R.string.SG_SecSecretShots)));
+
+        final int hidden = com.solegram.messenger.SolegramHiddenChats.count(currentAccount);
+        items.add(tile(UItem.asButton(ID_HIDDEN_CHATS, R.drawable.msg_archive_hide, getString(R.string.SG_HiddenChats),
+            hidden > 0 ? String.valueOf(hidden) : null), TILE_INDIGO).setSolegramSubtitle(getString(R.string.SG_HiddenSub)));
+        items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_SecFiles)));
         items.add(UItem.asButtonCheck(ID_WARN_FILES, getString(R.string.SG_SecWarnFiles), getString(R.string.SG_SecWarnFilesInfo))
@@ -280,6 +286,9 @@ public class SolegramSecurityActivity extends UniversalFragment {
                 return;
             case ID_CHECKUP:
                 presentFragment(new SolegramSecurityActivity(true));
+                return;
+            case ID_HIDDEN_CHATS:
+                presentFragment(new SolegramHiddenSettingsActivity());
                 return;
             case ID_CHECK_PASSCODE:
                 presentFragment(PasscodeActivity.determineOpenFragment());

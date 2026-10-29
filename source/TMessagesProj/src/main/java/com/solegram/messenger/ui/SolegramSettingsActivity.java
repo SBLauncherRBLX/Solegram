@@ -231,6 +231,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_AI_LANGUAGE = 229;
     private static final int ID_AI_SUMMARY_BUTTON = 230;
     private static final int ID_AI_NANO = 232;
+    private static final int ID_MEANING = 236;
+    private static final int ID_MEANING_RERANK = 237;
     private static final int ID_IOS_INPUT_BAR = 231;
     private static final int ID_TRANSCRIBE = 240;
     private static final int ID_TRANSCRIBE_ENGINE = 241;
@@ -800,7 +802,18 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(UItem.asShadow(null));
         }
 
+        fillMeaningSearch(items);
         fillTranscription(items);
+    }
+
+    /** "Search by meaning" in the chat list search; the on-device reranking only where Gemini Nano is. */
+    private void fillMeaningSearch(ArrayList<UItem> items) {
+        items.add(UItem.asHeader(getString(R.string.SG_MeaningSearch)));
+        items.add(UItem.asButtonCheck(ID_MEANING, getString(R.string.SG_MeaningSearch), getString(R.string.SG_MeaningSearchInfo)).setChecked(SolegramConfig.meaningSearch));
+        if (SolegramConfig.meaningSearch && com.solegram.messenger.SolegramMeaningSearch.rerankAvailable()) {
+            items.add(UItem.asButtonCheck(ID_MEANING_RERANK, getString(R.string.SG_MeaningRerank), getString(R.string.SG_MeaningRerankInfo)).setChecked(SolegramConfig.meaningRerank));
+        }
+        items.add(UItem.asShadow(SolegramConfig.meaningSearch ? getString(R.string.SG_MeaningPrivacy) : null));
     }
 
     private void fillTranscription(ArrayList<UItem> items) {
@@ -896,6 +909,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return ID_AI_SUMMARY;
             case ID_TRANSCRIBE_ENGINE:
                 return ID_TRANSCRIBE;
+            case ID_MEANING_RERANK:
+                return ID_MEANING;
             case ID_NOW_PLAYING_SHARE:
                 return ID_NOW_PLAYING;
             case ID_ADBLOCK_YOUTUBE:
@@ -912,6 +927,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int PAGE_FILTERS = 51;
     /** Nor this: the reminders (SolegramRemindersActivity). */
     private static final int PAGE_REMINDERS = 52;
+    /** Nor this: the hidden chats (SolegramHiddenSettingsActivity, under Security). */
+    private static final int PAGE_HIDDEN_CHATS = 53;
 
     /** {page, item id (0 = the page itself), title, keywords (an index into SEARCH_KEYWORDS, -1 = none)} */
     private static final int[][] SEARCH = {
@@ -975,6 +992,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_AI, ID_AI_NANO, R.string.SG_NanoTitle, 13},
         {PAGE_AI, ID_TRANSCRIBE, R.string.SG_Transcribe, 12},
         {PAGE_AI, ID_TRANSCRIBE_ENGINE, R.string.SG_TranscribeEngine, 12},
+        {PAGE_AI, ID_MEANING, R.string.SG_MeaningSearch, 22},
+        {PAGE_AI, ID_MEANING_RERANK, R.string.SG_MeaningRerank, 22},
         {PAGE_MUSIC, 0, R.string.SG_NowPlaying, 4},
         {PAGE_MUSIC, ID_NOW_PLAYING_SHARE, R.string.SG_NowPlayingShare, 4},
         {PAGE_MAIN_SCREEN, 0, R.string.SG_MainScreen, -1},
@@ -1051,6 +1070,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_SOLEDROP, ID_SOLEDROP_ACCOUNT, R.string.SG_SoleDropReceiveAccount, 20},
         {PAGE_SOLEDROP, ID_SOLEDROP_SHARE_NAME, R.string.SG_SoleDropShareName, 20},
         {PAGE_SOLEDROP, ID_SOLEDROP_CODE, R.string.SG_SoleDropMyCode, 20},
+        {PAGE_HIDDEN_CHATS, 0, R.string.SG_HiddenChats, 21},
+        {PAGE_HIDDEN_CHATS, SolegramHiddenSettingsActivity.ID_OPEN, R.string.SG_HiddenOpen, 21},
+        {PAGE_HIDDEN_CHATS, SolegramHiddenSettingsActivity.ID_NOTIFY_NORMAL, R.string.SG_HiddenNotify, 21},
+        {PAGE_HIDDEN_CHATS, SolegramHiddenSettingsActivity.ID_GESTURE, R.string.SG_HiddenGesture, 21},
     };
 
     private static final String[] SEARCH_KEYWORDS = {
@@ -1075,6 +1098,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         "иконки значки иконка набор пак стиль тонкие линейные заливка залитые phosphor icons icon pack thin outline filled",
         "мошенники мошенник мошенничество скам скамер обман развод фишинг подозрительные ссылки опасные ссылки аккаунты безопасность защита антискам доверенные сайты scam scammer phishing fraud suspicious links anti-scam safety trusted sites",
         "soledrop солдроп nfc нфс airdrop эирдроп аирдроп namedrop неймдроп поднести телефон касание передать бесконтактно обмен контактами qr код send phones tap share contact",
+        "скрытые чаты скрыть чат спрятать тайные секретные невидимые папка отпечаток пальца жест блокировка hidden chats hide chat secret private folder fingerprint biometric gesture lock",
+        "поиск по смыслу смысл найти переписку вопрос похожие слова синонимы где мы обсуждали умный поиск семантический semantic search meaning smart search ai ии gemini nano",
     };
 
     /** Solegram's pages and settings as results of Telegram's settings search. */
@@ -1091,6 +1116,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     fragment.presentFragment(filters);
                     if (itemId != 0) {
                         filters.highlightItem(itemId);
+                    }
+                    return;
+                }
+                if (page == PAGE_HIDDEN_CHATS) {
+                    final SolegramHiddenSettingsActivity hidden = new SolegramHiddenSettingsActivity();
+                    fragment.presentFragment(hidden);
+                    if (itemId != 0) {
+                        hidden.highlightItem(itemId);
                     }
                     return;
                 }
@@ -1174,6 +1207,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return LocaleController.getString(R.string.SG_Reminders);
             case PAGE_SCAM:
                 return LocaleController.getString(R.string.SG_Scam);
+            case PAGE_HIDDEN_CHATS:
+                return LocaleController.getString(R.string.SG_HiddenChats);
             case PAGE_SOLEDROP:
                 return LocaleController.getString(R.string.SG_SoleDrop);
             default:
@@ -2152,6 +2187,13 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_AI_SUMMARY_BUTTON:
                 toggleCheck(view, "aiSummaryButton");
+                return;
+            case ID_MEANING:
+                toggleCheck(view, "meaningSearch");
+                listView.adapter.update(true);
+                return;
+            case ID_MEANING_RERANK:
+                toggleCheck(view, "meaningRerank");
                 return;
             case ID_AI_PROVIDER:
                 showAiProviderPicker();

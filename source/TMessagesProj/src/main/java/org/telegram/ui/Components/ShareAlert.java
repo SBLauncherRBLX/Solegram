@@ -2924,13 +2924,14 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
             }
             ArrayList<TLRPC.Dialog> archivedDialogs = new ArrayList<>();
             ArrayList<TLRPC.Dialog> allDialogs = MessagesController.getInstance(currentAccount).getAllDialogs();
+            final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
             for (int a = 0; a < allDialogs.size(); a++) {
                 TLRPC.Dialog dialog = allDialogs.get(a);
                 if (!(dialog instanceof TLRPC.TL_dialog)) {
                     continue;
                 }
-                if (dialog.id == selfUserId) {
-                    continue;
+                if (dialog.id == selfUserId || com.solegram.messenger.SolegramHiddenChats.contains(solegramHidden, dialog.id)) {
+                    continue; // Solegram: hidden chats are not offered for sharing
                 }
                 if (!DialogObject.isEncryptedDialog(dialog.id)) {
                     if (DialogObject.isUserDialog(dialog.id)) {

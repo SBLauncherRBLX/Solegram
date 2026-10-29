@@ -426,7 +426,15 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         if (glassDrawableMenu.getAlpha() != alpha255) {
             glassDrawableMenu.setAlpha(alpha255);
         }
+        // fluid touch: a held button takes its bubble with it
+        final int fluid = canvas.save();
+        for (int i = 0, n = menu.getChildCount(); i < n; i++) {
+            if (com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, menu.getChildAt(i))) {
+                break;
+            }
+        }
         glassDrawableMenu.draw(canvas);
+        canvas.restoreToCount(fluid);
     }
 
     /**
@@ -2623,14 +2631,31 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         // Solegram: the button bubbles of a plain header give way to the selection bar and the search field
         if (glassDrawableBack != null && hasBackButton && !solegramButtonsGlass) {
             glassDrawableBack.setBounds(0, t, s + p * 2, b);
+            final int fluid = canvas.save();
+            com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, backButtonImageView); // fluid touch: the bubble follows its button
             glassDrawableBack.draw(canvas);
+            canvas.restoreToCount(fluid);
         }
         if (glassDrawableMenu != null && menuWidth > 0 && !glassOnlyBack && !doNotDrawGlassMenu && !solegramButtonsGlass) {
             {
                 glassDrawableMenu.setBounds(getWidth() - Math.max(s, menuWidth) - p * 2, t, getWidth(), b);
             }
             glassDrawableMenu.setAlpha(hasForcedMenuWidth ? 255 : (int) (255 * animatorHasMenuItems.getFloatValue()));
+            final int fluid = canvas.save();
+            if (menu != null) {
+                for (int i = 0, n = menu.getChildCount(); i < n; i++) {
+                    final View child = menu.getChildAt(i);
+                    // the menu's buttons are in the menu's frame: move the canvas there first
+                    canvas.translate(menu.getX(), menu.getY());
+                    if (com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, child)) {
+                        canvas.translate(-menu.getX(), -menu.getY());
+                        break;
+                    }
+                    canvas.translate(-menu.getX(), -menu.getY());
+                }
+            }
             glassDrawableMenu.draw(canvas);
+            canvas.restoreToCount(fluid);
         }
 
         if (blurredBackground && actionBarColor != Color.TRANSPARENT) {
@@ -2655,7 +2680,11 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 if (glassDrawableBack.getAlpha() != alpha255) {
                     glassDrawableBack.setAlpha(alpha255);
                 }
+                // fluid touch: the bubble goes and stretches with its button
+                final int fluid = canvas.save();
+                com.solegram.messenger.ui.SolegramFluidTouch.applyTo(canvas, backButtonImageView);
                 glassDrawableBack.draw(canvas);
+                canvas.restoreToCount(fluid);
             }
         }
 

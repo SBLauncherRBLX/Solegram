@@ -120,9 +120,10 @@ public class FeedController {
         final MessagesController mc = MessagesController.getInstance(account);
         final ArrayList<TLRPC.Dialog> result = new ArrayList<>();
         final HashSet<Long> seen = new HashSet<>();
+        final long[] hidden = SolegramHiddenChats.idsFor(account);
         for (TLRPC.Dialog d : mc.getAllDialogs()) {
-            if (!DialogObject.isChatDialog(d.id)) {
-                continue;
+            if (!DialogObject.isChatDialog(d.id) || SolegramHiddenChats.contains(hidden, d.id)) {
+                continue; // hidden channels stay out of the Feed too
             }
             final TLRPC.Chat chat = mc.getChat(-d.id);
             if (chat == null || !ChatObject.isChannelAndNotMegaGroup(chat) || ChatObject.isNotInChat(chat) || mc.isPromoDialog(d.id, false) || !seen.add(chat.id)) {
@@ -185,8 +186,9 @@ public class FeedController {
         final int since = seenDate();
         final MessagesController mc = MessagesController.getInstance(account);
         int count = 0;
+        final long[] hidden = SolegramHiddenChats.idsFor(account);
         for (TLRPC.Dialog d : mc.getAllDialogs()) {
-            if (d.last_message_date <= since || !DialogObject.isChatDialog(d.id)) {
+            if (d.last_message_date <= since || !DialogObject.isChatDialog(d.id) || SolegramHiddenChats.contains(hidden, d.id)) {
                 continue;
             }
             final TLRPC.Chat chat = mc.getChat(-d.id);

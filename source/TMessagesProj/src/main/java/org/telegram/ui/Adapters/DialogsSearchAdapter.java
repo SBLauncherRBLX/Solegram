@@ -283,6 +283,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     }
 
     private boolean filter(Object obj) {
+        // Solegram: hidden chats are found nowhere (chats, people, global results, recent searches)
+        if (com.solegram.messenger.SolegramHiddenChats.isHiddenPeer(currentAccount, obj)) {
+            return false;
+        }
         if (dialogsType != DialogsActivity.DIALOGS_TYPE_START_ATTACH_BOT) {
             return true;
         }
@@ -470,6 +474,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             if (maxId != 0 && message.id <= maxId) {
                                 continue;
                             }
+                            if (com.solegram.messenger.SolegramHiddenChats.isHidden(currentAccount, did)) {
+                                continue; // Solegram: no messages of hidden chats in the results
+                            }
                             searchForumResultMessages.add(messageObjects.get(a));
                         }
                         searchWas = true;
@@ -627,6 +634,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             int maxId = MessagesController.getInstance(currentAccount).deletedHistory.get(did);
                             if (maxId != 0 && message.id <= maxId) {
                                 continue;
+                            }
+                            if (com.solegram.messenger.SolegramHiddenChats.isHidden(currentAccount, did)) {
+                                continue; // Solegram: no messages of hidden chats in the results
                             }
                             MessageObject msg = messageObjects.get(a);
                             if (!searchForumResultMessages.isEmpty()) {
@@ -1010,6 +1020,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             for (int i = 0; i < result.size(); ++i) {
                 if (!filter(result.get(i))) {
                     result.remove(i);
+                    if (i < names.size()) {
+                        names.remove(i); // Solegram: the names stay beside their results
+                    }
                     i--;
                 }
             }

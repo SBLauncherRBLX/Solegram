@@ -660,6 +660,11 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                     ArrayList<CharSequence> resultArrayNames = new ArrayList<>();
                     ArrayList<TLRPC.User> encUsers = new ArrayList<>();
                     MessagesStorage.getInstance(currentAccount).localSearch(0, finalQuery, resultArray, resultArrayNames, encUsers, null, includeFolder ? 1 : 0);
+                    for (int i = resultArray.size() - 1; i >= 0; i--) {
+                        if (com.solegram.messenger.SolegramHiddenChats.isHiddenPeer(currentAccount, resultArray.get(i))) {
+                            resultArray.remove(i); // Solegram: hidden chats are not found
+                        }
+                    }
                 }
 
                 final TLRPC.TL_messages_searchGlobal req = new TLRPC.TL_messages_searchGlobal();
@@ -700,7 +705,11 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                 if (error == null) {
                     TLRPC.messages_Messages res = response;
                     int n = res.messages.size();
+                    final boolean solegramGlobal = request instanceof TLRPC.TL_messages_searchGlobal;
                     for (int i = 0; i < n; i++) {
+                        if (solegramGlobal && com.solegram.messenger.SolegramHiddenChats.isHidden(currentAccount, MessageObject.getDialogId(res.messages.get(i)))) {
+                            continue; // Solegram: no media, links or files of hidden chats in the global search
+                        }
                         MessageObject messageObject = new MessageObject(currentAccount, res.messages.get(i), false, true);
                         messageObject.setQuery(finalQuery);
                         messageObjects.add(messageObject);
