@@ -73,7 +73,7 @@ public final class SolegramFluidTouch {
     private static final int[] location = new int[2];
 
     public static boolean enabled() {
-        return SolegramConfig.fluidTouch && SolegramMotion.rich();
+        return SolegramConfig.fluidTouch && SolegramMotion.enabled();
     }
 
     /** The stretch of a held view, for whoever else sets its scale (the press spring keeps it). */
@@ -120,35 +120,21 @@ public final class SolegramFluidTouch {
 
     // region Finding the element under the finger
 
-    @Nullable
-    private static View find(View root, float rawX, float rawY) {
-        final View deepest = deepestAt(root, rawX, rawY);
-        // climb to the element: a clickable view, or a row of a list (lists handle clicks for their rows)
-        View v = deepest;
-        while (v != null && v != root) {
-            if (v instanceof EditText || v.getClass().getName().contains("SeekBar") || v.getClass().getName().contains("SlideChooseView")
-                    || v.getClass().getName().contains("SlideIntChooseView") || v instanceof org.telegram.ui.Cells.ChatMessageCell
-                    || v instanceof org.telegram.ui.Cells.ChatActionCell || v instanceof org.telegram.ui.Cells.DialogCell
-                    || v instanceof org.telegram.ui.MainTabsLayout) {
-                return null; // things that are dragged or edited, and messages, keep still
-            }
-            final ViewGroup parent = v.getParent() instanceof ViewGroup ? (ViewGroup) v.getParent() : null;
-            if (parent instanceof org.telegram.ui.MainTabsLayout) {
-                return null; // the tab bar has its own liquid lens under the finger
-            }
-            if (parent instanceof RecyclerView || parent instanceof AbsListView) {
-                return fits(v) ? v : null;
-            }
-            if ((v.isClickable() || v.isLongClickable()) && v.isEnabled()) {
-                return fits(v) ? v : null;
-            }
-            v = parent;
-        }
-        return null;
-    }
+    /** Returned from the search when the finger is on something that must keep still: nothing below is taken. */
+    private static final View KEEP_STILL = new View(org.telegram.messenger.ApplicationLoader.applicationContext);
 
     @Nullable
-    private static View deepestAt(View view, float rawX, float rawY) {
+    private static View find(View root, float rawX, float rawY) {
+        final View found = findIn(root, rawX, rawY);
+        return found == KEEP_STILL ? null : found;
+    }
+
+    /**
+     * The element under the finger, searched the way Android hands out a touch: the topmost child first, and when
+     * nothing in it can be held (a transparent glass layer, a decoration on top), the next one below.
+     */
+    @Nullable
+    private static View findIn(View view, float rawX, float rawY) {
         if (view.getVisibility() != View.VISIBLE || view.getAlpha() <= 0.01f) {
             return null;
         }
@@ -157,16 +143,27 @@ public final class SolegramFluidTouch {
                 || rawY > location[1] + view.getHeight() * Math.abs(view.getScaleY())) {
             return null;
         }
+        final String name = view.getClass().getName();
+        if (view instanceof EditText || name.contains("SeekBar") || name.contains("SlideChooseView") || name.contains("SlideIntChooseView")
+                || view instanceof org.telegram.ui.Cells.ChatMessageCell || view instanceof org.telegram.ui.Cells.ChatActionCell
+                || view instanceof org.telegram.ui.Cells.DialogCell || view instanceof org.telegram.ui.MainTabsLayout) {
+            return KEEP_STILL; // dragged or edited things, messages, chat rows (they swipe) and the tab bar (its own lens)
+        }
         if (view instanceof ViewGroup) {
             final ViewGroup group = (ViewGroup) view;
             for (int i = group.getChildCount() - 1; i >= 0; i--) {
-                final View hit = deepestAt(group.getChildAt(i), rawX, rawY);
+                final View hit = findIn(group.getChildAt(i), rawX, rawY);
                 if (hit != null) {
                     return hit;
                 }
             }
         }
-        return view;
+        final ViewGroup parent = view.getParent() instanceof ViewGroup ? (ViewGroup) view.getParent() : null;
+        // a row of a list (lists handle the clicks of their rows), or anything clickable
+        if (parent instanceof RecyclerView || parent instanceof AbsListView || (view.isClickable() || view.isLongClickable()) && view.isEnabled()) {
+            return fits(view) ? view : KEEP_STILL; // a whole screen or a big card that takes the touch stays still
+        }
+        return null;
     }
 
     /** Only elements of a hand's size: whole screens, big cards and media keep still. */
