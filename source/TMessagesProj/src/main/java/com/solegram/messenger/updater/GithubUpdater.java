@@ -89,54 +89,78 @@ final class GithubUpdater {
 
     static void check(CheckCallback callback) {
         checkQueue().postRunnable(() -> {
+            UpdateController.UpdateInfo stable = null;
+            String error = null;
+            // repositories use either main or master
+            String branch = SolegramConfig.getUpdateBranch();
             try {
-                // repositories use either main or master
-                String branch = SolegramConfig.getUpdateBranch();
-                byte[] body;
-                try {
-                    body = readAll(rawUrl(branch, "update.json") + "?t=" + System.currentTimeMillis());
-                } catch (java.io.FileNotFoundException | NotFound e) {
+                JSONObject o = readJson(branch, "update.json");
+                if (o == null) {
                     branch = "master";
-                    body = readAll(rawUrl(branch, "update.json") + "?t=" + System.currentTimeMillis());
+                    o = readJson(branch, "update.json");
                 }
-                String json = new String(body, "UTF-8");
-                JSONObject o = new JSONObject(json);
-                UpdateController.UpdateInfo info = new UpdateController.UpdateInfo();
-                info.build = o.optInt("build", 0);
-                info.versionName = clip(o.optString("version", String.valueOf(info.build)), 32);
-                info.changelog = clip(o.optString("changelog", ""), MAX_CHANGELOG);
-                info.size = o.optLong("size", 0);
-                info.sha256 = o.optString("sha256", "").trim().toLowerCase(Locale.ROOT);
-                String apk = o.optString("apk", "");
-                if (info.build <= 0 || info.build > 10_000_000 || TextUtils.isEmpty(apk)) {
-                    callback.onResult(null, "update.json: build/apk missing");
-                    return;
+                if (o == null) {
+                    throw new java.io.FileNotFoundException("update.json");
                 }
-                // every field is checked here: what does not fit is refused, never "fixed"
-                if (!TextUtils.isEmpty(info.sha256) && !SHA256.matcher(info.sha256).matches()) {
-                    callback.onResult(null, "update.json: bad sha256");
-                    return;
-                }
-                if (info.size < 0 || info.size > MAX_APK_SIZE) {
-                    callback.onResult(null, "update.json: bad size");
-                    return;
-                }
-                info.url = fileUrl(branch, apk);
-                if (info.url == null) {
-                    callback.onResult(null, "update.json: apk link not allowed");
-                    return;
-                }
-                // optional link that always points at the newest APK (for the browser); a bad one is ignored
-                final String latest = o.optString("latest", "");
-                if (!TextUtils.isEmpty(latest)) {
-                    info.latestUrl = fileUrl(branch, latest);
-                }
-                callback.onResult(info, null);
+                stable = parseInfo(o, branch);
             } catch (Throwable e) {
                 FileLog.e(e);
-                callback.onResult(null, e.getClass().getSimpleName() + ": " + e.getMessage());
+                error = e instanceof IllegalArgumentException ? e.getMessage() : e.getClass().getSimpleName() + ": " + e.getMessage();
             }
+            // Solegram betas: a newer beta is offered over the release (those with the access code only)
+            if (BetaChannel.enabled()) {
+                final UpdateController.UpdateInfo beta = BetaChannel.check(branch);
+                if (beta != null && (stable == null || beta.build > stable.build)) {
+                    callback.onResult(beta, null);
+                    return;
+                }
+            }
+            callback.onResult(stable, stable == null ? error : null);
         });
+    }
+
+    /** Checks a typed beta access code (BetaChannel.STATUS_*), on the update thread. */
+    static void verifyBetaCode(String code, BetaChannel.CodeCallback callback) {
+        checkQueue().postRunnable(() -> BetaChannel.verify(code, SolegramConfig.getUpdateBranch(), callback));
+    }
+
+    /** A JSON file of the repository, null when it is not there. */
+    static JSONObject readJson(String branch, String path) throws Exception {
+        try {
+            return new JSONObject(new String(readAll(rawUrl(branch, path) + "?t=" + System.currentTimeMillis()), "UTF-8"));
+        } catch (java.io.FileNotFoundException | NotFound e) {
+            return null;
+        }
+    }
+
+    /** An update.json; what does not fit is refused (IllegalArgumentException with the reason), never "fixed". */
+    static UpdateController.UpdateInfo parseInfo(JSONObject o, String branch) {
+        UpdateController.UpdateInfo info = new UpdateController.UpdateInfo();
+        info.build = o.optInt("build", 0);
+        info.versionName = clip(o.optString("version", String.valueOf(info.build)), 32);
+        info.changelog = clip(o.optString("changelog", ""), MAX_CHANGELOG);
+        info.size = o.optLong("size", 0);
+        info.sha256 = o.optString("sha256", "").trim().toLowerCase(Locale.ROOT);
+        String apk = o.optString("apk", "");
+        if (info.build <= 0 || info.build > 10_000_000 || TextUtils.isEmpty(apk)) {
+            throw new IllegalArgumentException("update.json: build/apk missing");
+        }
+        if (!TextUtils.isEmpty(info.sha256) && !SHA256.matcher(info.sha256).matches()) {
+            throw new IllegalArgumentException("update.json: bad sha256");
+        }
+        if (info.size < 0 || info.size > MAX_APK_SIZE) {
+            throw new IllegalArgumentException("update.json: bad size");
+        }
+        info.url = fileUrl(branch, apk);
+        if (info.url == null) {
+            throw new IllegalArgumentException("update.json: apk link not allowed");
+        }
+        // optional link that always points at the newest APK (for the browser); a bad one is ignored
+        final String latest = o.optString("latest", "");
+        if (!TextUtils.isEmpty(latest)) {
+            info.latestUrl = fileUrl(branch, latest);
+        }
+        return info;
     }
 
     /** Text at most {@code max} long, without control characters (it is shown as it is). */
@@ -218,6 +242,10 @@ final class GithubUpdater {
             }
             File target = apkFile(info);
             File part = new File(target.getPath() + ".part");
+            // a beta comes sealed: the part holds the sealed file, opened into the APK once it is complete
+            final boolean sealed = info.beta;
+            final long expectedSize = sealed ? info.sealedSize : info.size;
+            final String expectedSha256 = sealed ? info.sealedSha256 : info.sha256;
             boolean ok = false;
             // a lost connection or a stopped background job keeps the part: the next try resumes it.
             // A file that failed its check is never resumed
@@ -237,7 +265,7 @@ final class GithubUpdater {
                     }
                 }
                 long have = part.isFile() ? part.length() : 0;
-                if (info.size > 0 && have > info.size) {
+                if (expectedSize > 0 && have > expectedSize) {
                     part.delete();
                     have = 0;
                 }
@@ -246,7 +274,7 @@ final class GithubUpdater {
                     have = hashInto(part, have, digest);
                 }
                 long done = have;
-                if (info.size <= 0 || have < info.size) {
+                if (expectedSize <= 0 || have < expectedSize) {
                     connection = open(info.url, have);
                     final boolean append = have > 0 && connection.getResponseCode() == HttpURLConnection.HTTP_PARTIAL
                         && String.valueOf(connection.getHeaderField("Content-Range")).startsWith("bytes " + have + "-");
@@ -256,7 +284,7 @@ final class GithubUpdater {
                         done = 0;
                         digest.reset();
                     }
-                    long total = info.size;
+                    long total = expectedSize;
                     if (total <= 0) {
                         final long length = connection.getContentLengthLong();
                         total = length > 0 ? have + length : 0;
@@ -292,19 +320,25 @@ final class GithubUpdater {
                         throw new java.io.IOException("incomplete download: " + done + "/" + total);
                     }
                 }
-                if (info.size > 0 && done != info.size) {
+                if (expectedSize > 0 && done != expectedSize) {
                     dropPart = true;
-                    throw new SecurityException("size " + done + " != " + info.size);
+                    throw new SecurityException("size " + done + " != " + expectedSize);
                 }
                 String hash = toHex(digest.digest());
-                if (!TextUtils.isEmpty(info.sha256) && !info.sha256.equals(hash)) {
+                if (!TextUtils.isEmpty(expectedSha256) && !expectedSha256.equals(hash)) {
                     dropPart = true;
                     throw new SecurityException("sha256 mismatch");
                 }
-                target.delete();
-                ok = part.renameTo(target);
-                if (!ok) {
-                    error = "rename failed";
+                if (sealed) {
+                    BetaChannel.unseal(info, part, target);
+                    part.delete();
+                    ok = true;
+                } else {
+                    target.delete();
+                    ok = part.renameTo(target);
+                    if (!ok) {
+                        error = "rename failed";
+                    }
                 }
             } catch (RangeNotSatisfiable e) {
                 dropPart = true;
@@ -411,7 +445,7 @@ final class GithubUpdater {
         return connection;
     }
 
-    private static byte[] readAll(String url) throws Exception {
+    static byte[] readAll(String url) throws Exception {
         HttpURLConnection connection = open(url);
         try (InputStream in = connection.getInputStream()) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();

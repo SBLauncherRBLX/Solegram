@@ -1419,4 +1419,22 @@
     <string name="SG_SettingsIconsLinesInfo">Line icons in the theme colour, no tiles</string>
     <string name="SG_SettingsIconsTiles">Coloured tiles</string>
     <string name="SG_SettingsIconsTilesInfo">White icons on colourful tiles</string>
+    <string name="SG_Beta">Beta versions</string>
+    <string name="SG_BetaEnterCode">Enter access code</string>
+    <string name="SG_BetaInfo">Early builds with new features before their release. Access is by code only: the builds are encrypted, and without the code they cannot be downloaded or installed.</string>
+    <string name="SG_BetaCodeTitle">Beta access code</string>
+    <string name="SG_BetaCodeMessage">Enter the code you were given to get beta versions.</string>
+    <string name="SG_BetaChecking">Checking the code</string>
+    <string name="SG_BetaWelcome">Beta access is open</string>
+    <string name="SG_BetaWrongCode">Wrong code</string>
+    <string name="SG_BetaNoChannel">This update repository has no beta channel</string>
+    <string name="SG_BetaCheckFailed">Could not check the code. Check your connection</string>
+    <string name="SG_BetaReceive">Get beta versions</string>
+    <string name="SG_BetaStatusLatest">Latest beta: %1$s</string>
+    <string name="SG_BetaStatusNone">No beta versions right now</string>
+    <string name="SG_BetaStatusWrong">The code no longer fits: enter the new one</string>
+    <string name="SG_BetaStatusReady">Access open</string>
+    <string name="SG_BetaLeave">Leave beta testing</string>
+    <string name="SG_BetaLeaveConfirm">Beta versions will no longer come. The beta you have stays until the next release.</string>
+    <string name="SG_BetaInfoMember">Betas may be unstable. When a release newer than the beta comes out, you get the release.</string>
 </resources>

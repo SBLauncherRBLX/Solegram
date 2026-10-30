@@ -309,6 +309,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_UPDATE_REPO = 505;
     private static final int ID_UPDATE_BROWSER = 506;
     private static final int ID_UPDATE_WIFI = 507;
+    private static final int ID_BETA_CODE = 1126;
+    private static final int ID_BETA_ON = 1127;
+    private static final int ID_BETA_LEAVE = 1128;
 
     // about
     private static final int ID_SOURCE = 601;
@@ -1103,6 +1106,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_GENERAL, ID_ADD_ACCOUNT, R.string.SG_Accounts, -1},
         {PAGE_UPDATES, 0, R.string.SG_Updates, 9},
         {PAGE_UPDATES, ID_AUTO_UPDATE, R.string.SG_AutoUpdate, 9},
+        {PAGE_UPDATES, ID_BETA_CODE, R.string.SG_Beta, 9},
         {PAGE_MAIN, ID_EXPORT, R.string.SG_ExportSettings, 10},
         {PAGE_MAIN, ID_IMPORT, R.string.SG_ImportSettings, 10},
         {PAGE_PLUGINS, 0, R.string.SG_Plugins, 14},
@@ -2115,6 +2119,64 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             info += "\n" + status.substring(statusBreak + 1); // what automatic install still needs
         }
         items.add(UItem.asShadow(info));
+
+        if (github) {
+            // betas: early builds for those with the access code
+            items.add(UItem.asHeader(getString(R.string.SG_Beta)));
+            if (!com.solegram.messenger.updater.BetaChannel.hasAccess()) {
+                items.add(tile(UItem.asButton(ID_BETA_CODE, R.drawable.sg_beta_flask, getString(R.string.SG_BetaEnterCode)), TILE_PURPLE));
+                items.add(UItem.asShadow(getString(R.string.SG_BetaInfo)));
+            } else {
+                items.add(UItem.asButtonCheck(ID_BETA_ON, getString(R.string.SG_BetaReceive), betaStatusText()).setChecked(SolegramConfig.betaUpdates));
+                items.add(UItem.asButton(ID_BETA_LEAVE, getString(R.string.SG_BetaLeave)).red());
+                items.add(UItem.asShadow(getString(R.string.SG_BetaInfoMember)));
+            }
+        }
+    }
+
+    private String betaStatusText() {
+        if (!SolegramConfig.betaUpdates) {
+            return getString(R.string.SG_BetaStatusReady);
+        }
+        switch (com.solegram.messenger.updater.BetaChannel.status) {
+            case com.solegram.messenger.updater.BetaChannel.STATUS_OK:
+                return LocaleController.formatString(R.string.SG_BetaStatusLatest, com.solegram.messenger.updater.BetaChannel.latestVersion);
+            case com.solegram.messenger.updater.BetaChannel.STATUS_NONE:
+                return getString(R.string.SG_BetaStatusNone);
+            case com.solegram.messenger.updater.BetaChannel.STATUS_WRONG_CODE:
+                return getString(R.string.SG_BetaStatusWrong);
+            default:
+                return getString(R.string.SG_BetaStatusReady);
+        }
+    }
+
+    /** A typed access code is checked against the beta channel before it is kept. */
+    private void askBetaCode() {
+        askText(getString(R.string.SG_BetaCodeTitle), getString(R.string.SG_BetaCodeMessage), "", "XXXX-XXXX-XXXX", code -> {
+            if (TextUtils.isEmpty(code) || getParentActivity() == null) {
+                return;
+            }
+            final AlertDialog progress = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
+            progress.showDelayed(200);
+            com.solegram.messenger.updater.BetaChannel.verifyCode(code, result -> AndroidUtilities.runOnUIThread(() -> {
+                try {
+                    progress.dismiss();
+                } catch (Exception ignore) {
+                }
+                if (result == com.solegram.messenger.updater.BetaChannel.STATUS_OK) {
+                    com.solegram.messenger.updater.BetaChannel.setCode(code);
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.done, getString(R.string.SG_BetaWelcome)).show();
+                    UpdateController.getInstance().checkNow(null, false);
+                } else {
+                    final int text = result == com.solegram.messenger.updater.BetaChannel.STATUS_WRONG_CODE ? R.string.SG_BetaWrongCode
+                        : result == com.solegram.messenger.updater.BetaChannel.STATUS_NONE ? R.string.SG_BetaNoChannel : R.string.SG_BetaCheckFailed;
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(text)).show();
+                }
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+            }));
+        });
     }
 
     private void fillAbout(ArrayList<UItem> items) {
@@ -2906,6 +2968,35 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_UPDATE_BROWSER:
                 UpdateController.getInstance().openInBrowser(getParentActivity());
                 return;
+            case ID_BETA_CODE:
+                askBetaCode();
+                return;
+            case ID_BETA_ON: {
+                final boolean on = !SolegramConfig.betaUpdates;
+                SolegramConfig.putBoolean("betaUpdates", on);
+                if (on) {
+                    UpdateController.getInstance().checkNow(null, false);
+                }
+                listView.adapter.update(true);
+                return;
+            }
+            case ID_BETA_LEAVE: {
+                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+                builder.setTitle(getString(R.string.SG_BetaLeave));
+                builder.setMessage(getString(R.string.SG_BetaLeaveConfirm));
+                builder.setPositiveButton(getString(R.string.SG_BetaLeave), (d, w) -> {
+                    com.solegram.messenger.updater.BetaChannel.setCode("");
+                    listView.adapter.update(true);
+                });
+                builder.setNegativeButton(getString(R.string.Cancel), null);
+                AlertDialog dialog = builder.create();
+                showDialog(dialog);
+                final android.view.View button = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE);
+                if (button instanceof TextView) {
+                    ((TextView) button).setTextColor(Theme.getColor(Theme.key_text_RedBold));
+                }
+                return;
+            }
             case ID_UPDATE_CHANNEL:
                 askUpdateChannel();
                 return;

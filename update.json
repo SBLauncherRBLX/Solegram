@@ -1,9 +1,9 @@
 {
-  "version": "2.9.9",
-  "build": 68,
-  "apk": "apk/Solegram-2.9.9-b68-release.apk",
-  "size": 63237806,
-  "sha256": "78b62aac83334062fab0133bc8b872c9877b790b2e8bffb58468f6ebcd04cf06",
-  "changelog": "Solegram 2.9.9\n\n• Иконка Telegram Stars в настройках снова фирменная звезда Telegram, теперь в стиле линий.",
+  "version": "2.10.0",
+  "build": 69,
+  "apk": "apk/Solegram-2.10.0-b69-release.apk",
+  "size": 63246071,
+  "sha256": "940b183fddd5d6e8a054024758b2ff684d040ad515399f5615fa70fd18d29465",
+  "changelog": "Solegram 2.10.0\n\n• Бета-версии: ранние сборки с новыми функциями до их релиза. Доступ — по коду (Настройки Solegram → Обновления → Бета-версии). Сборки зашифрованы, без кода их не скачать и не установить.",
   "latest": "apk/Solegram-latest.apk"
 }

@@ -1673,5 +1673,23 @@
     <string name="SG_SettingsIconsLinesInfo">Контурные значки в цвете темы, без плашек</string>
     <string name="SG_SettingsIconsTiles">Цветные плашки</string>
     <string name="SG_SettingsIconsTilesInfo">Белые значки на цветных плашках</string>
+    <string name="SG_Beta">Бета-версии</string>
+    <string name="SG_BetaEnterCode">Ввести код доступа</string>
+    <string name="SG_BetaInfo">Ранние сборки с новыми функциями до их релиза. Доступ только по коду: сборки зашифрованы, без кода их не скачать и не установить.</string>
+    <string name="SG_BetaCodeTitle">Код доступа к бета-версиям</string>
+    <string name="SG_BetaCodeMessage">Введите код, который вам дали, чтобы получать бета-версии.</string>
+    <string name="SG_BetaChecking">Проверяем код</string>
+    <string name="SG_BetaWelcome">Доступ к бета-версиям открыт</string>
+    <string name="SG_BetaWrongCode">Неверный код</string>
+    <string name="SG_BetaNoChannel">В этом репозитории обновлений нет бета-канала</string>
+    <string name="SG_BetaCheckFailed">Не удалось проверить код. Проверьте подключение к интернету</string>
+    <string name="SG_BetaReceive">Получать бета-версии</string>
+    <string name="SG_BetaStatusLatest">Последняя бета: %1$s</string>
+    <string name="SG_BetaStatusNone">Сейчас бета-версий нет</string>
+    <string name="SG_BetaStatusWrong">Код больше не подходит: введите новый</string>
+    <string name="SG_BetaStatusReady">Доступ открыт</string>
+    <string name="SG_BetaLeave">Выйти из бета-тестирования</string>
+    <string name="SG_BetaLeaveConfirm">Бета-версии больше не будут приходить. Установленная бета останется до следующего релиза.</string>
+    <string name="SG_BetaInfoMember">Бета-версии могут работать нестабильно. Когда выйдет релиз новее беты, придёт он.</string>
     <!-- SOLEGRAM END -->
 </resources>

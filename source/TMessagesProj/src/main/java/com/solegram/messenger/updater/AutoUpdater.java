@@ -193,6 +193,7 @@ public final class AutoUpdater {
             o.put("url", info.url);
             o.put("latest", info.latestUrl);
             o.put("changelog", info.changelog);
+            BetaChannel.save(info, o);
             prefs().edit().putString(key, o.toString()).apply();
         } catch (Exception e) {
             FileLog.e(e);
@@ -214,6 +215,7 @@ public final class AutoUpdater {
             info.url = o.optString("url", null);
             info.latestUrl = o.isNull("latest") ? null : o.optString("latest", null);
             info.changelog = o.optString("changelog", "");
+            BetaChannel.load(o, info);
             return info.url != null && info.build > 0 ? info : null;
         } catch (Exception e) {
             return null;

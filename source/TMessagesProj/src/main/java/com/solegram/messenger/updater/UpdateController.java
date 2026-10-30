@@ -56,6 +56,12 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
         public String latestUrl;
         /** SHA-256 of the file as UpdateInstaller.verify checked it (signature included); only those bytes are installed. Not saved. */
         public String verifiedSha256;
+        /** A sealed Solegram beta (BetaChannel): the downloaded file, and how it is opened into the APK. */
+        public boolean beta;
+        public byte[] betaSalt, betaIv, betaMac;
+        public int betaIter;
+        public long sealedSize;
+        public String sealedSha256;
     }
 
     private static final long AUTO_CHECK_INTERVAL = 6 * 60 * 60 * 1000L;

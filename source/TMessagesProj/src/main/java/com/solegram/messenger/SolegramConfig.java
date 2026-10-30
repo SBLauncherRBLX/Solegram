@@ -326,6 +326,8 @@ public class SolegramConfig {
     /** 0 = GitHub repository (update.json), 1 = Telegram channel. */
     public static int updateSource;
     public static String updateRepo = "";
+    /** Solegram betas (updater.BetaChannel): looked for while on and an access code is saved. */
+    public static boolean betaUpdates;
     public static String updateChannel = "";
     public static long lastUpdateCheck;
     public static int skippedUpdateBuild;
@@ -548,6 +550,7 @@ public class SolegramConfig {
         updateWifiOnly = p.getBoolean("updateWifiOnly", true);
         updateSource = clamp(p.getInt("updateSource", 0), 0, 1);
         updateRepo = p.getString("updateRepo", "");
+        betaUpdates = p.getBoolean("betaUpdates", false);
         updateChannel = p.getString("updateChannel", "");
         lastUpdateCheck = readLong(p, "lastUpdateCheck");
         skippedUpdateBuild = p.getInt("skippedUpdateBuild", 0);
@@ -745,13 +748,13 @@ public class SolegramConfig {
     // region Backup
     // the AI key is a secret: it stays on this device, a backup file must not carry it
     private static final String[] NOT_EXPORTED = {"lastUpdateCheck", "skippedUpdateBuild", "aiApiKey", "aiBaseUrl", "aiConsent",
-        "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal", "reminderExactAsked"};
+        "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal", "reminderExactAsked", "betaUpdates", "betaCode"};
     // where message text is sent for AI summaries is chosen on the device, never taken from a settings file
     // changing the public bio is decided on the device too
     // where updates come from is chosen on the device too: a settings file must not point the updater elsewhere
     private static final java.util.List<String> NOT_IMPORTED = java.util.Arrays.asList("aiApiKey", "aiBaseUrl", "aiProvider", "aiMode", "aiConsent", "transcribeEngine",
         "nowPlayingShareBio", "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal", "updateRepo", "updateChannel", "updateSource",
-        "pluginsDevMode");
+        "pluginsDevMode", "betaUpdates", "betaCode");
 
     public static String exportToJson() {
         try {
