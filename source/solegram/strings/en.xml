@@ -1386,9 +1386,9 @@
     <string name="SG_SavedTagAdded">Tag %1$s added</string>
     <string name="SG_SavedTagRemoved">Tag %1$s removed</string>
     <string name="SG_SavedTagsSwitchInfo">Tag messages in Saved Messages and find them by tag</string>
-    <string name="SG_PremiumFree">Premium for free</string>
+    <string name="SG_PremiumFree">Solegram+</string>
     <string name="SG_PremiumFreeSub">Colours, pins, tags, stories and more</string>
-    <string name="SG_PremiumFreeIntro">What Telegram Premium has and Solegram can do on your phone. Colours and tags are seen only by you; the emoji next to your name is seen by other Solegram users too.</string>
+    <string name="SG_PremiumFreeIntro">Extra Solegram features: colours, pins, tags, stories and more. Everything works on your phone. Colours and tags are seen only by you; the emoji next to your name is seen by other Solegram users too.</string>
     <string name="SG_PremiumLook">Look</string>
     <string name="SG_SelfColors">Name and profile colour</string>
     <string name="SG_SelfColorsReset">Back to account colours</string>

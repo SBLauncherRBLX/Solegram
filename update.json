@@ -1,9 +1,9 @@
 {
-  "version": "2.9.1",
-  "build": 60,
-  "apk": "apk/Solegram-2.9.1-b60-release.apk",
-  "size": 63037929,
-  "sha256": "6e4c4eb0e5907534e1077239f975bd3d6d4fa9d345f2ce06d9ad7c3c72f3d47c",
-  "changelog": "Solegram 2.9.1\n\n• Эмодзи у имени теперь видят и другие пользователи Solegram. Оно передаётся невидимой меткой в конце описания профиля: обычный Telegram её не показывает. Выключить можно в Настройки Solegram → «Premium бесплатно» → «Показывать моё эмодзи пользователям Solegram».",
+  "version": "2.9.2",
+  "build": 61,
+  "apk": "apk/Solegram-2.9.2-b61-release.apk",
+  "size": 63040356,
+  "sha256": "a19be940964767220f39eb990f395ff7c187635b5a828ebaf5ceb311fec028e0",
+  "changelog": "Solegram 2.9.2\n\n• Раздел «Premium бесплатно» теперь называется «Solegram+» и получил свою иконку — солнце Solegram.",
   "latest": "apk/Solegram-latest.apk"
 }

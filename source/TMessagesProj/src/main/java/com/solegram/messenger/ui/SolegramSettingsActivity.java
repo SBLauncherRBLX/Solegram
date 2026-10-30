@@ -442,7 +442,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_SectionTalk)));
-        items.add(category(ID_PREMIUM_PAGE, R.drawable.msg_settings_premium, R.string.SG_PremiumFree, R.string.SG_PremiumFreeSub, null, TILE_PURPLE));
+        items.add(category(ID_PREMIUM_PAGE, R.drawable.sg_plus_mark, R.string.SG_PremiumFree, R.string.SG_PremiumFreeSub, null, TILE_PURPLE));
         items.add(category(ID_CHATS, R.drawable.msg_discussion, R.string.SG_Chats, R.string.SG_ChatsSub, null, TILE_GREEN));
         items.add(category(ID_FILTERS, R.drawable.msg_archive_hide, R.string.SG_Filters, R.string.SG_FiltersSub,
             SolegramConfig.messageFilters ? getString(R.string.SG_On) : null, TILE_RED));
