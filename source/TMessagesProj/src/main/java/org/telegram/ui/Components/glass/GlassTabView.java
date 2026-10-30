@@ -79,7 +79,28 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
 
     public GlassTabView(@NonNull Context context) {
         super(context);
-        imageView = new RLottieImageView(context);
+        imageView = new RLottieImageView(context) {
+            @Override
+            public void draw(android.graphics.Canvas canvas) {
+                if (solegramBands < 0f || solegramBands >= 1f || getWidth() <= 0) {
+                    super.draw(canvas);
+                    return;
+                }
+                // Solegram: the feed's lines rise into place one after another, from the bottom up
+                final int h = getHeight(), w = getWidth();
+                for (int i = 0; i < 3; i++) {
+                    final int band = 2 - i; // the bottom band moves first
+                    final float t = Math.max(0f, Math.min(1f, (solegramBands - i * 0.16f) / 0.68f));
+                    final float k = CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(t);
+                    final int top = h * band / 3, bottom = h * (band + 1) / 3;
+                    final int save = canvas.saveLayerAlpha(0, top - dp(8), w, bottom + dp(8), (int) (255 * Math.min(1f, t * 1.6f)));
+                    canvas.clipRect(0, top, w, bottom);
+                    canvas.translate(0, dp(7) * (1f - k));
+                    super.draw(canvas);
+                    canvas.restoreToCount(save);
+                }
+            }
+        };
         addView(imageView, LayoutHelper.createFrame(44, 44, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, -6, 0, 0));
 
         imageView.setColorFilter(new PorterDuffColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN));
@@ -244,13 +265,105 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
 
     public void setSelected(boolean selected, boolean animated) {
         if (selected && animated && !isSelectedAnimator.getValue() && getParent() instanceof org.telegram.ui.MainTabsLayout) {
-            com.solegram.messenger.ui.SolegramMotion.bounce(imageView, attachScale); // Solegram: the chosen tab's icon pops
+            solegramPlaySelectMotion(); // Solegram: every main tab moves in its own way when it opens
         }
         isSelectedAnimator.setValue(selected, animated);
         checkPlayAnimation(animated);
 
         textView.setTypeface(selected ? AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_EXTRA_BOLD) : AndroidUtilities.bold());
     }
+
+    // region Solegram: tab motions
+
+    private float solegramBands = -1f;
+    private android.animation.Animator solegramMotion;
+
+    private void solegramPlaySelectMotion() {
+        if (solegramMotion != null) {
+            solegramMotion.cancel();
+        }
+        final android.view.View icon = backupImageView != null && imageView.getVisibility() != VISIBLE ? backupImageView : imageView;
+        if (!com.solegram.messenger.ui.SolegramMotion.rich() || !icon.isAttachedToWindow()) {
+            return;
+        }
+        icon.animate().cancel();
+        final TabAnimation type = backupImageView != null && icon == backupImageView ? null : tabAnimation;
+        final float rest = icon == imageView ? attachScale : 1f;
+        final android.animation.ValueAnimator a = android.animation.ValueAnimator.ofFloat(0f, 1f);
+        final long duration;
+        if (type == TabAnimation.SETTINGS) {
+            duration = 720;
+        } else if (type == TabAnimation.FEED) {
+            duration = 620;
+        } else if (type == TabAnimation.CALLS) {
+            duration = 640;
+        } else {
+            duration = 560;
+        }
+        a.setDuration(duration);
+        a.setInterpolator(new android.view.animation.LinearInterpolator());
+        a.addUpdateListener(v -> solegramApplyMotion(icon, type, rest, (float) v.getAnimatedValue()));
+        a.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                solegramApplyMotion(icon, type, rest, 1f);
+                if (solegramMotion == animation) {
+                    solegramMotion = null;
+                }
+            }
+        });
+        solegramMotion = a;
+        a.start();
+    }
+
+    /** One frame of a tab's motion; t runs 0..1 and every motion ends exactly at rest. */
+    private void solegramApplyMotion(android.view.View icon, TabAnimation type, float rest, float t) {
+        float scaleX = 1f, scaleY = 1f, rotation = 0f, dy = 0f;
+        icon.setPivotX(icon.getWidth() / 2f);
+        icon.setPivotY(icon.getHeight() / 2f);
+        if (type == TabAnimation.SETTINGS) {
+            // the gear turns half a round (the same look as at rest), quick at first and settling with a little spring
+            rotation = 180f * CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.05f));
+            final float press = (float) Math.sin(Math.PI * Math.min(1f, t * 2.2f));
+            scaleX = scaleY = 1f - 0.08f * press;
+            if (t >= 1f) {
+                rotation = 0f;
+            }
+        } else if (type == TabAnimation.FEED) {
+            solegramBands = t >= 1f ? -1f : t;
+            imageView.invalidate();
+        } else if (type == TabAnimation.CALLS) {
+            // the handset rings: a few quick shakes that die away
+            rotation = (float) (Math.sin(t * Math.PI * 7) * 16f * (1f - t));
+        } else if (type == TabAnimation.CHATS || type == TabAnimation.CONTACTS) {
+            // the bubble pops out of its tail with a little wiggle
+            icon.setPivotX(icon.getWidth() * 0.25f);
+            icon.setPivotY(icon.getHeight() * 0.85f);
+            final float pop = t < 0.18f ? 1f - 0.2f * (t / 0.18f)
+                : 0.8f + 0.2f * CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation((t - 0.18f) / 0.82f) + 0.06f * (float) Math.sin(Math.PI * Math.min(1f, (t - 0.18f) / 0.5f));
+            scaleX = scaleY = pop;
+            rotation = (float) (Math.sin(t * Math.PI * 3) * 9f * (1f - t));
+        } else {
+            // the avatar hops and squashes a little when it lands
+            final float up = t < 0.45f ? (float) Math.sin(Math.PI * t / 0.45f) : 0f;
+            dy = -dp(5) * up;
+            final float land = t >= 0.42f && t < 0.75f ? (float) Math.sin(Math.PI * (t - 0.42f) / 0.33f) : 0f;
+            final float stretch = t < 0.42f ? 0.07f * (float) Math.sin(Math.PI * t / 0.42f) : 0f;
+            scaleX = 1f + 0.12f * land - stretch;
+            scaleY = 1f - 0.12f * land + stretch;
+            icon.setPivotY(icon.getHeight());
+        }
+        if (t >= 1f) {
+            scaleX = scaleY = 1f;
+            rotation = 0f;
+            dy = 0f;
+        }
+        icon.setScaleX(rest * scaleX);
+        icon.setScaleY(rest * scaleY);
+        icon.setRotation(rotation);
+        icon.setTranslationY(dy);
+    }
+    // endregion
 
     public boolean isTabSelected() {
         return isSelectedAnimator.getValue();
