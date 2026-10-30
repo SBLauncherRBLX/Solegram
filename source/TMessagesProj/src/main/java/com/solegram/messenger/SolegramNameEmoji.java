@@ -47,6 +47,7 @@ public final class SolegramNameEmoji {
         } else {
             SolegramConfig.putLong("nameEmoji", documentId);
         }
+        SolegramNameEmojiShare.scheduleSync(); // other Solegram users see it through the bio
         AndroidUtilities.runOnUIThread(() -> {
             for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
                 if (!UserConfig.isValidAccount(a)) {

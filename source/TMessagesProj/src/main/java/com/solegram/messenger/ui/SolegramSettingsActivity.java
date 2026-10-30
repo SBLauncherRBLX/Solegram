@@ -260,6 +260,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_LOCAL_REPEATS_LIST = 1120;
     private static final int ID_SAVE_STORIES = 1121;
     private static final int ID_SKIP_SILENCE = 1122;
+    private static final int ID_NAME_EMOJI_SHARE = 1123;
     private static final int ID_TRANSCRIBE_URL = 242;
     private static final int ID_TRANSCRIBE_KEY = 243;
     private static final int ID_TRANSCRIBE_MODEL = 244;
@@ -1029,6 +1030,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_PREMIUM, 0, R.string.SG_PremiumFree, -1},
         {PAGE_PREMIUM, ID_SELF_COLORS, R.string.SG_SelfColors, -1},
         {PAGE_PREMIUM, ID_ANIMATED_AVATARS, R.string.SG_AnimatedAvatars, -1},
+        {PAGE_PREMIUM, ID_NAME_EMOJI_SHARE, R.string.SG_NameEmojiShare, -1},
         {PAGE_PREMIUM, ID_LOCAL_PINS, R.string.SG_LocalPins, -1},
         {PAGE_PREMIUM, ID_SAVED_TAGS, R.string.SG_SavedTags, -1},
         {PAGE_PREMIUM, ID_FAVORITE_REACTIONS, R.string.SG_FavoriteReactions, -1},
@@ -1288,6 +1290,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
         items.add(tile(UItem.asButton(ID_NAME_EMOJI, R.drawable.msg2_smile_status, getString(R.string.SG_NameEmoji),
             getString(com.solegram.messenger.SolegramNameEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_PINK));
+        items.add(UItem.asButtonCheck(ID_NAME_EMOJI_SHARE, getString(R.string.SG_NameEmojiShare), getString(R.string.SG_NameEmojiShareInfo)).setChecked(SolegramConfig.nameEmojiShare));
         items.add(UItem.asButtonCheck(ID_ANIMATED_AVATARS, getString(R.string.SG_AnimatedAvatars), getString(R.string.SG_AnimatedAvatarsInfo)).setChecked(SolegramConfig.animatedAvatars));
         items.add(UItem.asShadow(getString(R.string.SG_PremiumLookInfo)));
 
@@ -2159,6 +2162,16 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_SKIP_SILENCE:
                 toggleCheck(view, "voiceSkipSilence");
+                return;
+            case ID_NAME_EMOJI_SHARE:
+                toggleCheck(view, "nameEmojiShare");
+                com.solegram.messenger.SolegramNameEmojiShare.scheduleSync();
+                if (SolegramConfig.nameEmojiShare && com.solegram.messenger.SolegramNameEmoji.get() != 0) {
+                    final org.telegram.tgnet.TLRPC.UserFull full = getMessagesController().getUserFull(getUserConfig().getClientUserId());
+                    if (full != null && com.solegram.messenger.SolegramNameEmojiShare.tooLong(currentAccount, full.about)) {
+                        org.telegram.ui.Components.BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_NameEmojiShareTooLong)).show();
+                    }
+                }
                 return;
             case ID_CAMERA:
                 presentFragment(new SolegramSettingsActivity(PAGE_CAMERA));

@@ -619,7 +619,7 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
 
         firstNameEdit.setText(currentFirstName = user.first_name);
         lastNameEdit.setText(currentLastName = user.last_name);
-        bioEdit.setText(currentBio = userFull.about);
+        bioEdit.setText(currentBio = com.solegram.messenger.SolegramNameEmojiShare.strip(userFull.about)); // Solegram: without the invisible mark
         birthday = currentBirthday = userFull.birthday;
         if ((userFull.flags2 & 64) != 0) {
             currentChannel = userFull.personal_channel_id;
@@ -700,7 +700,7 @@ public class UserInfoActivity extends UniversalFragment implements NotificationC
             req1.last_name = user.last_name = lastNameEdit.getText().toString();
 
             req1.flags |= 4;
-            req1.about = userFull.about = bioEdit.getText().toString();
+            req1.about = userFull.about = com.solegram.messenger.SolegramNameEmojiShare.withMark(currentAccount, bioEdit.getText().toString());
             userFull.flags = TextUtils.isEmpty(userFull.about) ? (userFull.flags & ~2) : (userFull.flags | 2);
 
             requests.add(req1);

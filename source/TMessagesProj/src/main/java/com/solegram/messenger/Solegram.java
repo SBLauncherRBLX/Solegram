@@ -103,6 +103,7 @@ public final class Solegram {
                 SolegramMediaListener.setWanted(SolegramConfig.nowPlaying);
                 SolegramNowPlaying.start();
                 SolegramNowPlayingBio.checkOnStart();
+                org.telegram.messenger.AndroidUtilities.runOnUIThread(SolegramNameEmojiShare::scheduleSync, 25_000);
             } catch (Throwable e) {
                 FileLog.e(e);
             }

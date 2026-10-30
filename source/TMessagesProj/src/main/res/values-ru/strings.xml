@@ -1605,7 +1605,7 @@
     <string name="SG_MeaningHow">Поиск по смыслу дополняет вопрос похожими словами и ранжирует то, что находит Telegram. Он не видит картинки, голосовые и секретные чаты, а переписку, где нет ни одного похожего слова, может пропустить.</string>
     <string name="SG_MeaningMenu">Поиск по смыслу</string>
     <string name="SG_NameEmoji">Эмодзи у имени</string>
-    <string name="SG_NameEmojiInfo">Эмодзи у имени работает как статус Premium, но видно его только тебе на этом устройстве. Поменять можно, нажав на него в своём профиле.</string>
+    <string name="SG_NameEmojiInfo">Эмодзи у имени работает как статус Premium: его видите вы и другие пользователи Solegram. Поменять можно, нажав на него в своём профиле.</string>
     <string name="SG_NowPlayingLook">Вид плеера</string>
     <string name="SG_NowPlayingStyleCover">Обложка</string>
     <string name="SG_NowPlayingStyleCoverInfo">Карточка окрашивается в цвета обложки</string>
@@ -1642,7 +1642,7 @@
     <string name="SG_SavedTagsSwitchInfo">Отмечайте сообщения в «Избранном» и находите их по тегам</string>
     <string name="SG_PremiumFree">Premium бесплатно</string>
     <string name="SG_PremiumFreeSub">Цвета, закрепы, теги, истории и не только</string>
-    <string name="SG_PremiumFreeIntro">То, что есть в Telegram Premium и что Solegram умеет делать на вашем телефоне. Цвета, эмодзи и теги видите только вы.</string>
+    <string name="SG_PremiumFreeIntro">То, что есть в Telegram Premium и что Solegram умеет делать на вашем телефоне. Цвета и теги видите только вы, эмодзи у имени видят и другие пользователи Solegram.</string>
     <string name="SG_PremiumLook">Внешний вид</string>
     <string name="SG_SelfColors">Цвет имени и профиля</string>
     <string name="SG_SelfColorsReset">Вернуть цвета аккаунта</string>
@@ -1665,5 +1665,8 @@
     <string name="SG_SkipSilence">Пропускать тишину в голосовых</string>
     <string name="SG_SkipSilenceInfo">Паузы пропускаются при прослушивании</string>
     <string name="SG_PremiumSoundsInfo">Звуки уведомлений любой длины: настройки уведомлений чата → Звук → «Звук с телефона».</string>
+    <string name="SG_NameEmojiShare">Показывать моё эмодзи пользователям Solegram</string>
+    <string name="SG_NameEmojiShareInfo">Невидимая метка в конце описания профиля: Solegram покажет эмодзи у вашего имени, другие приложения ничего не увидят</string>
+    <string name="SG_NameEmojiShareTooLong">Описание профиля слишком длинное для метки: сократите его на несколько символов</string>
     <!-- SOLEGRAM END -->
 </resources>

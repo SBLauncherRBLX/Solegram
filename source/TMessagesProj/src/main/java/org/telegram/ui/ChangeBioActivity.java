@@ -176,7 +176,7 @@ public class ChangeBioActivity extends BaseFragment {
 
         TLRPC.UserFull userFull = MessagesController.getInstance(currentAccount).getUserFull(UserConfig.getInstance(currentAccount).getClientUserId());
         if (userFull != null && userFull.about != null) {
-            firstNameField.setText(userFull.about);
+            firstNameField.setText(com.solegram.messenger.SolegramNameEmojiShare.strip(userFull.about)); // Solegram: without the invisible mark
             firstNameField.setSelection(firstNameField.length());
         }
 
@@ -203,7 +203,7 @@ public class ChangeBioActivity extends BaseFragment {
         if (currentName == null) {
             currentName = "";
         }
-        final String newName = firstNameField.getText().toString().replace("\n", "");
+        final String newName = com.solegram.messenger.SolegramNameEmojiShare.withMark(currentAccount, firstNameField.getText().toString().replace("\n", ""));
         if (currentName.equals(newName)) {
             finishFragment();
             return;

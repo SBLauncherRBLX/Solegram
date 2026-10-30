@@ -6864,6 +6864,7 @@ public class MessagesController extends BaseController implements NotificationCe
             return false;
         }
         com.solegram.messenger.SolegramNameEmoji.apply(currentAccount, user);
+        com.solegram.messenger.SolegramNameEmojiShare.apply(user);
         fromCache = fromCache && user.id / 1000 != 333 && user.id != 777000;
         TLRPC.User oldUser = users.get(user.id);
         if (oldUser == user && !force) {
@@ -7838,6 +7839,7 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                     fullUsers.put(user.id, userFull);
+                    com.solegram.messenger.SolegramNameEmojiShare.onUserFull(currentAccount, user, userFull); // Solegram: the name emoji others share
                     getTranslateController().updateDialogFull(user.id);
                     StarsController.getInstance(currentAccount).invalidateProfileGifts(userFull);
                     loadingFullUsers.remove(user.id);
@@ -10496,6 +10498,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 }
             }
             if (info != null) {
+                com.solegram.messenger.SolegramNameEmojiShare.onUserFull(currentAccount, user, info);
                 if (fullUsers.get(user.id) == null) {
                     fullUsers.put(user.id, info);
                     getTranslateController().updateDialogFull(user.id);

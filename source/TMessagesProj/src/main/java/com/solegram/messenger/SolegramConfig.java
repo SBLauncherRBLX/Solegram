@@ -123,6 +123,8 @@ public class SolegramConfig {
     public static long titleEmoji = 0;
     /** Custom emoji next to the user's own name (like Premium's emoji status), kept on this device (0 = none). */
     public static long nameEmoji = 0;
+    /** The name emoji is shown to other Solegram users (an invisible mark at the end of the bio). */
+    public static boolean nameEmojiShare = true;
     /** The call screen with the glass sheet (controls at the bottom in the app's glass). */
     public static boolean glassCallScreen = true;
     // endregion
@@ -428,6 +430,7 @@ public class SolegramConfig {
         transcribeModel = p.getString("transcribeModel", "");
         titleEmoji = readLong(p, "titleEmoji");
         nameEmoji = readLong(p, "nameEmoji");
+        nameEmojiShare = p.getBoolean("nameEmojiShare", true);
         glassCallScreen = p.getBoolean("glassCallScreen", true);
         liquidMotion = p.getBoolean("liquidMotion", true);
         iosInputBar = p.getBoolean("iosInputBar", true);
@@ -703,6 +706,7 @@ public class SolegramConfig {
             case "saveStories":
             case "localRepeats":
             case "localSavedTags":
+            case "nameEmojiShare":
             case "glassCallScreen":
             case "liquidMotion":
             case "iosInputBar":

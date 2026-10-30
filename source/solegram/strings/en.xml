@@ -1351,7 +1351,7 @@
     <string name="SG_MeaningHow">Search by meaning widens your question with related words and ranks what Telegram finds. It does not read pictures, voice messages or secret chats, and a conversation that shares no word with the question can still be missed.</string>
     <string name="SG_MeaningMenu">Search by meaning</string>
     <string name="SG_NameEmoji">Emoji next to my name</string>
-    <string name="SG_NameEmojiInfo">The emoji next to your name works like the Premium emoji status, but only you see it on this device. Tap it in your profile to change it.</string>
+    <string name="SG_NameEmojiInfo">The emoji next to your name works like the Premium emoji status: you and other Solegram users see it. Tap it in your profile to change it.</string>
     <string name="SG_NowPlayingLook">Player look</string>
     <string name="SG_NowPlayingStyleCover">Cover</string>
     <string name="SG_NowPlayingStyleCoverInfo">The card takes on the colours of the cover</string>
@@ -1388,7 +1388,7 @@
     <string name="SG_SavedTagsSwitchInfo">Tag messages in Saved Messages and find them by tag</string>
     <string name="SG_PremiumFree">Premium for free</string>
     <string name="SG_PremiumFreeSub">Colours, pins, tags, stories and more</string>
-    <string name="SG_PremiumFreeIntro">What Telegram Premium has and Solegram can do on your phone. Colours, emoji and tags are seen only by you.</string>
+    <string name="SG_PremiumFreeIntro">What Telegram Premium has and Solegram can do on your phone. Colours and tags are seen only by you; the emoji next to your name is seen by other Solegram users too.</string>
     <string name="SG_PremiumLook">Look</string>
     <string name="SG_SelfColors">Name and profile colour</string>
     <string name="SG_SelfColorsReset">Back to account colours</string>
@@ -1411,4 +1411,7 @@
     <string name="SG_SkipSilence">Skip silence in voice messages</string>
     <string name="SG_SkipSilenceInfo">Pauses are skipped while a voice message plays</string>
     <string name="SG_PremiumSoundsInfo">Notification sounds of any length: chat or notification settings, Sound, Sound from the phone.</string>
+    <string name="SG_NameEmojiShare">Show my emoji to Solegram users</string>
+    <string name="SG_NameEmojiShareInfo">An invisible mark at the end of your bio: Solegram shows the emoji next to your name, other apps show nothing</string>
+    <string name="SG_NameEmojiShareTooLong">Your bio is too long for the mark: shorten it by a few characters</string>
 </resources>

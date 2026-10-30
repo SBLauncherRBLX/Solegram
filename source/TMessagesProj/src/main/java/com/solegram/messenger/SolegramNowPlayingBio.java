@@ -133,7 +133,7 @@ public final class SolegramNowPlayingBio {
     }
 
     private static void writePending() {
-        final String text = pending;
+        final String text = pending == null ? null : SolegramNameEmojiShare.withMark(sharingAccount() < 0 ? 0 : sharingAccount(), pending);
         final int account = sharingAccount();
         if (text == null || account < 0 || !sharing()) {
             return;
@@ -149,7 +149,7 @@ public final class SolegramNowPlayingBio {
                 AndroidUtilities.runOnUIThread(writeRunnable, 15_000);
                 return;
             }
-            if (!sharing() || !TextUtils.equals(text, pending)) {
+            if (!sharing() || !TextUtils.equals(SolegramNameEmojiShare.strip(text), pending)) {
                 onTrackChanged(SolegramNowPlaying.get()); // things changed meanwhile: decide again
                 return;
             }
@@ -223,7 +223,8 @@ public final class SolegramNowPlayingBio {
                 AndroidUtilities.runOnUIThread(restoreRunnable);
                 return;
             }
-            target = cut(target == null ? "" : target, MessagesController.getInstance(account).getAboutLimit());
+            target = cut(target == null ? "" : SolegramNameEmojiShare.strip(target), MessagesController.getInstance(account).getAboutLimit());
+            target = SolegramNameEmojiShare.withMark(account, target); // the shared name emoji stays in the bio
             send(account, target, ok -> {
                 if (ok) {
                     forget.run();
@@ -251,15 +252,20 @@ public final class SolegramNowPlayingBio {
     public static String ownBio(long userId, @Nullable String about) {
         final String written = prefs().getString(KEY_WRITTEN + userId, null);
         if (written != null && same(about, written)) {
-            return prefs().getString(KEY_ORIGINAL + userId, "");
+            return SolegramNameEmojiShare.strip(prefs().getString(KEY_ORIGINAL + userId, ""));
         }
         final String stripped = SolegramNowPlaying.stripBio(about);
-        return stripped == null ? "" : stripped;
+        return stripped == null ? "" : SolegramNameEmojiShare.strip(stripped);
     }
 
-    /** Without the invisible mark, in case Telegram drops it from the bio. */
+    /** Without the invisible marks (the music line's, the shared name emoji's), in case Telegram drops them. */
     private static String plain(@Nullable String s) {
-        return s == null ? "" : s.replace("\u2060", "");
+        return s == null ? "" : SolegramNameEmojiShare.strip(s).replace("\u2060", "");
+    }
+
+    /** Whether the music line stands in this user's bio now (the name emoji mark goes with it). */
+    static boolean writesNow(long userId) {
+        return prefs().getString(KEY_WRITTEN + userId, null) != null;
     }
 
     private static boolean same(@Nullable String a, @Nullable String b) {

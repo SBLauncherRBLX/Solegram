@@ -10554,7 +10554,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (userInfo == null) {
             return null;
         }
-        final String about = com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about;
+        final String about = com.solegram.messenger.SolegramNameEmojiShare.strip(com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about);
         if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || TextUtils.isEmpty(about)) {
             return about;
         }
