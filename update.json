@@ -1,9 +1,9 @@
 {
-  "version": "2.9.7",
-  "build": 66,
-  "apk": "apk/Solegram-2.9.7-b66-release.apk",
-  "size": 63235357,
-  "sha256": "12302500f7739744e951d2ec2bd8a282678ffe25e0570a2cc184d74eb4a2edc9",
-  "changelog": "Solegram 2.9.7\n\n• Иконки-линии в настройках стали жирнее и заметнее.",
+  "version": "2.9.8",
+  "build": 67,
+  "apk": "apk/Solegram-2.9.8-b67-release.apk",
+  "size": 63237127,
+  "sha256": "57c2b1be92995fbbf547941fdf602800aba0b9fa395db6384c361a438b34dd83",
+  "changelog": "Solegram 2.9.8\n\n• Анимация вкладки «Лента»: теперь газета остаётся на месте, а строчки внутри неё по очереди выезжают снизу вверх.",
   "latest": "apk/Solegram-latest.apk"
 }

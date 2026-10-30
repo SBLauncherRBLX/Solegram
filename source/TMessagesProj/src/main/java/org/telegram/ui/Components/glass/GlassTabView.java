@@ -86,19 +86,50 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
                     super.draw(canvas);
                     return;
                 }
-                // Solegram: the feed's lines rise into place one after another, from the bottom up
-                final int h = getHeight(), w = getWidth();
-                for (int i = 0; i < 3; i++) {
-                    final int band = 2 - i; // the bottom band moves first
-                    final float t = Math.max(0f, Math.min(1f, (solegramBands - i * 0.16f) / 0.68f));
-                    final float k = CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(t);
-                    final int top = h * band / 3, bottom = h * (band + 1) / 3;
-                    final int save = canvas.saveLayerAlpha(0, top - dp(8), w, bottom + dp(8), (int) (255 * Math.min(1f, t * 1.6f)));
-                    canvas.clipRect(0, top, w, bottom);
-                    canvas.translate(0, dp(7) * (1f - k));
+                // Solegram: the newspaper stays put while the lines in it rise into place, the bottom one first
+                final android.graphics.drawable.Drawable d = getDrawable();
+                if (d == null) {
                     super.draw(canvas);
-                    canvas.restoreToCount(save);
+                    return;
                 }
+                final android.graphics.RectF box = new android.graphics.RectF(d.getBounds());
+                getImageMatrix().mapRect(box);
+                box.offset(getPaddingLeft(), getPaddingTop());
+                final boolean pack = com.solegram.messenger.SolegramIcons.tabIcon(TabAnimation.FEED.name(), true) != 0;
+                final float[] content = pack ? FEED_PACK_CONTENT : FEED_LOTTIE_CONTENT;
+                final float[][] bands = pack ? FEED_PACK_BANDS : FEED_LOTTIE_BANDS;
+                final android.graphics.RectF area = solegramFeedRect(box, content, solegramFeedArea);
+                // an own layer: the cut-outs must reach the icon only, not the tab bar under it
+                final int root = canvas.saveLayer(0, 0, getWidth(), getHeight(), null);
+                super.draw(canvas);
+                // the paper under the lines, in the icon's colour (the lines are cut out of a filled page)
+                solegramFeedPaint.setXfermode(null);
+                solegramFeedPaint.setAlpha(255);
+                solegramFeedPaint.setColor(ColorUtils.blendARGB(colorDefault, colorSelected, isSelectedAnimator.getFloatValue()));
+                canvas.drawRect(area, solegramFeedPaint);
+                for (int i = 0; i < bands.length; i++) {
+                    final int b = bands.length - 1 - i;
+                    final float t = Math.max(0f, Math.min(1f, (solegramBands - i * 0.16f) / 0.62f));
+                    if (t <= 0f) {
+                        continue;
+                    }
+                    final float dy = dp(6) * (1f - CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(t));
+                    final android.graphics.RectF band = solegramFeedRect(box, bands[b], solegramFeedBand);
+                    // the band's cut-outs, moved, punched out of the paper
+                    solegramFeedOut.setAlpha((int) (255 * Math.min(1f, t * 1.8f)));
+                    final int outer = canvas.saveLayer(area, solegramFeedOut);
+                    canvas.clipRect(area);
+                    solegramFeedPaint.setColor(Color.BLACK);
+                    // a pixel inside the band, so no hairline is left where the band's edges meet the page
+                    canvas.drawRect(band.left + 1, band.top + dy + 1, band.right - 1, band.bottom + dy - 1, solegramFeedPaint);
+                    solegramFeedCut.setAlpha(255);
+                    canvas.saveLayer(area, solegramFeedCut);
+                    canvas.translate(0, dy);
+                    canvas.clipRect(band);
+                    super.draw(canvas);
+                    canvas.restoreToCount(outer);
+                }
+                canvas.restoreToCount(root);
             }
         };
         addView(imageView, LayoutHelper.createFrame(44, 44, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, -6, 0, 0));
@@ -276,6 +307,25 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     // region Solegram: tab motions
 
     private float solegramBands = -1f;
+    private final Paint solegramFeedPaint = new Paint();
+    private final Paint solegramFeedOut = new Paint();
+    private final Paint solegramFeedCut = new Paint();
+    private final android.graphics.RectF solegramFeedArea = new android.graphics.RectF(), solegramFeedBand = new android.graphics.RectF();
+    {
+        solegramFeedOut.setXfermode(new android.graphics.PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
+        solegramFeedCut.setXfermode(new android.graphics.PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
+    }
+
+    // where the feed icon's lines are, as parts of the icon (left, top, right, bottom): the page under them, then each line
+    private static final float[] FEED_LOTTIE_CONTENT = {0.29f, 0.30f, 0.71f, 0.69f};
+    private static final float[][] FEED_LOTTIE_BANDS = {{0.29f, 0.30f, 0.71f, 0.503f}, {0.29f, 0.503f, 0.71f, 0.592f}, {0.29f, 0.592f, 0.71f, 0.69f}};
+    private static final float[] FEED_PACK_CONTENT = {0.3125f, 0.375f, 0.75f, 0.625f};
+    private static final float[][] FEED_PACK_BANDS = {{0.3125f, 0.375f, 0.75f, 0.5f}, {0.3125f, 0.5f, 0.75f, 0.625f}};
+
+    private static android.graphics.RectF solegramFeedRect(android.graphics.RectF box, float[] f, android.graphics.RectF out) {
+        out.set(box.left + box.width() * f[0], box.top + box.height() * f[1], box.left + box.width() * f[2], box.top + box.height() * f[3]);
+        return out;
+    }
     private android.animation.Animator solegramMotion;
 
     private void solegramPlaySelectMotion() {
