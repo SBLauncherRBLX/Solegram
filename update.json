@@ -1,9 +1,9 @@
 {
-  "version": "2.9.6",
-  "build": 65,
-  "apk": "apk/Solegram-2.9.6-b65-release.apk",
-  "size": 63065781,
-  "sha256": "3694bffa6cead8329932c06bdf84fcab8df137a78e5c75804d01637bd77a8f81",
-  "changelog": "Solegram 2.9.6\n\n• Иконки-линии в настройках Solegram теперь тоже в цвет темы (раньше были белыми).\n• Новые скруглённые иконки вместо угловатых и мелких: плагины (пазл), замок приватности, энергосбережение, Solegram+, ИИ, SoleDrop, музыка, звёзды, кошелёк и другие.\n• Все иконки-линии одного размера.",
+  "version": "2.9.7",
+  "build": 66,
+  "apk": "apk/Solegram-2.9.7-b66-release.apk",
+  "size": 63235357,
+  "sha256": "12302500f7739744e951d2ec2bd8a282678ffe25e0570a2cc184d74eb4a2edc9",
+  "changelog": "Solegram 2.9.7\n\n• Иконки-линии в настройках стали жирнее и заметнее.",
   "latest": "apk/Solegram-latest.apk"
 }

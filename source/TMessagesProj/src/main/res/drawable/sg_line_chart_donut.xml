@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Solegram: a settings icon for the line style (Phosphor Light, MIT, or drawn for Solegram) -->
+<!-- Solegram: a settings icon for the line style (Phosphor, MIT, or drawn for Solegram) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -9,8 +9,8 @@
         <path
             android:fillColor="#FFFFFFFF"
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="2"
+            android:strokeWidth="3"
             android:strokeLineJoin="round"
-            android:pathData="M128,26a6,6,0,0,0-6,6V88a6,6,0,0,0,6,6,34,34,0,1,1-29.45,17,6,6,0,0,0-2.2-8.2l-48.5-28A6,6,0,0,0,39.65,77,102,102,0,1,0,128,26ZM47.21,88.29l38.29,22.1A46,46,0,0,0,82,128a47.64,47.64,0,0,0,.4,6L39.7,145.45a90.27,90.27,0,0,1,7.51-57.16ZM42.81,157l42.7-11.44a46.12,46.12,0,0,0,36.49,28v44.2A90.2,90.2,0,0,1,42.81,157ZM134,217.8V173.6a46,46,0,0,0,0-91.21V38.2a90,90,0,0,1,0,179.6Z" />
+            android:pathData="M128,24a8,8,0,0,0-8,8V88a8,8,0,0,0,8,8,32,32,0,1,1-27.72,16,8,8,0,0,0-2.93-10.93l-48.5-28A8,8,0,0,0,37.92,76,104,104,0,1,0,128,24ZM48.09,91.1,83,111.26A48.09,48.09,0,0,0,80,128c0,1.53.08,3,.22,4.52L41.28,143A88.16,88.16,0,0,1,48.09,91.1Zm-2.67,67.31,39-10.44A48.1,48.1,0,0,0,120,175.32v40.31A88.2,88.2,0,0,1,45.42,158.41ZM136,215.63V175.32a48,48,0,0,0,0-94.65V40.36a88,88,0,0,1,0,175.27Z" />
     </group>
 </vector>

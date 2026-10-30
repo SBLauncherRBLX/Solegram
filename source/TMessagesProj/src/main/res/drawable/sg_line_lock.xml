@@ -1,28 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Solegram: a settings icon for the line style (Phosphor Light, MIT, or drawn for Solegram) -->
+<!-- Solegram: a settings icon for the line style (Phosphor, MIT, or drawn for Solegram) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.0" android:scaleY="1.0" android:translateX="0" android:translateY="0">
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+    <group android:pivotX="128" android:pivotY="128" android:scaleX="1.058" android:scaleY="1.058">
         <path
+            android:fillColor="#FFFFFFFF"
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="1.250"
-            android:strokeLineCap="round"
+            android:strokeWidth="3"
             android:strokeLineJoin="round"
-            android:pathData="M7.5,10V7.5A4.5,4.5 0,0 1,16.5,7.5V10" />
-        <path
-            android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="1.250"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:pathData="M7.5,10H16.5A3.5,3.5 0,0 1,20,13.5V17.5A3.5,3.5 0,0 1,16.5,21H7.5A3.5,3.5 0,0 1,4,17.5V13.5A3.5,3.5 0,0 1,7.5,10Z" />
-        <path
-            android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="1.250"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:pathData="M12,14.5V16.5" />
+            android:pathData="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z" />
     </group>
 </vector>
