@@ -767,18 +767,14 @@ public final class SolegramCameraUi {
 
     // region Glass
 
-    /**
-     * Background of a round control: live liquid glass over the preview, or a clean dark circle. Both get a soft
-     * light from above ({@link Sheen}): over the black bars around a 4:3 or 1:1 frame there is nothing for the
-     * glass to bend, and the lit edge is what still shows it as glass, as on iOS.
-     */
+    /** Background of a round control: live liquid glass over the preview, or a clean dark circle; nothing over it. */
     Drawable background(View view, int radius) {
         if (glass != null) {
             final BlurredBackgroundDrawable drawable = glass.create(view);
             drawable.setRadius(radius);
-            return new android.graphics.drawable.LayerDrawable(new Drawable[]{drawable, new Sheen(0x2EFFFFFF, 0x0DFFFFFF)});
+            return drawable;
         }
-        return new android.graphics.drawable.LayerDrawable(new Drawable[]{new PlainPill(0x61232326, 0x2EFFFFFF), new Sheen(0x1FFFFFFF, 0)});
+        return new PlainPill(0x61232326, 0x2EFFFFFF);
     }
 
     /**
@@ -911,61 +907,6 @@ public final class SolegramCameraUi {
         }
     }
 
-    /**
-     * The light on a round control: a soft glow over its upper part fading out before the middle, and a faint
-     * lower edge. The gradient is made when the size changes, never while drawing.
-     */
-    static final class Sheen extends Drawable {
-        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint low = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF rect = new RectF();
-        private final int topColor;
-
-        Sheen(int topColor, int lowColor) {
-            this.topColor = topColor;
-            low.setStyle(Paint.Style.STROKE);
-            low.setStrokeWidth(dpf2(0.8f));
-            low.setColor(lowColor);
-        }
-
-        @Override
-        protected void onBoundsChange(@NonNull android.graphics.Rect bounds) {
-            super.onBoundsChange(bounds);
-            if (bounds.height() > 0) {
-                glow.setShader(new android.graphics.LinearGradient(0, bounds.top, 0, bounds.top + bounds.height() * 0.55f,
-                    topColor, topColor & 0x00FFFFFF, android.graphics.Shader.TileMode.CLAMP));
-            }
-        }
-
-        @Override
-        public void draw(@NonNull Canvas canvas) {
-            rect.set(getBounds());
-            if (rect.isEmpty()) {
-                return;
-            }
-            final float r = Math.min(rect.width(), rect.height()) / 2f;
-            canvas.drawRoundRect(rect, r, r, glow);
-            if (low.getColor() != 0 && Math.abs(rect.width() - rect.height()) < dpf2(1f)) {
-                final float inset = dpf2(1.2f);
-                rect.inset(inset, inset);
-                // round buttons only, the lower part: light bounced back inside the glass
-                canvas.drawArc(rect, 25, 130, false, low);
-            }
-        }
-
-        @Override
-        public void setAlpha(int alpha) {
-        }
-
-        @Override
-        public void setColorFilter(@Nullable ColorFilter colorFilter) {
-        }
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.TRANSLUCENT;
-        }
-    }
     // endregion
 
     // region Views
