@@ -9075,6 +9075,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         final boolean[] hasPinAction = new boolean[1];
         hasPinAction[0] = true;
+        final boolean[] solegramPreviewPinLocal = new boolean[1];
         TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(dialogId);
         boolean containsFilter;
         final MessagesController.DialogFilter filter = (
@@ -9130,6 +9131,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
             }
             hasPinAction[0] = !(newPinnedSecretCount + pinnedSecretCount > maxPinnedCount || newPinnedCount + pinnedCount - alreadyAdded > maxPinnedCount);
+            // Solegram: past the limit the chat is pinned on this device
+            if (!hasPinAction[0] && folderId == 0 && filter == null && com.solegram.messenger.SolegramConfig.localPins) {
+                hasPinAction[0] = true;
+                solegramPreviewPinLocal[0] = true;
+            }
         }
 
         if (hasPinAction[0]) {
@@ -9156,6 +9162,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     }
                     UndoView undoView = getUndoView();
                     if (undoView == null) {
+                        return;
+                    }
+                    if (!isDialogPinned(dialog) && solegramPreviewPinLocal[0]) {
+                        com.solegram.messenger.SolegramLocalPins.pin(currentAccount, dialogId);
+                        solegramLocalPinsChanged();
+                        undoView.showWithAction(0, UndoView.ACTION_PIN_DIALOGS, 1, 1600, null, null);
+                        return;
+                    } else if (dialog != null && filter == null && !dialog.pinned && com.solegram.messenger.SolegramLocalPins.isPinned(currentAccount, dialogId)) {
+                        com.solegram.messenger.SolegramLocalPins.unpin(currentAccount, dialogId);
+                        solegramLocalPinsChanged();
+                        undoView.showWithAction(0, UndoView.ACTION_UNPIN_DIALOGS, 1, 1600, null, null);
                         return;
                     }
                     if (!isDialogPinned(dialog)) {
@@ -9676,8 +9693,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (filter != null) {
             return filter.pinnedDialogs.indexOfKey(dialog.id) >= 0;
         }
-        return dialog.pinned;
+        return dialog.pinned || folderId == 0 && com.solegram.messenger.SolegramLocalPins.isPinned(currentAccount, dialog.id);
     }
+
+    // Solegram: this pin action goes past Telegram's limit, so the new pins are kept on this device
+    private boolean solegramPinLocally;
 
     private void performSelectedDialogsAction(ArrayList<Long> selectedDialogs, int action, boolean alert, boolean longPress) {
         performSelectedDialogsAction(selectedDialogs, action, alert, longPress, null);
@@ -9774,7 +9794,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             } else {
                 maxPinnedCount = getUserConfig().isPremium() ? getMessagesController().dialogFiltersPinnedLimitPremium : getMessagesController().dialogFiltersPinnedLimitDefault;
             }
-            if (newPinnedSecretCount + pinnedSecretCount > maxPinnedCount || newPinnedCount + pinnedCount - alreadyAdded > maxPinnedCount) {
+            solegramPinLocally = false;
+            if ((newPinnedSecretCount + pinnedSecretCount > maxPinnedCount || newPinnedCount + pinnedCount - alreadyAdded > maxPinnedCount)
+                && folderId == 0 && filter == null && com.solegram.messenger.SolegramConfig.localPins) {
+                solegramPinLocally = true;
+            } else if (newPinnedSecretCount + pinnedSecretCount > maxPinnedCount || newPinnedCount + pinnedCount - alreadyAdded > maxPinnedCount) {
                 if (folderId != 0 || filter != null) {
                     AlertsCreator.showSimpleAlert(DialogsActivity.this, LocaleController.formatString("PinFolderLimitReached", R.string.PinFolderLimitReached, LocaleController.formatPluralString("Chats", maxPinnedCount)));
                 } else {
@@ -9918,6 +9942,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         continue;
                     }
                     pinnedActionCount++;
+                    if (solegramPinLocally) {
+                        com.solegram.messenger.SolegramLocalPins.pin(currentAccount, selectedDialog);
+                        solegramLocalPinsChanged();
+                        continue;
+                    }
                     pinDialog(selectedDialog, true, filter, minPinnedNum, count == 1);
                     if (filter != null) {
                         minPinnedNum++;
@@ -9936,6 +9965,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         continue;
                     }
                     pinnedActionCount++;
+                    if (filter == null && !dialog.pinned && com.solegram.messenger.SolegramLocalPins.isPinned(currentAccount, selectedDialog)) {
+                        com.solegram.messenger.SolegramLocalPins.unpin(currentAccount, selectedDialog);
+                        solegramLocalPinsChanged();
+                        continue;
+                    }
                     pinDialog(selectedDialog, false, filter, minPinnedNum, count == 1);
                 }
             } else if (action == read) {
@@ -10063,6 +10097,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             scrollToTop(true, false);
         }
         hideActionMode(action != pin2 && action != pin && action != delete);
+    }
+
+    private void solegramLocalPinsChanged() {
+        getMessagesController().sortDialogs(null);
+        getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
     }
 
     private void markAsRead(long did) {

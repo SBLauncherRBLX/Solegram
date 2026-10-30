@@ -2704,7 +2704,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     if (scheduleDate != 0) {
                         req.schedule_date = scheduleDate;
                         req.flags |= 1024;
-                        if (scheduleRepeatPeriod != 0) {
+                        // Solegram: forwarded once without Premium (the server refuses a repeat for them)
+                        if (scheduleRepeatPeriod != 0 && (getUserConfig().isPremium() || !com.solegram.messenger.SolegramConfig.localRepeats)) {
                             req.schedule_repeat_period = scheduleRepeatPeriod;
                             req.flags |= TLObject.FLAG_24;
                         }
@@ -4419,6 +4420,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         final SendMessageParams sendMessageParams = com.solegram.messenger.SolegramHooks.onSendMessage(currentAccount, sendMessageParamsIn);
         if (sendMessageParams == null) {
             return;
+        }
+        // Solegram: a repeat without Premium is kept on this device (the server would refuse it)
+        if (com.solegram.messenger.SolegramConfig.localRepeats) {
+            com.solegram.messenger.SolegramRepeats.takeOver(currentAccount, sendMessageParams);
         }
         final SendMessageChatArguments sendMessageChatArguments = sendMessageParams.sendMessageChatArguments != null ?
                 sendMessageParams.sendMessageChatArguments : SendMessageChatArguments.EMPTY;

@@ -40,6 +40,7 @@ public final class SolegramMessageMenu {
     public static final int OPTION_FILTER_SIMILAR = 9005;
     public static final int OPTION_REMIND = 9006;
     public static final int OPTION_SOLEDROP = 9007;
+    public static final int OPTION_SAVED_TAG = 9008;
     public static final int OPTION_PLUGIN_BASE = 9100;
     public static final int HEADER_PLUGIN_BASE = 20000;
     public static final int PROFILE_PLUGIN_BASE = 21000;
@@ -128,6 +129,13 @@ public final class SolegramMessageMenu {
             options.add(OPTION_FILTER_SIMILAR);
             icons.add(R.drawable.msg_archive_hide);
         }
+        // tags in Saved Messages without Premium, kept on this device
+        if (SolegramConfig.localSavedTags && !chat.getUserConfig().isPremium() && chat.getDialogId() == chat.getUserConfig().getClientUserId()
+            && message.getId() > 0 && chat.getChatMode() != ChatActivity.MODE_SCHEDULED) {
+            items.add(LocaleController.getString(R.string.SG_SavedTag));
+            options.add(OPTION_SAVED_TAG);
+            icons.add(R.drawable.menu_tag_plus);
+        }
         if (SolegramConfig.messageDetails) {
             items.add(LocaleController.getString(R.string.SG_MessageDetails));
             options.add(OPTION_MESSAGE_DETAILS);
@@ -173,6 +181,10 @@ public final class SolegramMessageMenu {
         }
         if (option == OPTION_SOLEDROP) {
             com.solegram.messenger.soledrop.SoleDrop.open(chat, com.solegram.messenger.soledrop.SoleDropItem.messages(soleDropMessages(message, group)));
+            return true;
+        }
+        if (option == OPTION_SAVED_TAG) {
+            com.solegram.messenger.ui.SolegramSavedTagsActivity.showPicker(chat, message);
             return true;
         }
         if (option == OPTION_REMIND) {
@@ -338,6 +350,8 @@ public final class SolegramMessageMenu {
     public static final int ACTION_REMIND = 19992;
     /** Selection action bar: the selected messages go by SoleDrop. */
     public static final int ACTION_SOLEDROP = 19993;
+    /** Saved Messages menu: the tags kept on this device. */
+    public static final int HEADER_SAVED_TAGS = 19994;
     /** Profile menu: the account, group or channel goes by SoleDrop. */
     public static final int PROFILE_SOLEDROP = 20990;
     /** Profile menu: the chat is hidden from the lists of this device (or shown again). */
@@ -358,6 +372,10 @@ public final class SolegramMessageMenu {
         if (headerItem != null && chat.getChatMode() == ChatActivity.MODE_DEFAULT && SolegramMessageFilters.isActive()
             && chat.getDialogId() != chat.getUserConfig().getClientUserId()) {
             filterItems.put(chat, headerItem.lazilyAddSubItem(HEADER_FILTERS, R.drawable.msg_archive_hide, filtersHeaderText(chat)));
+        }
+        if (headerItem != null && SolegramConfig.localSavedTags && !chat.getUserConfig().isPremium()
+            && chat.getDialogId() == chat.getUserConfig().getClientUserId() && chat.getChatMode() == ChatActivity.MODE_DEFAULT) {
+            headerItem.lazilyAddSubItem(HEADER_SAVED_TAGS, R.drawable.menu_tag_filter, LocaleController.getString(R.string.SG_SavedTags));
         }
         if (headerItem == null || !PluginsController.isEngineAvailable()) {
             return;
@@ -385,6 +403,10 @@ public final class SolegramMessageMenu {
             final ArrayList<MessageObject> selected = chat.solegramSelectedMessages();
             chat.clearSelectionMode();
             com.solegram.messenger.ui.SolegramReminderSheet.show(chat, selected);
+            return true;
+        }
+        if (id == HEADER_SAVED_TAGS) {
+            chat.presentFragment(new com.solegram.messenger.ui.SolegramSavedTagsActivity());
             return true;
         }
         if (id == HEADER_FILTERS) {

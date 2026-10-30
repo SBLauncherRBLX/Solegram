@@ -1461,6 +1461,19 @@ public class MessagesController extends BaseController implements NotificationCe
                 return 0;
             }
         }
+        // Solegram: chats pinned past the limit on this device come next, the newest first
+        if (com.solegram.messenger.SolegramLocalPins.hasAny(currentAccount)) {
+            final int l1 = dialog1.folder_id == 0 ? com.solegram.messenger.SolegramLocalPins.position(currentAccount, dialog1.id) : -1;
+            final int l2 = dialog2.folder_id == 0 ? com.solegram.messenger.SolegramLocalPins.position(currentAccount, dialog2.id) : -1;
+            if (l1 >= 0 || l2 >= 0) {
+                if (l2 < 0) {
+                    return -1;
+                } else if (l1 < 0) {
+                    return 1;
+                }
+                return Integer.compare(l1, l2);
+            }
+        }
         MediaDataController mediaDataController = getMediaDataController();
         long date1 = DialogObject.getLastMessageOrDraftDate(dialog1, mediaDataController.getDraft(dialog1.id, 0));
         long date2 = DialogObject.getLastMessageOrDraftDate(dialog2, mediaDataController.getDraft(dialog2.id, 0));
@@ -24331,7 +24344,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isStoryQualityFullOnAccount() {
-        return getUserConfig().isPremium() && storyQualityFull;
+        return (getUserConfig().isPremium() || com.solegram.messenger.SolegramConfig.saveStories) && storyQualityFull; // Solegram: HD stories without Premium
     }
 
     public static boolean isStoryQualityFull() {

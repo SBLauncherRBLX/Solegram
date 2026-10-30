@@ -4799,6 +4799,10 @@ public class NotificationsController extends BaseController implements Notificat
                                 ApplicationLoader.applicationContext.grantUriPermission("com.android.systemui", sound, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                             } else {
                                 sound = Uri.parse(soundPath);
+                                if (com.solegram.messenger.SolegramSounds.isOwn(soundPath)) {
+                                    // Solegram: a sound from the phone the user added; the system may read it
+                                    ApplicationLoader.applicationContext.grantUriPermission("com.android.systemui", sound, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                }
                             }
                         }
                     } else {

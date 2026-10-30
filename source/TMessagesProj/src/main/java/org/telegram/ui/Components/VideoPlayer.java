@@ -263,6 +263,9 @@ public class VideoPlayer implements Player.Listener, VideoListener, AnalyticsLis
                 builder.setLooper(looper);
             }
             player = builder.build();
+            if (solegramSkipSilence) {
+                player.setSkipSilenceEnabled(true);
+            }
 
             player.addAnalyticsListener(this);
             player.addListener(this);
@@ -1455,6 +1458,18 @@ public class VideoPlayer implements Player.Listener, VideoListener, AnalyticsLis
             audioUpdateHandler.removeCallbacksAndMessages(null);
             audioVisualizerDelegate.onVisualizerUpdate(false, true, null);
         }
+    }
+
+    // Solegram: pauses in voice messages are skipped
+    private boolean solegramSkipSilence;
+
+    public void setSkipSilence(boolean skip) {
+        solegramSkipSilence = skip;
+        try {
+            if (player != null) {
+                player.setSkipSilenceEnabled(skip);
+            }
+        } catch (Exception ignore) {}
     }
 
     public void setPlaybackSpeed(float speed) {

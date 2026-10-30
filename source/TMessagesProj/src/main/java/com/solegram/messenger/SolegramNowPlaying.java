@@ -280,7 +280,8 @@ public final class SolegramNowPlaying {
         }
         callbacks.clear();
         for (MediaController c : keep) {
-            final MediaController.Callback callback = new MediaController.Callback() {
+            final MediaController.Callback[] self = new MediaController.Callback[1];
+            final MediaController.Callback callback = self[0] = new MediaController.Callback() {
                 @Override
                 public void onPlaybackStateChanged(@Nullable PlaybackState state) {
                     refresh();
@@ -293,6 +294,12 @@ public final class SolegramNowPlaying {
 
                 @Override
                 public void onSessionDestroyed() {
+                    // the player closed its session: its last track must not stay on the card
+                    try {
+                        c.unregisterCallback(self[0]);
+                    } catch (Throwable ignore) {
+                    }
+                    callbacks.remove(c);
                     refresh();
                 }
             };
@@ -307,7 +314,13 @@ public final class SolegramNowPlaying {
     }
 
     /** The playing player wins; else the one paused last keeps its card. */
+    /** A paused song keeps its card this long after the pause, then the card goes. */
+    private static final long PAUSED_KEEP_MS = 3 * 60_000;
+    private static final Runnable refreshLater = SolegramNowPlaying::refresh;
+
     private static void refresh() {
+        handler.removeCallbacks(refreshLater);
+        long nextCheck = Long.MAX_VALUE;
         MediaController best = null;
         MediaMetadata bestMetadata = null;
         PlaybackState bestState = null;
@@ -328,6 +341,17 @@ public final class SolegramNowPlaying {
                 continue;
             }
             final boolean playing = state != null && (state.getState() == PlaybackState.STATE_PLAYING || state.getState() == PlaybackState.STATE_BUFFERING);
+            if (!playing) {
+                // stopped, or paused a while ago: nothing is being listened to any more
+                if (state == null || state.getState() != PlaybackState.STATE_PAUSED) {
+                    continue;
+                }
+                final long since = state.getLastPositionUpdateTime() > 0 ? SystemClock.elapsedRealtime() - state.getLastPositionUpdateTime() : PAUSED_KEEP_MS;
+                if (since >= PAUSED_KEEP_MS) {
+                    continue;
+                }
+                nextCheck = Math.min(nextCheck, PAUSED_KEEP_MS - since + 1000);
+            }
             if (best == null || playing && !bestPlaying) {
                 best = c;
                 bestMetadata = metadata;
@@ -344,6 +368,9 @@ public final class SolegramNowPlaying {
                 FileLog.e(e);
                 return;
             }
+        }
+        if (nextCheck != Long.MAX_VALUE && started) {
+            handler.postDelayed(refreshLater, nextCheck); // the paused card goes when its time is up
         }
         setCurrent(track);
     }

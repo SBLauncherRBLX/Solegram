@@ -4725,7 +4725,8 @@ public class AlertsCreator {
 
         if (repeatTextView != null) {
             repeatTextView.setOnClickListener(v -> {
-                if (!UserConfig.getInstance(UserConfig.selectedAccount).isPremium()) {
+                // Solegram: without Premium the repeats are scheduled from this device (text messages)
+                if (!UserConfig.getInstance(UserConfig.selectedAccount).isPremium() && !com.solegram.messenger.SolegramConfig.localRepeats) {
                     BulletinFactory.of(bulletinContainer, resourcesProvider)
                         .createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.premiumText(LocaleController.getString(R.string.MessageScheduledRepeatPremium), () -> {
                             final BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();

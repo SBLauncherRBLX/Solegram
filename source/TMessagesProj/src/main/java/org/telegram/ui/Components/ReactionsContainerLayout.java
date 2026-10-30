@@ -581,6 +581,7 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
 
     @SuppressLint("NotifyDataSetChanged")
     private void setVisibleReactionsList(List<ReactionsLayoutInBubble.VisibleReaction> visibleReactionsList, boolean animated) {
+        visibleReactionsList = com.solegram.messenger.SolegramFavoriteReactions.order(visibleReactionsList); // Solegram: the user's favourites first
         this.visibleReactionsList.clear();
         if (showCustomEmojiReaction()) {
             int i = 0;

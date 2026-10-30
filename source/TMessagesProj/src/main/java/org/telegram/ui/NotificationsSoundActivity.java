@@ -89,6 +89,7 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
     int serverTonesEndRow;
 
     int uploadRow;
+    int solegramLocalRow = -1; // Solegram: a sound from the phone, any length and size, kept on this device
 
     int dividerRow;
     int dividerRow2;
@@ -354,6 +355,17 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
         ((DefaultItemAnimator) listView.getItemAnimator()).setDelayAnimations(false);
         listView.setLayoutManager(new LinearLayoutManager(context));
         listView.setOnItemClickListener((view, position) -> {
+            if (position == solegramLocalRow) {
+                try {
+                    final Intent picker = new Intent(Intent.ACTION_GET_CONTENT);
+                    picker.setType("audio/*");
+                    picker.addCategory(Intent.CATEGORY_OPENABLE);
+                    startActivityForResult(picker, 22);
+                } catch (Exception e) {
+                    FileLog.e(e);
+                }
+                return;
+            }
             if (position == uploadRow) {
                 chatAttachAlert = new ChatAttachAlert(context, NotificationsSoundActivity.this, false, false, true, resourcesProvider);
                 chatAttachAlert.setSoundPicker();
@@ -507,6 +519,24 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
             selectedTone = defaultTone;
         }
 
+        // Solegram: sounds the user added from the phone
+        for (com.solegram.messenger.SolegramSounds.Sound local : com.solegram.messenger.SolegramSounds.list()) {
+            Tone tone = new Tone();
+            tone.stableId = stableIds++;
+            tone.title = local.title;
+            tone.uri = local.uri;
+            if (startSelectedTone != null && startSelectedTone.document == null && local.uri.equals(startSelectedTone.uri)) {
+                startSelectedTone = null;
+                selectedTone = tone;
+            }
+            if (solegramJustAdded != null && solegramJustAdded.equals(local.uri)) {
+                selectedTone = tone;
+                selectedToneChanged = true;
+            }
+            systemTones.add(tone);
+        }
+        solegramJustAdded = null;
+
         while (cursor.moveToNext()) {
             String notificationTitle = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX);
             String notificationUri = cursor.getString(RingtoneManager.URI_COLUMN_INDEX) + "/" + cursor.getString(RingtoneManager.ID_COLUMN_INDEX);
@@ -575,6 +605,7 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
             serverTonesEndRow = rowCount;
         }
         uploadRow = rowCount++;
+        solegramLocalRow = rowCount++;
         dividerRow = rowCount++;
 
         if (!systemTones.isEmpty()) {
@@ -608,6 +639,8 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
                 return 2;
             } else if (position == uploadRow) {
                 return 3;
+            } else if (position == solegramLocalRow) {
+                return 6;
             } else if (position == dividerRow) {
                 return 4;
             } else if (position == dividerRow2) {
@@ -695,7 +728,7 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
                     drawable1.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_switchTrackChecked, resourcesProvider), PorterDuff.Mode.MULTIPLY));
                     drawable2.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_checkboxCheck, resourcesProvider), PorterDuff.Mode.MULTIPLY));
                     CombinedDrawable combinedDrawable = new CombinedDrawable(drawable1, drawable2);
-                    textCell.setTextAndIcon(LocaleController.getString(R.string.UploadSound), combinedDrawable, false);
+                    textCell.setTextAndIcon(LocaleController.getString(position == solegramLocalRow ? R.string.SG_SoundFromDevice : R.string.UploadSound), combinedDrawable, false);
                     break;
             }
         }
@@ -706,7 +739,7 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
                 return 0;
             } else if (position == serverTonesHeaderRow || position == systemTonesHeaderRow) {
                 return 1;
-            } else if (position == uploadRow) {
+            } else if (position == uploadRow || position == solegramLocalRow) {
                 return 2;
             } else if (position == dividerRow || position == dividerRow2) {
                 return 3;
@@ -944,8 +977,27 @@ public class NotificationsSoundActivity extends BaseFragment implements ChatAtta
         }
     }
 
+    private String solegramJustAdded;
+
     @Override
     public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
+        if (requestCode == 22) {
+            // Solegram: copied into the app and chosen at once; it plays from here, nothing is uploaded
+            if (data == null || data.getData() == null) {
+                return;
+            }
+            final String uri = com.solegram.messenger.SolegramSounds.add(data.getData());
+            if (uri == null) {
+                org.telegram.ui.Components.BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.SG_SoundFromDeviceFailed)).show();
+                return;
+            }
+            solegramJustAdded = uri;
+            loadTones();
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
+            return;
+        }
         if (requestCode == 21) {
             if (data == null) {
                 return;

@@ -795,6 +795,29 @@ public class TranscribeButton {
         }
     }
 
+    // Solegram: voice messages already given to the automatic transcription in this run of the app
+    private static final java.util.HashSet<String> solegramAutoTried = new java.util.HashSet<>();
+
+    /**
+     * Solegram: with automatic transcription on, a voice message shown in a chat is transcribed by itself (once;
+     * one the user closed stays closed). Only where Solegram transcribes it (on the phone or the user's own service).
+     */
+    public static void solegramAutoTranscribe(MessageObject m) {
+        if (!com.solegram.messenger.SolegramConfig.transcribeAuto || m == null || m.messageOwner == null || !m.isVoice() || !m.isSent()) {
+            return;
+        }
+        if (m.messageOwner.voiceTranscription != null || m.messageOwner.voiceTranscriptionOpen || m.getDuration() > 300) {
+            return;
+        }
+        if (!com.solegram.messenger.SolegramTranscriber.handles(m)) {
+            return;
+        }
+        if (!solegramAutoTried.add(m.currentAccount + "_" + m.getDialogId() + "_" + m.getId())) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> transcribePressed(m, true, null));
+    }
+
     /**
      * Solegram: the message is transcribed by SolegramTranscriber; the text heard so far shows while it works
      * (as Telegram's pending transcriptions do) and the result is stored like Telegram's, so it stays after reload.

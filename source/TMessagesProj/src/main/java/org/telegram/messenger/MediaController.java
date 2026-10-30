@@ -3978,6 +3978,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                         }
                         shouldSavePositionForCurrentAudio = name;
                     }
+                    audioPlayer.setSkipSilence(com.solegram.messenger.SolegramConfig.voiceSkipSilence);
                     if (Math.abs(currentPlaybackSpeed - 1.0f) > 0.001f) {
                         audioPlayer.setPlaybackSpeed(Math.round(currentPlaybackSpeed * 10f) / 10f);
                     }

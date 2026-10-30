@@ -6986,6 +6986,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     @Override
     protected void onResume() {
         super.onResume();
+        com.solegram.messenger.SolegramRepeats.tick(); // Solegram: the next copies of repeating messages
         isResumed = true;
         com.solegram.messenger.BackgroundConnection.ensureRunning(this);
         com.solegram.messenger.soledrop.SoleDrop.onAppResumed(); // Solegram: a fresh SoleDrop token for the next tap

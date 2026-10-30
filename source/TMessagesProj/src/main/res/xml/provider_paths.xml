@@ -5,4 +5,5 @@
     <files-path name="cache" path="/cache/"/>
     <root-path name="external_files" path="/storage/" />
     <cache-path name="solegram" path="solegram/" />
+    <files-path name="solegram_sounds" path="solegram_sounds/" />
 </paths>

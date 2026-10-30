@@ -211,17 +211,20 @@ public class UserObject {
 
     public static int getColorId(TLRPC.User user) {
         if (user == null) return 0;
+        if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.nameColor(); // Solegram: kept on this device
         if (user.color instanceof TLRPC.TL_peerColor && (user.color.flags & 1) != 0) return user.color.color;
         return (int) (user.id % 7);
     }
 
     public static long getEmojiId(TLRPC.User user) {
+        if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.nameEmoji();
         if (user != null && user.color instanceof TLRPC.TL_peerColor && (user.color.flags & 2) != 0) return user.color.background_emoji_id;
         return 0;
     }
 
     public static int getProfileColorId(TLRPC.User user) {
         if (user == null) return 0;
+        if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileColor();
         if (user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 1) != 0) return user.profile_color.color;
         return -1;
     }
@@ -230,11 +233,13 @@ public class UserObject {
         if (user != null && user.emoji_status instanceof TLRPC.TL_emojiStatusCollectible) {
             return ((TLRPC.TL_emojiStatusCollectible) user.emoji_status).pattern_document_id;
         }
+        if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileEmoji();
         if (user != null && user.profile_color != null && (user.profile_color.flags & 2) != 0) return user.profile_color.background_emoji_id;
         return 0;
     }
 
     public static long getOnlyProfileEmojiId(TLRPC.User user) {
+        if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileEmoji();
         if (user != null && user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 2) != 0) return user.profile_color.background_emoji_id;
         return 0;
     }

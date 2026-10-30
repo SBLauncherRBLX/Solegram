@@ -103,6 +103,20 @@ public class SolegramConfig {
     public static boolean transcribe = true;
     /** SolegramTranscriber.ENGINE_*: 0 = auto, 1 = on the device, 2 = the user's AI service. */
     public static int transcribeEngine = 0;
+    /** Video profile photos move in the chat list for everyone, not only for Premium users' photos. */
+    public static boolean animatedAvatars = true;
+    /** Pauses in voice messages are skipped while they play. */
+    public static boolean voiceSkipSilence = false;
+    /** Pinning past Telegram's limit keeps the extra chats on top on this device. */
+    public static boolean localPins = true;
+    /** Stories that may be shared are saved to the gallery without Premium. */
+    public static boolean saveStories = true;
+    /** Repeating scheduled messages without Premium, scheduled from this device. */
+    public static boolean localRepeats = true;
+    /** Tags for Saved Messages without Premium, kept on this device. */
+    public static boolean localSavedTags = true;
+    /** Voice messages are transcribed as soon as they show in a chat. */
+    public static boolean transcribeAuto = true;
     /** Speech-to-text model of the user's AI service; empty = whisper-1 (whisper-large-v3-turbo on Groq). */
     public static String transcribeModel = "";
     /** Custom emoji next to the chats screen title, kept on this device (0 = none). */
@@ -404,6 +418,13 @@ public class SolegramConfig {
         meaningRerank = p.getBoolean("meaningRerank", true);
         transcribe = p.getBoolean("transcribe", true);
         transcribeEngine = clamp(p.getInt("transcribeEngine", 0), 0, 2);
+        transcribeAuto = p.getBoolean("transcribeAuto", true);
+        animatedAvatars = p.getBoolean("animatedAvatars", true);
+        voiceSkipSilence = p.getBoolean("voiceSkipSilence", false);
+        localPins = p.getBoolean("localPins", true);
+        saveStories = p.getBoolean("saveStories", true);
+        localRepeats = p.getBoolean("localRepeats", true);
+        localSavedTags = p.getBoolean("localSavedTags", true);
         transcribeModel = p.getString("transcribeModel", "");
         titleEmoji = readLong(p, "titleEmoji");
         nameEmoji = readLong(p, "nameEmoji");
@@ -676,6 +697,12 @@ public class SolegramConfig {
             case "meaningSearch":
             case "meaningRerank":
             case "transcribe":
+            case "transcribeAuto":
+            case "animatedAvatars":
+            case "localPins":
+            case "saveStories":
+            case "localRepeats":
+            case "localSavedTags":
             case "glassCallScreen":
             case "liquidMotion":
             case "iosInputBar":

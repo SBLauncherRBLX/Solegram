@@ -12711,6 +12711,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             ) && currentMessageObject.messageOwner != null && !(MessageObject.getMedia(currentMessageObject.messageOwner) instanceof TLRPC.TL_messageMediaWebPage) &&
             (currentMessageObject.messageOwner.media == null || currentMessageObject.messageOwner.media.ttl_seconds == 0)
         );
+        if (useTranscribeButton) {
+            TranscribeButton.solegramAutoTranscribe(currentMessageObject); // Solegram: voice messages turn into text by themselves
+        }
         updateSeekBarWaveformWidth(null);
     }
 

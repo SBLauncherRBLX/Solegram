@@ -1271,7 +1271,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                     buttonState.subText = null;
                 }
             } else {
-                buttonState.text = !getUserConfig().isPremium() && !isChannel ? buttonLocked : (selectedEmojiCollectible != null ? buttonCollectible : buttonUnlocked);
+                // Solegram: without Premium the colours are kept on this device, so the button is never locked
+                buttonState.text = selectedEmojiCollectible != null ? buttonCollectible : buttonUnlocked;
                 buttonState.subText = null;
             }
             if (getButtonPage() == this) {
@@ -1927,7 +1928,17 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             finishFragment();
         } else {
             if (!getUserConfig().isPremium()) {
-                showDialog(new PremiumFeatureBottomSheet(PeerColorActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_NAME_COLOR, true));
+                if (getButtonPage().selectedResaleGift != null) {
+                    showDialog(new PremiumFeatureBottomSheet(PeerColorActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_NAME_COLOR, true));
+                    return;
+                }
+                // Solegram: the colours and patterns are kept on this device, only the user sees them
+                com.solegram.messenger.SolegramSelfColors.save(namePage.selectedColor, namePage.selectedEmoji, profilePage.selectedColor, profilePage.selectedEmoji);
+                getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
+                finishFragment();
+                if (bulletinFragment != null) {
+                    BulletinFactory.of(bulletinFragment).createSimpleBulletin(R.raw.contact_check, getString(R.string.SG_SelfColorsSaved)).show();
+                }
                 return;
             }
         }
