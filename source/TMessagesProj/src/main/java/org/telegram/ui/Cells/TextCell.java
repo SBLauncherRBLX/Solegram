@@ -639,6 +639,25 @@ public class TextCell extends FrameLayout {
         colorfulIconSet = true;
         offsetFromImage = getOffsetFromImage(true);
         imageView.setVisibility(VISIBLE);
+        if (com.solegram.messenger.SolegramIcons.lineStyle()) {
+            // Solegram: a thin line glyph in the theme's colour, no tile
+            imageView.setPadding(dp(2), dp(2), dp(2), dp(2));
+            imageView.setTranslationX(dp(LocaleController.isRTL ? 0 : -3));
+            imageView.setColorFilter(null);
+            imageView.setBackground(null);
+            final android.graphics.drawable.Drawable line = com.solegram.messenger.SolegramIcons.lineIcon(getContext(), resId,
+                com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider));
+            if (line != null) {
+                final android.graphics.drawable.LayerDrawable sized = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{line});
+                sized.setLayerSize(0, dp(24), dp(24));
+                sized.setLayerGravity(0, android.view.Gravity.CENTER);
+                imageView.setImageDrawable(sized);
+            } else {
+                imageView.setImageResource(resId);
+                imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider), PorterDuff.Mode.SRC_IN));
+            }
+            return;
+        }
         imageView.setPadding(dp(2), dp(2), dp(2), dp(2));
         imageView.setTranslationX(dp(LocaleController.isRTL ? 0 : -3));
         // Solegram: every tile icon at the same 24dp (some of Telegram's icons, e.g. files_music, are drawn larger)

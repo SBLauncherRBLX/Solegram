@@ -1414,4 +1414,9 @@
     <string name="SG_NameEmojiShare">Показывать моё эмодзи пользователям Solegram</string>
     <string name="SG_NameEmojiShareInfo">Невидимая метка в конце описания профиля: Solegram покажет эмодзи у вашего имени, другие приложения ничего не увидят</string>
     <string name="SG_NameEmojiShareTooLong">Описание профиля слишком длинное для метки: сократите его на несколько символов</string>
+    <string name="SG_SettingsIcons">Иконки в настройках</string>
+    <string name="SG_SettingsIconsLines">Тонкие линии</string>
+    <string name="SG_SettingsIconsLinesInfo">Контурные значки в цвете темы, без плашек</string>
+    <string name="SG_SettingsIconsTiles">Цветные плашки</string>
+    <string name="SG_SettingsIconsTilesInfo">Белые значки на цветных плашках</string>
 </resources>

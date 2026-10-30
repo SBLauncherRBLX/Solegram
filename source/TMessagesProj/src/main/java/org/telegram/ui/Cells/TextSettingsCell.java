@@ -267,6 +267,23 @@ public class TextSettingsCell extends FrameLayout {
             } else {
                 params.leftMargin = AndroidUtilities.dp(this.padding);
             }
+        } else if (com.solegram.messenger.SolegramIcons.lineStyle()) {
+            // Solegram: a thin line glyph in the theme's colour, no tile
+            imageView.setBackground(null);
+            imageView.setColorFilter(null);
+            final android.graphics.drawable.Drawable line = com.solegram.messenger.SolegramIcons.lineIcon(getContext(), resId,
+                com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider));
+            if (line != null) {
+                imageView.setImageDrawable(line);
+            } else {
+                imageView.setImageResource(resId);
+            }
+            imageView.setVisibility(VISIBLE);
+            if (LocaleController.isRTL) {
+                params.rightMargin = AndroidUtilities.dp(58);
+            } else {
+                params.leftMargin = AndroidUtilities.dp(58);
+            }
         } else {
             imageView.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(8), color));
             imageView.setImageResource(resId);

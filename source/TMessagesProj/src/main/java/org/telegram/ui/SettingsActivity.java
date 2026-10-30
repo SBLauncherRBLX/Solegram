@@ -1229,13 +1229,22 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             CharSequence subtitle,
             CharSequence value
         ) {
-            hasBackground = iconColorTop != 0 || iconColorBottom != 0;
+            final boolean lines = com.solegram.messenger.SolegramIcons.lineStyle();
+            hasBackground = !lines && (iconColorTop != 0 || iconColorBottom != 0);
             iconLayout.setVisibility(icon != 0 ? View.VISIBLE : View.GONE);
             titleView.setTranslationX(icon == 0 ? dp(2) : 0);
             subtitleView.setTranslationX(icon == 0 ? dp(2) : 0);
 
             iconBackground.setColor(iconColorTop, iconColorBottom);
-            iconView.setImageResource(icon);
+            iconBackground.setHidden(lines);
+            final Drawable line = lines && icon != 0
+                ? com.solegram.messenger.SolegramIcons.lineIcon(getContext(), icon, com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider)) : null;
+            if (line != null) {
+                // Solegram: a thin line glyph in the theme's colour, no tile
+                iconView.setImageDrawable(line);
+            } else {
+                iconView.setImageResource(icon);
+            }
             titleView.setText(title);
             subtitleView.setVisibility((twoLines = !TextUtils.isEmpty(subtitle)) ? View.VISIBLE : View.GONE);
             subtitleView.setText(subtitle);
@@ -1278,8 +1287,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 this.border = drawBorder;
             }
 
+            private boolean hidden;
+            /** Solegram: no tile at all (line icons). */
+            public void setHidden(boolean hidden) {
+                if (this.hidden != hidden) {
+                    this.hidden = hidden;
+                    invalidateSelf();
+                }
+            }
+
             @Override
             public void draw(@NonNull Canvas canvas) {
+                if (hidden) {
+                    return;
+                }
                 final float r = dp(10);
                 AndroidUtilities.rectTmp.set(getBounds());
                 matrix.reset();

@@ -117,6 +117,42 @@ public final class SolegramIcons {
         return resources instanceof Res ? ((Res) resources).base : resources;
     }
 
+    // region Settings icon style
+
+    public static final int STYLE_TILES = 0;
+    public static final int STYLE_LINES = 1;
+
+    /**
+     * Settings icons as thin lines in the theme's colour, without the coloured tiles (every settings screen:
+     * Telegram's and Solegram's).
+     */
+    public static boolean lineStyle() {
+        return SolegramConfig.settingsIconStyle == STYLE_LINES;
+    }
+
+    /** The colour of the line icons: the theme's accent, as its section headers have it. */
+    public static int lineColor(org.telegram.ui.ActionBar.Theme.ResourcesProvider resourcesProvider) {
+        return org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhiteBlueHeader, resourcesProvider);
+    }
+
+    /** The thin (line) glyph for a Telegram icon, whatever pack is on, tinted; Telegram's own when the thin pack has none. */
+    public static Drawable lineIcon(Context context, int id, int color) {
+        final Resources res = original(context.getResources());
+        Drawable d;
+        try {
+            d = res.getDrawable(map(id, map(PACK_THIN)));
+        } catch (Throwable e) {
+            d = null;
+        }
+        if (d == null) {
+            return null;
+        }
+        d = d.mutate();
+        d.setColorFilter(new android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN));
+        return d;
+    }
+    // endregion
+
     /** A pack's icon for a Telegram drawable id, whatever pack is on now (the picker's previews). */
     public static Drawable preview(Context context, int pack, int id) {
         final Resources res = original(context.getResources());

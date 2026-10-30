@@ -46,6 +46,8 @@ public class SolegramConfig {
     public static String mainTitleText = "";
     /** Icon pack, see {@link SolegramIcons#PACK_STANDARD}: Telegram's icons, thin or filled ones. */
     public static int iconPack;
+    /** Settings icons: SolegramIcons.STYLE_* (thin lines in the theme's colour, or coloured tiles). */
+    public static int settingsIconStyle = 1;
     // endregion
 
     // region Glass (100 = Telegram's value unless noted; the defaults are Solegram's tuned look, see writeGlassDefaults())
@@ -381,6 +383,7 @@ public class SolegramConfig {
         mainTitle = clamp(p.getInt("mainTitle", 0), 0, 3);
         mainTitleText = p.getString("mainTitleText", "");
         iconPack = clamp(p.getInt("iconPack", 0), 0, 2);
+        settingsIconStyle = clamp(p.getInt("settingsIconStyle", 1), 0, 1);
         SolegramIcons.setPack(iconPack);
 
         glassThickness = clamp(p.getInt("glassThickness", 70), 25, 300);

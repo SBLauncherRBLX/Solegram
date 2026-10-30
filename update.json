@@ -1,9 +1,9 @@
 {
-  "version": "2.9.3",
-  "build": 62,
-  "apk": "apk/Solegram-2.9.3-b62-release.apk",
-  "size": 63040136,
-  "sha256": "31eceeff0d823da4e6325ab74c59a783ad8b23844e2aa4f264abe777a016ea8a",
-  "changelog": "Solegram 2.9.3\n\n• Кнопки камеры снова из чистого жидкого стекла — без блика-текстуры поверх.",
+  "version": "2.9.4",
+  "build": 63,
+  "apk": "apk/Solegram-2.9.4-b63-release.apk",
+  "size": 63041228,
+  "sha256": "298a2e64d52396d38c388b52bff604a0b4f28372ef570a67a7f4c74f27a3f06d",
+  "changelog": "Solegram 2.9.4\n\n• Новый вид иконок в настройках — тонкие линии в цвете вашей темы, без цветных плашек. Во всех настройках: и Telegram, и Solegram.\n• Вернуть цветные плашки: Настройки Solegram → Оформление → «Иконки в настройках».",
   "latest": "apk/Solegram-latest.apk"
 }

@@ -12953,5 +12953,10 @@
     <string name="SG_NameEmojiShare">Show my emoji to Solegram users</string>
     <string name="SG_NameEmojiShareInfo">An invisible mark at the end of your bio: Solegram shows the emoji next to your name, other apps show nothing</string>
     <string name="SG_NameEmojiShareTooLong">Your bio is too long for the mark: shorten it by a few characters</string>
+    <string name="SG_SettingsIcons">Settings icons</string>
+    <string name="SG_SettingsIconsLines">Thin lines</string>
+    <string name="SG_SettingsIconsLinesInfo">Line icons in the theme colour, no tiles</string>
+    <string name="SG_SettingsIconsTiles">Coloured tiles</string>
+    <string name="SG_SettingsIconsTilesInfo">White icons on colourful tiles</string>
     <!-- SOLEGRAM END -->
 </resources>
