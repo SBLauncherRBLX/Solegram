@@ -2580,6 +2580,9 @@ public class MessagesController extends BaseController implements NotificationCe
             new_emoji_status = emojiStatusCollectibleFromGift((TL_stars.TL_starGiftUnique) gift);
         }
 
+        if (myself && com.solegram.messenger.SolegramNameEmoji.get() != 0) {
+            com.solegram.messenger.SolegramNameEmoji.set(0); // a real status was picked: it replaces the one kept on this device
+        }
         TLObject r;
         if (myself) {
             TL_account.updateEmojiStatus req = new TL_account.updateEmojiStatus();
@@ -6847,6 +6850,7 @@ public class MessagesController extends BaseController implements NotificationCe
         if (user == null) {
             return false;
         }
+        com.solegram.messenger.SolegramNameEmoji.apply(currentAccount, user);
         fromCache = fromCache && user.id / 1000 != 333 && user.id != 777000;
         TLRPC.User oldUser = users.get(user.id);
         if (oldUser == user && !force) {

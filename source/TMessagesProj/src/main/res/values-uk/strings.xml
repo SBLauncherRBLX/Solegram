@@ -1617,5 +1617,23 @@
     <string name="SG_MeaningInChat">Chat: %1$s</string>
     <string name="SG_MeaningHow">Search by meaning widens your question with related words and ranks what Telegram finds. It does not read pictures, voice messages or secret chats, and a conversation that shares no word with the question can still be missed.</string>
     <string name="SG_MeaningMenu">Search by meaning</string>
+    <string name="SG_NameEmoji">Emoji next to my name</string>
+    <string name="SG_NameEmojiInfo">The emoji next to your name works like the Premium emoji status, but only you see it on this device. Tap it in your profile to change it.</string>
+    <string name="SG_NowPlayingLook">Player look</string>
+    <string name="SG_NowPlayingStyleCover">Cover</string>
+    <string name="SG_NowPlayingStyleCoverInfo">The card takes on the colours of the cover</string>
+    <string name="SG_NowPlayingStyleGlass">Glass</string>
+    <string name="SG_NowPlayingStyleGlassInfo">Frosted glass made of the cover, white text</string>
+    <string name="SG_NowPlayingStyleCompact">Compact</string>
+    <string name="SG_NowPlayingStyleCompactInfo">One slim line with a small cover</string>
+    <string name="SG_NowPlayingVinyl">Record</string>
+    <string name="SG_NowPlayingVinylInfo">The cover turns like a record while the music plays</string>
+    <string name="SG_NowPlayingProgress">Song progress and time</string>
+    <string name="SG_NowPlayingEqualizer">Equalizer</string>
+    <string name="SG_NowPlayingAccent">Colour</string>
+    <string name="SG_NowPlayingAccentCover">From the cover</string>
+    <string name="SG_NowPlayingAccentPlayer">The player colour (Spotify, SoundCloud)</string>
+    <string name="SG_NowPlayingAccentTheme">The theme accent</string>
+    <string name="SG_NowPlayingLookInfo">Buttons and progress are on your own card only; others see what you play.</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -107,6 +107,8 @@ public class SolegramConfig {
     public static String transcribeModel = "";
     /** Custom emoji next to the chats screen title, kept on this device (0 = none). */
     public static long titleEmoji = 0;
+    /** Custom emoji next to the user's own name (like Premium's emoji status), kept on this device (0 = none). */
+    public static long nameEmoji = 0;
     /** The call screen with the glass sheet (controls at the bottom in the app's glass). */
     public static boolean glassCallScreen = true;
     // endregion
@@ -125,6 +127,16 @@ public class SolegramConfig {
     public static boolean nowPlayingSoundCloud = true;
     /** Others see it too: the track goes into the profile's bio while it plays (the bio comes back after). */
     public static boolean nowPlayingShareBio = false;
+    /** The profile player: NOW_PLAYING_STYLE_* (the cover's colours, frosted glass of the cover, one slim line). */
+    public static int nowPlayingStyle = 0;
+    /** The cover as a rounded square, or as a record that turns while the music plays. */
+    public static boolean nowPlayingVinyl = false;
+    /** The song's progress and time on the own card. */
+    public static boolean nowPlayingProgress = true;
+    /** The little equalizer next to «Listening now». */
+    public static boolean nowPlayingEqualizer = true;
+    /** The card's accent: 0 = from the cover, 1 = the player's own colour, 2 = the theme's accent. */
+    public static int nowPlayingAccent = 1;
     // endregion
 
     // region Profile links
@@ -394,6 +406,7 @@ public class SolegramConfig {
         transcribeEngine = clamp(p.getInt("transcribeEngine", 0), 0, 2);
         transcribeModel = p.getString("transcribeModel", "");
         titleEmoji = readLong(p, "titleEmoji");
+        nameEmoji = readLong(p, "nameEmoji");
         glassCallScreen = p.getBoolean("glassCallScreen", true);
         liquidMotion = p.getBoolean("liquidMotion", true);
         iosInputBar = p.getBoolean("iosInputBar", true);
@@ -401,6 +414,11 @@ public class SolegramConfig {
         nowPlayingSpotify = p.getBoolean("nowPlayingSpotify", true);
         nowPlayingSoundCloud = p.getBoolean("nowPlayingSoundCloud", true);
         nowPlayingShareBio = p.getBoolean("nowPlayingShareBio", false);
+        nowPlayingStyle = clamp(p.getInt("nowPlayingStyle", 0), 0, 2);
+        nowPlayingVinyl = p.getBoolean("nowPlayingVinyl", false);
+        nowPlayingProgress = p.getBoolean("nowPlayingProgress", true);
+        nowPlayingEqualizer = p.getBoolean("nowPlayingEqualizer", true);
+        nowPlayingAccent = clamp(p.getInt("nowPlayingAccent", 1), 0, 2);
         profileLinks = p.getBoolean("profileLinks", true);
         adBlock = p.getBoolean("adBlock", true);
         adBlockCosmetic = p.getBoolean("adBlockCosmetic", true);
@@ -664,6 +682,8 @@ public class SolegramConfig {
             case "nowPlaying":
             case "nowPlayingSpotify":
             case "nowPlayingSoundCloud":
+            case "nowPlayingProgress":
+            case "nowPlayingEqualizer":
             case "profileLinks":
             case "adBlock":
             case "adBlockCosmetic":

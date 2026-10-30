@@ -187,7 +187,8 @@ public class FragmentSearchField extends FrameLayout implements FactorAnimator.T
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
         canvas.save();
-        if (bg != null) {
+        // Solegram: on glass the field is the glass alone; the grey fill under it made it look grey, unlike the other glass
+        if (bg != null && blurredBackgroundDrawable == null) {
             bg.setBounds(
                 getPaddingLeft(),
                 getPaddingTop(),

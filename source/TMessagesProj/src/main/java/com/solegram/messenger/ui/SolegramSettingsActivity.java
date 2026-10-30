@@ -126,6 +126,15 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_NOW_PLAYING_SPOTIFY = 703;
     private static final int ID_NOW_PLAYING_SOUNDCLOUD = 704;
     private static final int ID_NOW_PLAYING_SHARE = 705;
+    private static final int ID_NP_STYLE_COVER = 706;
+    private static final int ID_NP_STYLE_GLASS = 707;
+    private static final int ID_NP_STYLE_COMPACT = 708;
+    private static final int ID_NP_VINYL = 709;
+    private static final int ID_NP_PROGRESS = 711;
+    private static final int ID_NP_EQUALIZER = 712;
+    private static final int ID_NP_ACCENT_COVER = 713;
+    private static final int ID_NP_ACCENT_PLAYER = 714;
+    private static final int ID_NP_ACCENT_THEME = 715;
 
     // camera
     private static final int ID_CAMERA_FPS_AUTO = 801;
@@ -193,6 +202,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_GLASS_PREVIEW_LOOK = 133;
     private static final int ID_FROSTED_HEADERS = 134;
     private static final int ID_TITLE_EMOJI = 135;
+    private static final int ID_NAME_EMOJI = 1109;
     private static final int ID_GLASS_CALL = 136;
     private static final int ID_FLOATING_HEADER = 137;
     private static final int ID_HEADER_BUTTONS = 138;
@@ -480,12 +490,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_MAIN_TITLE, R.drawable.msg_edit, getString(R.string.SG_MainTitle), mainTitleName(SolegramConfig.mainTitle)), TILE_ORANGE));
         items.add(tile(UItem.asButton(ID_TITLE_EMOJI, R.drawable.msg2_smile_status, getString(R.string.SG_TitleEmoji),
             getString(com.solegram.messenger.SolegramTitleEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_YELLOW));
+        items.add(tile(UItem.asButton(ID_NAME_EMOJI, R.drawable.msg2_smile_status, getString(R.string.SG_NameEmoji),
+            getString(com.solegram.messenger.SolegramNameEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_PINK));
         items.add(UItem.asCheck(ID_CENTER_TITLE, getString(R.string.SG_CenterTitle)).setChecked(SolegramConfig.centerTitle));
         if (Build.VERSION.SDK_INT >= 31) {
             items.add(UItem.asButtonCheck(ID_MONET, getString(R.string.SG_Monet), getString(R.string.SG_MonetInfo)).setChecked(SolegramConfig.monetAccent));
         }
         items.add(tile(UItem.asButton(ID_THEMES, R.drawable.msg_theme, getString(R.string.SG_ThemesAndIcons)), TILE_BLUE));
-        items.add(UItem.asShadow(null));
+        items.add(UItem.asShadow(getString(R.string.SG_NameEmojiInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_IconPack)));
         if (iconPackPicker == null) {
@@ -938,6 +950,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_SystemFont, -1},
         {PAGE_APPEARANCE, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
         {PAGE_APPEARANCE, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
+        {PAGE_APPEARANCE, ID_NAME_EMOJI, R.string.SG_NameEmoji, -1},
         {PAGE_APPEARANCE, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
         {PAGE_APPEARANCE, ID_SMOOTH_TRANSITIONS, R.string.SG_SmoothTransitions, -1},
         {PAGE_APPEARANCE, ID_PRESS_SCALE, R.string.SG_PressScale, -1},
@@ -994,6 +1007,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_AI, ID_MEANING_RERANK, R.string.SG_MeaningRerank, 22},
         {PAGE_MUSIC, 0, R.string.SG_NowPlaying, 4},
         {PAGE_MUSIC, ID_NOW_PLAYING_SHARE, R.string.SG_NowPlayingShare, 4},
+        {PAGE_MUSIC, ID_NP_STYLE_COVER, R.string.SG_NowPlayingLook, 4},
+        {PAGE_MUSIC, ID_NP_VINYL, R.string.SG_NowPlayingVinyl, 4},
         {PAGE_MAIN_SCREEN, 0, R.string.SG_MainScreen, -1},
         {PAGE_MAIN_SCREEN, ID_REMEMBER_FOLDER, R.string.SG_RememberFolder, -1},
         {PAGE_MAIN_SCREEN, ID_MARK_ALL_READ, R.string.SG_MarkAllReadInMenu, -1},
@@ -1244,6 +1259,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 }
             });
         }
+        nowPlayingPreview.styleChanged();
         nowPlayingPreview.setTrack(com.solegram.messenger.SolegramNowPlaying.get(), true);
         items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPreview)));
         items.add(UItem.asCustom(nowPlayingPreview));
@@ -1259,6 +1275,24 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             getString(access ? R.string.SG_NowPlayingAccessOn : R.string.SG_NowPlayingAccessOff)), access ? TILE_GREEN : TILE_ORANGE);
         items.add(access ? accessItem : accessItem.accent());
         items.add(UItem.asShadow(getString(R.string.SG_NowPlayingAccessInfo)));
+
+        // how the card looks: the preview above changes with every choice
+        final int style = SolegramConfig.nowPlayingStyle;
+        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingLook)));
+        items.add(UItem.asRadio2(ID_NP_STYLE_COVER, getString(R.string.SG_NowPlayingStyleCover), getString(R.string.SG_NowPlayingStyleCoverInfo)).setChecked(style == SolegramNowPlayingView.STYLE_COVER));
+        items.add(UItem.asRadio2(ID_NP_STYLE_GLASS, getString(R.string.SG_NowPlayingStyleGlass), getString(R.string.SG_NowPlayingStyleGlassInfo)).setChecked(style == SolegramNowPlayingView.STYLE_GLASS));
+        items.add(UItem.asRadio2(ID_NP_STYLE_COMPACT, getString(R.string.SG_NowPlayingStyleCompact), getString(R.string.SG_NowPlayingStyleCompactInfo)).setChecked(style == SolegramNowPlayingView.STYLE_COMPACT));
+        items.add(UItem.asShadow(null));
+        items.add(UItem.asButtonCheck(ID_NP_VINYL, getString(R.string.SG_NowPlayingVinyl), getString(R.string.SG_NowPlayingVinylInfo)).setChecked(SolegramConfig.nowPlayingVinyl));
+        items.add(UItem.asCheck(ID_NP_PROGRESS, getString(R.string.SG_NowPlayingProgress)).setChecked(SolegramConfig.nowPlayingProgress));
+        items.add(UItem.asCheck(ID_NP_EQUALIZER, getString(R.string.SG_NowPlayingEqualizer)).setChecked(SolegramConfig.nowPlayingEqualizer));
+        items.add(UItem.asShadow(null));
+        final int accent = SolegramConfig.nowPlayingAccent;
+        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingAccent)));
+        items.add(UItem.asRadio(ID_NP_ACCENT_COVER, getString(R.string.SG_NowPlayingAccentCover)).setChecked(accent == 0));
+        items.add(UItem.asRadio(ID_NP_ACCENT_PLAYER, getString(R.string.SG_NowPlayingAccentPlayer)).setChecked(accent == 1));
+        items.add(UItem.asRadio(ID_NP_ACCENT_THEME, getString(R.string.SG_NowPlayingAccentTheme)).setChecked(accent == 2));
+        items.add(UItem.asShadow(getString(R.string.SG_NowPlayingLookInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_NowPlayingSources)));
         items.add(UItem.asButtonCheck(ID_NOW_PLAYING_SPOTIFY, "Spotify", getString(com.solegram.messenger.SolegramNowPlaying.isInstalled(com.solegram.messenger.SolegramNowPlaying.SPOTIFY)
@@ -1543,6 +1577,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         });
         builder.setNegativeButton(getString(R.string.Cancel), null);
         showDialog(builder.create());
+    }
+
+    /** The card's look changed: the preview and every open profile draw it anew. */
+    private void musicLookChanged() {
+        listView.adapter.update(true);
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramNowPlayingChanged);
     }
 
     private void musicSettingChanged(View view, String key) {
@@ -2002,6 +2042,30 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_NOW_PLAYING_SPOTIFY:
                 musicSettingChanged(view, "nowPlayingSpotify");
                 return;
+            case ID_NP_STYLE_COVER:
+            case ID_NP_STYLE_GLASS:
+            case ID_NP_STYLE_COMPACT:
+                SolegramConfig.putInt("nowPlayingStyle", item.id - ID_NP_STYLE_COVER);
+                musicLookChanged();
+                return;
+            case ID_NP_ACCENT_COVER:
+            case ID_NP_ACCENT_PLAYER:
+            case ID_NP_ACCENT_THEME:
+                SolegramConfig.putInt("nowPlayingAccent", item.id - ID_NP_ACCENT_COVER);
+                musicLookChanged();
+                return;
+            case ID_NP_VINYL:
+                toggleCheck(view, "nowPlayingVinyl");
+                musicLookChanged();
+                return;
+            case ID_NP_PROGRESS:
+                toggleCheck(view, "nowPlayingProgress");
+                musicLookChanged();
+                return;
+            case ID_NP_EQUALIZER:
+                toggleCheck(view, "nowPlayingEqualizer");
+                musicLookChanged();
+                return;
             case ID_NOW_PLAYING_SOUNDCLOUD:
                 musicSettingChanged(view, "nowPlayingSoundCloud");
                 return;
@@ -2264,6 +2328,13 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 // Telegram's emoji status picker; the emoji shows next to the title on the chats screen
                 if (titleEmojiPicker == null || !titleEmojiPicker.isShowing()) {
                     titleEmojiPicker = com.solegram.messenger.SolegramTitleEmoji.showPicker(this, view, 0, 0, null, null, null, () -> listView.adapter.update(true));
+                }
+                return;
+            case ID_NAME_EMOJI:
+                // the same picker; the emoji shows next to the own name and only on this device
+                if (titleEmojiPicker == null || !titleEmojiPicker.isShowing()) {
+                    titleEmojiPicker = com.solegram.messenger.SolegramTitleEmoji.showPicker(this, view, 0, 0, null, null, null,
+                        com.solegram.messenger.SolegramNameEmoji.get(), com.solegram.messenger.SolegramNameEmoji::set, () -> listView.adapter.update(true));
                 }
                 return;
             case ID_MAIN_TITLE:

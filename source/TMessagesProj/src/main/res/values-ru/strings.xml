@@ -1604,5 +1604,23 @@
     <string name="SG_MeaningInChat">Чат: %1$s</string>
     <string name="SG_MeaningHow">Поиск по смыслу дополняет вопрос похожими словами и ранжирует то, что находит Telegram. Он не видит картинки, голосовые и секретные чаты, а переписку, где нет ни одного похожего слова, может пропустить.</string>
     <string name="SG_MeaningMenu">Поиск по смыслу</string>
+    <string name="SG_NameEmoji">Эмодзи у имени</string>
+    <string name="SG_NameEmojiInfo">Эмодзи у имени работает как статус Premium, но видно его только тебе на этом устройстве. Поменять можно, нажав на него в своём профиле.</string>
+    <string name="SG_NowPlayingLook">Вид плеера</string>
+    <string name="SG_NowPlayingStyleCover">Обложка</string>
+    <string name="SG_NowPlayingStyleCoverInfo">Карточка окрашивается в цвета обложки</string>
+    <string name="SG_NowPlayingStyleGlass">Стекло</string>
+    <string name="SG_NowPlayingStyleGlassInfo">Матовое стекло из самой обложки, белый текст</string>
+    <string name="SG_NowPlayingStyleCompact">Компактный</string>
+    <string name="SG_NowPlayingStyleCompactInfo">Одна тонкая строка с маленькой обложкой</string>
+    <string name="SG_NowPlayingVinyl">Пластинка</string>
+    <string name="SG_NowPlayingVinylInfo">Обложка крутится, как виниловая пластинка, пока играет музыка</string>
+    <string name="SG_NowPlayingProgress">Прогресс и время трека</string>
+    <string name="SG_NowPlayingEqualizer">Эквалайзер</string>
+    <string name="SG_NowPlayingAccent">Цвет</string>
+    <string name="SG_NowPlayingAccentCover">Из обложки</string>
+    <string name="SG_NowPlayingAccentPlayer">Цвет плеера (Spotify, SoundCloud)</string>
+    <string name="SG_NowPlayingAccentTheme">Акцент темы</string>
+    <string name="SG_NowPlayingLookInfo">Кнопки и прогресс есть только в вашей карточке, другие видят только трек.</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -281,6 +281,7 @@ public class UserConfig extends BaseController {
     public void setCurrentUser(TLRPC.User user) {
         synchronized (sync) {
             TLRPC.User oldUser = currentUser;
+            com.solegram.messenger.SolegramNameEmoji.apply(currentAccount, user);
             currentUser = user;
             clientUserId = user.id;
             checkPremiumSelf(oldUser, user);
@@ -388,6 +389,7 @@ public class UserConfig extends BaseController {
                 if (bytes != null) {
                     SerializedData data = new SerializedData(bytes);
                     currentUser = TLRPC.User.TLdeserialize(data, data.readInt32(false), false);
+                    com.solegram.messenger.SolegramNameEmoji.apply(currentAccount, currentUser);
                     data.cleanup();
                 }
             }

@@ -6733,6 +6733,26 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow selectAnimatedEmojiDialog;
 
+    /** Solegram: the picker for the emoji next to the own name kept on this device (see SolegramNameEmoji). */
+    private void solegramShowNameEmojiPicker() {
+        if (selectAnimatedEmojiDialog != null || nameTextView[1] == null) {
+            return;
+        }
+        getEmojiStatusLocation(AndroidUtilities.rectTmp2);
+        final int topMarginDp = nameTextView[1].getScaleX() < 1.5f ? 16 : 32;
+        final int yoff = -(avatarContainer2.getHeight() - AndroidUtilities.rectTmp2.centerY()) - AndroidUtilities.dp(topMarginDp);
+        final int popupWidth = (int) Math.min(AndroidUtilities.dp(340 - 16), AndroidUtilities.displaySize.x * .95f);
+        int ecenter = AndroidUtilities.rectTmp2.centerX();
+        final int xoff = MathUtils.clamp(ecenter - popupWidth / 2, 0, AndroidUtilities.displaySize.x - popupWidth);
+        ecenter -= xoff;
+        selectAnimatedEmojiDialog = com.solegram.messenger.SolegramTitleEmoji.showPicker(this, fragmentView, xoff, yoff, Math.max(0, ecenter),
+            emojiStatusDrawable[1], nameTextView[1], com.solegram.messenger.SolegramNameEmoji.get(), com.solegram.messenger.SolegramNameEmoji::set,
+            () -> AndroidUtilities.runOnUIThread(() -> updateProfileData(false)));
+        if (selectAnimatedEmojiDialog != null) {
+            selectAnimatedEmojiDialog.setOnDismissListener(() -> selectAnimatedEmojiDialog = null);
+        }
+    }
+
     public void showStatusSelect() {
         if (selectAnimatedEmojiDialog != null) {
             return;
@@ -11761,6 +11781,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     nameTextView[a].setRightDrawableOnClick(v -> {
                         showStatusSelect();
                     });
+                } else if (user.self && user.emoji_status instanceof com.solegram.messenger.SolegramNameEmoji.LocalStatus) {
+                    // Solegram: the emoji kept on this device is changed with the same picker, without Premium
+                    nameTextView[a].setRightDrawableOnClick(v -> solegramShowNameEmojiPicker());
                 }
                 if (!user.self && getMessagesController().isPremiumUser(user)) {
                     final SimpleTextView textView = nameTextView[a];

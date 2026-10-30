@@ -54,6 +54,13 @@ public final class SolegramTitleEmoji {
      */
     public static SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow showPicker(BaseFragment fragment, View anchor, int xoff, int yoff, Integer emojiX,
                                                                                       AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable scrimDrawable, SimpleTextView scrimView, Runnable onPicked) {
+        return showPicker(fragment, anchor, xoff, yoff, emojiX, scrimDrawable, scrimView, get(), SolegramTitleEmoji::set, onPicked);
+    }
+
+    /** The same picker for any emoji kept on this device: {@code selected} is the current one, {@code choose} saves the choice (0 = none). */
+    public static SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow showPicker(BaseFragment fragment, View anchor, int xoff, int yoff, Integer emojiX,
+                                                                                      AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable scrimDrawable, SimpleTextView scrimView,
+                                                                                      long selected, org.telegram.messenger.Utilities.Callback<Long> choose, Runnable onPicked) {
         if (fragment == null || fragment.getParentActivity() == null || anchor == null) {
             return null;
         }
@@ -68,7 +75,7 @@ public final class SolegramTitleEmoji {
             @Override
             protected void onEmojiSelected(View emojiView, Long documentId, TLRPC.Document document, TL_stars.TL_starGiftUnique gift, Integer until) {
                 if (gift == null) {
-                    set(documentId == null ? 0 : documentId);
+                    choose.run(documentId == null ? 0L : documentId);
                     if (onPicked != null) {
                         onPicked.run();
                     }
@@ -78,7 +85,7 @@ public final class SolegramTitleEmoji {
                 }
             }
         };
-        layout.setSelected(get() != 0 ? get() : null);
+        layout.setSelected(selected != 0 ? selected : null);
         layout.setSaveState(1);
         if (scrimDrawable != null && scrimView != null) {
             layout.setScrimDrawable(scrimDrawable, scrimView);

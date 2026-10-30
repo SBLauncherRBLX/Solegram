@@ -20,12 +20,7 @@ import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider
 public class BlurredBackgroundProviderImpl {
     public static BlurredBackgroundProvider mainTabs(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
-            .setBackgroundColor((r, isDark) -> {
-                final float alpha = com.solegram.messenger.SolegramGlass.alpha(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
-                final int colorBg = Theme.getColor(Theme.key_windowBackgroundWhite, r);
-                final int colorTarget = Theme.getColor(Theme.key_glass_targetMainTabs, r);
-                return solveSrcColor(colorBg, colorTarget, alpha);
-            })
+            .setBackgroundColor((r, isDark) -> solegramPanelColor(r))
             .setStrokeColorTop(0x11000000, 0x06FFFFFF)
             .setStrokeColorBottom(0x20000000, 0x11FFFFFF)
             .setShadowColor(0x20000000, 0x04FFFFFF)
@@ -55,12 +50,7 @@ public class BlurredBackgroundProviderImpl {
 
     public static BlurredBackgroundProvider topPanel(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
-            .setBackgroundColor((r, isDark) -> {
-                final float alpha = com.solegram.messenger.SolegramGlass.alpha(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
-                final int colorBg = Theme.getColor(Theme.key_windowBackgroundWhite, r);
-                final int colorTarget = Theme.getColor(Theme.key_glass_targetMainTopPanel, r);
-                return solveSrcColor(colorBg, colorTarget, alpha);
-            })
+            .setBackgroundColor((r, isDark) -> solegramPanelColor(r))
             .setStrokeColorTop(0x11000000, 0x06FFFFFF)
             .setStrokeColorBottom(0x20000000, 0x11FFFFFF)
             .setShadowColor(0x20000000, 0x04FFFFFF)
@@ -322,6 +312,16 @@ public class BlurredBackgroundProviderImpl {
             .setShadowLayer(dpf2(12 / 3f), 0, dpf2(1 / 3f))
             .setStrokeWidth(dpf2(0.4f), dpf2(0.4f))
             .build();
+    }
+
+    /**
+     * Solegram: the tab bar, the search field and the header panels of the chats screen are the same glass as
+     * every other one: the page colour at the glass density. Telegram aimed them at their own "target" colours,
+     * which in many themes (dark ones, Monet) are lighter or greyer than the page, and turned out grey.
+     */
+    private static int solegramPanelColor(Theme.ResourcesProvider r) {
+        final float alpha = com.solegram.messenger.SolegramGlass.alpha(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+        return Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhite, r), alpha);
     }
 
     public static int solveSrcColor(int bgColor, int outColor, float alpha) {

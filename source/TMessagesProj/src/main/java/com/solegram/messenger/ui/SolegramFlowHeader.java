@@ -122,6 +122,12 @@ public class SolegramFlowHeader extends FrameLayout {
     // page is pulled down) instead of stopping at the banner's own edge
     private float drawnGap = -1;
     private final ViewTreeObserver.OnPreDrawListener gapWatcher = () -> {
+        // the banner is there at once: fading in with the list's rows, it let the bare page show under the
+        // header for a moment, like the old solid header
+        if (getParent() instanceof View && ((View) getParent()).getAnimation() != null) {
+            ((View) getParent()).clearAnimation();
+            ((View) getParent()).invalidate();
+        }
         if (gapAbove() != drawnGap) {
             invalidate();
         }
