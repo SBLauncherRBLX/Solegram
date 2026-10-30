@@ -1,9 +1,9 @@
 {
-  "version": "2.9.8",
-  "build": 67,
-  "apk": "apk/Solegram-2.9.8-b67-release.apk",
-  "size": 63237127,
-  "sha256": "57c2b1be92995fbbf547941fdf602800aba0b9fa395db6384c361a438b34dd83",
-  "changelog": "Solegram 2.9.8\n\n• Анимация вкладки «Лента»: теперь газета остаётся на месте, а строчки внутри неё по очереди выезжают снизу вверх.",
+  "version": "2.9.9",
+  "build": 68,
+  "apk": "apk/Solegram-2.9.9-b68-release.apk",
+  "size": 63237806,
+  "sha256": "78b62aac83334062fab0133bc8b872c9877b790b2e8bffb58468f6ebcd04cf06",
+  "changelog": "Solegram 2.9.9\n\n• Иконка Telegram Stars в настройках снова фирменная звезда Telegram, теперь в стиле линий.",
   "latest": "apk/Solegram-latest.apk"
 }

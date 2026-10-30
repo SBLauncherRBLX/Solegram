@@ -739,7 +739,7 @@ final class SolegramIconMaps {
             R.drawable.msg_filled_storageusage, R.drawable.sg_line_chart_donut,
             R.drawable.msg_filled_stories, R.drawable.sg_line_circle_dashed,
             R.drawable.filled_gram_earnings, R.drawable.sg_line_chart_line_up,
-            R.drawable.settings_stars, R.drawable.sg_line_star_four,
+            R.drawable.settings_stars, R.drawable.sg_line_tg_stars,
             R.drawable.settings_wallet, R.drawable.sg_line_wallet,
             R.drawable.settings_wallet_dark, R.drawable.sg_line_wallet,
             R.drawable.msg2_battery, R.drawable.sg_line_leaf,
