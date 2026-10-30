@@ -643,10 +643,9 @@ public class TextCell extends FrameLayout {
             // Solegram: a thin line glyph in the theme's colour, no tile
             imageView.setPadding(dp(2), dp(2), dp(2), dp(2));
             imageView.setTranslationX(dp(LocaleController.isRTL ? 0 : -3));
-            imageView.setColorFilter(null);
             imageView.setBackground(null);
-            final android.graphics.drawable.Drawable line = com.solegram.messenger.SolegramIcons.lineIcon(getContext(), resId,
-                com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider));
+            final int lineColor = com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider);
+            final android.graphics.drawable.Drawable line = com.solegram.messenger.SolegramIcons.lineIcon(getContext(), resId, lineColor);
             if (line != null) {
                 final android.graphics.drawable.LayerDrawable sized = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{line});
                 sized.setLayerSize(0, dp(24), dp(24));
@@ -654,8 +653,9 @@ public class TextCell extends FrameLayout {
                 imageView.setImageDrawable(sized);
             } else {
                 imageView.setImageResource(resId);
-                imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider), PorterDuff.Mode.SRC_IN));
             }
+            // the view's filter, set after the drawable: ImageView hands its own filter (even none) down to a new drawable
+            imageView.setColorFilter(new PorterDuffColorFilter(lineColor, PorterDuff.Mode.SRC_IN));
             return;
         }
         imageView.setPadding(dp(2), dp(2), dp(2), dp(2));

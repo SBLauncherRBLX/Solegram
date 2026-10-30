@@ -33,7 +33,7 @@ public final class SolegramIcons {
     /** Telegram id -> pack id of the active pack; null with the standard icons. */
     private static volatile SparseIntArray active;
     private static volatile int activePack = -1;
-    private static SparseIntArray thinMap, fillMap;
+    private static SparseIntArray thinMap, fillMap, lineMap;
     private static int[] thinTabs, fillTabs;
 
     /** Called by SolegramConfig whenever settings are read. */
@@ -140,7 +140,15 @@ public final class SolegramIcons {
         final Resources res = original(context.getResources());
         Drawable d;
         try {
-            d = res.getDrawable(map(id, map(PACK_THIN)));
+            final SparseIntArray line;
+            synchronized (SolegramIcons.class) {
+                if (lineMap == null) {
+                    lineMap = build(SolegramIconMaps.line());
+                }
+                line = lineMap;
+            }
+            final int own = line.get(id);
+            d = res.getDrawable(own != 0 ? own : map(id, map(PACK_THIN)));
         } catch (Throwable e) {
             d = null;
         }

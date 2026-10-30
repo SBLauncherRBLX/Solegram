@@ -363,6 +363,40 @@ final class SolegramIconMaps {
         };
     }
 
+    /**
+     * The settings' line style, over the thin pack: rounder glyphs for the boxy ones, and lines for the icons the
+     * thin pack has none for (Solegram's own, Telegram's filled ones).
+     */
+    static int[] line() {
+        return new int[]{
+            R.drawable.msg_bots, R.drawable.sg_line_puzzle,
+            R.drawable.sg_settings_mark, R.drawable.sg_line_sun,
+            R.drawable.sg_plus_mark, R.drawable.sg_line_plus_circle,
+            R.drawable.sg_ai_summary, R.drawable.sg_line_sparkle,
+            R.drawable.msg_soledrop, R.drawable.sg_line_drop,
+            R.drawable.sg_brand_link, R.drawable.sg_line_link_simple,
+            R.drawable.msg_voicechat, R.drawable.sg_line_waveform,
+            R.drawable.msg_newphone, R.drawable.sg_line_device_mobile,
+            R.drawable.menu_tag_filter, R.drawable.sg_line_tag,
+            R.drawable.files_music, R.drawable.sg_line_music_notes,
+            R.drawable.msg_filled_datausage, R.drawable.sg_line_chart_bar,
+            R.drawable.msg_filled_menu_channels, R.drawable.sg_line_megaphone,
+            R.drawable.msg_filled_menu_groups, R.drawable.sg_line_users_three,
+            R.drawable.msg_filled_menu_users, R.drawable.sg_line_user,
+            R.drawable.msg_filled_sdcard, R.drawable.sg_line_hard_drive,
+            R.drawable.msg_filled_storageusage, R.drawable.sg_line_chart_donut,
+            R.drawable.msg_filled_stories, R.drawable.sg_line_circle_dashed,
+            R.drawable.filled_gram_earnings, R.drawable.sg_line_chart_line_up,
+            R.drawable.settings_stars, R.drawable.sg_line_star_four,
+            R.drawable.settings_wallet, R.drawable.sg_line_wallet,
+            R.drawable.settings_wallet_dark, R.drawable.sg_line_wallet,
+            R.drawable.msg2_battery, R.drawable.sg_line_leaf,
+            R.drawable.settings_power, R.drawable.sg_line_leaf,
+            R.drawable.msg_secret, R.drawable.sg_line_lock,
+            R.drawable.settings_privacy, R.drawable.sg_line_lock,
+        };
+    }
+
     static int[] fill() {
         return new int[]{
             R.drawable.menu_reply, R.drawable.sg_fill_menu_reply,
