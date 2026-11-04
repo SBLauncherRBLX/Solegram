@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "note": "Solegram Studio scenes. Every scene starts on the main screen showing the chosen chat folder. Steps: open (chats, wallet, vault, music, player, soledrop, settings, solegram_settings, chat_settings, privacy_settings, glass_settings, profile_editor, profile, stars, or a t.me link), wait (ms), tap [x, y] and swipe [x1, y1, x2, y2, ms] in parts of the screen, back, shot (frame name).",
+  "scenes": [
+    {"id": "chats", "title": "Главный экран и стекло", "steps": [
+      {"wait": 1800}, {"shot": "chats"},
+      {"swipe": [0.5, 0.78, 0.5, 0.38, 1400]}, {"wait": 1200}, {"shot": "chats-scrolled"},
+      {"swipe": [0.5, 0.38, 0.5, 0.78, 1400]}, {"wait": 1200}
+    ]},
+    {"id": "music", "title": "Вкладка «Музыка»", "steps": [
+      {"open": "music"}, {"wait": 2200}, {"shot": "music"},
+      {"swipe": [0.5, 0.8, 0.5, 0.45, 1200]}, {"wait": 1200}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "player", "title": "Плеер", "steps": [
+      {"open": "player"}, {"wait": 3500}, {"shot": "player"}, {"wait": 3000}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "wallet", "title": "SoleWallet", "steps": [
+      {"open": "wallet"}, {"wait": 2000},
+      {"swipe": [0.25, 0.26, 0.85, 0.26, 700]}, {"wait": 1400}, {"tap": [0.5, 0.26]}, {"wait": 1600}, {"tap": [0.5, 0.26]}, {"wait": 1400},
+      {"shot": "wallet"}, {"swipe": [0.5, 0.82, 0.5, 0.4, 1000]}, {"wait": 1400}, {"shot": "wallet-goals"}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "collection", "title": "Коллекция и хранилище", "steps": [
+      {"open": "vault"}, {"wait": 3000}, {"shot": "collection"}, {"swipe": [0.5, 0.8, 0.5, 0.45, 1000]}, {"wait": 1400}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "stars", "title": "Звёзды", "steps": [
+      {"open": "stars"}, {"wait": 2500}, {"shot": "stars"}, {"swipe": [0.5, 0.8, 0.5, 0.4, 1200]}, {"wait": 1400}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "soledrop", "title": "SoleDrop", "steps": [
+      {"open": "soledrop"}, {"wait": 3000}, {"shot": "soledrop"}, {"wait": 2000}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "profile", "title": "Профиль", "steps": [
+      {"open": "profile"}, {"wait": 2500}, {"shot": "profile"}, {"swipe": [0.5, 0.8, 0.5, 0.35, 1400]}, {"wait": 1500}, {"shot": "profile-posts"}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "editor", "title": "Редактор профиля", "steps": [
+      {"open": "profile_editor"}, {"wait": 2500}, {"shot": "editor"}, {"swipe": [0.5, 0.8, 0.5, 0.45, 1200]}, {"wait": 1400}, {"back": true}, {"wait": 600}
+    ]},
+    {"id": "settings", "title": "Настройки", "steps": [
+      {"open": "settings"}, {"wait": 1800}, {"swipe": [0.5, 0.8, 0.5, 0.35, 1200]}, {"wait": 1200}, {"shot": "settings"}, {"back": true}, {"wait": 600},
+      {"open": "chat_settings"}, {"wait": 1800}, {"shot": "chat-settings"}, {"back": true}, {"wait": 600},
+      {"open": "glass_settings"}, {"wait": 2000}, {"shot": "glass-settings"}, {"back": true}, {"wait": 600}
+    ]}
+  ]
+}
