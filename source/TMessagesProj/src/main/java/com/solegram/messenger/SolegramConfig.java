@@ -67,6 +67,11 @@ public class SolegramConfig {
     public static boolean glassVibrancy = true;
     /** Window blur (Android 12+) behind popup menus, dialogs and bottom sheets. */
     public static boolean glassMenus = true;
+    public static boolean streaks = true;
+    public static boolean newPlayer = true;
+    public static boolean musicTab = false;
+    /** The bottom bar's tabs after Chats, comma separated (SolegramTabs); empty: Telegram's layout. */
+    public static String tabsLayout = "";
     public static boolean glassDialogs = true;
     public static boolean glassSheets = true;
     /** Switches and sliders drawn like the liquid glass demo (white pill that turns into a lens). */
@@ -101,10 +106,6 @@ public class SolegramConfig {
     public static boolean meaningSearch = true;
     /** Gemini Nano reorders the best results of a search by meaning, where it is on the phone. */
     public static boolean meaningRerank = true;
-    /** Voice and round video transcription without Premium (on the device, or the user's own AI service). */
-    public static boolean transcribe = true;
-    /** SolegramTranscriber.ENGINE_*: 0 = auto, 1 = on the device, 2 = the user's AI service. */
-    public static int transcribeEngine = 0;
     /** Video profile photos move in the chat list for everyone, not only for Premium users' photos. */
     public static boolean animatedAvatars = true;
     /** Pauses in voice messages are skipped while they play. */
@@ -117,10 +118,6 @@ public class SolegramConfig {
     public static boolean localRepeats = true;
     /** Tags for Saved Messages without Premium, kept on this device. */
     public static boolean localSavedTags = true;
-    /** Voice messages are transcribed as soon as they show in a chat. */
-    public static boolean transcribeAuto = true;
-    /** Speech-to-text model of the user's AI service; empty = whisper-1 (whisper-large-v3-turbo on Groq). */
-    public static String transcribeModel = "";
     /** Custom emoji next to the chats screen title, kept on this device (0 = none). */
     public static long titleEmoji = 0;
     /** Custom emoji next to the user's own name (like Premium's emoji status), kept on this device (0 = none). */
@@ -257,6 +254,8 @@ public class SolegramConfig {
     public static boolean markAllReadInMenu = true;
     public static boolean hideContactsTab;
     public static boolean hideProfileTab;
+    /** A round glass search button beside the tab bar, as on iOS. */
+    public static boolean tabsSearchButton;
     public static boolean savedInMenu = true;
     /** Bottom tab "Feed" (posts of subscribed channels) takes the place of Contacts. */
     public static boolean feedInsteadOfContacts = true;
@@ -328,6 +327,11 @@ public class SolegramConfig {
     public static String updateRepo = "";
     /** Solegram betas (updater.BetaChannel): looked for while on and an access code is saved. */
     public static boolean betaUpdates;
+    /** maps.SolegramMaps: the map in the app (auto, Google, OpenStreetMap) and the app routes open in. */
+    public static int mapEngine;
+    public static int mapsNavApp = 1;
+    /** SolegramProfileCard: banners and tile layouts of Solegram users' profiles are shown. */
+    public static boolean profileCards = true;
     public static String updateChannel = "";
     public static long lastUpdateCheck;
     public static int skippedUpdateBuild;
@@ -401,6 +405,10 @@ public class SolegramConfig {
         glassShadow = p.getBoolean("glassShadow", true);
         glassVibrancy = p.getBoolean("glassVibrancy", true);
         glassMenus = p.getBoolean("glassMenus", true);
+        streaks = p.getBoolean("streaks", true);
+        newPlayer = p.getBoolean("newPlayer", true);
+        musicTab = p.getBoolean("musicTab", false);
+        tabsLayout = p.getString("tabsLayout", "");
         glassDialogs = p.getBoolean("glassDialogs", true);
         glassSheets = p.getBoolean("glassSheets", true);
         liquidControls = p.getBoolean("liquidControls", true);
@@ -423,16 +431,12 @@ public class SolegramConfig {
         aiConsent = p.getBoolean("aiConsent", false);
         meaningSearch = p.getBoolean("meaningSearch", true);
         meaningRerank = p.getBoolean("meaningRerank", true);
-        transcribe = p.getBoolean("transcribe", true);
-        transcribeEngine = clamp(p.getInt("transcribeEngine", 0), 0, 2);
-        transcribeAuto = p.getBoolean("transcribeAuto", true);
         animatedAvatars = p.getBoolean("animatedAvatars", true);
         voiceSkipSilence = p.getBoolean("voiceSkipSilence", false);
         localPins = p.getBoolean("localPins", true);
         saveStories = p.getBoolean("saveStories", true);
         localRepeats = p.getBoolean("localRepeats", true);
         localSavedTags = p.getBoolean("localSavedTags", true);
-        transcribeModel = p.getString("transcribeModel", "");
         titleEmoji = readLong(p, "titleEmoji");
         nameEmoji = readLong(p, "nameEmoji");
         nameEmojiShare = p.getBoolean("nameEmojiShare", true);
@@ -507,6 +511,7 @@ public class SolegramConfig {
         markAllReadInMenu = p.getBoolean("markAllReadInMenu", true);
         hideContactsTab = p.getBoolean("hideContactsTab", false);
         hideProfileTab = p.getBoolean("hideProfileTab", false);
+        tabsSearchButton = p.getBoolean("tabsSearchButton", false);
         savedInMenu = p.getBoolean("savedInMenu", true);
         feedInsteadOfContacts = p.getBoolean("feedInsteadOfContacts", true);
         contactsSwipe = p.getBoolean("contactsSwipe", true);
@@ -551,6 +556,9 @@ public class SolegramConfig {
         updateSource = clamp(p.getInt("updateSource", 0), 0, 1);
         updateRepo = p.getString("updateRepo", "");
         betaUpdates = p.getBoolean("betaUpdates", false);
+        mapEngine = clamp(p.getInt("mapEngine", 0), 0, 2);
+        mapsNavApp = clamp(p.getInt("mapsNavApp", 1), 0, 7);
+        profileCards = p.getBoolean("profileCards", true);
         updateChannel = p.getString("updateChannel", "");
         lastUpdateCheck = readLong(p, "lastUpdateCheck");
         skippedUpdateBuild = p.getInt("skippedUpdateBuild", 0);
@@ -673,6 +681,7 @@ public class SolegramConfig {
 
     private static boolean defaultBoolean(String key) {
         switch (key) {
+            case "profileCards":
             case "ghostReadOnInteract":
             case "ghostInDrawer":
             case "backgroundConnection":
@@ -684,6 +693,8 @@ public class SolegramConfig {
             case "glassShadow":
             case "glassVibrancy":
             case "glassMenus":
+            case "streaks":
+            case "newPlayer":
             case "glassDialogs":
             case "glassSheets":
             case "messageDetails":
@@ -705,8 +716,6 @@ public class SolegramConfig {
             case "aiSummaryButton":
             case "meaningSearch":
             case "meaningRerank":
-            case "transcribe":
-            case "transcribeAuto":
             case "animatedAvatars":
             case "localPins":
             case "saveStories":

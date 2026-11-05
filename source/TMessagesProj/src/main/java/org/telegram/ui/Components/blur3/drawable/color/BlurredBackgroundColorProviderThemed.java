@@ -14,7 +14,13 @@ public class BlurredBackgroundColorProviderThemed implements BlurredBackgroundCo
 
     public BlurredBackgroundColorProviderThemed(Theme.ResourcesProvider resourcesProvider, int backgroundColorId) {
         this(resourcesProvider, backgroundColorId, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f);
+        // Solegram: the glass is as see-through as the "Glass" settings say, like the header's (it used to stay at
+        // Telegram's fixed 85% here: the chat's bottom bar was darker than its top)
+        followSolegram = true;
+        updateColors();
     }
+
+    private boolean followSolegram;
 
     public BlurredBackgroundColorProviderThemed(Theme.ResourcesProvider resourcesProvider, int backgroundColorId, float alpha) {
         this.resourcesProvider = resourcesProvider;
@@ -26,6 +32,7 @@ public class BlurredBackgroundColorProviderThemed implements BlurredBackgroundCo
 
     public void setAlpha(float alpha) {
         this.alpha = alpha;
+        followSolegram = false;
         updateColors();
     }
 
@@ -38,7 +45,7 @@ public class BlurredBackgroundColorProviderThemed implements BlurredBackgroundCo
 
     public void updateColors() {
         final int color = Theme.getColor(backgroundColorId, resourcesProvider);
-        backgroundColor = Theme.multAlpha(color, alpha);
+        backgroundColor = Theme.multAlpha(color, followSolegram ? com.solegram.messenger.SolegramGlass.alpha(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) : alpha);
 
         if (isDark()) {
             strokeColorTop = 0x28FFFFFF;
@@ -58,6 +65,10 @@ public class BlurredBackgroundColorProviderThemed implements BlurredBackgroundCo
 
     @Override
     public int getBackgroundColor() {
+        if (followSolegram) {
+            // read on every draw: a change in the glass settings shows at once
+            return Theme.multAlpha(Theme.getColor(backgroundColorId, resourcesProvider), com.solegram.messenger.SolegramGlass.alpha(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)));
+        }
         return backgroundColor;
     }
 

@@ -143,9 +143,26 @@ public class ActionBarMenu extends LinearLayout {
         }
         menuItem.setOnClickListener(view -> {
             ActionBarMenuItem item = (ActionBarMenuItem) view;
+            // Solegram: the icon moves the way its picture suggests
+            final int sgIcon = item.getIconResId() != 0 ? item.getIconResId() : icon;
+            if (item.hasSubMenu() && sgIcon == 0) {
+                // a menu button drawn without a resource (the chat's ⋮ with its badge): the dots tumble
+                com.solegram.messenger.ui.SolegramIconMotion.play(item.getIconView(), com.solegram.messenger.ui.SolegramIconMotion.DOTS);
+            } else {
+                com.solegram.messenger.ui.SolegramIconMotion.playFor(item.getIconView(), sgIcon);
+            }
             if (item.hasSubMenu()) {
                 if (parentActionBar.actionBarMenuOnItemClick.canOpenMenu()) {
-                    item.toggleSubMenu();
+                    // the menu opens over the button: a moment for the motion to be seen first
+                    if (com.solegram.messenger.ui.SolegramMotion.rich() && !item.isSubMenuShowing()) {
+                        AndroidUtilities.runOnUIThread(() -> {
+                            if (item.isAttachedToWindow() && !item.isSubMenuShowing()) {
+                                item.toggleSubMenu();
+                            }
+                        }, com.solegram.messenger.ui.SolegramIconMotion.MENU_DELAY);
+                    } else {
+                        item.toggleSubMenu();
+                    }
                 }
             } else if (item.isSearchField()) {
                 parentActionBar.onSearchFieldVisibilityChanged(item.toggleSearch(true));

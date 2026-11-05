@@ -206,23 +206,10 @@ public class TranscribeButton {
             return;
         }
         clickedToOpen = false;
-        // Solegram: a tap while Solegram transcribes stops it
-        if (!shouldBeOpen && loading && com.solegram.messenger.SolegramTranscriber.isRunning(parent.getMessageObject())) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && selectorDrawable instanceof RippleDrawable) {
-                selectorDrawable.setState(StateSet.NOTHING);
-                parent.invalidate();
-            }
-            pressed = false;
-            com.solegram.messenger.SolegramTranscriber.cancel(parent.getMessageObject());
-            setLoading(false, true);
-            return;
-        }
-        // Solegram: transcribed on the device or by the user's AI service instead of the Premium offer
-        final boolean solegram = com.solegram.messenger.SolegramTranscriber.handles(parent.getMessageObject());
         boolean processClick, toOpen = !shouldBeOpen;
         if (!shouldBeOpen) {
             processClick = !loading;
-            if ((premium || solegram || canTranscribeTrial(parent.getMessageObject())) && parent.getMessageObject().isSent()) {
+            if ((premium || canTranscribeTrial(parent.getMessageObject())) && parent.getMessageObject().isSent()) {
                 setLoading(true, true);
             }
         } else {
@@ -237,10 +224,7 @@ public class TranscribeButton {
         pressed = false;
         if (processClick) {
             if (!premium && toOpen) {
-                if (solegram) {
-                    clickedToOpen = true;
-                    transcribePressed(parent.getMessageObject(), toOpen, parent.getDelegate());
-                } else if (canTranscribeTrial(parent.getMessageObject()) || parent.getMessageObject() != null && parent.getMessageObject().messageOwner != null && !TextUtils.isEmpty(parent.getMessageObject().messageOwner.voiceTranscription)) {
+                if (canTranscribeTrial(parent.getMessageObject()) || parent.getMessageObject() != null && parent.getMessageObject().messageOwner != null && !TextUtils.isEmpty(parent.getMessageObject().messageOwner.voiceTranscription)) {
                     transcribePressed(parent.getMessageObject(), toOpen, parent.getDelegate());
                 } else {
                     if (parent.getDelegate() != null) {
@@ -699,9 +683,6 @@ public class TranscribeButton {
                 AndroidUtilities.runOnUIThread(() -> {
                     NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject, null, null, (Boolean) true, (Boolean) true);
                 });
-            } else if (com.solegram.messenger.SolegramTranscriber.handles(messageObject)) {
-                // Solegram: transcription without Telegram's server, shown the same way
-                solegramTranscribe(messageObject);
             } else {
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d("sending Transcription request, msg_id=" + messageId + " dialog_id=" + dialogId);
@@ -782,8 +763,6 @@ public class TranscribeButton {
                 }, flags);
             }
         } else {
-            // Solegram: closing stops a transcription still in work
-            com.solegram.messenger.SolegramTranscriber.cancel(messageObject);
             if (transcribeOperationsByDialogPosition != null) {
                 transcribeOperationsByDialogPosition.remove((Integer) reqInfoHash(messageObject));
             }
@@ -793,83 +772,6 @@ public class TranscribeButton {
                 NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject, null, null, (Boolean) false, null);
             });
         }
-    }
-
-    // Solegram: voice messages already given to the automatic transcription in this run of the app
-    private static final java.util.HashSet<String> solegramAutoTried = new java.util.HashSet<>();
-
-    /**
-     * Solegram: with automatic transcription on, a voice message shown in a chat is transcribed by itself (once;
-     * one the user closed stays closed). Only where Solegram transcribes it (on the phone or the user's own service).
-     */
-    public static void solegramAutoTranscribe(MessageObject m) {
-        if (!com.solegram.messenger.SolegramConfig.transcribeAuto || m == null || m.messageOwner == null || !m.isVoice() || !m.isSent()) {
-            return;
-        }
-        if (m.messageOwner.voiceTranscription != null || m.messageOwner.voiceTranscriptionOpen || m.getDuration() > 300) {
-            return;
-        }
-        if (!com.solegram.messenger.SolegramTranscriber.handles(m)) {
-            return;
-        }
-        if (!solegramAutoTried.add(m.currentAccount + "_" + m.getDialogId() + "_" + m.getId())) {
-            return;
-        }
-        AndroidUtilities.runOnUIThread(() -> transcribePressed(m, true, null));
-    }
-
-    /**
-     * Solegram: the message is transcribed by SolegramTranscriber; the text heard so far shows while it works
-     * (as Telegram's pending transcriptions do) and the result is stored like Telegram's, so it stays after reload.
-     */
-    private static void solegramTranscribe(MessageObject messageObject) {
-        if (transcribeOperationsByDialogPosition == null) {
-            transcribeOperationsByDialogPosition = new HashMap<>();
-        }
-        final Integer key = reqInfoHash(messageObject);
-        if (transcribeOperationsByDialogPosition.containsKey(key) || com.solegram.messenger.SolegramTranscriber.isRunning(messageObject)) {
-            return;
-        }
-        transcribeOperationsByDialogPosition.put(key, messageObject);
-        final int account = messageObject.currentAccount;
-        final long id = com.solegram.messenger.SolegramTranscriber.newTranscriptionId();
-        final long start = SystemClock.elapsedRealtime();
-        messageObject.messageOwner.voiceTranscriptionId = id;
-        com.solegram.messenger.SolegramTranscriber.transcribe(messageObject, new com.solegram.messenger.SolegramTranscriber.Callback() {
-            @Override
-            public void onPartial(String text) {
-                if (transcribeOperationsByDialogPosition == null || !transcribeOperationsByDialogPosition.containsKey(key)) {
-                    return;
-                }
-                openVideoTranscription(messageObject);
-                messageObject.messageOwner.voiceTranscriptionOpen = true;
-                messageObject.messageOwner.voiceTranscriptionFinal = false;
-                messageObject.messageOwner.voiceTranscription = text;
-                NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject, (Long) id, text, (Boolean) true, (Boolean) false);
-            }
-
-            @Override
-            public void onDone(String text) {
-                openVideoTranscription(messageObject);
-                messageObject.messageOwner.voiceTranscriptionOpen = true;
-                messageObject.messageOwner.voiceTranscriptionId = id;
-                messageObject.messageOwner.voiceTranscription = text;
-                // as with the server: the loading state shows at least a moment
-                AndroidUtilities.runOnUIThread(() -> finishTranscription(messageObject, id, text), Math.max(0, 350 - (SystemClock.elapsedRealtime() - start)));
-            }
-
-            @Override
-            public void onStopped() {
-                if (transcribeOperationsByDialogPosition != null) {
-                    transcribeOperationsByDialogPosition.remove(key);
-                }
-                if (!messageObject.messageOwner.voiceTranscriptionFinal) {
-                    messageObject.messageOwner.voiceTranscription = null;
-                }
-                messageObject.messageOwner.voiceTranscriptionOpen = false;
-                NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject, null, null, (Boolean) false, null);
-            }
-        });
     }
 
     public static boolean finishTranscription(MessageObject messageObject, long transcription_id, String text) {
@@ -956,10 +858,6 @@ public class TranscribeButton {
             return false;
         }
         if (isFreeTranscribeInChat(messageObject)) {
-            return false;
-        }
-        // Solegram: no lock when Solegram transcribes the message
-        if (com.solegram.messenger.SolegramTranscriber.handles(messageObject)) {
             return false;
         }
         if (!TextUtils.isEmpty(messageObject.messageOwner.voiceTranscription)) {

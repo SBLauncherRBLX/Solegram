@@ -1,5 +1,7 @@
 <resources>
     <item name="menu_spoiler" type="id"/>
+    <item name="solegram_icon_motion" type="id"/>
+    <item name="solegram_icon_motion_base" type="id"/>
     <item name="menu_quote" type="id"/>
     <item name="menu_regular" type="id"/>
     <item name="menu_bold" type="id"/>

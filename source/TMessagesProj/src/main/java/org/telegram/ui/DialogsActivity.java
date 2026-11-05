@@ -3542,6 +3542,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             optionsItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
             optionsItem.setOnClickListener(v -> {
                 getContactsController().loadGlobalPrivacySetting();
+                // Solegram: the dots tumble, and the menu (which opens over them) waits a moment for it
+                if (com.solegram.messenger.ui.SolegramMotion.rich()) {
+                    com.solegram.messenger.ui.SolegramIconMotion.play(optionsItem.getIconView(), com.solegram.messenger.ui.SolegramIconMotion.DOTS);
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (optionsItem != null && optionsItem.isAttachedToWindow()) {
+                            showItemOptions();
+                        }
+                    }, com.solegram.messenger.ui.SolegramIconMotion.MENU_DELAY);
+                    return;
+                }
                 showItemOptions();
             });
             optionsItem.setOnLongClickListener(v -> {
@@ -9405,6 +9415,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             openWriteContacts();
         } else {
             com.solegram.messenger.ui.SolegramCreateChain.open(this, action);
+        }
+    }
+
+    /** Solegram: the tab bar's search button opens the chat search, as the header's search button does. */
+    public void solegramOpenSearch() {
+        if (searchItem != null && searchItem.getVisibility() == View.VISIBLE) {
+            searchItem.callOnClick();
+        } else {
+            showSearch(true, false, true);
         }
     }
 

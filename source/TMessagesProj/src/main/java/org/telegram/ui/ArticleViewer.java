@@ -4172,7 +4172,11 @@ public class ArticleViewer extends IArticleViewer implements NotificationCenter.
 
                     return result;
                 } else {
-                    return super.drawChild(canvas, child, drawingTime);
+                    final boolean r = super.drawChild(canvas, child, drawingTime);
+                    if (child == actionBar && actionBar != null) {
+                        actionBar.solegramDrawSoftFade(canvas, this); // Solegram: a soft fade under the bar, no hard edge
+                    }
+                    return r;
                 }
             }
 

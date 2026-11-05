@@ -53,7 +53,7 @@ final class GithubUpdater {
      * release assets), https only. The APK is still checked for our signature before it is installed.
      */
     private static final String[] ALLOWED_HOSTS = {"raw.githubusercontent.com", "github.com", "objects.githubusercontent.com",
-        "release-assets.githubusercontent.com"};
+        "release-assets.githubusercontent.com", "api.github.com"};
     private static final int MAX_REDIRECTS = 5;
     /** Far above any real Solegram APK; a server that keeps sending must not fill the storage. */
     private static final long MAX_APK_SIZE = 400L * 1024 * 1024;
@@ -122,6 +122,55 @@ final class GithubUpdater {
     /** Checks a typed beta access code (BetaChannel.STATUS_*), on the update thread. */
     static void verifyBetaCode(String code, BetaChannel.CodeCallback callback) {
         checkQueue().postRunnable(() -> BetaChannel.verify(code, SolegramConfig.getUpdateBranch(), callback));
+    }
+
+    /**
+     * A JSON file as the repository has it right now: through GitHub's API (raw.githubusercontent.com keeps a copy
+     * for up to five minutes, so a beta published a moment ago would not be seen yet), falling back to the raw file.
+     */
+    /** Solegram Studio's scenes from the update repository (studio/scenes.json on main), or null. */
+    static JSONObject studioScenes() throws Exception {
+        return readJsonFresh("main", "studio/scenes.json");
+    }
+
+    static JSONObject readJsonFresh(String branch, String path) throws Exception {
+        final String url = "https://api.github.com/repos/" + SolegramConfig.getUpdateRepo() + "/contents/" + path + "?ref=" + branch;
+        if (isAllowedUrl(url)) {
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(TIMEOUT);
+                c.setReadTimeout(TIMEOUT);
+                c.setInstanceFollowRedirects(false);
+                c.setRequestProperty("User-Agent", "Solegram-Updater");
+                c.setRequestProperty("Accept", "application/vnd.github.raw");
+                if (c.getResponseCode() == 200) {
+                    try (InputStream in = c.getInputStream()) {
+                        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        final byte[] buffer = new byte[8192];
+                        int read;
+                        while ((read = in.read(buffer)) > 0) {
+                            out.write(buffer, 0, read);
+                            if (out.size() > 512 * 1024) {
+                                throw new java.io.IOException("update.json too large");
+                            }
+                        }
+                        return new JSONObject(new String(out.toByteArray(), "UTF-8"));
+                    }
+                } else if (c.getResponseCode() == 404) {
+                    return null;
+                }
+            } catch (org.json.JSONException e) {
+                throw e;
+            } catch (Exception e) {
+                FileLog.e(e); // rate limit or network: the raw file below
+            } finally {
+                if (c != null) {
+                    c.disconnect();
+                }
+            }
+        }
+        return readJson(branch, path);
     }
 
     /** A JSON file of the repository, null when it is not there. */

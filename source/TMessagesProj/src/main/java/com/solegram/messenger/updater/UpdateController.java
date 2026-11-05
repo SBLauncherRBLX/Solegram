@@ -118,7 +118,8 @@ public class UpdateController implements NotificationCenter.NotificationCenterDe
         if (!SolegramConfig.autoUpdateCheck) {
             return;
         }
-        final long interval = AutoUpdater.isAppVisible() ? VISIBLE_START_CHECK_INTERVAL : AUTO_CHECK_INTERVAL;
+        // beta testers get new betas soon after they come out: the app looks on every start after 5 minutes
+        final long interval = AutoUpdater.isAppVisible() ? (BetaChannel.enabled() ? 5 * 60 * 1000L : VISIBLE_START_CHECK_INTERVAL) : AUTO_CHECK_INTERVAL;
         if (Math.abs(System.currentTimeMillis() - SolegramConfig.lastUpdateCheck) < interval) {
             return;
         }

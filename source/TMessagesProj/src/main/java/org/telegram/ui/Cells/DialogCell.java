@@ -2391,6 +2391,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameString = ((String) nameString).replace('\n', ' ');
             }
             CharSequence nameStringFinal = nameString;
+            final com.solegram.messenger.SolegramStreak.Span sgStreak = !isForumCell() && !isSavedDialog && currentDialogFolderId == 0 ? com.solegram.messenger.SolegramStreak.span(currentAccount, currentDialogId) : null;
+            if (sgStreak != null) {
+                ellipsizeWidth = Math.max(0, ellipsizeWidth - sgStreak.width(Theme.dialogs_namePaint[paintIndex]));
+            }
             if (nameLayoutEllipsizeByGradient) {
                 nameLayoutFits = nameStringFinal.length() == TextUtils.ellipsize(nameStringFinal, Theme.dialogs_namePaint[paintIndex], ellipsizeWidth, TextUtils.TruncateAt.END).length();
                 ellipsizeWidth += dp(48);
@@ -2403,6 +2407,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameStringFinal = TextUtils.ellipsize(nameStringFinal, Theme.dialogs_namePaint[paintIndex], ellipsizeWidth, TextUtils.TruncateAt.END);
             }
             nameStringFinal = Emoji.replaceEmoji(nameStringFinal, Theme.dialogs_namePaint[paintIndex].getFontMetricsInt(), false);
+            if (sgStreak != null) {
+                nameStringFinal = com.solegram.messenger.SolegramStreak.append(nameStringFinal, sgStreak);
+                ellipsizeWidth += sgStreak.width(Theme.dialogs_namePaint[paintIndex]);
+            }
             if (message != null && message.hasHighlightedWords()) {
                 CharSequence s = AndroidUtilities.highlightText(nameStringFinal, message.highlightedWords, resourcesProvider);
                 if (s != null) {

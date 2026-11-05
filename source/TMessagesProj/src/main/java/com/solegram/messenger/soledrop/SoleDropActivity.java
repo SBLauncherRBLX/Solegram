@@ -512,23 +512,97 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
 
     // region Tiles (the SoleDrop screen opened by itself)
 
+    /** Not an item: Stars and gifts are sent from SoleWallet now (it can also send them by a tap). */
+    private static final int TILE_WALLET = -1;
+
     private static final int[] TILE_TYPES = {
-        SoleDropProtocol.ITEM_MY_ACCOUNT, SoleDropProtocol.ITEM_STARS, SoleDropProtocol.ITEM_GIFT,
+        SoleDropProtocol.ITEM_MY_ACCOUNT, TILE_WALLET,
         SoleDropProtocol.ITEM_PHOTO, SoleDropProtocol.ITEM_LOCATION, SoleDropProtocol.ITEM_LINK
     };
     private static final int[] TILE_NAMES = {
-        R.string.SG_SoleDropMyProfile, R.string.SG_SoleDropStars, R.string.SG_SoleDropGift,
+        R.string.SG_SoleDropMyProfile, R.string.SG_SoleDropWallet,
         R.string.SG_SoleDropPhoto, R.string.SG_SoleDropLocation, R.string.SG_SoleDropLink
     };
 
     private static final org.telegram.ui.Components.glass.GlassTabView.TabAnimation[] TILE_ICONS = {
         org.telegram.ui.Components.glass.GlassTabView.TabAnimation.CONTACTS,
         org.telegram.ui.Components.glass.GlassTabView.TabAnimation.STARS,
-        org.telegram.ui.Components.glass.GlassTabView.TabAnimation.GIFT,
         org.telegram.ui.Components.glass.GlassTabView.TabAnimation.GALLERY,
         org.telegram.ui.Components.glass.GlassTabView.TabAnimation.LOCATION,
         org.telegram.ui.Components.glass.GlassTabView.TabAnimation.LINK
     };
+
+    /**
+     * A row that scrolls inside a capsule: what goes past an end fades out along the end's curve (not along a straight
+     * edge, which would leave the round tips of the capsule unfaded), as far as there is more to scroll that way.
+     */
+    private static final class CapsuleScrollView extends HorizontalScrollView {
+        private final int radius, fade;
+        private final android.graphics.Paint maskPaint = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+        private android.graphics.Bitmap mask;
+
+        CapsuleScrollView(Context context, int radius, int fade) {
+            super(context);
+            this.radius = radius;
+            this.fade = fade;
+            maskPaint.setXfermode(new android.graphics.PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
+        }
+
+        /** How much of the left end to fade out (1 = all of it) for each pixel: 0 inside, rising toward the curve. */
+        private android.graphics.Bitmap mask(int h) {
+            if (mask != null && mask.getHeight() == h) {
+                return mask;
+            }
+            final int r = Math.min(radius, h / 2), w = r + fade;
+            final int[] px = new int[w * h];
+            for (int y = 0; y < h; y++) {
+                final float yc = y + 0.5f;
+                // where the capsule's edge is at this height
+                float edge = 0;
+                if (yc < r) {
+                    final float dy = r - yc;
+                    edge = r - (float) Math.sqrt(Math.max(0, r * r - dy * dy));
+                } else if (yc > h - r) {
+                    final float dy = yc - (h - r);
+                    edge = r - (float) Math.sqrt(Math.max(0, r * r - dy * dy));
+                }
+                for (int x = 0; x < w; x++) {
+                    final float k = Math.max(0f, Math.min(1f, (x + 0.5f - edge) / fade));
+                    final float out = 1f - k * k * (3 - 2 * k); // smooth
+                    px[y * w + x] = ((int) (out * 255) << 24);
+                }
+            }
+            mask = android.graphics.Bitmap.createBitmap(px, w, h, android.graphics.Bitmap.Config.ARGB_8888);
+            return mask;
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas canvas) {
+            final View child = getChildCount() > 0 ? getChildAt(0) : null;
+            final int w = getWidth(), h = getHeight(), x = getScrollX();
+            final int max = child == null ? 0 : Math.max(0, child.getWidth() + getPaddingLeft() + getPaddingRight() - w);
+            final float left = Math.min(1f, x / (float) fade), right = Math.min(1f, (max - x) / (float) fade);
+            if (w <= 0 || h <= 0 || left <= 0 && right <= 0) {
+                super.draw(canvas);
+                return;
+            }
+            final int save = canvas.saveLayer(x, 0, x + w, h, null);
+            super.draw(canvas);
+            final android.graphics.Bitmap m = mask(h);
+            if (left > 0) {
+                maskPaint.setAlpha((int) (255 * left));
+                canvas.drawBitmap(m, x, 0, maskPaint);
+            }
+            if (right > 0) {
+                maskPaint.setAlpha((int) (255 * right));
+                canvas.save();
+                canvas.scale(-1, 1, x + w / 2f, 0);
+                canvas.drawBitmap(m, x, 0, maskPaint);
+                canvas.restore();
+            }
+            canvas.restoreToCount(save);
+        }
+    }
 
     /**
      * What to send: a glass bar like Solegram's bottom tab bar, its tabs at their full size in a row that scrolls
@@ -542,11 +616,19 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         final int margin = dp(org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN);
         final FrameLayout bar = new FrameLayout(context);
         bar.setBackground(glass.createTabs(bar, dp(32), margin));
-        tilesStrip = new HorizontalScrollView(context);
+        tilesStrip = new CapsuleScrollView(context, dp(32), dp(30));
         tilesStrip.setHorizontalScrollBarEnabled(false);
         tilesStrip.setOverScrollMode(View.OVER_SCROLL_NEVER);
         tilesStrip.setClipToPadding(false);
         tilesStrip.setPadding(dp(6), 0, dp(6), 0);
+        // the row stays inside the glass pill: clipped to its round shape and fading out along its round ends
+        tilesStrip.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(32));
+            }
+        });
+        tilesStrip.setClipToOutline(true);
         final LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < TILE_TYPES.length; i++) {
@@ -562,7 +644,8 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             row.addView(tab, LayoutHelper.createLinear(84, 68));
         }
         tilesStrip.addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        bar.addView(tilesStrip, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 68, Gravity.CENTER_VERTICAL));
+        bar.addView(tilesStrip, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 68, Gravity.CENTER_VERTICAL,
+            org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN, 0, org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN, 0));
         tilesScroll.addView(bar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 68 + org.telegram.ui.DialogsActivity.MAIN_TABS_MARGIN * 2, Gravity.BOTTOM));
         bottom.addView(tilesScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 6, 0, 6, 0));
         updateTiles(false);
@@ -600,6 +683,16 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             return;
         }
         SoleDrop.hapticTick(fragmentView);
+        // the tapped tile moves the way its picture suggests, as the main tab bar's tabs do
+        for (int i = 0; i < TILE_TYPES.length; i++) {
+            if (TILE_TYPES[i] == type && tabViews[i] != null) {
+                tabViews[i].solegramPlayMotion();
+            }
+        }
+        if (type == TILE_WALLET) {
+            AndroidUtilities.runOnUIThread(() -> presentFragment(new com.solegram.messenger.wallet.SoleWalletActivity()), 120);
+            return;
+        }
         if (type == item.type) {
             if (!item.isReady()) {
                 onPick(item);
@@ -664,6 +757,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             requestLocation();
         }
         updateOffer();
+        tryPendingToken();
     }
 
     /** The offer of the next tap, with a new session (the other phone shows one card per session). */
@@ -832,6 +926,18 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
     @Override
     public void onRequestPermissionsResultFragment(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResultFragment(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CAMERA) {
+            boolean camera = false;
+            for (int r : grantResults) {
+                camera |= r == PackageManager.PERMISSION_GRANTED;
+            }
+            if (camera) {
+                AndroidUtilities.runOnUIThread(this::scanCode, 200);
+            } else {
+                showPill(getString(R.string.SG_SoleDropCameraDenied), null, null);
+            }
+            return;
+        }
         if (requestCode != REQUEST_LOCATION) {
             return;
         }
@@ -894,6 +1000,7 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         it.hasLocation = true;
         card.updateLocation();
         updateOffer();
+        tryPendingToken();
     }
     // endregion
 
@@ -993,7 +1100,8 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             }
             if (user == null) {
                 peerView.setRing(SoleDropPeerView.RING_FAIL);
-                peerView.setStatus(getString(R.string.SG_SoleDropNotFound));
+                // a scanned code that Telegram does not know: it was replaced by a newer one on the friend's phone
+                peerView.setStatus(getString(token != null && resolveError != null ? R.string.SG_SoleDropCodeStale : R.string.SG_SoleDropNotFound));
                 AndroidUtilities.runOnUIThread(() -> backToIdle(true), 1800);
                 return;
             }
@@ -1011,6 +1119,9 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             }
         });
     }
+
+    /** Why the last contact token did not lead to anyone (Telegram's error), null when it did. */
+    private String resolveError;
 
     /** Telegram finds the account behind the tap: the contact token, else the username, else a user already known. */
     private void resolve(long userId, @Nullable String username, @Nullable String token, Utilities.Callback<TLRPC.User> done) {
@@ -1031,12 +1142,15 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
         }
         final TLRPC.TL_contacts_importContactToken req = new TLRPC.TL_contacts_importContactToken();
         req.token = token;
+        resolveError = null;
         getConnectionsManager().sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
             if (res instanceof TLRPC.User) {
                 final TLRPC.User user = (TLRPC.User) res;
                 mc.putUser(user, false);
                 done.run(user);
             } else {
+                // the friend's code is old (a newer one replaced it) or not a contact code at all
+                resolveError = err != null ? err.text : "NO_USER";
                 byUsername.run();
             }
         }), ConnectionsManager.RequestFlagFailOnServerErrors);
@@ -1621,8 +1735,18 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
             .show();
     }
 
+    private static final int REQUEST_CAMERA = 4471;
+    /** A friend's code scanned before there was anything ready to send: it is used as soon as there is. */
+    private String pendingToken;
+
     private void scanCode() {
         if (state != S_IDLE || getParentActivity() == null) {
+            return;
+        }
+        // the scanner shows nothing without the camera: ask first, as Telegram's own QR screens do
+        if (android.os.Build.VERSION.SDK_INT >= 23
+            && getParentActivity().checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            getParentActivity().requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQUEST_CAMERA);
             return;
         }
         CameraScanActivity.solegramGlassNext = true;
@@ -1635,15 +1759,27 @@ public class SoleDropActivity extends BaseFragment implements NotificationCenter
                         showPill(getString(R.string.SG_SoleDropBadCode), null, null);
                         return;
                     }
-                    if (state != S_IDLE || !item.isReady()) {
+                    if (state != S_IDLE) {
                         return;
                     }
-                    // the code is the tap: the same wave and the same person in glass
-                    onContact();
-                    foundPeer(0, null, null, token);
+                    pendingToken = token;
+                    if (!tryPendingToken()) {
+                        showPill(getString(R.string.SG_SoleDropCodeWaiting), null, null);
+                    }
                 }, 250);
             }
         });
+    }
+    /** The scanned code, once there is something ready to send: the code is the tap (the same wave, the same person in glass). */
+    private boolean tryPendingToken() {
+        if (pendingToken == null || state != S_IDLE || item == null || !item.isReady()) {
+            return false;
+        }
+        final String token = pendingToken;
+        pendingToken = null;
+        onContact();
+        foundPeer(0, null, null, token);
+        return true;
     }
     // endregion
 

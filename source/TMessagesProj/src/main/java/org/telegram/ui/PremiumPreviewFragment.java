@@ -737,7 +737,8 @@ public class PremiumPreviewFragment extends BaseFragment implements Notification
                 if (whiteBackground) {
                     backgroundPaint.setColor(getThemedColor(Theme.key_windowBackgroundGray));
                     canvas.drawRect(0, 0, getMeasuredWidth(), getMeasuredHeight(), backgroundPaint);
-                    if (progressToFull > 0 && actionBar != null) {
+                    // Solegram: no white panel behind the folded header (the list is cut below it): the page's colour stays
+                    if (progressToFull > 0 && actionBar != null && !com.solegram.messenger.ui.SolegramFloatingHeader.enabled()) {
                         backgroundPaint.setColor(ColorUtils.blendARGB(getThemedColor(Theme.key_windowBackgroundGray), getThemedColor(Theme.key_windowBackgroundWhite), progressToFull));
                         canvas.drawRect(0, 0, getMeasuredWidth(), actionBar.getHeight(), backgroundPaint);
                     }
@@ -753,7 +754,7 @@ public class PremiumPreviewFragment extends BaseFragment implements Notification
                     navbarProtectionDrawable.draw(canvas);
                 }
 
-                if (parentLayout != null && whiteBackground) {
+                if (parentLayout != null && whiteBackground && !com.solegram.messenger.ui.SolegramFloatingHeader.enabled()) {
                     parentLayout.drawHeaderShadow(canvas, (int) (0xFF * progressToFull), actionBar.getBottom());
                 }
             }

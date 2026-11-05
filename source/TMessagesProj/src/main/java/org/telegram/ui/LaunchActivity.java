@@ -3082,7 +3082,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             } else if (showPlayer) {
                 if (!actionBarLayout.getFragmentStack().isEmpty()) {
                     BaseFragment fragment = actionBarLayout.getFragmentStack().get(0);
-                    fragment.showDialog(new AudioPlayerAlert(this, null));
+                    if (com.solegram.messenger.SolegramConfig.newPlayer) {
+                        com.solegram.messenger.ui.SolegramPlayer.open(this, null);
+                    } else {
+                        fragment.showDialog(new AudioPlayerAlert(this, null));
+                    }
                 }
                 pushOpened = false;
             } else if (showLocations) {

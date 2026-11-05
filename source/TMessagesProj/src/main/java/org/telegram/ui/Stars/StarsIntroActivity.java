@@ -694,6 +694,8 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
     private final int BUTTON_GIFT = -2;
     private final int BUTTON_SUBSCRIPTIONS_EXPAND = -3;
     private final int BUTTON_AFFILIATE = -4;
+    private final int BUTTON_SG_CLEAR_HISTORY = -5;
+    private final int BUTTON_SG_RESTORE_HISTORY = -6;
 
     public void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (getContext() == null) {
@@ -729,6 +731,14 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
             items.add(UItem.asShadow(null));
         }
 
+        // Solegram: clear the transaction history (hidden on this device; Telegram keeps it), or show it again
+        if (c.hasTransactions()) {
+            items.add(UItem.asButton(BUTTON_SG_CLEAR_HISTORY, R.drawable.msg_clear, getString(R.string.SG_StarsClearHistory)).red());
+            items.add(UItem.asShadow(null));
+        } else if (com.solegram.messenger.SolegramStarsHistory.isCleared(currentAccount)) {
+            items.add(UItem.asButton(BUTTON_SG_RESTORE_HISTORY, R.drawable.msg_reset, getString(R.string.SG_StarsRestoreHistory)).accent());
+            items.add(UItem.asShadow(getString(R.string.SG_StarsHistoryClearedInfo)));
+        }
         if (hadTransactions = c.hasTransactions()) {
             items.add(UItem.asFullscreenCustom(transactionsLayout, ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(24) + AndroidUtilities.navigationBarHeight));
         } else {
@@ -737,6 +747,26 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
     }
 
     public void onItemClick(UItem item, int position) {
+        if (item.id == BUTTON_SG_CLEAR_HISTORY && getParentActivity() != null) {
+            showDialog(new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity(), getResourceProvider())
+                .setTitle(getString(R.string.SG_StarsClearHistory))
+                .setMessage(getString(R.string.SG_StarsClearHistoryInfo))
+                .setPositiveButton(getString(R.string.SG_StarsClearHistoryShort), (d, w) -> {
+                    com.solegram.messenger.SolegramStarsHistory.clear(currentAccount);
+                    StarsController.getInstance(currentAccount).invalidateTransactions(true);
+                    adapter.update(true);
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.done, getString(R.string.SG_StarsHistoryCleared)).show();
+                })
+                .setNegativeButton(getString(R.string.Cancel), null)
+                .makeRed(org.telegram.ui.ActionBar.AlertDialog.BUTTON_POSITIVE)
+                .create());
+            return;
+        } else if (item.id == BUTTON_SG_RESTORE_HISTORY) {
+            com.solegram.messenger.SolegramStarsHistory.restore(currentAccount);
+            StarsController.getInstance(currentAccount).invalidateTransactions(true);
+            adapter.update(true);
+            return;
+        }
         if (item.id == BUTTON_EXPAND) {
             expanded = !expanded;
             adapter.update(true);

@@ -251,6 +251,8 @@ public abstract class BaseFragment {
     /** Solegram: this screen's floating header, decided once per screen view (see SolegramFloatingScreen). */
     public com.solegram.messenger.ui.SolegramFloatingScreen solegramFloatingScreen;
     public View solegramFloatingDecidedFor;
+    /** Solegram: a screen that cannot have the floating header gets a soft one (page-coloured bar, content fading under it). */
+    public boolean solegramSoftHeader;
 
     /** Solegram: screens with their own header design opt out of the floating header. */
     public boolean solegramAllowsFloatingHeader() {

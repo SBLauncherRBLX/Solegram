@@ -195,6 +195,10 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
                 host = solegramScreenBehind();
                 if (host == null || !host.canSample()) {
                     solegramDropGlass(); // nothing live to show: the menu's own panel
+                    // over a web page or video: the system's blur behind the window, seen through the panel
+                    if (com.solegram.messenger.ui.SolegramLiveGlass.frostBehind(windowRoot, backgroundDrawable)) {
+                        invalidate();
+                    }
                     return;
                 }
             }
@@ -216,6 +220,7 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             if (glass == null) {
                 return;
             }
+            backgroundDrawable.setAlpha(255); // it may have been frosted over a web page before
             solegramPlainBackground = backgroundDrawable;
             solegramGlass = glass;
             solegramGlassHost = host;

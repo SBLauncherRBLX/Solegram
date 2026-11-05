@@ -82,7 +82,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         imageView = new RLottieImageView(context) {
             @Override
             public void draw(android.graphics.Canvas canvas) {
-                if (solegramBands < 0f || solegramBands >= 1f || getWidth() <= 0) {
+                if (solegramBands < 0f || solegramBands >= 1f || getWidth() <= 0 || !isSelectedAnimator.getValue()) {
                     super.draw(canvas);
                     return;
                 }
@@ -297,6 +297,8 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     public void setSelected(boolean selected, boolean animated) {
         if (selected && animated && !isSelectedAnimator.getValue() && getParent() instanceof org.telegram.ui.MainTabsLayout) {
             solegramPlaySelectMotion(); // Solegram: every main tab moves in its own way when it opens
+        } else if (!selected && solegramMotion != null) {
+            solegramStopMotion(); // left before the motion ended: the icon goes back to rest at once
         }
         isSelectedAnimator.setValue(selected, animated);
         checkPlayAnimation(animated);
@@ -328,6 +330,23 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     }
     private android.animation.Animator solegramMotion;
 
+    private void solegramStopMotion() {
+        final android.animation.Animator motion = solegramMotion;
+        solegramMotion = null;
+        if (motion != null) {
+            motion.cancel(); // its end listener puts the icon at rest
+        }
+        solegramBands = -1f;
+        imageView.invalidate();
+    }
+
+    private static final android.view.animation.BounceInterpolator SOLEGRAM_BOUNCE = new android.view.animation.BounceInterpolator();
+
+    /** Solegram: the tab's own motion on demand (tabs outside the main bar, e.g. SoleDrop's). */
+    public void solegramPlayMotion() {
+        solegramPlaySelectMotion();
+    }
+
     private void solegramPlaySelectMotion() {
         if (solegramMotion != null) {
             solegramMotion.cancel();
@@ -347,6 +366,8 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             duration = 620;
         } else if (type == TabAnimation.CALLS) {
             duration = 640;
+        } else if (type == TabAnimation.SG_MUSIC) {
+            duration = 760;
         } else {
             duration = 560;
         }
@@ -363,6 +384,9 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             }
         });
         solegramMotion = a;
+        if (type == TabAnimation.SG_MUSIC) {
+            solegramApplyMotion(icon, type, rest, 0f); // the notes start hollow, not filled for a frame
+        }
         a.start();
     }
 
@@ -382,9 +406,39 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         } else if (type == TabAnimation.FEED) {
             solegramBands = t >= 1f ? -1f : t;
             imageView.invalidate();
+        } else if (type == TabAnimation.SG_MUSIC) {
+            // the notes play: the drawable moves its heads, beam and waves; the tab only breathes with the beat
+            // the notes fill and sway inside the drawable; the view itself stays put
+            if (imageView.getDrawable() instanceof com.solegram.messenger.ui.SolegramMusicTabIcon) {
+                ((com.solegram.messenger.ui.SolegramMusicTabIcon) imageView.getDrawable()).setProgress(t);
+            }
         } else if (type == TabAnimation.CALLS) {
             // the handset rings: a few quick shakes that die away
             rotation = (float) (Math.sin(t * Math.PI * 7) * 16f * (1f - t));
+        } else if (type == TabAnimation.STARS) {
+            // the star turns once, settling with a little spring
+            rotation = 360f * CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.05f));
+            scaleX = scaleY = 1f + 0.1f * (float) Math.sin(Math.PI * Math.min(1f, t * 1.6f));
+            if (t >= 1f) {
+                rotation = 0f;
+            }
+        } else if (type == TabAnimation.GIFT || type == TabAnimation.LINK) {
+            // the bow (the link) swings on its top
+            icon.setPivotY(icon.getHeight() * 0.2f);
+            rotation = (float) (Math.sin(t * Math.PI * 3) * 18f * (1f - t));
+            scaleX = scaleY = 1f + 0.08f * (float) Math.sin(Math.PI * Math.min(1f, t * 2f));
+        } else if (type == TabAnimation.GALLERY) {
+            // a camera's click: squeezed for a moment, then out again
+            final float k = t < 0.25f ? t / 0.25f : 1f - CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation((t - 0.25f) / 0.75f);
+            scaleX = 1f + 0.08f * k;
+            scaleY = 1f - 0.2f * k;
+        } else if (type == TabAnimation.LOCATION) {
+            // the pin drops into place and bounces
+            icon.setPivotY(icon.getHeight());
+            dy = -dp(7) * (1f - SOLEGRAM_BOUNCE.getInterpolation(Math.min(1f, t * 1.2f)));
+            final float land = t > 0.35f && t < 0.6f ? (float) Math.sin(Math.PI * (t - 0.35f) / 0.25f) : 0f;
+            scaleX = 1f + 0.1f * land;
+            scaleY = 1f - 0.1f * land;
         } else if (type == TabAnimation.CHATS || type == TabAnimation.CONTACTS) {
             // the bubble pops out of its tail with a little wiggle
             icon.setPivotX(icon.getWidth() * 0.25f);
@@ -485,6 +539,16 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         }
 
         if (tabAnimation == null) {
+            return;
+        }
+
+        if (tabAnimation == TabAnimation.SG_MUSIC) {
+            // Solegram: the Music tab's own icon, which plays when the tab opens
+            if (!(imageView.getDrawable() instanceof com.solegram.messenger.ui.SolegramMusicTabIcon)) {
+                imageView.setImageDrawable(new com.solegram.messenger.ui.SolegramMusicTabIcon(solegramIconDp));
+            }
+            ((com.solegram.messenger.ui.SolegramMusicTabIcon) imageView.getDrawable()).setSelectedState(isSelected);
+            updateColors();
             return;
         }
 
@@ -751,6 +815,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         WALLET(R.raw.tab_wallet, R.raw.tab_wallet_reverse),
         LINK(TabAnimationType.STATIC, R.drawable.tabs_link_24),
         STARS(TabAnimationType.STATIC, R.drawable.settings_stars), // Solegram: SoleDrop
+        SG_MUSIC(TabAnimationType.STATIC, R.drawable.files_music), // Solegram: the Music tab (drawn by SolegramMusicTabIcon)
         ARTICLE(R.raw.tab_article, R.raw.tab_article_reverse),
         GRAM(R.raw.gram, R.raw.gram_reverse),
 

@@ -198,7 +198,10 @@ public final class SolegramProfileLinks {
     // an address without https:// counts as a website only on these (so "readme.md" or "Node.js" stay words)
     private static final HashSet<String> SITE_TLDS = new HashSet<>(Arrays.asList(
         "com", "net", "org", "io", "dev", "app", "me", "ru", "рф", "su", "ua", "by", "kz", "uz", "de", "uk", "eu", "fr", "it", "es",
-        "pl", "nl", "us", "ca", "co", "ai", "xyz", "info", "tv", "fm", "gg", "to", "cc"));
+        "pl", "nl", "us", "ca", "co", "ai", "xyz", "info", "tv", "fm", "gg", "to", "cc", "pro", "store", "shop", "site", "online", "link",
+        "page", "live", "tech", "space", "art", "studio", "design", "world", "games", "bio", "lol", "one", "biz", "work", "blog", "club",
+        "fun", "top", "am", "ge", "lv", "lt", "ee", "cz", "sk", "at", "ch", "se", "no", "fi", "dk", "jp", "kr", "in", "br", "tr", "il",
+        "ly", "sh", "so", "im", "ws", "gl", "vc", "st", "red", "ink", "bot", "chat", "social", "network", "media", "news"));
 
     private static String cachedAbout;
     private static Parsed cachedParsed;
@@ -208,9 +211,8 @@ public final class SolegramProfileLinks {
 
     /** Reads any bio (cached for the last one: the profile asks several times per layout). */
     public static Parsed parse(@Nullable String about) {
-        if (about == null) {
-            about = "";
-        }
+        // the shared name emoji's invisible mark ends the bio: glued to the last link it hid the platform
+        about = about == null ? "" : SolegramNameEmojiShare.strip(about);
         synchronized (SolegramProfileLinks.class) {
             if (cachedParsed != null && about.equals(cachedAbout)) {
                 return cachedParsed;
@@ -348,8 +350,9 @@ public final class SolegramProfileLinks {
             }
             final Matcher pm = p.path.matcher(path);
             if (!pm.find()) {
-                // the platform's own page that is not a profile (instagram.com/p/…): not a profile link
-                return null;
+                // the platform's page that is not a profile (a video, a post, an invite): still a link, as a website
+                final String text = compact(raw);
+                return new Link(website(), text, text, start, end);
             }
             String handle = null;
             for (int g = pm.groupCount(); g >= 1 && handle == null; g--) {

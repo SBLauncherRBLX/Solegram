@@ -444,15 +444,26 @@ public class ProfileActionsView extends View {
         if (action.iconScale != 1f) {
             canvas.scale(action.iconScale, action.iconScale, action.bounds.centerX(), action.bounds.centerY());
         }
+        // Solegram: a tapped button's icon moves the way its picture suggests
+        float motionAlpha = 1f;
+        if (action.sgMotionStart > 0) {
+            final float t = (System.currentTimeMillis() - action.sgMotionStart) / (float) com.solegram.messenger.ui.SolegramIconMotion.duration(action.sgMotionKind);
+            if (t >= 1f) {
+                action.sgMotionStart = 0;
+            } else {
+                motionAlpha = com.solegram.messenger.ui.SolegramIconMotion.transform(canvas, action.sgMotionKind, t, action.bounds);
+                invalidate();
+            }
+        }
         if (!isAnimatingCallAction || action.key != KEY_CALL) {
-            final float outlineAlpha = (1f - useFilledWhiteIcon) * alpha;
-            final float filledAlpha = useFilledWhiteIcon * alpha;
+            final float outlineAlpha = (1f - useFilledWhiteIcon) * alpha * motionAlpha;
+            final float filledAlpha = useFilledWhiteIcon * alpha * motionAlpha;
             if (action.drawableAnimated != null) {
                 if (action.key == KEY_NOTIFICATION) {
                     drawActionDrawable(canvas, action.drawableOutline, outlineAlpha);
                     drawActionDrawable(canvas, action.drawableAnimated, filledAlpha);
                 } else {
-                    drawActionDrawable(canvas, action.drawableAnimated, alpha);
+                    drawActionDrawable(canvas, action.drawableAnimated, alpha * motionAlpha);
                 }
             } else {
                 drawActionDrawable(canvas, action.drawableOutline, outlineAlpha);
@@ -462,6 +473,38 @@ public class ProfileActionsView extends View {
 
         canvas.restore();
         drawLoading(canvas, action, alpha);
+    }
+
+    private static int solegramMotionKind(int key) {
+        switch (key) {
+            case KEY_MESSAGE:
+            case KEY_DISCUSS:
+                return com.solegram.messenger.ui.SolegramIconMotion.WOBBLE;
+            case KEY_NOTIFICATION:
+                return com.solegram.messenger.ui.SolegramIconMotion.RING;
+            case KEY_CALL:
+            case KEY_VOICE_CHAT:
+                return com.solegram.messenger.ui.SolegramIconMotion.SHAKE;
+            case KEY_VIDEO:
+            case KEY_STREAM:
+            case KEY_SET_PHOTO:
+                return com.solegram.messenger.ui.SolegramIconMotion.SHUTTER;
+            case KEY_SHARE:
+                return com.solegram.messenger.ui.SolegramIconMotion.TAKE_OFF;
+            case KEY_GIFT:
+                return com.solegram.messenger.ui.SolegramIconMotion.SWING;
+            case KEY_SETTINGS:
+                return com.solegram.messenger.ui.SolegramIconMotion.SPIN;
+            case KEY_EDIT_INFO:
+            case KEY_EDIT_USERNAME:
+                return com.solegram.messenger.ui.SolegramIconMotion.SCRIBBLE;
+            case KEY_LEAVE:
+                return com.solegram.messenger.ui.SolegramIconMotion.NUDGE_BACK;
+            case KEY_JOIN:
+                return com.solegram.messenger.ui.SolegramIconMotion.NUDGE_UP;
+            default:
+                return com.solegram.messenger.ui.SolegramIconMotion.POP;
+        }
     }
 
     private void drawActionDrawable(Canvas canvas, Drawable drawable, float alpha) {
@@ -569,6 +612,11 @@ public class ProfileActionsView extends View {
                         hit.updateDrawable(true, hit.supportsAnimate);
                     }
                     hit.startTime = System.currentTimeMillis();
+                    if (com.solegram.messenger.ui.SolegramMotion.rich()) {
+                        hit.sgMotionKind = solegramMotionKind(hit.key);
+                        hit.sgMotionStart = hit.startTime;
+                        invalidate();
+                    }
                     final Action finalHit = hit;
                     if (onActionClickListener != null) {
                         if (finalHit.callDelay == 0) {
@@ -995,6 +1043,9 @@ public class ProfileActionsView extends View {
         int key;
 
         private final ButtonBounce bounce = new ButtonBounce(ProfileActionsView.this);
+        /** Solegram: the icon's motion after a tap (SolegramIconMotion). */
+        long sgMotionStart;
+        int sgMotionKind;
         final RectF prevRect = new RectF();
         final RectF rect = new RectF();
 

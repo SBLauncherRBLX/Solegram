@@ -14,6 +14,8 @@ import com.solegram.messenger.SolegramConfig;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.DispatchQueue;
 import org.telegram.messenger.FileLog;
@@ -974,6 +976,57 @@ public class PluginsController {
     }
     // endregion
 
+    // region Misbehaving plugins
+    // A plugin whose hooks keep failing (or keep holding the thread they run on) is switched off by itself, and the
+    // user is told: a broken plugin must not break messaging.
+
+    private static final int ERROR_LIMIT = 15;
+    private static final long ERROR_WINDOW_MS = 60_000;
+    private static final long SLOW_HOOK_MS = 1500;
+    private final ConcurrentHashMap<String, long[]> hookErrors = new ConcurrentHashMap<>();
+
+    /** A Python method hook of the plugin failed (called from the engine). */
+    public static void reportHookError(String pluginId, String error) {
+        if (pluginId != null) {
+            getInstance().onHookFailed(pluginId, error);
+        }
+    }
+
+    void onHookFailed(String pluginId, String error) {
+        final PluginMeta meta = plugins.get(pluginId);
+        if (meta == null || !meta.enabled) {
+            return;
+        }
+        if (error != null) {
+            meta.error = error.length() > 300 ? error.substring(0, 300) : error;
+        }
+        final long now = android.os.SystemClock.elapsedRealtime();
+        final long[] w = hookErrors.compute(pluginId, (k, v) -> v == null || now - v[0] > ERROR_WINDOW_MS ? new long[]{now, 1} : new long[]{v[0], v[1] + 1});
+        if (w[1] >= ERROR_LIMIT) {
+            hookErrors.remove(pluginId);
+            FileLog.e("Solegram: plugin " + pluginId + " failed " + w[1] + " times in a minute, switching it off");
+            AndroidUtilities.runOnUIThread(() -> {
+                if (!meta.enabled) {
+                    return;
+                }
+                setEnabled(pluginId, false);
+                final org.telegram.ui.ActionBar.BaseFragment fragment = org.telegram.ui.LaunchActivity.getSafeLastFragment();
+                if (fragment != null) {
+                    org.telegram.ui.Components.BulletinFactory.of(fragment).createSimpleBulletin(R.raw.error,
+                        LocaleController.formatString(R.string.SG_PluginAutoDisabled, meta.name != null ? meta.name : pluginId)).show();
+                }
+            });
+        }
+    }
+
+    void onHookDone(String pluginId, long startedAt) {
+        final long took = android.os.SystemClock.elapsedRealtime() - startedAt;
+        if (took > SLOW_HOOK_MS) {
+            onHookFailed(pluginId, "hook took " + took + " ms");
+        }
+    }
+    // endregion
+
     // region Dispatch
 
     private static final ConcurrentHashMap<Class<?>, String> tlNames = new ConcurrentHashMap<>();
@@ -1020,12 +1073,15 @@ public class PluginsController {
                 continue;
             }
             HookResult r;
+            final long sgStarted = android.os.SystemClock.elapsedRealtime();
             try {
                 r = h.preRequestHook(name, account, current);
             } catch (Throwable t) {
                 FileLog.e(t);
+                onHookFailed(e.pluginId, t.toString());
                 continue;
             }
+            onHookDone(e.pluginId, sgStarted);
             if (r == null || r.isDefault()) {
                 continue;
             }
@@ -1059,12 +1115,15 @@ public class PluginsController {
                 continue;
             }
             HookResult r;
+            final long sgStarted = android.os.SystemClock.elapsedRealtime();
             try {
                 r = h.postRequestHook(name, account, curResponse, curError);
             } catch (Throwable t) {
                 FileLog.e(t);
+                onHookFailed(e.pluginId, t.toString());
                 continue;
             }
+            onHookDone(e.pluginId, sgStarted);
             if (r == null || r.isDefault()) {
                 continue;
             }
@@ -1104,12 +1163,15 @@ public class PluginsController {
                 continue;
             }
             HookResult r;
+            final long sgStarted = android.os.SystemClock.elapsedRealtime();
             try {
                 r = h.onUpdateHook(name, account, current);
             } catch (Throwable t) {
                 FileLog.e(t);
+                onHookFailed(e.pluginId, t.toString());
                 continue;
             }
+            onHookDone(e.pluginId, sgStarted);
             if (r == null || r.isDefault()) {
                 continue;
             }
@@ -1147,12 +1209,15 @@ public class PluginsController {
                 continue;
             }
             HookResult r;
+            final long sgStarted = android.os.SystemClock.elapsedRealtime();
             try {
                 r = h.onUpdatesHook(name, account, current);
             } catch (Throwable t) {
                 FileLog.e(t);
+                onHookFailed(pluginId, t.toString());
                 continue;
             }
+            onHookDone(pluginId, sgStarted);
             if (r == null || r.isDefault()) {
                 continue;
             }
@@ -1180,12 +1245,15 @@ public class PluginsController {
                 continue;
             }
             HookResult r;
+            final long sgStarted = android.os.SystemClock.elapsedRealtime();
             try {
                 r = h.onSendMessageHook(account, current);
             } catch (Throwable t) {
                 FileLog.e(t);
+                onHookFailed(e.pluginId, t.toString());
                 continue;
             }
+            onHookDone(e.pluginId, sgStarted);
             if (r == null || r.isDefault()) {
                 continue;
             }

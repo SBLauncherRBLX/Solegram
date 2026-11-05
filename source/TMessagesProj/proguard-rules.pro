@@ -76,3 +76,6 @@
 # layout managers...): keep their public API so it is not shrunk away from what plugins expect.
 -keep class androidx.core.** { public protected *; }
 -keep class androidx.recyclerview.** { public protected *; }
+
+# Solegram: OpenStreetMap maps
+-dontwarn org.osmdroid.**

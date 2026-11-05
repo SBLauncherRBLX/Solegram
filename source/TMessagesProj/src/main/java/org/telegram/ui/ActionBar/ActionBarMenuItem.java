@@ -1261,6 +1261,11 @@ public class ActionBarMenuItem extends FrameLayout {
         iconViewResId = 0;
     }
 
+    /** Solegram: the drawable the icon shows (0 when it was set as a drawable). */
+    public int getIconResId() {
+        return iconViewResId;
+    }
+
     public RLottieImageView getIconView() {
         return iconView;
     }

@@ -161,6 +161,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
     private int secretWebpageRow;
     private int secretDetailRow;
     private int rowCount;
+    private int sgLinksRow = -1; // Solegram: its settings of the same kind
 
     private final ArrayList<BotBiometry.Bot> biometryBots = new ArrayList<>();
 
@@ -708,7 +709,9 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
     public void updateRows(boolean notify) {
         passkeysRow = -1;
         rowCount = 0;
+        sgLinksRow = -1;
 
+        sgLinksRow = rowCount++;
         securitySectionRow = rowCount++;
         passwordRow = rowCount++;
         autoDeleteMesages = rowCount++;
@@ -1019,6 +1022,9 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
 
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return false;
+            }
             int position = holder.getAdapterPosition();
             return position == passcodeRow || position == passwordRow || position == passkeysRow || position == blockedRow || position == sessionsRow || position == secretWebpageRow || position == webSessionsRow ||
                     position == groupsRow && !getContactsController().getLoadingPrivacyInfo(ContactsController.PRIVACY_RULES_TYPE_INVITE) ||
@@ -1047,6 +1053,11 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
 
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            if (viewType == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                final View sg = com.solegram.messenger.ui.SolegramSettingsLinks.block(PrivacySettingsActivity.this, parent.getContext(), com.solegram.messenger.ui.SolegramSettingsLinks.PRIVACY, getResourceProvider());
+                sg.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
+                return new RecyclerListView.Holder(sg);
+            }
             View view;
             switch (viewType) {
                 case 0:
@@ -1074,6 +1085,9 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return;
+            }
             switch (holder.getItemViewType()) {
                 case 0:
                     boolean showLoading = false;
@@ -1389,6 +1403,9 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
 
         @Override
         public int getItemViewType(int position) {
+            if (position == sgLinksRow) {
+                return com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE;
+            }
             if (position == passportRow || position == lastSeenRow || position == phoneNumberRow ||
                     position == deleteAccountRow || position == webSessionsRow || position == groupsRow || position == paymentsClearRow ||
                     position == secretMapRow || position == contactsDeleteRow || position == botsBiometryRow) {

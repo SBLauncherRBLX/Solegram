@@ -156,6 +156,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
     private int resetNotificationsRow;
     private int resetNotificationsSectionRow;
     private int rowCount = 0;
+    private int sgLinksRow = -1; // Solegram: its settings of the same kind
 
     private boolean updateVibrate;
     private boolean updateRingtone;
@@ -166,6 +167,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
         MessagesController.getInstance(currentAccount).loadSignUpNotificationsSettings();
         loadExceptions(null);
 
+        sgLinksRow = rowCount++;
         if (UserConfig.getActivatedAccountsCount() > 1) {
             accountsSectionRow = rowCount++;
             accountsAllRow = rowCount++;
@@ -933,6 +935,9 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
 
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return false;
+            }
             int position = holder.getAdapterPosition();
             return !(position == notificationsSectionRow || position == notificationsSection2Row || position == inappSectionRow ||
                     position == eventsSectionRow || position == otherSectionRow || position == resetSectionRow ||
@@ -949,6 +954,11 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
 
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            if (viewType == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                final View sg = com.solegram.messenger.ui.SolegramSettingsLinks.block(NotificationsSettingsActivity.this, parent.getContext(), com.solegram.messenger.ui.SolegramSettingsLinks.NOTIFICATIONS, getResourceProvider());
+                sg.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
+                return new RecyclerListView.Holder(sg);
+            }
             View view;
             switch (viewType) {
                 case 0:
@@ -979,6 +989,9 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return;
+            }
             switch (holder.getItemViewType()) {
                 case 0: {
                     HeaderCell headerCell = (HeaderCell) holder.itemView;
@@ -1196,6 +1209,9 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
 
         @Override
         public int getItemViewType(int position) {
+            if (position == sgLinksRow) {
+                return com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE;
+            }
             if (position == eventsSectionRow || position == otherSectionRow || position == resetSectionRow ||
                     position == callsSectionRow || position == badgeNumberSection || position == inappSectionRow ||
                     position == notificationsSectionRow || position == accountsSectionRow) {

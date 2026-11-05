@@ -622,6 +622,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int sgNowPlayingConnectRow = -1;
     // Solegram: links to profiles on other platforms, read from the bio, as buttons under it
     private int sgLinksRow = -1;
+    private int sgPostsRow = -1;
+    private int sgStreakRow = -1;
     // Solegram anti-scam: "Possibly a scammer" with the main reasons, for a risky stranger
     private int sgScamRow = -1;
     private int sgScamDividerRow = -1;
@@ -1388,6 +1390,25 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         canvas.restore();
                     }
                 }
+                // Solegram: the banner of the user's profile card, darkened toward the name
+                if (sgBanner != null && sgCard != null && sgCard.hasBanner() && com.solegram.messenger.SolegramConfig.profileCards) {
+                    final float shown = (playProfileAnimation == 0 ? 1f : avatarAnimationProgress);
+                    sgBanner.setImageCoords(0, 0, getMeasuredWidth(), y1);
+                    sgBanner.setAlpha(shown);
+                    sgBanner.draw(canvas);
+                    if (sgCard.dim > 0) {
+                        if (sgDimPaint == null) {
+                            sgDimPaint = new Paint();
+                        }
+                        if (sgDimHeight != y1 || sgDimValue != sgCard.dim) {
+                            sgDimHeight = y1;
+                            sgDimValue = sgCard.dim;
+                            sgDimPaint.setShader(new android.graphics.LinearGradient(0, y1 * 0.3f, 0, y1, 0x00000000, Color.argb((int) (2.55f * sgCard.dim), 0, 0, 0), Shader.TileMode.CLAMP));
+                        }
+                        sgDimPaint.setAlpha((int) (255 * shown));
+                        canvas.drawRect(0, 0, getMeasuredWidth(), y1, sgDimPaint);
+                    }
+                }
                 if (previousTransitionFragment != null) {
                     ActionBar actionBar = previousTransitionFragment.getActionBar();
                     ActionBarMenu menu = actionBar.menu;
@@ -1409,6 +1430,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private Rect blurBounds = new Rect();
+        private Paint sgDimPaint;
+        private int sgDimHeight, sgDimValue;
     }
 
     private class OverlaysView extends View implements ProfileGalleryView.Callback {
@@ -2364,9 +2387,80 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return !isPulledDown;
     }
 
+    // region Solegram: profile card (banner and tiles)
+
+    private com.solegram.messenger.SolegramProfileCard.Card sgCard;
+    private ImageReceiver sgBanner;
+
+    private void sgLoadCard() {
+        if (userId == 0 || userInfo == null || !com.solegram.messenger.SolegramConfig.profileCards) {
+            return;
+        }
+        final long uid = userId;
+        sgApplyCard(com.solegram.messenger.SolegramProfileCard.get(uid));
+        com.solegram.messenger.SolegramProfileCard.load(currentAccount, uid, userInfo, () -> {
+            if (!isFinishing() && fragmentView != null) {
+                sgApplyCard(com.solegram.messenger.SolegramProfileCard.get(uid));
+            }
+        });
+    }
+
+    /** A post picked for the profile: opened in its channel. */
+    private void sgOpenPost(MessageObject post) {
+        if (post == null || post.messageOwner == null) {
+            return;
+        }
+        final Bundle args = new Bundle();
+        args.putLong("chat_id", -post.getDialogId());
+        args.putInt("message_id", post.getId());
+        presentFragment(new ChatActivity(args));
+    }
+
+    private void sgApplyCard(com.solegram.messenger.SolegramProfileCard.Card card) {
+        if (card == sgCard) {
+            return;
+        }
+        sgCard = card;
+        if (card != null && card.hasBanner() && topView != null) {
+            if (sgBanner == null) {
+                sgBanner = new ImageReceiver(topView);
+                sgBanner.setAllowStartAnimation(true);
+                sgBanner.setAutoRepeat(1);
+                sgBanner.onAttachedToWindow();
+            }
+            final MessageObject post = card.post;
+            final TLRPC.Document doc = post.getDocument();
+            if (doc != null && !(post.messageOwner.media instanceof TLRPC.TL_messageMediaPhoto)) {
+                final TLRPC.PhotoSize thumb = FileLoader.getClosestPhotoSizeWithSize(doc.thumbs, 320);
+                if ("image/webp".equals(doc.mime_type)) {
+                    sgBanner.setImage(ImageLocation.getForDocument(doc), null, ImageLocation.getForDocument(thumb, doc), "b", doc.size, null, post, 0);
+                } else {
+                    sgBanner.setImage(ImageLocation.getForDocument(doc), ImageLoader.AUTOPLAY_FILTER, null, null, ImageLocation.getForDocument(thumb, doc), "b", null, doc.size, null, post, 0);
+                }
+            } else {
+                final TLRPC.PhotoSize big = FileLoader.getClosestPhotoSizeWithSize(post.photoThumbs, 1280);
+                final TLRPC.PhotoSize small = FileLoader.getClosestPhotoSizeWithSize(post.photoThumbs, 50);
+                sgBanner.setImage(ImageLocation.getForObject(big, post.photoThumbsObject), null, ImageLocation.getForObject(small, post.photoThumbsObject), "b", big != null ? big.size : 0, null, post, 1);
+            }
+        } else if (sgBanner != null) {
+            sgBanner.clearImage();
+        }
+        if (topView != null) {
+            topView.invalidate();
+        }
+        updateRowsIds();
+        if (listAdapter != null) {
+            listAdapter.notifyDataSetChanged();
+        }
+    }
+    // endregion
+
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        if (sgBanner != null) {
+            sgBanner.onDetachedFromWindow();
+        }
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onDestroy();
         }
@@ -3892,7 +3986,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     MediaController.getInstance().getPlaylist().clear();
                     MediaController.getInstance().getPlaylist().addAll(savedMusicList.list);
                     if (!sameList) MediaController.getInstance().playMessage(savedMusicList.list.get(0));
-                    showDialog(new AudioPlayerAlert(getContext(), getResourceProvider()));
+                    if (com.solegram.messenger.SolegramConfig.newPlayer && getParentActivity() != null) {
+                        com.solegram.messenger.ui.SolegramPlayer.open(getParentActivity(), getResourceProvider());
+                    } else {
+                        showDialog(new AudioPlayerAlert(getContext(), getResourceProvider()));
+                    }
                 }
             });
 
@@ -9277,6 +9375,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             final long uid = (Long) args[0];
             if (uid == userId) {
                 userInfo = (TLRPC.UserFull) args[1];
+                sgLoadCard();
                 if (ratingView != null) {
                     ratingView.set(userInfo.stars_rating);
                 }
@@ -10411,6 +10510,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             ProfileBirthdayEffect.BirthdayEffectFetcher birthdayAssetsFetcher
     ) {
         userInfo = value;
+        sgLoadCard();
         if (ratingView != null) {
             ratingView.set(userInfo.stars_rating);
         }
@@ -10705,6 +10805,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         sgNowPlayingRow = -1;
         sgNowPlayingConnectRow = -1;
         sgLinksRow = -1;
+        sgPostsRow = -1;
+        sgStreakRow = -1;
         setUsernameRow = -1;
         bioRow = -1;
         channelRow = -1;
@@ -10952,46 +11054,85 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     sgScamDividerRow = rowCount++;
                 }
 
+                // Solegram: the user's profile card (SolegramProfileCard) may move and hide these tiles
+                final com.solegram.messenger.SolegramProfileCard.Card sgLayout = com.solegram.messenger.SolegramConfig.profileCards ? sgCard : null;
+                boolean sgChannelOk = false;
                 if (userInfo != null && (userInfo.flags2 & 64) != 0 && (profileChannelMessageFetcher == null || !profileChannelMessageFetcher.loaded || !profileChannelMessageFetcher.messageObjects.isEmpty())) {
                     final TLRPC.Chat channel = getMessagesController().getChat(userInfo.personal_channel_id);
-                    if (channel != null && (ChatObject.isPublic(channel) || !ChatObject.isNotInChat(channel))) {
-                        channelRow = rowCount++;
-                        channelDividerRow = rowCount++;
-                    }
+                    sgChannelOk = channel != null && (ChatObject.isPublic(channel) || !ChatObject.isNotInChat(channel));
+                }
+                if (sgChannelOk && (sgLayout == null || com.solegram.messenger.SolegramProfileCard.CHANNEL_TOP.equals(sgLayout.channel))) {
+                    channelRow = rowCount++;
+                    channelDividerRow = rowCount++;
                 }
                 infoStartRow = rowCount;
-                if (!isBot && (hasPhone || !hasInfo)) {
-                    phoneRow = rowCount++;
-                }
-                if (userInfo != null && !TextUtils.isEmpty(sgAbout())) {
-                    userInfoRow = rowCount++;
-                }
-                if (sgProfileLinks() != null) {
-                    sgLinksRow = rowCount++;
-                }
-                if (sgNowPlayingTrack() != null) {
-                    sgNowPlayingRow = rowCount++;
-                } else if (sgOfferMusic()) {
-                    sgNowPlayingConnectRow = rowCount++;
-                }
-                if (user != null && username != null) {
-                    usernameRow = rowCount++;
-                }
-                if (com.solegram.messenger.SolegramConfig.showUserId && userId != 0) {
-                    solegramIdRow = rowCount++;
-                }
-                if (userInfo != null) {
-                    if (userInfo.birthday != null) {
-                        birthdayRow = rowCount++;
+                for (String sgTile : sgLayout != null ? sgLayout.order : java.util.Arrays.asList(com.solegram.messenger.SolegramProfileCard.TILES)) {
+                    if (sgLayout != null && !sgLayout.shown(sgTile)) {
+                        continue;
                     }
-                    if (userInfo.business_work_hours != null) {
-                        bizHoursRow = rowCount++;
-                    }
-                    if (userInfo.business_location != null) {
-                        bizLocationRow = rowCount++;
-                    }
-                    if (userInfo.note != null) {
-                        noteRow = rowCount++;
+                    switch (sgTile) {
+                        case "phone":
+                            if (!isBot && (hasPhone || !hasInfo)) {
+                                phoneRow = rowCount++;
+                            }
+                            break;
+                        case "bio":
+                            if (userInfo != null && !TextUtils.isEmpty(sgAbout())) {
+                                userInfoRow = rowCount++;
+                            }
+                            break;
+                        case "links":
+                            if (sgProfileLinks() != null) {
+                                sgLinksRow = rowCount++;
+                            }
+                            break;
+                        case "posts":
+                            if (sgLayout != null && !sgLayout.featured.isEmpty()) {
+                                sgPostsRow = rowCount++;
+                            }
+                            break;
+                        case "streak":
+                            if (sgLayout != null && sgLayout.hasStreak()) {
+                                sgStreakRow = rowCount++;
+                            }
+                            break;
+                        case "music":
+                            if (sgNowPlayingTrack() != null) {
+                                sgNowPlayingRow = rowCount++;
+                            } else if (sgOfferMusic()) {
+                                sgNowPlayingConnectRow = rowCount++;
+                            }
+                            break;
+                        case "username":
+                            if (user != null && username != null) {
+                                usernameRow = rowCount++;
+                            }
+                            break;
+                        case "id":
+                            if (com.solegram.messenger.SolegramConfig.showUserId && userId != 0) {
+                                solegramIdRow = rowCount++;
+                            }
+                            break;
+                        case "birthday":
+                            if (userInfo != null && userInfo.birthday != null) {
+                                birthdayRow = rowCount++;
+                            }
+                            break;
+                        case "hours":
+                            if (userInfo != null && userInfo.business_work_hours != null) {
+                                bizHoursRow = rowCount++;
+                            }
+                            break;
+                        case "location":
+                            if (userInfo != null && userInfo.business_location != null) {
+                                bizLocationRow = rowCount++;
+                            }
+                            break;
+                        case "note":
+                            if (userInfo != null && userInfo.note != null) {
+                                noteRow = rowCount++;
+                            }
+                            break;
                     }
                 }
                 if (actionsView == null && userId != getUserConfig().getClientUserId()) {
@@ -11002,6 +11143,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 infoEndRow = rowCount - 1;
                 infoSectionRow = rowCount++;
+                if (sgChannelOk && sgLayout != null && com.solegram.messenger.SolegramProfileCard.CHANNEL_BOTTOM.equals(sgLayout.channel)) {
+                    channelRow = rowCount++;
+                    channelDividerRow = rowCount++;
+                }
 
                 if (user != null && user.linked_community_id != 0) {
                     linkedCommunityRow = rowCount++;
@@ -13394,7 +13539,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 VIEW_TYPE_LINKED_COMMUNITY = 33,
                 VIEW_TYPE_SG_NOW_PLAYING = 34,
                 VIEW_TYPE_SG_NOW_PLAYING_CONNECT = 35,
-                VIEW_TYPE_SG_LINKS = 36
+                VIEW_TYPE_SG_LINKS = 36,
+                VIEW_TYPE_SG_POSTS = 37,
+                VIEW_TYPE_SG_STREAK = 38
                         ;
 
         private Context mContext;
@@ -13420,6 +13567,18 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 case VIEW_TYPE_SG_NOW_PLAYING_CONNECT: {
                     view = new TextCell(mContext, resourcesProvider);
+                    view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                    break;
+                }
+                case VIEW_TYPE_SG_POSTS: {
+                    final com.solegram.messenger.ui.SolegramProfilePostsView posts = new com.solegram.messenger.ui.SolegramProfilePostsView(mContext, resourcesProvider);
+                    posts.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                    posts.setDelegate(ProfileActivity.this::sgOpenPost);
+                    view = posts;
+                    break;
+                }
+                case VIEW_TYPE_SG_STREAK: {
+                    view = new com.solegram.messenger.ui.SolegramProfileStreakView(mContext, resourcesProvider);
                     view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
                     break;
                 }
@@ -13734,6 +13893,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             switch (holder.getItemViewType()) {
                 case VIEW_TYPE_SG_NOW_PLAYING:
                     ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(sgNowPlayingTrack(), sgIsSelf());
+                    break;
+                case VIEW_TYPE_SG_POSTS:
+                    ((com.solegram.messenger.ui.SolegramProfilePostsView) holder.itemView).setPosts(sgCard != null ? sgCard.featured : null);
+                    break;
+                case VIEW_TYPE_SG_STREAK:
+                    ((com.solegram.messenger.ui.SolegramProfileStreakView) holder.itemView).set(currentAccount, sgCard);
                     break;
                 case VIEW_TYPE_SG_LINKS: {
                     final java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> links = sgProfileLinks();
@@ -14181,7 +14346,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     } else if (position == dataRow) {
                         textCell.setTextAndIcon(LocaleController.getString(R.string.DataSettings), R.drawable.msg2_data, true);
                     } else if (position == chatRow) {
-                        textCell.setTextAndIcon(LocaleController.getString(R.string.ChatSettings), R.drawable.msg2_discussion, true);
+                        textCell.setTextAndIcon(LocaleController.getString(R.string.SG_Customization), R.drawable.msg2_discussion, true);
                     } else if (position == filtersRow) {
                         textCell.setTextAndIcon(LocaleController.getString(R.string.Filters), R.drawable.msg2_folder, true);
                     } else if (position == stickersRow) {
@@ -14644,7 +14809,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             return type != VIEW_TYPE_HEADER && type != VIEW_TYPE_DIVIDER && type != VIEW_TYPE_SHADOW &&
                     type != VIEW_TYPE_EMPTY && type != VIEW_TYPE_EMPTY2 && type != VIEW_TYPE_HEADER_EMPTY && type != VIEW_TYPE_BOTTOM_PADDING && type != VIEW_TYPE_SHARED_MEDIA &&
                     type != 9 && type != 10 && type != VIEW_TYPE_BOT_APP && type != VIEW_TYPE_TEXT2 && // These are legacy ones, left for compatibility
-                    type != VIEW_TYPE_SG_LINKS; // Solegram: the buttons take their own taps
+                    type != VIEW_TYPE_SG_LINKS && type != VIEW_TYPE_SG_POSTS && type != VIEW_TYPE_SG_STREAK; // Solegram: the buttons take their own taps
         }
 
         @Override
@@ -14660,6 +14825,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return VIEW_TYPE_SG_NOW_PLAYING_CONNECT;
             } else if (position == sgLinksRow) {
                 return VIEW_TYPE_SG_LINKS;
+            } else if (position == sgPostsRow) {
+                return VIEW_TYPE_SG_POSTS;
+            } else if (position == sgStreakRow) {
+                return VIEW_TYPE_SG_STREAK;
             }
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
@@ -15009,27 +15178,27 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     new SearchResult(224, getString(R.string.SaveToGalleryGroups), "saveToGalleryGroupsRow", getString(R.string.DataSettings), getString(R.string.SaveToGallery), R.drawable.msg2_data, () -> f.presentFragment(new DataSettingsActivity())).withLink("tg://settings/data/save-to-photos/groups"),
                     new SearchResult(225, getString(R.string.SaveToGalleryChannels), "saveToGalleryChannelsRow", getString(R.string.DataSettings), getString(R.string.SaveToGallery), R.drawable.msg2_data, () -> f.presentFragment(new DataSettingsActivity())).withLink("tg://settings/data/save-to-photos/channels"),
 
-                    new SearchResult(300, getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/themes"),
-                    new SearchResult(301, getString(R.string.TextSizeHeader), "textSizeHeaderRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/text-size"),
-                    new SearchResult(302, getString(R.string.ChangeChatBackground), getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL))).withLink("tg://settings/appearance/wallpapers"),
-                    new SearchResult(303, getString(R.string.SetColor), null, getString(R.string.ChatSettings), getString(R.string.ChatBackground), R.drawable.msg2_discussion, () -> f.presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_COLOR))),
-                    new SearchResult(304, getString(R.string.ResetChatBackgrounds), "resetRow", getString(R.string.ChatSettings), getString(R.string.ChatBackground), R.drawable.msg2_discussion, () -> f.presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL))),
-                    new SearchResult(306, getString(R.string.ColorTheme), "themeHeaderRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
-                    new SearchResult(319, getString(R.string.BrowseThemes), null, getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_THEMES_BROWSER))),
-                    new SearchResult(320, getString(R.string.CreateNewTheme), "createNewThemeRow", getString(R.string.ChatSettings), getString(R.string.BrowseThemes), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_THEMES_BROWSER))).withLink("tg://settings/appearance/themes/create"),
-                    new SearchResult(321, getString(R.string.BubbleRadius), "bubbleRadiusHeaderRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/message-corners"),
-                    new SearchResult(322, getString(R.string.ChatList), "chatListHeaderRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
-                    new SearchResult(323, getString(R.string.ChatListSwipeGesture), "swipeGestureHeaderRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
-                    new SearchResult(324, getString(R.string.AppIcon), "appIconHeaderRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/app-icon"),
-                    new SearchResult(305, getString(R.string.AutoNightTheme), getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT))),
-                    new SearchResult(328, getString(R.string.NextMediaTap), "nextMediaTapRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/tap-for-next-media"),
-                    new SearchResult(327, getString(R.string.RaiseToListen), "raiseToListenRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/data/raise-to-listen"),
-                    new SearchResult(310, getString(R.string.RaiseToSpeak), "raiseToSpeakRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/data/raise-to-speak"),
-                    new SearchResult(326, getString(R.string.PauseMusicOnMedia), "pauseOnMediaRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/data/pause-music"),
-                    new SearchResult(325, getString(R.string.MicrophoneForVoiceMessages), "bluetoothScoRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
-                    new SearchResult(308, getString(R.string.DirectShare), "directShareRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
-                    new SearchResult(311, getString(R.string.SendByEnter), "sendByEnterRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
-                    new SearchResult(318, getString(R.string.DistanceUnits), "distanceRow", getString(R.string.ChatSettings), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(300, getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/themes"),
+                    new SearchResult(301, getString(R.string.TextSizeHeader), "textSizeHeaderRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/text-size"),
+                    new SearchResult(302, getString(R.string.ChangeChatBackground), getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL))).withLink("tg://settings/appearance/wallpapers"),
+                    new SearchResult(303, getString(R.string.SetColor), null, getString(R.string.SG_Customization), getString(R.string.ChatBackground), R.drawable.msg2_discussion, () -> f.presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_COLOR))),
+                    new SearchResult(304, getString(R.string.ResetChatBackgrounds), "resetRow", getString(R.string.SG_Customization), getString(R.string.ChatBackground), R.drawable.msg2_discussion, () -> f.presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL))),
+                    new SearchResult(306, getString(R.string.ColorTheme), "themeHeaderRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(319, getString(R.string.BrowseThemes), null, getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_THEMES_BROWSER))),
+                    new SearchResult(320, getString(R.string.CreateNewTheme), "createNewThemeRow", getString(R.string.SG_Customization), getString(R.string.BrowseThemes), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_THEMES_BROWSER))).withLink("tg://settings/appearance/themes/create"),
+                    new SearchResult(321, getString(R.string.BubbleRadius), "bubbleRadiusHeaderRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/message-corners"),
+                    new SearchResult(322, getString(R.string.ChatList), "chatListHeaderRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(323, getString(R.string.ChatListSwipeGesture), "swipeGestureHeaderRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(324, getString(R.string.AppIcon), "appIconHeaderRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/app-icon"),
+                    new SearchResult(305, getString(R.string.AutoNightTheme), getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT))),
+                    new SearchResult(328, getString(R.string.NextMediaTap), "nextMediaTapRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/appearance/tap-for-next-media"),
+                    new SearchResult(327, getString(R.string.RaiseToListen), "raiseToListenRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/data/raise-to-listen"),
+                    new SearchResult(310, getString(R.string.RaiseToSpeak), "raiseToSpeakRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/data/raise-to-speak"),
+                    new SearchResult(326, getString(R.string.PauseMusicOnMedia), "pauseOnMediaRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))).withLink("tg://settings/data/pause-music"),
+                    new SearchResult(325, getString(R.string.MicrophoneForVoiceMessages), "bluetoothScoRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(308, getString(R.string.DirectShare), "directShareRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(311, getString(R.string.SendByEnter), "sendByEnterRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
+                    new SearchResult(318, getString(R.string.DistanceUnits), "distanceRow", getString(R.string.SG_Customization), R.drawable.msg2_discussion, () -> f.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC))),
 
                     new SearchResult(600, getString(R.string.StickersName), R.drawable.msg2_sticker, () -> f.presentFragment(new StickersActivity(MediaDataController.TYPE_IMAGE, null))).withLink("tg://settings/appearance/stickers-and-emoji"),
                     new SearchResult(601, getString(R.string.SuggestStickers), "suggestRow", getString(R.string.StickersName), R.drawable.msg2_sticker, () -> f.presentFragment(new StickersActivity(MediaDataController.TYPE_IMAGE, null))),
@@ -16132,6 +16301,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, sgNowPlayingRow, sparseIntArray);
             put(++pointer, sgNowPlayingConnectRow, sparseIntArray);
             put(++pointer, sgLinksRow, sparseIntArray);
+            put(++pointer, sgPostsRow, sparseIntArray);
+            put(++pointer, sgStreakRow, sparseIntArray);
             put(++pointer, channelRow, sparseIntArray);
             put(++pointer, botStarsBalanceRow, sparseIntArray);
             put(++pointer, botTonBalanceRow, sparseIntArray);
@@ -16617,6 +16788,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 //                            FileLog.e(e);
 //                        }
 //                    } else {
+            if (!BuildVars.isHuaweiStoreApp() && com.solegram.messenger.SolegramConfig.mapsNavApp != com.solegram.messenger.maps.SolegramMaps.NAV_GOOGLE) {
+                // Solegram: an address opens in the phone's choice of map apps
+                com.solegram.messenger.maps.SolegramMaps.openPoint(getParentActivity(), 0, 0, userInfo.business_location.address);
+                return;
+            }
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(String.format(Locale.US, domain + "?q=" + userInfo.business_location.address)));
                 getParentActivity().startActivity(intent);

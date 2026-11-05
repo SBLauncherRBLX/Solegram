@@ -76,6 +76,58 @@ public class SolegramFloatingScreen {
         return new SolegramFloatingScreen(fragment, actionBar, fragmentView, scrollRoot, overlays);
     }
 
+    /**
+     * The soft header, for screens that cannot have the floating one (their list does not start at the top, or they
+     * have their own things there): the bar takes the page's colour, drops its shadow, and the screen fades out
+     * under it (drawSoftFade). False when the screen keeps its header as it is.
+     */
+    public static boolean soften(BaseFragment fragment, ActionBar actionBar, View fragmentView) {
+        if (fragment == null || actionBar == null || fragmentView == null || !SolegramFloatingHeader.enabled()) {
+            return false;
+        }
+        if (fragment.solegramInPreviewMode() || fragment instanceof ChatActivity || fragment instanceof DialogsActivity || !fragment.solegramAllowsFloatingHeader()) {
+            return false;
+        }
+        if (actionBar.solegramIsGlassMode() || actionBar.getVisibility() != View.VISIBLE || actionBar.getAlpha() < 1f || actionBar.solegramExtraHeight() > 0
+            || actionBar.getTranslationY() != 0f || actionBar.solegramIsFloating()) {
+            return false;
+        }
+        if (opaqueColor(actionBar.getBackground()) == 0) {
+            return false; // a clear or coloured header is the screen's own design
+        }
+        int page = opaqueColor(fragmentView.getBackground());
+        if (page == 0) {
+            page = Theme.getColor(Theme.key_windowBackgroundGray, fragment.getResourceProvider());
+        }
+        actionBar.solegramLockColor(page);
+        actionBar.setCastShadows(false);
+        return true;
+    }
+
+    private static final android.graphics.Paint softPaint = new android.graphics.Paint();
+    private static int softColor, softHeight;
+
+    /** Under a soft header: the top of the screen fades into the header's colour. */
+    public static void drawSoftFade(Canvas canvas, ActionBar actionBar, int width) {
+        final int color = actionBar.solegramLockedColor();
+        if (color == 0) {
+            return;
+        }
+        final int height = dp(22);
+        if (softColor != color || softHeight != height) {
+            softColor = color;
+            softHeight = height;
+            softPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, height,
+                new int[]{ColorUtils.setAlphaComponent(color, 0xF0), ColorUtils.setAlphaComponent(color, 0x80), ColorUtils.setAlphaComponent(color, 0)},
+                new float[]{0f, 0.45f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+        }
+        final float top = actionBar.getY() + actionBar.getMeasuredHeight();
+        canvas.save();
+        canvas.translate(0, top);
+        canvas.drawRect(0, 0, width, height, softPaint);
+        canvas.restore();
+    }
+
     private static boolean isScroll(View view) {
         return view instanceof RecyclerView || view instanceof AbsListView || view instanceof ScrollView || view instanceof NestedScrollView;
     }

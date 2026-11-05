@@ -669,6 +669,18 @@
              notification access; notifications themselves are not used -->
         <!-- Solegram SoleDrop: the receiving phone answers a tap as a card under SoleDrop's private AID
              (only while unlocked; switched off as a component when receiving is off in the settings) -->
+        <!-- Solegram Studio (betas): records the screen while it plays a scene the person started (Android's capture dialog first) -->
+        <activity
+            android:name="com.solegram.messenger.studio.StudioCaptureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <service
+            android:name="com.solegram.messenger.studio.StudioRecordService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
         <service
             android:name="com.solegram.messenger.soledrop.SoleDropHceService"
             android:exported="true"

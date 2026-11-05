@@ -186,13 +186,18 @@ public class StarsController {
                     MessagesController.getInstance(currentAccount).putChats(r.chats, false);
 
                     if (transactions[ALL_TRANSACTIONS].isEmpty()) {
+                        boolean sgHidden = false; // Solegram: the history cleared on this device stays hidden
                         for (TL_stars.StarsTransaction t : r.history) {
+                            if (!ton && com.solegram.messenger.SolegramStarsHistory.hidden(currentAccount, t)) {
+                                sgHidden = true;
+                                continue;
+                            }
                             transactions[ALL_TRANSACTIONS].add(t);
                             transactions[t.amount.amount > 0 ? INCOMING_TRANSACTIONS : OUTGOING_TRANSACTIONS].add(t);
                         }
                         for (int i = 0; i < 3; ++i) {
-                            transactionsExist[i] = !transactions[i].isEmpty() || transactionsExist[i];
-                            endReached[i] = (r.flags & 1) == 0;
+                            transactionsExist[i] = !transactions[i].isEmpty() || transactionsExist[i] && !sgHidden;
+                            endReached[i] = (r.flags & 1) == 0 || sgHidden;
                             if (endReached[i]) {
                                 loading[i] = false;
                             }
@@ -602,9 +607,16 @@ public class StarsController {
                 MessagesController.getInstance(currentAccount).putUsers(r.users, false);
                 MessagesController.getInstance(currentAccount).putChats(r.chats, false);
 
-                transactions[type].addAll(r.history);
-                transactionsExist[type] = !transactions[type].isEmpty() || transactionsExist[type];
-                endReached[type] = (r.flags & 1) == 0;
+                boolean sgHidden = false; // Solegram: the history cleared on this device stays hidden (it is older than the rest)
+                for (TL_stars.StarsTransaction t : r.history) {
+                    if (!ton && com.solegram.messenger.SolegramStarsHistory.hidden(currentAccount, t)) {
+                        sgHidden = true;
+                    } else {
+                        transactions[type].add(t);
+                    }
+                }
+                transactionsExist[type] = !transactions[type].isEmpty() || transactionsExist[type] && !sgHidden;
+                endReached[type] = (r.flags & 1) == 0 || sgHidden;
                 offset[type] = endReached[type] ? null : r.next_offset;
 
                 updateBalance(r.balance);
@@ -1436,6 +1448,11 @@ public class StarsController {
     }
 
     public static void showNoSupportDialog(Context context, Theme.ResourcesProvider resourcesProvider) {
+        // Solegram: say why, and show Telegram's own ways to top up instead of a dead end
+        if (context != null) {
+            com.solegram.messenger.SolegramStarsTopUp.show(context, resourcesProvider);
+            return;
+        }
         new AlertDialog.Builder(context, resourcesProvider)
             .setTitle(getString(R.string.StarsNotAvailableTitle))
             .setMessage(getString(R.string.StarsNotAvailableText))

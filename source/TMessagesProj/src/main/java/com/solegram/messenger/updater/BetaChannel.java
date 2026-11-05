@@ -103,7 +103,7 @@ public final class BetaChannel {
     /** Checks a typed code against the beta channel (in the background; the result on the update thread). */
     static void verify(String code, String branch, CodeCallback callback) {
         try {
-            final JSONObject o = GithubUpdater.readJson(branch, "beta/update.json");
+            final JSONObject o = GithubUpdater.readJsonFresh(branch, "beta/update.json");
             callback.onResult(o == null ? STATUS_NONE : codeMatches(o, normalize(code)) ? STATUS_OK : STATUS_WRONG_CODE);
         } catch (Throwable e) {
             FileLog.e(e);
@@ -114,7 +114,7 @@ public final class BetaChannel {
     /** The newest beta, when the code fits and one is published; null otherwise (the status says why). */
     static UpdateController.UpdateInfo check(String branch) {
         try {
-            final JSONObject o = GithubUpdater.readJson(branch, "beta/update.json");
+            final JSONObject o = GithubUpdater.readJsonFresh(branch, "beta/update.json");
             if (o == null) {
                 status = STATUS_NONE;
                 latestVersion = null;

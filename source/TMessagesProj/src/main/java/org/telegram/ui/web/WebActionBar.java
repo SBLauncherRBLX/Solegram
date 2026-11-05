@@ -200,18 +200,20 @@ public class WebActionBar extends FrameLayout {
             if (!(getParent() instanceof ViewGroup)) return;
             Utilities.CallbackReturn<Integer, Runnable> click = id -> () -> menuListener.run(id);
             ItemOptions o = ItemOptions.makeOptions((ViewGroup) getParent(), menuButton);
-            o.setDimAlpha(0);
-            o.setColors(menuTextColor, menuIconColor);
             o.translate(0, -dp(52));
             o.setMinWidth(200);
-            o.setSelectorColor(Theme.blendOver(menuBackgroundColor, Theme.multAlpha(menuTextColor, .1f)));
-            if (AndroidUtilities.computePerceivedBrightness(menuBackgroundColor) > .721f) {
-                o.setBackgroundColor(0xFFFFFFFF);
-                o.setGapBackgroundColor(0xFFF0F0F0);
-            } else {
-                o.setBackgroundColor(0xFF1F1F1F);
-                o.setGapBackgroundColor(0xFF121212);
-            }
+            if (!solegramStyle()) {
+                o.setDimAlpha(0);
+                o.setColors(menuTextColor, menuIconColor);
+                o.setSelectorColor(Theme.blendOver(menuBackgroundColor, Theme.multAlpha(menuTextColor, .1f)));
+                if (AndroidUtilities.computePerceivedBrightness(menuBackgroundColor) > .721f) {
+                    o.setBackgroundColor(0xFFFFFFFF);
+                    o.setGapBackgroundColor(0xFFF0F0F0);
+                } else {
+                    o.setBackgroundColor(0xFF1F1F1F);
+                    o.setGapBackgroundColor(0xFF121212);
+                }
+            } // Solegram: otherwise the menu is glass in the app's colours over a dimmed page, like every other menu
             if (menuType == ArticleViewer.PageLayout.TYPE_ARTICLE) {
                 o.add(R.drawable.msg_openin, getString(R.string.OpenInExternalApp), click.run(open_item));
                 o.add(R.drawable.msg_search, getString(R.string.Search), click.run(search_item));
@@ -254,6 +256,9 @@ public class WebActionBar extends FrameLayout {
                 adBlockItem = null;
             });
             o.show();
+            if (solegramStyle()) {
+                solegramFrostMenu(o);
+            }
             isMenuShown = true;
         });
         menuButton.setBackground(menuButtonSelector = Theme.createSelectorDrawable(Theme.ACTION_BAR_WHITE_SELECTOR_COLOR));
@@ -811,14 +816,120 @@ public class WebActionBar extends FrameLayout {
     }
 
     public boolean drawShadow;
+
+    // region Solegram: the bar in Solegram's style - its buttons in bubbles, the page in an address capsule, no hard line
+    private final Paint sgBubblePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint sgEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF sgRect = new RectF();
+
+    private boolean solegramStyle() {
+        return com.solegram.messenger.SolegramConfig.glassMenus;
+    }
+
+    private void solegramDrawBubbles(Canvas canvas, float top, float bottom) {
+        final int bg = backgroundPaint[0].getColor();
+        final boolean light = AndroidUtilities.computePerceivedBrightness(bg) > 0.5f;
+        sgBubblePaint.setColor(light ? 0x12000000 : 0x1CFFFFFF);
+        sgEdgePaint.setStyle(Paint.Style.STROKE);
+        sgEdgePaint.setStrokeWidth(Math.max(1, dp(0.66f)));
+        sgEdgePaint.setColor(light ? 0x14000000 : 0x24FFFFFF);
+        final float alpha = (1f - searchingProgress) * (1f - addressingProgress);
+        if (alpha <= 0.01f) {
+            return;
+        }
+        sgBubblePaint.setAlpha((int) (sgBubblePaint.getAlpha() * alpha));
+        sgEdgePaint.setAlpha((int) (sgEdgePaint.getAlpha() * alpha));
+        final float cy = (top + bottom) / 2f, h = dp(38);
+        // the back button and the menu: round bubbles of their own
+        for (android.view.View menu : new android.view.View[]{leftmenu, rightmenu}) {
+            if (menu == null || menu.getVisibility() != VISIBLE || menu.getWidth() <= 0) {
+                continue;
+            }
+            sgRect.set(menu.getLeft() + dp(4), cy - h / 2f, menu.getRight() - dp(4), cy + h / 2f);
+            if (sgRect.width() < h) {
+                final float cx = sgRect.centerX();
+                sgRect.left = cx - h / 2f;
+                sgRect.right = cx + h / 2f;
+            }
+            canvas.drawRoundRect(sgRect, h / 2f, h / 2f, sgBubblePaint);
+            canvas.drawRoundRect(sgRect, h / 2f, h / 2f, sgEdgePaint);
+        }
+        // the page's title in a capsule, as an address field
+        sgRect.set(leftmenu.getRight() + dp(2), cy - h / 2f, rightmenu.getLeft() - dp(2), cy + h / 2f);
+        if (sgRect.width() > h) {
+            canvas.drawRoundRect(sgRect, h / 2f, h / 2f, sgBubblePaint);
+            canvas.drawRoundRect(sgRect, h / 2f, h / 2f, sgEdgePaint);
+        }
+    }
+    /**
+     * Over a web page the live glass of menus can't look under them (a WebView draws in its own window only), so
+     * the system blurs what is behind the menu's window instead (Android 12+, when the device does window blur)
+     * and the menu's panel lets that blur show through: a frosted menu over the page, live, not a picture of it.
+     */
+    private void solegramFrostMenu(org.telegram.ui.Components.ItemOptions o) {
+        if (o.actionBarPopupWindow == null || o.actionBarPopupWindow.getContentView() == null) {
+            return;
+        }
+        final android.view.View root = o.actionBarPopupWindow.getContentView().getRootView();
+        final android.view.ViewGroup layout = o.getLayout();
+        if (layout instanceof org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+            solegramFrostPanel(root, (org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout) layout);
+        } else if (layout != null) {
+            for (int i = 0; i < layout.getChildCount(); i++) {
+                if (layout.getChildAt(i) instanceof org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout) {
+                    solegramFrostPanel(root, (org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout) layout.getChildAt(i));
+                }
+            }
+        }
+    }
+
+    private static void solegramFrostPanel(android.view.View root, org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout panel) {
+        final android.graphics.drawable.Drawable bg = panel.getBackgroundDrawable();
+        if (bg instanceof org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable) {
+            return; // live glass took it after all
+        }
+        if (com.solegram.messenger.ui.SolegramLiveGlass.frostBehind(root, bg)) {
+            panel.invalidate();
+        }
+    }
+
+    private final Paint sgFadePaint = new Paint();
+    private int sgFadeColor;
+
+    /** Below the bar: a soft fade of its colour over the page instead of a hard edge, as under every Solegram header. */
+    public void solegramDrawSoftFade(Canvas canvas, android.view.View parent) {
+        if (!solegramStyle() || ArticleViewer.BOTTOM_ACTION_BAR || getVisibility() != VISIBLE || getAlpha() <= 0) {
+            return;
+        }
+        final int color = backgroundPaint[0].getColor() | 0xFF000000;
+        final int h = dp(22);
+        if (sgFadeColor != color) {
+            sgFadeColor = color;
+            sgFadePaint.setShader(new android.graphics.LinearGradient(0, 0, 0, h,
+                new int[]{androidx.core.graphics.ColorUtils.setAlphaComponent(color, 0xE0), androidx.core.graphics.ColorUtils.setAlphaComponent(color, 0x70), androidx.core.graphics.ColorUtils.setAlphaComponent(color, 0)},
+                new float[]{0f, 0.45f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+        }
+        canvas.save();
+        canvas.translate(getX(), getY() + getHeight());
+        sgFadePaint.setAlpha((int) (255 * getAlpha() * (1f - addressingProgress)));
+        canvas.drawRect(0, 0, getWidth(), h, sgFadePaint);
+        canvas.restore();
+    }
+    // endregion
+
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        drawBackground(canvas, topPadding() + height, 1f, 1f, drawShadow);
+        drawBackground(canvas, topPadding() + height, 1f, 1f, drawShadow && !solegramStyle());
 
         float left = leftmenu.getRight();
         float right = rightmenu.getLeft();
         float top =    ArticleViewer.BOTTOM_ACTION_BAR ? getHeight() - height : topPadding();
         float bottom = ArticleViewer.BOTTOM_ACTION_BAR ? getHeight()          : topPadding() + height;
+        if (solegramStyle()) {
+            solegramDrawBubbles(canvas, top, bottom);
+            left += dp(12); // the title starts inside its capsule
+            right -= dp(16); // and fades out before the capsule's round end
+        }
 
         if (titleProgress < 1) {
             canvas.save();

@@ -99,6 +99,8 @@ public class SolegramMeaningSearchActivity extends BaseFragment implements Soleg
     private TextView status;
     private TextView refineButton;
     private TextView refineInfo;
+    private TextView deepButton, deepInfo, answerView;
+    private boolean deepWorking;
     private TextView notice;
     private final LinkedHashMap<String, TextView> chipViews = new LinkedHashMap<>();
 
@@ -180,8 +182,10 @@ public class SolegramMeaningSearchActivity extends BaseFragment implements Soleg
                 }
             }
         });
-        frame.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 60, 0, 0));
-        frame.addView(fieldBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44, Gravity.TOP, 14, 8, 14, 0));
+        // the question field heads the list (not a bar of its own): the screen is one full-size list, so it gets
+        // Solegram's floating header, a darkening at the top instead of a grey bar
+        header.addView(fieldBar, 0, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 0, 0, 0, 6));
+        frame.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         field.setText(initialQuery);
         field.setSelection(field.length());
@@ -306,6 +310,33 @@ public class SolegramMeaningSearchActivity extends BaseFragment implements Soleg
         refineInfo.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
         box.addView(refineInfo, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 6, 0, 0));
 
+        // the found messages (snippets, never secret or protected chats) to the AI service, which answers the question
+        deepButton = new TextView(context);
+        deepButton.setText("✦ " + getString(R.string.SG_MeaningDeep));
+        deepButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        deepButton.setTypeface(AndroidUtilities.bold());
+        deepButton.setGravity(Gravity.CENTER);
+        deepButton.setPadding(dp(16), 0, dp(16), 0);
+        deepButton.setTextColor(accent);
+        deepButton.setBackground(new GlassPill(ColorUtils.setAlphaComponent(accent, 0x22), dp(17)));
+        deepButton.setOnClickListener(v -> deepAnalyze());
+        SolegramMotion.pressable(deepButton, SolegramMotion.PRESS_BUTTON);
+        box.addView(deepButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 34, Gravity.LEFT, 0, 12, 0, 0));
+        deepInfo = new TextView(context);
+        deepInfo.setText(getString(R.string.SG_MeaningDeepInfo));
+        deepInfo.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        deepInfo.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
+        box.addView(deepInfo, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 6, 0, 0));
+        answerView = new TextView(context);
+        answerView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        answerView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        answerView.setLineSpacing(dp(2), 1f);
+        answerView.setPadding(dp(14), dp(10), dp(14), dp(12));
+        answerView.setBackground(new GlassPill(ColorUtils.setAlphaComponent(accent, 0x16), dp(16)));
+        answerView.setTextIsSelectable(true);
+        answerView.setVisibility(View.GONE);
+        box.addView(answerView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
+
         notice = new TextView(context);
         notice.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         notice.setTextColor(getThemedColor(Theme.key_text_RedRegular));
@@ -323,9 +354,33 @@ public class SolegramMeaningSearchActivity extends BaseFragment implements Soleg
         final String q = field.getText().toString().trim();
         searching = !q.isEmpty();
         refining = false;
+        deepWorking = false;
+        if (answerView != null) {
+            answerView.setVisibility(View.GONE);
+        }
         search.search(q);
         updateHeader(true);
         updateRows(true);
+    }
+
+    private void deepAnalyze() {
+        if (deepWorking) {
+            return;
+        }
+        deepWorking = true;
+        onNotice(null);
+        updateHeader(true);
+        search.deepAnalyze(answer -> {
+            deepWorking = false;
+            if (answer == null) {
+                onNotice(getString(R.string.SG_MeaningDeepFailed));
+            } else {
+                final String text = answer.isEmpty() ? getString(R.string.SG_MeaningDeepNothing) : answer;
+                answerView.setText(new android.text.SpannableStringBuilder("✦ ").append(getString(R.string.SG_MeaningDeepAnswer)).append("\n").append(text));
+                SolegramMotion.setVisible(answerView, true, true);
+            }
+            updateHeader(true);
+        });
     }
 
     private void refine() {
@@ -411,6 +466,15 @@ public class SolegramMeaningSearchActivity extends BaseFragment implements Soleg
         refineInfo.setVisibility(refineShown ? View.VISIBLE : View.GONE);
         refineButton.setEnabled(!refining);
         refineButton.setAlpha(refining ? 0.5f : 1f);
+        final boolean deepShown = hasPlan && SolegramMeaningSearch.canRefineWithAi() && results != null && !results.isEmpty() && (!searching || deepWorking);
+        deepButton.setVisibility(deepShown ? View.VISIBLE : View.GONE);
+        deepInfo.setVisibility(deepShown ? View.VISIBLE : View.GONE);
+        deepButton.setEnabled(!deepWorking);
+        deepButton.setAlpha(deepWorking ? 0.5f : 1f);
+        if (!hasPlan) {
+            answerView.setVisibility(View.GONE);
+        }
+        progress.setVisibility(searching || nanoWorking || refining || deepWorking ? View.VISIBLE : View.INVISIBLE);
     }
 
     private void removeChip(String key) {
@@ -543,7 +607,13 @@ public class SolegramMeaningSearchActivity extends BaseFragment implements Soleg
             SolegramMeaningSearch.applyHighlight(r);
         }
         if (progress != null) {
-            progress.setVisibility(searching || nanoWorking || refining ? View.VISIBLE : View.INVISIBLE);
+            progress.setVisibility(searching || nanoWorking || refining || deepWorking ? View.VISIBLE : View.INVISIBLE);
+        }
+        if (deepButton != null) {
+            final boolean deepShown = SolegramMeaningSearch.canRefineWithAi() && !results.isEmpty() && (!searching || deepWorking);
+            if ((deepButton.getVisibility() == View.VISIBLE) != deepShown) {
+                updateHeader(true);
+            }
         }
         updateRows(true);
     }

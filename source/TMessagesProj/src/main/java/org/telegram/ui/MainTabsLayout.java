@@ -673,7 +673,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     private float lensDownX;
     @Nullable
     private View lensDownChild, lensFound, lensStartSelected;
-    private final com.solegram.messenger.ui.SolegramLiquid.Spring lensX = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).params(0.3f, 0.8f);
+    // springier than a plain slide: it overshoots a little and wobbles into place, like a drop of liquid
+    private final com.solegram.messenger.ui.SolegramLiquid.Spring lensX = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).params(0.34f, 0.7f);
     private final com.solegram.messenger.ui.SolegramLiquid.Spring lensA = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).rest(0.002f);
     private long lensLastFrame;
     private boolean lensRich;
@@ -685,8 +686,18 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     private final Paint lensPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint lensRimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Matrix lensRimMatrix = new Matrix();
-    // what the glass refracts: the bar's own glass (the blurred screen under it) and the tabs on it
+    /**
+     * Solegram: draws what lies behind the bar (the screen, in this view's coordinates), so the lens, which reaches
+     * past the bar's edges, shows the real background there instead of an empty band. Null: the bar only.
+     */
+    @Nullable
+    public Utilities.Callback<Canvas> solegramLensBackdrop;
+
+    // what the glass refracts: the screen behind the bar, the bar's own glass (the blurred screen under it) and the tabs on it
     private final Utilities.Callback<Canvas> lensContent = c -> {
+        if (solegramLensBackdrop != null) {
+            solegramLensBackdrop.run(c);
+        }
         final android.graphics.drawable.Drawable bg = getBackground();
         if (bg != null) {
             bg.draw(c);
@@ -724,7 +735,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                     setLensShown(true);
                 }
                 lensX.to(clampXToChildrenCenters(ev.getX(), this));
-                lensA.params(0.3f, 0.72f);
+                // it swells out of the pill with a little overshoot
+                lensA.params(0.3f, 0.66f);
                 lensA.to(1);
                 postDelayed(lensHoldCheck, ViewConfiguration.getLongPressTimeout());
                 invalidate();
@@ -782,8 +794,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         lensTracking = false;
         lensDragging = false;
         lensDownChild = null;
-        // a little bounce as it settles
-        lensA.params(0.42f, 0.6f);
+        // a bouncy settle back into the pill
+        lensA.params(0.44f, 0.58f);
         lensA.to(0);
         invalidate();
     }
@@ -824,22 +836,26 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             }
         }
 
-        final float a = Math.max(-0.2f, Math.min(1.04f, lensA.value));
+        final float a = Math.max(-0.25f, Math.min(1.1f, lensA.value));
         final float on = Math.max(0, Math.min(1, a));
         final float tabH = getHeight() - getPaddingTop() - getPaddingBottom();
         final float cx = lensX.value, cy = getPaddingTop() + tabH / 2f;
         final float pillW = getInterpolatedWidthByX(cx, this);
-        // about 1.25 of the capsule's height: over the bar's glass at the top and bottom
-        final float lensH = getHeight() - dp(1);
-        final float lensW = Math.max(pillW * 1.18f + dp(6), lensH * 1.2f);
-        // liquid stretch: the glass draws out along its way as it slides, and rounds up again as it stops
-        final float stretch = lensRich ? Math.min(0.22f, Math.abs(lensX.velocity) / dp(2400)) : 0f;
+        // taller than the bar's glass: it reaches a little past its top and bottom edges (and takes in the
+        // background there), as the selection does on iOS 26
+        final float lensH = getHeight();
+        final float lensW = Math.max(pillW * 1.24f + dp(10), lensH * 1.28f);
+        // liquid stretch: the glass draws out along its way as it slides and squashes a little in height, then
+        // rounds up again with a wobble as it stops
+        final float stretch = lensRich ? Math.min(0.24f, Math.abs(lensX.velocity) / dp(2200)) : 0f;
         final float w = Math.max(dp(8), pillW + (lensW - pillW) * a) * (1f + stretch);
-        final float h = Math.max(dp(8), tabH + (lensH - tabH) * a) * (1f - stretch * 0.15f);
+        final float h = Math.max(dp(8), tabH + (lensH - tabH) * a) * (1f - stretch * 0.25f);
         final float r = h / 2f;
+        // at the first and last tab the wider lens would reach past the view, where it is cut off: it stays inside
+        final float cxDraw = Math.max(w / 2f, Math.min(getWidth() - w / 2f, cx));
         // how fast the glass slides (0..1): a moving drop bends the picture a little more, like liquid
         lensFlow = lensRich ? Math.min(1f, Math.abs(lensX.velocity) / dp(1800)) : 0f;
-        lensRect.set(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
+        lensRect.set(cxDraw - w / 2f, cy - h / 2f, cxDraw + w / 2f, cy + h / 2f);
         lensPath.rewind();
         lensPath.addRoundRect(lensRect, r, r, Path.Direction.CW);
 
@@ -864,7 +880,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             canvas.restore();
         }
         // the tabs under the lens: magnified, bent at the rim, colours split there (Android 13+)
-        final boolean shaderLens = drawShaderLens(canvas, cx, cy, w, h, on);
+        final boolean shaderLens = drawShaderLens(canvas, cxDraw, cy, w, h, on);
         // Telegram's pill fades as the glass forms (over the shader's picture, which hides what is under it)
         if (on < 1f) {
             lensPaint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider), 0.09f * (1f - on)));
@@ -874,7 +890,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             canvas.save();
             canvas.clipPath(lensPath);
             final float magnify = 1f + 0.3f * on;
-            canvas.scale(magnify, magnify, cx, cy);
+            canvas.scale(magnify, magnify, cxDraw, cy);
             super.dispatchDraw(canvas);
             canvas.restore();
             if (on > 0.01f) {
@@ -928,7 +944,8 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                 bg.getPadding(lensBarPadding);
             }
             lensBar.set(lensBarPadding.left, lensBarPadding.top, getWidth() - lensBarPadding.right, getHeight() - lensBarPadding.bottom);
-            if (lensBar.width() <= 0 || lensBar.height() <= 0) {
+            if (lensBar.width() <= 0 || lensBar.height() <= 0 || solegramLensBackdrop != null) {
+                // with the background behind the bar drawn too, the picture is whole: the lens samples all of it
                 lensBar.set(0, 0, getWidth(), getHeight());
             }
             ((LensShader) lensShader).draw(canvas, getWidth(), getHeight(), cx, cy, w, h, on, lensFlow, lensBar, lensContent);

@@ -484,54 +484,51 @@ public class SoleDropCardView extends FrameLayout {
     // region Little drawings
 
     /** A big golden star with a soft shine that slowly sweeps over it (Telegram Stars). */
+    /**
+     * Telegram's own Star (the golden star of Telegram Stars), with a warm halo; it floats a little and a soft
+     * shine passes over it, only over the star itself.
+     */
     private static final class StarGlyph extends View {
-        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint shine = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Path star = new Path();
         private final android.graphics.Matrix matrix = new android.graphics.Matrix();
+        private final android.graphics.drawable.Drawable star;
         private final long start = SystemClock.elapsedRealtime();
         private int built;
 
         StarGlyph(Context context) {
             super(context);
             setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+            star = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.star_small_inner).mutate();
+            shine.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_ATOP));
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             final int w = getWidth(), h = getHeight();
-            final float cx = w / 2f, cy = h / 2f, r = Math.min(w, h) * 0.40f;
+            final float cx = w / 2f, cy = h / 2f, r = Math.min(w, h) * 0.42f;
             if (built != w) {
                 built = w;
-                star.reset();
-                for (int i = 0; i < 10; i++) {
-                    final double a = -Math.PI / 2 + i * Math.PI / 5;
-                    final float rr = i % 2 == 0 ? r : r * 0.48f;
-                    final float x = cx + (float) Math.cos(a) * rr, y = cy + (float) Math.sin(a) * rr;
-                    if (i == 0) {
-                        star.moveTo(x, y);
-                    } else {
-                        star.lineTo(x, y);
-                    }
-                }
-                star.close();
-                fill.setShader(new LinearGradient(0, cy - r, 0, cy + r, 0xFFFFD84A, 0xFFFF9F0A, Shader.TileMode.CLAMP));
-                fill.setPathEffect(new android.graphics.CornerPathEffect(dp(5)));
-                shine.setPathEffect(fill.getPathEffect());
-                shine.setShader(new LinearGradient(0, 0, r * 0.7f, 0, new int[]{0x00FFFFFF, 0x99FFFFFF, 0x00FFFFFF}, null, Shader.TileMode.CLAMP));
-                halo.setShader(new RadialGradient(cx, cy, r * 1.25f, new int[]{0x55FFC94A, 0x00FFC94A}, null, Shader.TileMode.CLAMP));
+                halo.setShader(new RadialGradient(cx, cy, r * 1.2f, new int[]{0x55FFC94A, 0x00FFC94A}, null, Shader.TileMode.CLAMP));
+                shine.setShader(new LinearGradient(0, 0, r * 0.7f, 0, new int[]{0x00FFFFFF, 0x80FFFFFF, 0x00FFFFFF}, null, Shader.TileMode.CLAMP));
             }
-            canvas.drawCircle(cx, cy, r * 1.25f, halo);
-            canvas.drawPath(star, fill);
-            if (SolegramMotion.rich()) {
-                final float t = ((SystemClock.elapsedRealtime() - start) % 2600) / 2600f;
-                matrix.setTranslate(cx - r * 1.6f + t * r * 3.2f, 0);
-                matrix.postSkew(-0.4f, 0, cx, cy);
-                shine.getShader().setLocalMatrix(matrix);
-                canvas.drawPath(star, shine);
-                postInvalidateOnAnimation();
+            final boolean rich = SolegramMotion.rich();
+            final float t = ((SystemClock.elapsedRealtime() - start) % 2600) / 2600f;
+            final float bob = rich ? (float) Math.sin(t * Math.PI * 2) * dp(2) : 0;
+            canvas.drawCircle(cx, cy, r * 1.2f, halo);
+            star.setBounds((int) (cx - r), (int) (cy - r + bob), (int) (cx + r), (int) (cy + r + bob));
+            if (!rich) {
+                star.draw(canvas);
+                return;
             }
+            final int layer = canvas.saveLayer(cx - r, cy - r + bob, cx + r, cy + r + bob, null);
+            star.draw(canvas);
+            matrix.setTranslate(cx - r * 1.6f + t * r * 3.2f, 0);
+            matrix.postSkew(-0.4f, 0, cx, cy);
+            shine.getShader().setLocalMatrix(matrix);
+            canvas.drawRect(cx - r, cy - r + bob, cx + r, cy + r + bob, shine);
+            canvas.restoreToCount(layer);
+            postInvalidateOnAnimation();
         }
     }
 

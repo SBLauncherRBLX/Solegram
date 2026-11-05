@@ -78,13 +78,24 @@ public final class SolegramMeaningSearch {
 
     private static final String EXPAND_INSTRUCTION = "You help to search a messenger chat history. Turn the user's question into "
         + "search keywords. Answer with one line of JSON only: {\"terms\":[...],\"date\":\"\",\"person\":\"\"}. "
-        + "terms: 6 to 12 single words that a message about this would contain: the key words of the question in other forms, "
-        + "synonyms, slang, related words, and the same words in Russian and English. No question words, no pronouns. "
+        + "terms: 8 to 14 single words that a message about this would really contain. Do not just repeat the question's words: "
+        + "give their other forms (other cases and tenses, and short word stems such as \"встреч\" for встреча, встретимся), "
+        + "synonyms, slang, words people use when they talk about it, and the same in Russian and English. "
+        + "No question words, pronouns, prepositions or other short common words. "
         + "date: YYYY-MM-DD..YYYY-MM-DD when the question names a time, else empty. Today is {today}. "
         + "person: the name of the person the chat was with, if the question names one, else empty.";
     private static final String RERANK_INSTRUCTION = "You rank messenger messages for a search. The user asks a question; "
         + "numbered messages follow. Answer only with the numbers of the messages that best answer the question, the best first, "
         + "separated by commas, at most 10 numbers. Nothing else.";
+
+    private static final String DEEP_INSTRUCTION = "You help a person find something in their messenger history. They ask a question; "
+        + "numbered messages a keyword search found follow, each with the day it was written and its chat (\"me\": written by the person). Read them all, pick the ones that really answer "
+        + "the question, and answer it from them. Answer with one line of JSON only: {\"best\":[numbers of the messages that answer the "
+        + "question, the best first, at most 8],\"answer\":\"one or two sentences in {lang} that answer the question from these "
+        + "messages (with the date when it matters); empty when none of them answers it\"}.";
+    /** Messages the AI reads in a deep analysis, and how much of each. */
+    private static final int DEEP_COUNT = 40;
+    private static final int DEEP_SNIPPET = 240;
 
     private static final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "SolegramMeaning");
@@ -167,8 +178,11 @@ public final class SolegramMeaningSearch {
             return match;
         }
 
+        /** What a deep analysis by the AI service said of it. */
+        float aiBonus;
+
         public float rank() {
-            return match.score + nanoBonus;
+            return match.score + nanoBonus + aiBonus;
         }
     }
 
@@ -219,6 +233,8 @@ public final class SolegramMeaningSearch {
     private boolean rerankStarted;
     private boolean reranked;
     private final HashSet<String> requested = new HashSet<>();
+    /** The last ranked results (worker thread). */
+    private ArrayList<Result> lastList = new ArrayList<>();
 
     public SolegramMeaningSearch(int account, Listener listener) {
         this.account = account;
@@ -649,6 +665,7 @@ public final class SolegramMeaningSearch {
         }
         final boolean searching = inFlight > 0 || !queue.isEmpty() || nanoExpanding;
         final boolean wasReranked = reranked;
+        lastList = list;
         AndroidUtilities.runOnUIThread(() -> {
             if (g == generation.get()) {
                 listener.onResults(list, searching, wasReranked);
@@ -976,6 +993,94 @@ public final class SolegramMeaningSearch {
                     });
                 });
             });
+    }
+
+    /**
+     * Deep analysis: the AI service the user chose reads the best results (short snippets with date and chat; never
+     * from secret chats or chats that forbid forwarding), picks the messages that answer the question and answers it.
+     * UI thread; {@code done} gets the answer ("" when none of the messages answers it), or null when it failed.
+     */
+    public void deepAnalyze(org.telegram.messenger.Utilities.Callback<String> done) {
+        final int g = generation.get();
+        worker.execute(() -> {
+            if (g != generation.get()) {
+                return;
+            }
+            final ArrayList<Result> top = new ArrayList<>();
+            final StringBuilder input = new StringBuilder();
+            input.append("Question: ").append(asked).append("\n\nMessages:\n");
+            final SimpleDateFormat day = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            final MessagesController mc = MessagesController.getInstance(account);
+            for (Result r : lastList) {
+                if (top.size() >= DEEP_COUNT) {
+                    break;
+                }
+                final long did = r.message.getDialogId();
+                if (DialogObject.isEncryptedDialog(did) || r.message.messageOwner.noforwards || mc.isPeerNoForwards(did) || TextUtils.isEmpty(r.text)) {
+                    continue;
+                }
+                top.add(r);
+                final String chat = dialogName(did);
+                input.append(top.size()).append(". [").append(day.format(new Date(r.date)));
+                if (!TextUtils.isEmpty(chat)) {
+                    input.append(", ").append(chat);
+                }
+                input.append(r.message.isOut() ? ", me" : "").append("] ");
+                input.append(SolegramMeaning.snippet(r.text, r.match, DEEP_SNIPPET).replace('\n', ' ')).append('\n');
+            }
+            if (top.isEmpty()) {
+                AndroidUtilities.runOnUIThread(() -> done.run(""));
+                return;
+            }
+            final String in = input.toString();
+            final String q = asked;
+            AndroidUtilities.runOnUIThread(() -> SolegramSummarizer.compose(DEEP_INSTRUCTION.replace("{lang}", "the language of the question"), in, q,
+                LocaleController.getInstance().getCurrentLocale().getLanguage(), 400, true, R.string.SG_MeaningDeep, R.string.SG_MeaningDeepConsent,
+                (answer, code) -> {
+                    if (g != generation.get()) {
+                        return;
+                    }
+                    if (answer == null) {
+                        done.run(null);
+                        return;
+                    }
+                    String text = "";
+                    final ArrayList<Integer> order = new ArrayList<>();
+                    try {
+                        final String clean = answer.replaceAll("(?s)<think>.*?</think>", "");
+                        final int a = clean.indexOf('{'), b = clean.lastIndexOf('}');
+                        final org.json.JSONObject o = new org.json.JSONObject(a >= 0 && b > a ? clean.substring(a, b + 1) : clean);
+                        text = o.optString("answer", "").trim();
+                        final org.json.JSONArray best = o.optJSONArray("best");
+                        for (int i = 0; best != null && i < best.length(); i++) {
+                            final int n = best.optInt(i, 0) - 1;
+                            if (n >= 0 && n < top.size() && !order.contains(n)) {
+                                order.add(n);
+                            }
+                        }
+                    } catch (Throwable e) {
+                        order.addAll(SolegramMeaning.parseModelOrder(answer, top.size()));
+                    }
+                    final String result = text;
+                    worker.execute(() -> {
+                        if (g != generation.get()) {
+                            return;
+                        }
+                        for (Result r : results.values()) {
+                            r.aiBonus = 0;
+                        }
+                        for (int i = 0; i < order.size(); i++) {
+                            top.get(order.get(i)).aiBonus = 3f * (1f - i / (float) order.size()) + 1f;
+                        }
+                        publish(g);
+                        AndroidUtilities.runOnUIThread(() -> {
+                            if (g == generation.get()) {
+                                done.run(result);
+                            }
+                        });
+                    });
+                }));
+        });
     }
 
     // endregion

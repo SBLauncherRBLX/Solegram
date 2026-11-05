@@ -446,14 +446,19 @@ public abstract class GradientHeaderActivity extends BaseFragment {
             backgroundView.titleView.setTextColor(titleColor);
             headerBgPaint.setAlpha((int) (255 * (1f - alpha)));
             setLightStatusBar(Theme.blendOver(Theme.getColor(Theme.key_premiumGradientBackground4, resourceProvider), headerBgPaint.getColor()));
-            canvas.drawRect(0, 0, getMeasuredWidth(), actionBar.getMeasuredHeight(), headerBgPaint);
+            // Solegram: no panel behind the collapsed header: the list fades out under it (drawChild), as elsewhere
+            if (com.solegram.messenger.ui.SolegramFloatingHeader.enabled()) {
+                solegramHeaderAlpha = 1f - alpha;
+            } else {
+                solegramHeaderAlpha = 0f;
+                canvas.drawRect(0, 0, getMeasuredWidth(), actionBar.getMeasuredHeight(), headerBgPaint);
+            }
 
             super.dispatchDraw(canvas);
-
-            if (alpha <= 0.01f && drawActionBarShadow()) {
-                parentLayout.drawHeaderShadow(canvas, 0xFF, actionBar.getMeasuredHeight());
-            }
         }
+
+        private float solegramHeaderAlpha;
+        private final com.solegram.messenger.ui.SolegramFloatingHeader solegramFade = new com.solegram.messenger.ui.SolegramFloatingHeader();
 
         private Boolean lightStatusBar;
         private void setLightStatusBar(int color) {
@@ -466,11 +471,15 @@ public abstract class GradientHeaderActivity extends BaseFragment {
         @Override
         protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
             if (child == listView) {
+                // Solegram: once the header has folded into a bar, the list goes on under it and fades out there
                 canvas.save();
-                canvas.clipRect(0, actionBar.getBottom(), getMeasuredWidth(), getMeasuredHeight());
+                canvas.clipRect(0, actionBar.getBottom() * (1f - solegramHeaderAlpha), getMeasuredWidth(), getMeasuredHeight());
                 super.drawChild(canvas, child, drawingTime);
                 canvas.restore();
                 return true;
+            }
+            if (child == actionBar && solegramHeaderAlpha > 0.01f) {
+                solegramFade.draw(canvas, actionBar, getMeasuredWidth(), headerBgPaint.getColor() | 0xFF000000, solegramHeaderAlpha);
             }
             return super.drawChild(canvas, child, drawingTime);
         }

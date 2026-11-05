@@ -151,7 +151,7 @@ public class CameraScanActivity extends BaseFragment {
 
     private boolean needGalleryButton;
 
-    /** Solegram: the next scanner gets the camera's liquid glass buttons (set by SoleDrop just before it opens one). */
+    /** Solegram: kept for callers that ask for the glass buttons; every scanner has them now. */
     public static boolean solegramGlassNext;
     private boolean solegramGlass;
 
@@ -255,7 +255,8 @@ public class CameraScanActivity extends BaseFragment {
     public CameraScanActivity(int type) {
         super();
         currentType = type;
-        solegramGlass = solegramGlassNext;
+        // Solegram: every scanner has the camera's glass buttons (the wallet's, SoleDrop's, Telegram's own)
+        solegramGlass = true;
         solegramGlassNext = false;
         if (isQr()) {
             Utilities.globalQueue.postRunnable(() -> {

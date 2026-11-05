@@ -276,6 +276,19 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         setCastShadows(false);
     }
 
+    private int solegramLockedColor;
+
+    /** Solegram soft header (SolegramFloatingScreen.soften): the bar keeps the page's colour. */
+    public void solegramLockColor(int color) {
+        solegramLockedColor = color;
+        setBackgroundColor(color);
+        setShadowAlpha(0);
+    }
+
+    public int solegramLockedColor() {
+        return solegramLockedColor;
+    }
+
     public boolean solegramIsFloating() {
         return solegramFloating;
     }
@@ -615,6 +628,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
 
         backButtonImageView.setOnClickListener(v -> {
+            com.solegram.messenger.ui.SolegramIconMotion.play(backButtonImageView, com.solegram.messenger.ui.SolegramIconMotion.NUDGE_BACK); // Solegram
             if (!actionModeVisible && isSearchFieldVisible) {
                 closeSearchField();
                 return;
@@ -1512,6 +1526,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
 
     @Override
     public void setBackgroundColor(int color) {
+        if (solegramLockedColor != 0) {
+            color = solegramLockedColor; // Solegram soft header: the page's colour, whatever the screen asks
+        }
         actionBarColor = color;
         if (!blurredBackground && !solegramFloating) {
             super.setBackgroundColor(actionBarColor);

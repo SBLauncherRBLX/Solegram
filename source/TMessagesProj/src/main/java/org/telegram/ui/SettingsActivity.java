@@ -714,6 +714,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(100, 0xFFFFA24A, 0xFF8A3CF0, R.drawable.sg_settings_mark, getString(R.string.SG_SettingsTitle), getString(R.string.SG_SettingsSubtitle), com.solegram.messenger.updater.UpdateController.getInstance().hasPendingUpdate() ? getString(R.string.SG_UpdateAvailableShort) : null));
         items.add(SettingCell.Factory.of(101, 0xFF4FC3F7, 0xFF3F51B5, R.drawable.msg_bots, getString(R.string.SG_Plugins), com.solegram.messenger.plugins.PluginsController.isEngineAvailable() ? String.valueOf(com.solegram.messenger.plugins.PluginsController.getInstance().getPlugins().size()) : null));
         items.add(UItem.asShadow(null));
+        // Solegram's own features, which Telegram's settings have no place for (the rest sit in Telegram's sections)
+        items.add(UItem.asHeader(getString(R.string.SG_SettingsFeatures)));
+        items.add(SettingCell.Factory.of(106, 0xFFFFB443, 0xFFF2762E, R.drawable.msg_payment_card, "SoleWallet", getString(R.string.SG_SettingsWalletSub)));
+        items.add(SettingCell.Factory.of(105, 0xFFFF7EB3, 0xFFE0457B, R.drawable.msg_soledrop, getString(R.string.SG_SoleDrop), getString(R.string.SG_SoleDropSub)));
+        items.add(SettingCell.Factory.of(102, 0xFFB57BFF, 0xFF7C4DFF, R.drawable.msg_openprofile, getString(R.string.SG_ProfilePage), getString(R.string.SG_ProfilePageSub)));
+        items.add(SettingCell.Factory.of(103, 0xFFFF8FA3, 0xFFE8506B, R.drawable.files_music, getString(R.string.SG_NowPlaying), getString(R.string.SG_NowPlayingSub)));
+        items.add(SettingCell.Factory.of(104, 0xFF9C8CFF, 0xFF5E5CE6, R.drawable.sg_ai_summary, getString(R.string.SG_AiPage), getString(R.string.SG_AiPageSub)));
+        items.add(UItem.asShadow(null));
 
         final boolean walletAbove = getConnectionsManager().getCurrentTime() - 1791538462 < 4 * 7 * 24 * 60 * 60;
         if (walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -723,7 +731,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
 
         items.add(SettingCell.Factory.of(1, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
-        items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
+        items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SG_Customization), getString(R.string.SettingsChatInfo)));
         items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
         items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
         items.add(SettingCell.Factory.of(6, IconBackgroundColors.BLUE_DEEP.top, IconBackgroundColors.BLUE_DEEP.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
@@ -848,6 +856,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             case 101:
                 presentSettingFragment(new com.solegram.messenger.ui.PluginsActivity());
+                break;
+            case 102:
+                presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_PREMIUM));
+                break;
+            case 103:
+                presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_MUSIC));
+                break;
+            case 104:
+                presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_AI));
+                break;
+            case 105:
+                presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_SOLEDROP));
+                break;
+            case 106:
+                presentSettingFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
                 break;
             case 1:
                 presentSettingFragment(new UserInfoActivity());

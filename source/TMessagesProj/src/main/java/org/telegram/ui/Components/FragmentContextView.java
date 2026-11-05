@@ -767,9 +767,9 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
                     if (messageObject.isMusic()) {
                         final Activity activity = AndroidUtilities.findActivity(getContext());
                         if (activity instanceof LaunchActivity) {
-                            new AudioPlayerAlert(activity, resourcesProvider).show();
+                            com.solegram.messenger.ui.SolegramPlayer.open(activity, resourcesProvider);
                         } else if (AndroidUtilities.isContextSafe(LaunchActivity.instance)) {
-                            new AudioPlayerAlert(LaunchActivity.instance, resourcesProvider).show();
+                            com.solegram.messenger.ui.SolegramPlayer.open(LaunchActivity.instance, resourcesProvider);
                         }
                     } else {
                         long dialogId = 0;

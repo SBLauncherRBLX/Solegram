@@ -21977,6 +21977,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean updateInterfaceWithMessages(long dialogId, ArrayList<MessageObject> messages, int mode) {
+        if (mode == 0) {
+            com.solegram.messenger.SolegramStreak.onMessages(currentAccount, dialogId, messages);
+        }
         if (messages == null || messages.isEmpty()) {
             return false;
         }

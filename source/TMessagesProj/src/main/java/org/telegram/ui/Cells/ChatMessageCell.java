@@ -12687,9 +12687,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 ||
                 TranscribeButton.isFreeTranscribeInChat(currentMessageObject)
                 ||
-                // Solegram: the button for everyone when Solegram can transcribe the message
-                com.solegram.messenger.SolegramTranscriber.handles(currentMessageObject)
-                ||
                 MessagesController.getInstance(currentAccount).transcribeAudioTrialWeeklyNumber > 0 &&
                 currentMessageObject.getDuration() <= MessagesController.getInstance(currentAccount).transcribeAudioTrialDurationMax && (
                     currentMessageObject.messageOwner != null && (
@@ -12711,9 +12708,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             ) && currentMessageObject.messageOwner != null && !(MessageObject.getMedia(currentMessageObject.messageOwner) instanceof TLRPC.TL_messageMediaWebPage) &&
             (currentMessageObject.messageOwner.media == null || currentMessageObject.messageOwner.media.ttl_seconds == 0)
         );
-        if (useTranscribeButton) {
-            TranscribeButton.solegramAutoTranscribe(currentMessageObject); // Solegram: voice messages turn into text by themselves
-        }
         updateSeekBarWaveformWidth(null);
     }
 

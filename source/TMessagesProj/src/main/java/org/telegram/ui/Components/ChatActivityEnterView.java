@@ -2733,6 +2733,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             if (adjustPanLayoutHelper != null && adjustPanLayoutHelper.animationInProgress()) {
                 return;
             }
+            com.solegram.messenger.ui.SolegramIconMotion.play(emojiButton, com.solegram.messenger.ui.SolegramIconMotion.WOBBLE); // Solegram: the smile rocks
             if (emojiButtonRestricted) {
                 showRestrictedHint();
                 return;
@@ -2852,6 +2853,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 if (adjustPanLayoutHelper != null && adjustPanLayoutHelper.animationInProgress() || attachLayoutPaddingAlpha == 0f) {
                     return;
                 }
+                com.solegram.messenger.ui.SolegramIconMotion.play(attachButton, com.solegram.messenger.ui.SolegramIconMotion.SWING); // Solegram: the clip swings
                 delegate.didPressAttachButton();
             });
             attachButton.setContentDescription(getString(R.string.AccDescrAttachButton));

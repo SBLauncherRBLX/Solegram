@@ -643,7 +643,7 @@ public final class SolegramSummarizer {
 
     /** The language of the text by ML Kit language identification (on the device), or null. Background threads only. */
     @Nullable
-    private static String detectLanguage(String text) {
+    static String detectLanguage(String text) {
         final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
         final String[] found = new String[1];
         org.telegram.messenger.LanguageDetector.detectLanguage(text.length() > 1000 ? text.substring(0, 1000) : text, code -> {

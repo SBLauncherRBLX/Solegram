@@ -241,6 +241,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     private int appIconSeasonalRow;
 
     private int rowCount;
+    private int sgLinksRow = -1; // Solegram: its settings of the same kind
 
     private boolean updatingLocation;
 
@@ -537,6 +538,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         rowCount = 0;
         contactsReimportRow = -1;
+        sgLinksRow = -1;
         contactsSortRow = -1;
         scheduleLocationRow = -1;
         scheduleUpdateLocationRow = -1;
@@ -660,6 +662,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             createNewThemeRow = rowCount++;
             lastShadowRow = rowCount++;
         } else if (currentType == THEME_TYPE_BASIC) {
+            sgLinksRow = rowCount++;
             textSizeHeaderRow = rowCount++;
             textSizeRow = rowCount++;
             backgroundRow = rowCount++;
@@ -962,7 +965,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             sunDrawable.setPlayInDirectionOfCustomEndFrame(true);
             menuItem = menu.addItem(day_night_switch, sunDrawable);
         } else if (currentType == THEME_TYPE_BASIC) {
-            actionBar.setTitle(getString("ChatSettings", R.string.ChatSettings));
+            actionBar.setTitle(getString(R.string.SG_Customization));
             ActionBarMenu menu = actionBar.createMenu();
             menuItem = menu.addItem(0, R.drawable.ic_ab_other);
             menuItem.setContentDescription(getString("AccDescrMoreOptions", R.string.AccDescrMoreOptions));
@@ -2096,6 +2099,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return false;
+            }
             int type = holder.getItemViewType();
             return type == 0 || type == TYPE_TEXT_SETTING || type == TYPE_THEME_TYPE || type == TYPE_TEXT_CHECK ||
                     type == TYPE_NIGHT_THEME || type == TYPE_THEME_LIST || type == TYPE_THEME_ACCENT_LIST ||
@@ -2244,6 +2250,11 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         @NonNull
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            if (viewType == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                final View sg = com.solegram.messenger.ui.SolegramSettingsLinks.block(ThemeActivity.this, parent.getContext(), com.solegram.messenger.ui.SolegramSettingsLinks.CHATS, getResourceProvider());
+                sg.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
+                return new RecyclerListView.Holder(sg);
+            }
             View view;
             switch (viewType) {
                 case TYPE_TEXT_SETTING:
@@ -2489,6 +2500,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return;
+            }
             switch (holder.getItemViewType()) {
                 case TYPE_TEXT_SETTING: {
                     TextSettingsCell cell = (TextSettingsCell) holder.itemView;
@@ -2745,6 +2759,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         @Override
         public void onViewAttachedToWindow(RecyclerView.ViewHolder holder) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return;
+            }
             int type = holder.getItemViewType();
             if (type == TYPE_THEME_TYPE) {
                 ((ThemeTypeCell) holder.itemView).setTypeChecked(holder.getAdapterPosition() == Theme.selectedAutoNightType);
@@ -2753,6 +2770,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         @Override
         public int getItemViewType(int position) {
+            if (position == sgLinksRow) {
+                return com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE;
+            }
             if (position == scheduleFromRow || position == distanceRow ||
                     position == scheduleToRow || position == scheduleUpdateLocationRow ||
                     position == contactsReimportRow || position == contactsSortRow ||

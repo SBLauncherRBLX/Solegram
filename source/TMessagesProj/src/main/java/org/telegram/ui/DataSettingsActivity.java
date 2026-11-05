@@ -114,6 +114,7 @@ public class DataSettingsActivity extends BaseFragment {
     private int saveToGalleryDividerRow;
 
     private int rowCount;
+    private int sgLinksRow = -1; // Solegram: its settings of the same kind
 
     private boolean updateVoipUseLessData;
 
@@ -133,7 +134,9 @@ public class DataSettingsActivity extends BaseFragment {
 
     private void updateRows(boolean fullNotify) {
 
+        sgLinksRow = -1;
         rowCount = 0;
+        sgLinksRow = rowCount++;
         usageSectionRow = rowCount++;
         storageUsageRow = rowCount++;
         dataUsageRow = rowCount++;
@@ -646,6 +649,9 @@ public class DataSettingsActivity extends BaseFragment {
 
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return;
+            }
             switch (holder.getItemViewType()) {
                 case 0: {
                     break;
@@ -862,6 +868,9 @@ public class DataSettingsActivity extends BaseFragment {
 
         @Override
         public void onViewAttachedToWindow(RecyclerView.ViewHolder holder) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return;
+            }
             int viewType = holder.getItemViewType();
             if (viewType == 3) {
                 TextCheckCell checkCell = (TextCheckCell) holder.itemView;
@@ -890,11 +899,19 @@ public class DataSettingsActivity extends BaseFragment {
 
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
+            if (holder.getItemViewType() == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                return false;
+            }
             return isRowEnabled(holder.getAdapterPosition());
         }
 
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            if (viewType == com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE) {
+                final View sg = com.solegram.messenger.ui.SolegramSettingsLinks.block(DataSettingsActivity.this, parent.getContext(), com.solegram.messenger.ui.SolegramSettingsLinks.DATA, getResourceProvider());
+                sg.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
+                return new RecyclerListView.Holder(sg);
+            }
             View view;
             switch (viewType) {
                 case 0:
@@ -926,6 +943,9 @@ public class DataSettingsActivity extends BaseFragment {
 
         @Override
         public int getItemViewType(int position) {
+            if (position == sgLinksRow) {
+                return com.solegram.messenger.ui.SolegramSettingsLinks.VIEW_TYPE;
+            }
             if (position == mediaDownloadSection2Row || position == usageSection2Row || position == callsSection2Row || position == proxySection2Row || position == autoplaySectionRow || position == clearDraftsSectionRow || position == saveToGalleryDividerRow) {
                 return 0;
             } else if (position == mediaDownloadSectionRow || position == streamSectionRow || position == callsSectionRow || position == usageSectionRow || position == proxySectionRow || position == autoplayHeaderRow || position == saveToGallerySectionRow) {

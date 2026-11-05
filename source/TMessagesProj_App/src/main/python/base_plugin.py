@@ -4,6 +4,7 @@ A plugin file defines top-level metadata (__id__, __name__, ...) and one subclas
 """
 import abc
 import enum
+import sys
 import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -283,6 +284,15 @@ class BaseHook(MethodHook):
             self._after(param)
 
 
+def _report_hook_error(plugin, where):
+    """A failing hook counts toward the plugin's error budget (PluginsController switches off one that keeps failing)."""
+    try:
+        exc = sys.exc_info()[1]
+        _PC.reportHookError(getattr(plugin, "id", None), "%s: %s: %s" % (where, type(exc).__name__, exc))
+    except Exception:
+        pass
+
+
 class _HookBridge:
     """Object called from Java (PyXposedHook) for every hooked invocation."""
 
@@ -306,6 +316,7 @@ class _HookBridge:
             self.hook.before_hooked_method(param)
         except Exception:
             self.plugin.logger.error("before_hooked_method failed:\n%s", traceback.format_exc())
+            _report_hook_error(self.plugin, "before_hooked_method")
 
     def _sg_after(self, param):
         if not self._has_after:
@@ -316,12 +327,14 @@ class _HookBridge:
             self.hook.after_hooked_method(param)
         except Exception:
             self.plugin.logger.error("after_hooked_method failed:\n%s", traceback.format_exc())
+            _report_hook_error(self.plugin, "after_hooked_method")
 
     def _sg_replace(self, param):
         try:
             return self.hook.replace_hooked_method(param)
         except Exception:
             self.plugin.logger.error("replace_hooked_method failed:\n%s", traceback.format_exc())
+            _report_hook_error(self.plugin, "replace_hooked_method")
             raise  # Java then runs the original method so the app keeps working
 
 

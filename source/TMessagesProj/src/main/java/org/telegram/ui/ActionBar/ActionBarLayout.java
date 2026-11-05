@@ -154,6 +154,8 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             if (fragment.solegramFloatingDecidedFor != view) {
                 fragment.solegramFloatingDecidedFor = view;
                 fragment.solegramFloatingScreen = com.solegram.messenger.ui.SolegramFloatingScreen.decide(fragment, actionBar, view);
+                fragment.solegramSoftHeader = fragment.solegramFloatingScreen == null
+                    && com.solegram.messenger.ui.SolegramFloatingScreen.soften(fragment, actionBar, view);
             }
             return fragment.solegramFloatingScreen;
         }
@@ -283,6 +285,19 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                     }
                 } else {
                     result = super.drawChild(canvas, child, drawingTime);
+                }
+                // Solegram: a soft header instead of the shadow: the screen fades out under it
+                if (child == getChildAt(0)) {
+                    for (int a = 0; a < childCount; a++) {
+                        final View view = getChildAt(a);
+                        if (view instanceof ActionBar && view.getVisibility() == VISIBLE) {
+                            final BaseFragment owner = ((ActionBar) view).parentFragment;
+                            if (owner != null && owner.solegramSoftHeader && owner.fragmentView == child) {
+                                com.solegram.messenger.ui.SolegramFloatingScreen.drawSoftFade(canvas, (ActionBar) view, getMeasuredWidth());
+                            }
+                            break;
+                        }
+                    }
                 }
                 if (actionBarHeight != 0 && headerShadowDrawable != null) {
                     int wasAlpha = headerShadowDrawable.getAlpha();

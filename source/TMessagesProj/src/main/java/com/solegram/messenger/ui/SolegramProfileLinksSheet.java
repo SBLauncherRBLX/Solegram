@@ -170,7 +170,7 @@ public class SolegramProfileLinksSheet extends BottomSheet {
 
         // while the music is shared, the bio holds the song: the user's own bio is the one to edit
         final String own = SolegramNowPlayingBio.ownBio(UserConfig.getInstance(account).getClientUserId(), about == null ? "" : about);
-        initialAbout = own == null ? "" : own;
+        initialAbout = own == null ? "" : com.solegram.messenger.SolegramNameEmojiShare.strip(own); // without the name emoji's invisible mark
         final SolegramProfileLinks.Parsed parsed = SolegramProfileLinks.parse(initialAbout);
         links.addAll(parsed.removed);
         row = SolegramProfileLinks.looksLikeRow(initialAbout) && !parsed.removed.isEmpty();
@@ -571,7 +571,9 @@ public class SolegramProfileLinksSheet extends BottomSheet {
         saving = true;
         saveButton.setLoading(true);
         final TL_account.updateProfile req = new TL_account.updateProfile();
-        req.about = bio;
+        // the shared name emoji's mark goes back after the links, as every bio editor does
+        final String saved = com.solegram.messenger.SolegramNameEmojiShare.withMark(account, bio);
+        req.about = saved;
         req.flags |= 4;
         ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
             saving = false;
@@ -586,7 +588,7 @@ public class SolegramProfileLinksSheet extends BottomSheet {
             final long self = UserConfig.getInstance(account).getClientUserId();
             final TLRPC.UserFull full = MessagesController.getInstance(account).getUserFull(self);
             if (full != null) {
-                full.about = bio;
+                full.about = saved;
                 if (TextUtils.isEmpty(bio)) {
                     full.flags &= ~2;
                 } else {

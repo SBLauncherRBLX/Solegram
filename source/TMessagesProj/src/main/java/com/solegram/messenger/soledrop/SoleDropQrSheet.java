@@ -113,7 +113,9 @@ public class SoleDropQrSheet extends BottomSheet {
 
     private void load(boolean force) {
         final String link = SoleDropIdentity.link(account);
-        if (link != null && !force && SoleDropIdentity.expiresIn(account) > 60) {
+        // a code shown on the screen must still be valid when the friend scans it a while later: a fresh one when
+        // the cached one has less than half an hour left
+        if (link != null && !force && SoleDropIdentity.expiresIn(account) > 30 * 60) {
             render(link);
             return;
         }

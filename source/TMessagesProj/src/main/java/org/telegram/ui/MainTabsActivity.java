@@ -92,18 +92,29 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     public static final int TABS_COUNT = 4;
     private static final int POSITION_CHATS = 0;
-    private static final int POSITION_CONTACTS = 1;
-    private static final int POSITION_CALLS_OR_SETTINGS = 2;
-    private static final int POSITION_PROFILE = 3;
+    // Solegram: the pages of the bar, left to right (com.solegram.messenger.SolegramTabs), fixed for the life of the screen
+    private final java.util.List<String> sgPages = com.solegram.messenger.SolegramTabs.pages();
+    private final int POSITION_CALLS_OR_SETTINGS = sgPages.indexOf(com.solegram.messenger.SolegramTabs.CALLS_OR_SETTINGS);
+    private final int POSITION_PROFILE = sgPages.indexOf(com.solegram.messenger.SolegramTabs.PROFILE);
+    /** Per tab view: what it is and the page it opens (Telegram's Calls and Settings share one page). */
+    private String[] sgTabKinds;
+    private int[] sgTabPositions;
 
-    private static final int INDEX_CHATS = 0;
-    private static final int INDEX_CONTACTS = 1;
-    private static final int INDEX_SETTINGS = 2;
-    private static final int INDEX_CALLS = 3;
-    private static final int INDEX_PROFILE = 4;
+    private int indexToPosition(int index) {
+        return sgTabPositions[index];
+    }
 
-    private static int indexToPosition(int index) {
-        return index > 2 ? index - 1 : index;
+    /** The tab view of a kind, or null when the bar has none. */
+    private GlassTabView tabOf(String kind) {
+        if (tabs == null || sgTabKinds == null) {
+            return null;
+        }
+        for (int i = 0; i < tabs.length; i++) {
+            if (kind.equals(sgTabKinds[i])) {
+                return tabs[i];
+            }
+        }
+        return null;
     }
 
     private static final int ANIMATOR_ID_TABS_VISIBLE = 0;
@@ -290,19 +301,18 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         showAccountChangeHint();
     }
 
-    /** Solegram: the second tab shows the Feed instead of Contacts; fixed for the life of the screen. */
-    private final boolean feedTab = com.solegram.messenger.SolegramConfig.feedInsteadOfContacts;
 
     private void checkContactsTabBadge() {
-        if (tabsView != null && tabs[INDEX_CONTACTS] != null && !feedTab) {
+        final GlassTabView contactsTab = tabOf(com.solegram.messenger.SolegramTabs.CONTACTS);
+        if (tabsView != null && contactsTab != null) {
             final boolean hasPermission = Build.VERSION.SDK_INT >= 23 && ContactsController.hasContactsPermission();
             if (hasPermission) {
                 MessagesController.getGlobalNotificationsSettings().edit().putBoolean("askAboutContacts2", true).apply();
             }
             if (Build.VERSION.SDK_INT >= 23 && UserConfig.getInstance(currentAccount).syncContacts && !hasPermission && MessagesController.getGlobalNotificationsSettings().getBoolean("askAboutContacts2", true)) {
-                tabs[INDEX_CONTACTS].setCounter("!", true, true);
+                contactsTab.setCounter("!", true, true);
             } else {
-                tabs[INDEX_CONTACTS].setCounter(null, true, true);
+                contactsTab.setCounter(null, true, true);
             }
         }
     }
@@ -338,34 +348,37 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsView.setMaxWidth(dp(308 + (DialogsActivity.MAIN_TABS_MARGIN + 4) * 2));
         tabsView.setMinTabsWidth(dp(288));
 
-        tabs = new GlassTabView[5];
-        tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
-        // Solegram: the Feed takes the Contacts place (contacts open with a swipe on the chat list)
-        tabs[INDEX_CONTACTS] = feedTab
-            ? GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.FEED, R.string.SG_Feed)
-            : GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CONTACTS, R.string.MainTabsContacts);
-        tabs[INDEX_SETTINGS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Settings);
-        tabs[INDEX_CALLS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CALLS, R.string.MainTabsCalls);
-        tabs[INDEX_PROFILE] = GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
-        tabs[INDEX_CHATS].setOnLongClickListener(this::openFoldersSelector);
-        if (feedTab) {
-            tabs[INDEX_CONTACTS].setOnLongClickListener(v -> {
-                com.solegram.messenger.ui.FeedActivity.openContacts(this);
-                return true;
-            });
-        } else {
-            tabs[INDEX_CONTACTS].setOnLongClickListener(this::openContactsSelector);
+        // Solegram: the bar's tabs as laid out (com.solegram.messenger.SolegramTabs); Telegram's Calls/Settings slot has both, one shown
+        final java.util.ArrayList<GlassTabView> tabViews = new java.util.ArrayList<>();
+        final java.util.ArrayList<String> kinds = new java.util.ArrayList<>();
+        final java.util.ArrayList<Integer> positions = new java.util.ArrayList<>();
+        for (int position = 0; position < sgPages.size(); position++) {
+            final String kind = sgPages.get(position);
+            if (com.solegram.messenger.SolegramTabs.CALLS_OR_SETTINGS.equals(kind)) {
+                tabViews.add(createSolegramTab(context, com.solegram.messenger.SolegramTabs.SETTINGS));
+                kinds.add(com.solegram.messenger.SolegramTabs.SETTINGS);
+                positions.add(position);
+                tabViews.add(createSolegramTab(context, com.solegram.messenger.SolegramTabs.CALLS));
+                kinds.add(com.solegram.messenger.SolegramTabs.CALLS);
+                positions.add(position);
+            } else {
+                tabViews.add(createSolegramTab(context, kind));
+                kinds.add(kind);
+                positions.add(position);
+            }
         }
-        tabs[INDEX_CALLS].setOnLongClickListener(this::openCallsSelector);
-        tabs[INDEX_PROFILE].setOnLongClickListener(this::openAccountSelector);
-
-        tabsView.addTabToIgnoreClick(tabs[INDEX_CHATS]);
-        tabsView.addTabToIgnoreClick(tabs[INDEX_CONTACTS]);
-        tabsView.addTabToIgnoreClick(tabs[INDEX_PROFILE]);
-        tabsView.addTabToIgnoreClick(tabs[INDEX_CALLS]);
+        tabs = tabViews.toArray(new GlassTabView[0]);
+        sgTabKinds = kinds.toArray(new String[0]);
+        sgTabPositions = new int[positions.size()];
+        for (int i = 0; i < sgTabPositions.length; i++) {
+            sgTabPositions[i] = positions.get(i);
+        }
 
         for (int index = 0; index < tabs.length; index++) {
             final GlassTabView view = tabs[index];
+            if (!com.solegram.messenger.SolegramTabs.SETTINGS.equals(sgTabKinds[index])) {
+                tabsView.addTabToIgnoreClick(view);
+            }
 
             final int position = indexToPosition(index);
             tabs[index].setOnClickListener(v -> {
@@ -389,12 +402,17 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.setViewVisible(view, true, false);
         }
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
-        // Solegram: optional tabs
-        if (com.solegram.messenger.SolegramConfig.hideContactsTab) {
-            tabsView.setViewVisible(tabs[INDEX_CONTACTS], false, false);
-        }
-        if (com.solegram.messenger.SolegramConfig.hideProfileTab) {
-            tabsView.setViewVisible(tabs[INDEX_PROFILE], false, false);
+        // Solegram: Telegram's layout with the options to hide a tab (an own layout simply leaves it out)
+        if (!com.solegram.messenger.SolegramTabs.isCustom()) {
+            if (com.solegram.messenger.SolegramConfig.hideContactsTab) {
+                final GlassTabView second = tabs.length > 1 ? tabs[1] : null;
+                if (second != null) {
+                    tabsView.setViewVisible(second, false, false);
+                }
+            }
+            if (com.solegram.messenger.SolegramConfig.hideProfileTab && tabOf(com.solegram.messenger.SolegramTabs.PROFILE) != null) {
+                tabsView.setViewVisible(tabOf(com.solegram.messenger.SolegramTabs.PROFILE), false, false);
+            }
         }
 
         selectTab(viewPager.getCurrentPosition(), false);
@@ -428,6 +446,25 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewWrapper.setClipToPadding(false);
         // Solegram: the glass lens of the selection may reach a little past the tabs' bounds
         tabsViewWrapper.setClipChildren(false);
+        // Solegram: the lens shows the screen behind the bar where it reaches past the bar's glass
+        // (the pages themselves: the glass source keeps only the strip right under the bar's glass)
+        tabsView.solegramLensBackdrop = c -> {
+            if (viewPager == null || contentView == null || viewPager.getParent() != contentView
+                    || !ViewPositionWatcher.computeRectInParent(tabsView, contentView, sgLensRect)) {
+                return;
+            }
+            c.save();
+            c.translate(viewPager.getX() - sgLensRect.left, viewPager.getY() - sgLensRect.top);
+            try {
+                viewPager.draw(c);
+            } catch (Throwable e) {
+                org.telegram.messenger.FileLog.e(e);
+            }
+            c.restore();
+        };
+        if (com.solegram.messenger.SolegramConfig.tabsSearchButton) {
+            sgCreateSearchButton(context, iBlur3FactoryGlass);
+        }
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
 
         // Solegram: the new-chat «+» flows out of the tab bar (liquid glass under the tabs, its content over them)
@@ -453,6 +490,161 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         return contentView;
     }
 
+    // Solegram: a round glass search button beside the tab bar (iOS style), when turned on in the settings
+
+    private FrameLayout sgSearchButton;
+    private android.widget.ImageView sgSearchIcon;
+    private BlurredBackgroundDrawable sgSearchBackground;
+    private final RectF sgLensRect = new RectF();
+
+    private void sgCreateSearchButton(Context context, BlurredBackgroundDrawableViewFactory factory) {
+        sgSearchButton = new FrameLayout(context) {
+            // a soft white light under the finger, inside the glass circle (as on the app's other glass buttons)
+            private final android.graphics.Paint glowPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Path circle = new android.graphics.Path();
+            private float gx, gy;
+            private final com.solegram.messenger.ui.SolegramLiquid.Spring glow = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).params(0.22f, 1f).rest(0.003f);
+            private long last;
+
+            @Override
+            public boolean onTouchEvent(android.view.MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        gx = e.getX();
+                        gy = e.getY();
+                        glow.to(1);
+                        invalidate();
+                        break;
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        glow.params(0.4f, 1f);
+                        glow.to(0);
+                        invalidate();
+                        break;
+                }
+                return super.onTouchEvent(e);
+            }
+
+            @Override
+            protected void dispatchDraw(@NonNull Canvas canvas) {
+                super.dispatchDraw(canvas);
+                final long now = System.nanoTime();
+                final float dt = last == 0 ? 1f / 60f : Math.max(0, Math.min(1f / 30f, (now - last) / 1e9f));
+                last = now;
+                final boolean moving = glow.step(dt);
+                if (!moving) {
+                    last = 0;
+                    glow.params(0.22f, 1f);
+                }
+                final float a = Math.max(0, Math.min(1, glow.value));
+                if (a > 0.005f) {
+                    final float pad = dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f);
+                    final float cx = getWidth() / 2f, cy = getHeight() / 2f, r = Math.min(getWidth(), getHeight()) / 2f - pad;
+                    circle.rewind();
+                    circle.addCircle(cx, cy, r, android.graphics.Path.Direction.CW);
+                    final float lr = r * 1.3f;
+                    glowPaint.setShader(new android.graphics.RadialGradient(gx, gy, lr,
+                        new int[]{Theme.isCurrentThemeDark() ? 0x40FFFFFF : 0x66FFFFFF, Theme.isCurrentThemeDark() ? 0x14FFFFFF : 0x22FFFFFF, 0x00FFFFFF},
+                        new float[]{0f, 0.45f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+                    glowPaint.setAlpha((int) (255 * a));
+                    canvas.save();
+                    canvas.clipPath(circle);
+                    canvas.drawCircle(gx, gy, lr, glowPaint);
+                    canvas.restore();
+                }
+                if (moving) {
+                    postInvalidateOnAnimation();
+                }
+            }
+        };
+        sgSearchBackground = factory.create(sgSearchButton, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
+        sgSearchBackground.setRadius(dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
+        sgSearchBackground.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
+        sgSearchButton.setBackground(sgSearchBackground);
+        sgSearchIcon = new android.widget.ImageView(context);
+        sgSearchIcon.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+        sgSearchIcon.setImageResource(R.drawable.outline_header_search);
+        sgSearchIcon.setColorFilter(new android.graphics.PorterDuffColorFilter(getThemedColor(Theme.key_glass_tabUnselected), android.graphics.PorterDuff.Mode.SRC_IN));
+        sgSearchButton.addView(sgSearchIcon, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        sgSearchButton.setContentDescription(LocaleController.getString(R.string.Search));
+        sgSearchButton.setOnClickListener(v -> sgOpenSearch());
+        com.solegram.messenger.ui.SolegramMotion.pressable(sgSearchButton, com.solegram.messenger.ui.SolegramMotion.PRESS_CARD);
+        tabsViewWrapper.addView(sgSearchButton, LayoutHelper.createFrame(DialogsActivity.MAIN_TABS_BAR_HEIGHT, DialogsActivity.MAIN_TABS_BAR_HEIGHT, Gravity.BOTTOM | Gravity.LEFT, 0, 0, 0, DialogsActivity.MAIN_TABS_LIFT));
+        // the capsule and the round button side by side, centred together
+        final View.OnLayoutChangeListener place = (v, l, t, r, b, ol, ot, or, ob) -> sgPlaceSearchButton();
+        tabsView.addOnLayoutChangeListener(place);
+        sgSearchButton.addOnLayoutChangeListener(place);
+    }
+
+    private void sgPlaceSearchButton() {
+        if (sgSearchButton == null || tabsViewWrapper == null || tabsViewWrapper.getWidth() <= 0 || tabsView.getWidth() <= 0) {
+            return;
+        }
+        final int pad = dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f);
+        final float gap = dp(8);
+        final float capsule = tabsView.getWidth() - pad * 2, circle = sgSearchButton.getWidth() - pad * 2;
+        final float left = (tabsViewWrapper.getWidth() - (capsule + gap + circle)) / 2f;
+        final boolean rtl = LocaleController.isRTL;
+        final float capsuleLeft = rtl ? left + circle + gap : left;
+        final float circleLeft = rtl ? left : left + capsule + gap;
+        tabsView.setTranslationX(capsuleLeft - pad - tabsView.getLeft());
+        sgSearchButton.setTranslationX(circleLeft - pad - sgSearchButton.getLeft());
+    }
+
+    private void sgOpenSearch() {
+        if (viewPager == null || dialogsActivity == null) {
+            return;
+        }
+        if (viewPager.getCurrentPosition() != POSITION_CHATS) {
+            selectTab(POSITION_CHATS, true);
+            viewPager.scrollToPosition(POSITION_CHATS);
+            AndroidUtilities.runOnUIThread(() -> {
+                if (dialogsActivity != null) {
+                    dialogsActivity.solegramOpenSearch();
+                }
+            }, 320);
+        } else {
+            dialogsActivity.solegramOpenSearch();
+        }
+    }
+
+    /** Solegram: one tab of the bar, with its long press. */
+    private GlassTabView createSolegramTab(Context context, String kind) {
+        final GlassTabView tab;
+        switch (kind) {
+            case com.solegram.messenger.SolegramTabs.CHATS:
+                tab = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
+                tab.setOnLongClickListener(this::openFoldersSelector);
+                break;
+            case com.solegram.messenger.SolegramTabs.FEED:
+                tab = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.FEED, R.string.SG_Feed);
+                tab.setOnLongClickListener(v -> {
+                    com.solegram.messenger.ui.FeedActivity.openContacts(this);
+                    return true;
+                });
+                break;
+            case com.solegram.messenger.SolegramTabs.CONTACTS:
+                tab = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CONTACTS, R.string.MainTabsContacts);
+                tab.setOnLongClickListener(this::openContactsSelector);
+                break;
+            case com.solegram.messenger.SolegramTabs.MUSIC:
+                tab = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SG_MUSIC, R.string.SG_PlayerMusic);
+                break;
+            case com.solegram.messenger.SolegramTabs.CALLS:
+                tab = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CALLS, R.string.MainTabsCalls);
+                tab.setOnLongClickListener(this::openCallsSelector);
+                break;
+            case com.solegram.messenger.SolegramTabs.SETTINGS:
+                tab = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Settings);
+                break;
+            default:
+                tab = GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
+                tab.setOnLongClickListener(this::openAccountSelector);
+        }
+        return tab;
+    }
+
     private void checkUnreadCount(boolean animated) {
         if (tabsView == null) {
             return;
@@ -461,14 +653,15 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         final int unreadCount = MessagesStorage.getInstance(currentAccount).getMainUnreadCount();
         if (unreadCount > 0) {
             final String unreadCountFmt = LocaleController.formatNumber(unreadCount, ',');
-            tabs[INDEX_CHATS].setCounter(unreadCountFmt, false, animated);
+            tabs[0].setCounter(unreadCountFmt, false, animated);
         } else {
-            tabs[INDEX_CHATS].setCounter(null, false, animated);
+            tabs[0].setCounter(null, false, animated);
         }
-        if (feedTab && tabs[INDEX_CONTACTS] != null) {
+        final GlassTabView feedTabView = tabOf(com.solegram.messenger.SolegramTabs.FEED);
+        if (feedTabView != null) {
             // Solegram: how many channels posted since the Feed was last opened
             final int fresh = com.solegram.messenger.FeedController.getInstance(currentAccount).countFreshChannels();
-            tabs[INDEX_CONTACTS].setCounter(fresh > 0 ? (fresh > 99 ? "99+" : String.valueOf(fresh)) : null, false, animated);
+            feedTabView.setCounter(fresh > 0 ? (fresh > 99 ? "99+" : String.valueOf(fresh)) : null, false, animated);
         }
     }
 
@@ -649,6 +842,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         }
     }
 
+    /** Solegram Studio: the chats tab, showing a folder (its filter id; 0 = all chats). */
+    public void solegramShowChatsFolder(int folderId) {
+        openFolder(folderId);
+    }
+
     private void openFolder(int folderId) {
         if (viewPager.getCurrentPosition() == POSITION_CHATS && dialogsActivity != null) {
             dialogsActivity.scrollToFolder(folderId);
@@ -782,11 +980,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         if (viewPager != null) {
             final int currentPosition = viewPager.getCurrentPosition();
-            if (currentPosition != POSITION_CALLS_OR_SETTINGS && dropCallsFragmentAfterPageScroll) {
+            if (POSITION_CALLS_OR_SETTINGS >= 0 && currentPosition != POSITION_CALLS_OR_SETTINGS && dropCallsFragmentAfterPageScroll) {
                 dropFragmentAtPosition(POSITION_CALLS_OR_SETTINGS);
                 dropCallsFragmentAfterPageScroll = false;
             }
-            if (currentPosition != POSITION_PROFILE) {
+            if (POSITION_PROFILE >= 0 && currentPosition != POSITION_PROFILE) {
                 dropFragmentAtPosition(POSITION_PROFILE);
             }
             if (pendingFolderId != null && currentPosition == POSITION_CHATS && dialogsActivity != null) {
@@ -863,7 +1061,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     @Override
     protected int getFragmentsCount() {
-        return TABS_COUNT;
+        return sgPages.size();
     }
 
     @Override
@@ -909,39 +1107,40 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     @Override
     protected BaseFragment createBaseFragmentAt(int position) {
-        if (position == POSITION_CONTACTS && feedTab) {
-            Bundle args = new Bundle();
-            args.putBoolean("hasMainTabs", true);
-            return new com.solegram.messenger.ui.FeedActivity(args);
-        } else if (position == POSITION_CONTACTS) {
-            Bundle args = new Bundle();
-            args.putBoolean("needPhonebook", true);
-            args.putBoolean("needFinishFragment", false);
-            args.putBoolean("hasMainTabs", true);
-            return new ContactsActivity(args);
-        } else if (position == POSITION_CALLS_OR_SETTINGS) {
-            if (getUserConfig().showCallsTab) {
-                Bundle args = new Bundle();
+        final String kind = position >= 0 && position < sgPages.size() ? sgPages.get(position) : null;
+        if (kind == null) {
+            return null;
+        }
+        final Bundle args = new Bundle();
+        args.putBoolean("hasMainTabs", true);
+        switch (kind) {
+            case com.solegram.messenger.SolegramTabs.CHATS:
+                dialogsActivity = new DialogsActivity(args);
+                dialogsActivity.setMainTabsActivityController(new MainTabsActivityControllerImpl());
+                return dialogsActivity;
+            case com.solegram.messenger.SolegramTabs.FEED:
+                return new com.solegram.messenger.ui.FeedActivity(args);
+            case com.solegram.messenger.SolegramTabs.CONTACTS:
+                args.putBoolean("needPhonebook", true);
                 args.putBoolean("needFinishFragment", false);
-                args.putBoolean("hasMainTabs", true);
+                return new ContactsActivity(args);
+            case com.solegram.messenger.SolegramTabs.MUSIC:
+                return new com.solegram.messenger.ui.SolegramMusicActivity(args);
+            case com.solegram.messenger.SolegramTabs.CALLS:
+                args.putBoolean("needFinishFragment", false);
                 return new CallLogActivity(args);
-            }
-            Bundle args = new Bundle();
-            args.putBoolean("hasMainTabs", true);
-            return new SettingsActivity(args);
-        } else if (position == POSITION_CHATS) {
-            Bundle args = new Bundle();
-            args.putBoolean("hasMainTabs", true);
-            dialogsActivity = new DialogsActivity(args);
-            dialogsActivity.setMainTabsActivityController(new MainTabsActivityControllerImpl());
-            return dialogsActivity;
-        } else if (position == POSITION_PROFILE) {
-            Bundle args = new Bundle();
-            args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
-            args.putBoolean("my_profile", true);
-            // args.putBoolean("expandPhoto", true);
-            args.putBoolean("hasMainTabs", true);
-            return new ProfileActivity(args);
+            case com.solegram.messenger.SolegramTabs.SETTINGS:
+                return new SettingsActivity(args);
+            case com.solegram.messenger.SolegramTabs.CALLS_OR_SETTINGS:
+                if (getUserConfig().showCallsTab) {
+                    args.putBoolean("needFinishFragment", false);
+                    return new CallLogActivity(args);
+                }
+                return new SettingsActivity(args);
+            case com.solegram.messenger.SolegramTabs.PROFILE:
+                args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
+                args.putBoolean("my_profile", true);
+                return new ProfileActivity(args);
         }
         return null;
     }
@@ -1000,8 +1199,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private boolean canScrollInternal(MotionEvent ev, boolean forward) {
         // Solegram: never swipe onto a hidden tab's page
         final int target = viewPager.getCurrentPosition() + (forward ? 1 : -1);
-        if (target == POSITION_CONTACTS && com.solegram.messenger.SolegramConfig.hideContactsTab
-                || target == POSITION_PROFILE && com.solegram.messenger.SolegramConfig.hideProfileTab) {
+        if (!com.solegram.messenger.SolegramTabs.isCustom() && (target == 1 && com.solegram.messenger.SolegramConfig.hideContactsTab
+                || target == POSITION_PROFILE && com.solegram.messenger.SolegramConfig.hideProfileTab)) {
             return false;
         }
         final BaseFragment fragment = getCurrentVisibleFragment();
@@ -1106,7 +1305,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         } else if (id == NotificationCenter.callTabsVisibleToggled) {
             final boolean callTabsVisible = getUserConfig().showCallsTab;
             checkUi_callTabVisible(callTabsVisible, true);
-            if (viewPager != null && viewPager.getCurrentPosition() == POSITION_CALLS_OR_SETTINGS) {
+            if (POSITION_CALLS_OR_SETTINGS < 0) {
+                // Solegram: an own layout has no shared Calls/Settings page
+            } else if (viewPager != null && viewPager.getCurrentPosition() == POSITION_CALLS_OR_SETTINGS) {
                 viewPager.scrollToPosition(POSITION_CHATS);
                 selectTab(POSITION_CHATS, true);
                 dropCallsFragmentAfterPageScroll = true;
@@ -1114,8 +1315,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 dropFragmentAtPosition(POSITION_CALLS_OR_SETTINGS);
             }
         } else if (id == NotificationCenter.mainUserInfoChanged) {
-            if (tabs != null && tabs[INDEX_PROFILE] != null) {
-                tabs[INDEX_PROFILE].updateUserAvatar(currentAccount);
+            if (tabOf(com.solegram.messenger.SolegramTabs.PROFILE) != null) {
+                tabOf(com.solegram.messenger.SolegramTabs.PROFILE).updateUserAvatar(currentAccount);
             }
         } else if (id == NotificationCenter.contactsPermissionBadgeCheck) {
             checkContactsTabBadge();
@@ -1204,9 +1405,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private void checkUi_callTabVisible(boolean callTabsVisible, boolean animated) {
-        if (tabsView != null) {
-            tabsView.setViewVisible(tabs[INDEX_SETTINGS], !callTabsVisible, animated);
-            tabsView.setViewVisible(tabs[INDEX_CALLS], callTabsVisible, animated);
+        if (tabsView != null && POSITION_CALLS_OR_SETTINGS >= 0 && tabOf(com.solegram.messenger.SolegramTabs.SETTINGS) != null && tabOf(com.solegram.messenger.SolegramTabs.CALLS) != null) {
+            tabsView.setViewVisible(tabOf(com.solegram.messenger.SolegramTabs.SETTINGS), !callTabsVisible, animated);
+            tabsView.setViewVisible(tabOf(com.solegram.messenger.SolegramTabs.CALLS), callTabsVisible, animated);
         }
     }
 
@@ -1308,6 +1509,17 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         final int normalMax = dp(308 + (DialogsActivity.MAIN_TABS_MARGIN + 4) * 2);
         final int normalMin = dp(288);
         final boolean room = createChain != null && createChain.isActive() && (solegramPlusRoom || createChain.wantsRoomAtStart());
+        if (!room && sgSearchButton != null && contentWidth > 0) {
+            // the search button beside the capsule: the capsule narrows to leave room for it
+            final int glassPad = dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f);
+            final int circle = dp(DialogsActivity.MAIN_TABS_BAR_HEIGHT) - glassPad * 2;
+            final int avail = contentWidth - insetLeft - insetRight;
+            final int capsule = avail - dp(10) * 2 - dp(8) - circle;
+            final int max = Math.max(dp(120), Math.min(normalMax, capsule + glassPad * 2));
+            tabsView.setMaxWidth(max);
+            tabsView.setMinTabsWidth(Math.max(0, Math.min(normalMin, max - dp(DialogsActivity.MAIN_TABS_MARGIN + 4) * 2)));
+            return;
+        }
         if (!room || contentWidth <= 0) {
             tabsView.setMaxWidth(normalMax);
             tabsView.setMinTabsWidth(normalMin);
@@ -1428,9 +1640,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         if (accountSwitchHint == null && HintsController.Hint.AccountSwitchHint.show()) {
             AndroidUtilities.runOnUIThread(() -> {
-                if (getContext() == null || tabs == null) return;
+                if (getContext() == null || tabs == null || tabOf(com.solegram.messenger.SolegramTabs.PROFILE) == null) return;
 
-                final View v = tabs[INDEX_PROFILE];
+                final View v = tabOf(com.solegram.messenger.SolegramTabs.PROFILE);
                 final float translate = (contentView.getWidth() - ((tabsView.getX() + v.getX()) + v.getWidth()) + v.getWidth() / 2f) / AndroidUtilities.density;
 
                 accountSwitchHint = new HintView2(getContext(), HintView2.DIRECTION_BOTTOM);
@@ -1482,6 +1694,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         blur3_updateFadeColors();
         if (tabsViewBackground != null) {
             tabsViewBackground.updateColors();
+        }
+        if (sgSearchBackground != null) {
+            sgSearchBackground.updateColors();
+            sgSearchIcon.setColorFilter(new android.graphics.PorterDuffColorFilter(getThemedColor(Theme.key_glass_tabUnselected), android.graphics.PorterDuff.Mode.SRC_IN));
         }
         if (createChain != null) {
             createChain.updateColors();

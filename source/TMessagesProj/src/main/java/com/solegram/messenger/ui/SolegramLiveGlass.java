@@ -406,6 +406,44 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
     }
 
     /** Glass in the window of {@code windowRoot} can show what is under it live. */
+    /**
+     * A menu's window over a screen the live glass can't read (a web page, video): the system blurs what is behind
+     * that window (Android 12+, where the device does window blur) and the panel lets it show through, so the menu
+     * is still frosted glass over a live screen. Only for popup windows (sub windows), never a screen's own window.
+     *
+     * @return whether the blur is on
+     */
+    public static boolean frostBehind(@Nullable View windowRoot, @Nullable android.graphics.drawable.Drawable panel) {
+        if (Build.VERSION.SDK_INT < 31 || windowRoot == null || !com.solegram.messenger.SolegramConfig.glassMenus || !available()) {
+            return false;
+        }
+        try {
+            if (!(windowRoot.getLayoutParams() instanceof android.view.WindowManager.LayoutParams)) {
+                return false;
+            }
+            final android.view.WindowManager.LayoutParams lp = (android.view.WindowManager.LayoutParams) windowRoot.getLayoutParams();
+            if (lp.type < android.view.WindowManager.LayoutParams.FIRST_SUB_WINDOW || lp.type > android.view.WindowManager.LayoutParams.LAST_SUB_WINDOW) {
+                return false;
+            }
+            final android.view.WindowManager wm = (android.view.WindowManager) windowRoot.getContext().getSystemService(android.content.Context.WINDOW_SERVICE);
+            if (wm == null || !wm.isCrossWindowBlurEnabled()) {
+                return false;
+            }
+            if ((lp.flags & android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND) == 0) {
+                lp.flags |= android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND;
+                lp.setBlurBehindRadius(AndroidUtilities.dp(24));
+                wm.updateViewLayout(windowRoot, lp);
+            }
+            if (panel != null) {
+                panel.mutate().setAlpha(0xC4);
+            }
+            return true;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        }
+    }
+
     public static boolean canSample(@Nullable View windowRoot) {
         if (!available() || windowRoot == null) {
             return false;

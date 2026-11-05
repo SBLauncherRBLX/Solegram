@@ -1689,6 +1689,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int view_as_topics = 59;
 
     private final static int search = 40;
+    private final static int sg_streak = 1101;
 
     private final static int topic_close = 60;
     private final static int open_forum = 61;
@@ -3426,10 +3427,6 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
-        // Solegram: voice transcriptions of this chat still in work stop with it (a preview of the chat leaves them be)
-        if (!inPreviewMode) {
-            com.solegram.messenger.SolegramTranscriber.cancelDialog(currentAccount, dialog_id);
-        }
         if (solegramMenuLiquid != null) {
             solegramMenuLiquid.finishNow();
         }
@@ -3654,10 +3651,7 @@ public class ChatActivity extends BaseFragment implements
                     return ColorUtils.setAlphaComponent(getThemedColor(Theme.key_chat_messagePanelBackground), 255);
                 }
 
-                final boolean isThemeLight = themeDelegate != null && !themeDelegate.isDark();
-                if (isThemeLight) {
-                    return ColorUtils.setAlphaComponent(super.getBackgroundColor(), 216);
-                }
+                // Solegram: light and dark alike, as see-through as the glass settings say (it was a fixed 85% here)
                 return super.getBackgroundColor();
             }
         };
@@ -3668,10 +3662,7 @@ public class ChatActivity extends BaseFragment implements
                     return ColorUtils.setAlphaComponent(getThemedColor(Theme.key_windowBackgroundWhite), 255);
                 }
 
-                final boolean isThemeLight = themeDelegate != null && !themeDelegate.isDark();
-                if (isThemeLight) {
-                    return ColorUtils.setAlphaComponent(super.getBackgroundColor(), 216);
-                }
+                // Solegram: light and dark alike, as see-through as the glass settings say (it was a fixed 85% here)
                 return super.getBackgroundColor();
             }
         };
@@ -4041,6 +4032,8 @@ public class ChatActivity extends BaseFragment implements
                     getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/help", dialog_id, null, null, null, false, null, null, null, true, 0, 0, null, false));
                 } else if (id == bot_settings) {
                     getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/settings", dialog_id, null, null, null, false, null, null, null, true, 0, 0, null, false));
+                } else if (id == sg_streak) {
+                    com.solegram.messenger.ui.SolegramStreakSheet.show(ChatActivity.this, dialog_id);
                 } else if (id == search) {
                     openSearchWithText(isSupportedTags() ? "" : null);
                 } else if (id == translate) {
@@ -4497,6 +4490,10 @@ public class ChatActivity extends BaseFragment implements
 
             if (searchItem != null) {
                 headerItem.lazilyAddSubItem(search, R.drawable.msg_search, LocaleController.getString(R.string.Search));
+            }
+            if (currentUser != null && chatMode == 0 && com.solegram.messenger.SolegramStreak.eligible(currentAccount, currentUser.id)) {
+                headerItem.lazilyAddSubItem(sg_streak, R.drawable.notification, LocaleController.getString(R.string.SG_StreakMenu));
+                sgUpdateStreakItem();
             }
             if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, dp(24), dp(24));
@@ -19713,6 +19710,18 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    /** Solegram: the streak item in the menu is there only while a streak is. */
+    private void sgUpdateStreakItem() {
+        if (headerItem == null || currentUser == null) {
+            return;
+        }
+        if (com.solegram.messenger.SolegramStreak.days(currentAccount, currentUser.id) > 0) {
+            headerItem.showSubItem(sg_streak);
+        } else {
+            headerItem.hideSubItem(sg_streak);
+        }
+    }
+
     public void updateTitle(boolean animated) {
         if (avatarContainer == null) {
             return;
@@ -19731,7 +19740,8 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (threadMessageId > 0) {
                     final TLRPC.User user = getMessagesController().getUser(threadMessageId);
-                    avatarContainer.setTitle(AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(user))), user.scam, user.fake, user.verified, user.premium, user.emoji_status, animated);
+                    avatarContainer.setTitle(com.solegram.messenger.SolegramStreak.withBadge(currentAccount, user.id, AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(user)))), user.scam, user.fake, user.verified, user.premium, user.emoji_status, animated);
+                    sgUpdateStreakItem();
                 } else {
                     TLRPC.Chat chat = getMessagesController().getChat(-threadMessageId);
                     if (chat == null) chat = currentChat;
@@ -38032,7 +38042,11 @@ public class ChatActivity extends BaseFragment implements
                     cell.resetPressedLink(-1);
                 }
                 if (!messageObject.isVoice()) {
-                    showDialog(new AudioPlayerAlert(getContext(), themeDelegate));
+                    if (com.solegram.messenger.SolegramConfig.newPlayer && getParentActivity() != null) {
+                        com.solegram.messenger.ui.SolegramPlayer.open(getParentActivity(), themeDelegate);
+                    } else {
+                        showDialog(new AudioPlayerAlert(getContext(), themeDelegate));
+                    }
                 }
             } else if (str.startsWith("tonaddress:")) {
                 didPressTonAddress(cell, url, str.substring(11));

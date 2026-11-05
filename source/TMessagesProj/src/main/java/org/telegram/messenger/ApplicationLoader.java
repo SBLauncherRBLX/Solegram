@@ -104,6 +104,11 @@ public class ApplicationLoader extends Application {
     }
 
     public static IMapsProvider getMapsProvider() {
+        // Solegram: OpenStreetMap where there are no Google services, or by choice
+        final IMapsProvider solegram = com.solegram.messenger.maps.SolegramMaps.provider();
+        if (solegram != null) {
+            return solegram;
+        }
         if (mapsProvider == null) {
             mapsProvider = applicationLoaderInstance.onCreateMapsProvider();
         }

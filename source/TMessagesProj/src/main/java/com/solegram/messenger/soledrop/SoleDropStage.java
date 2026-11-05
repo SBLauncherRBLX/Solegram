@@ -240,13 +240,14 @@ public class SoleDropStage extends View {
         if (auraBoost > 0) {
             auraBoost = Math.max(0, auraBoost - dt * 1.6f);
         }
-        final float spread = (dp(16) + dp(8) * breath + dp(14) * boost) * scale;
+        // a quiet glow, as the rest of Solegram: it stays close to the card and only flares at the moment of contact
+        final float spread = (dp(9) + dp(4) * breath + dp(14) * boost) * scale;
         final float radius = dp(26) * scale;
         final float cx = rect.centerX(), cy = rect.centerY();
         matrix.setRotate(breathing ? (t * 24f) % 360f : 0f);
         matrix.postTranslate(cx, cy);
         auraShader.setLocalMatrix(matrix);
-        final float base = (dark ? 0.46f : 0.34f) * (0.7f + 0.3f * breath) + 0.35f * boost;
+        final float base = (dark ? 0.24f : 0.17f) * (0.75f + 0.25f * breath) + 0.35f * boost;
         final int alpha = (int) (255 * Math.min(1f, base) * auraAlpha);
         // one soft band of light hugging the card, blurred as a whole: no rings, no steps
         final float band = spread * 0.9f;

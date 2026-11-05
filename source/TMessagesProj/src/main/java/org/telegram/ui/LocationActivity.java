@@ -1600,7 +1600,10 @@ public class LocationActivity extends BaseFragment implements NotificationCenter
         if (BuildVars.isHuaweiStoreApp()) {
             domain = "mapapp://navigation";
         } else {
-            domain = "http://maps.google.com/maps";
+            // Solegram: the route opens in the map app chosen in settings
+            com.solegram.messenger.maps.SolegramMaps.openDirections(getParentActivity(), myLocation != null ? myLocation.getLatitude() : 0,
+                myLocation != null ? myLocation.getLongitude() : 0, myLocation != null, daddrLat, daddrLong);
+            return;
         }
         if (myLocation != null) {
             try {
