@@ -50,6 +50,10 @@ public class FeedPostCell extends View {
         void onOpenPost(FeedController.Post post);
 
         void onOpenChannel(FeedController.Post post);
+
+        /** A long press: the post's menu. */
+        default void onPostMenu(FeedController.Post post, FeedPostCell cell) {
+        }
     }
 
     private static final int MAX_LINES = 7;
@@ -375,11 +379,24 @@ public class FeedPostCell extends View {
                     // the card gives in under the finger, unless the touch turns out to be a scroll
                     removeCallbacks(pressIn);
                     postDelayed(pressIn, android.view.ViewConfiguration.getTapTimeout());
+                    longPressed = false;
+                    removeCallbacks(longPress);
+                    postDelayed(longPress, android.view.ViewConfiguration.getLongPressTimeout());
                     return true;
                 }
                 return false;
+            case MotionEvent.ACTION_MOVE:
+                if (Math.abs(e.getX() - downX) > dp(10) || Math.abs(e.getY() - downY) > dp(10)) {
+                    removeCallbacks(longPress);
+                }
+                return true;
             case MotionEvent.ACTION_UP:
-                releasePress(true);
+                removeCallbacks(longPress);
+                releasePress(!longPressed);
+                if (longPressed) {
+                    longPressed = false;
+                    return true; // the menu is open: no tap
+                }
                 if (Math.abs(e.getX() - downX) < dp(10) && Math.abs(e.getY() - downY) < dp(10)) {
                     if (translateLabel != null && translateRect.contains(downX, downY)) {
                         toggleTranslation();
@@ -396,10 +413,32 @@ public class FeedPostCell extends View {
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                removeCallbacks(longPress);
+                longPressed = false;
                 releasePress(false);
                 return true;
         }
         return true;
+    }
+
+    private boolean longPressed;
+    private final Runnable longPress = () -> {
+        if (post == null) {
+            return;
+        }
+        longPressed = true;
+        try {
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        } catch (Exception ignore) {
+        }
+        if (getParent() != null) {
+            getParent().requestDisallowInterceptTouchEvent(true);
+        }
+        openMenu();
+    };
+
+    private void openMenu() {
+        delegate.onPostMenu(post, this);
     }
 
     private boolean pressShown;

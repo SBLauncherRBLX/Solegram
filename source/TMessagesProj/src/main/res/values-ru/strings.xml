@@ -2031,5 +2031,7 @@
     <string name="SG_WalletCardGiftEmpty">Коллекционных подарков пока нет</string>
     <string name="SG_VaultOnChain">В блокчейне</string>
     <string name="SG_WalletLockedMoney">Откройте SoleWallet, чтобы зайти в кошелёк</string>
+    <string name="SG_FeedHidePost">Скрыть из ленты</string>
+    <string name="SG_FeedPostHidden">Пост скрыт из ленты</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -5,6 +5,8 @@
 
 package com.solegram.messenger.ui;
 
+import org.telegram.messenger.MessageObject;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
@@ -491,6 +493,11 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
                 public void onOpenChannel(FeedController.Post post) {
                     openPost(post, false);
                 }
+
+                @Override
+                public void onPostMenu(FeedController.Post post, FeedPostCell cell) {
+                    showPostMenu(post, cell);
+                }
             });
             cell.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return new RecyclerListView.Holder(cell);
@@ -527,6 +534,26 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
         public int getItemCount() {
             return posts.size();
         }
+    }
+
+    /** A post's menu on a long press: forward it, or hide it from the Feed. */
+    private void showPostMenu(FeedController.Post post, View cell) {
+        if (post == null || post.message == null || getParentActivity() == null) {
+            return;
+        }
+        final org.telegram.ui.Components.ItemOptions o = org.telegram.ui.Components.ItemOptions.makeOptions(this, cell);
+        o.add(R.drawable.msg_forward, getString(R.string.Forward), () -> {
+            final ArrayList<MessageObject> messages = new ArrayList<>(post.group.isEmpty() ? java.util.Collections.singletonList(post.message) : post.group);
+            showDialog(new org.telegram.ui.Components.ShareAlert(getParentActivity(), messages, null, false, null, false, resourceProvider));
+        });
+        o.add(R.drawable.msg_cancel, getString(R.string.SG_FeedHidePost), () -> {
+            final FeedController controller = FeedController.getInstance(currentAccount);
+            controller.setHidden(post, true);
+            org.telegram.ui.Components.BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_delete, getString(R.string.SG_FeedPostHidden),
+                getString(R.string.Undo), () -> controller.setHidden(post, false)).show();
+        });
+        o.setDrawScrim(false);
+        o.show();
     }
 
     /* Insets */

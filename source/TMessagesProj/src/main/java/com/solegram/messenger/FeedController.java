@@ -365,11 +365,50 @@ public class FeedController {
         return result;
     }
 
+    // posts the user hid from the Feed (their keys), kept on the device
+    private java.util.HashSet<String> hidden;
+
+    private android.content.SharedPreferences hiddenPrefs() {
+        return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("solegram_feed_hidden_" + account, android.content.Context.MODE_PRIVATE);
+    }
+
+    private java.util.HashSet<String> hidden() {
+        if (hidden == null) {
+            hidden = new java.util.HashSet<>(hiddenPrefs().getStringSet("keys", java.util.Collections.emptySet()));
+        }
+        return hidden;
+    }
+
+    /** Hides a post from the Feed (or shows it again). */
+    public void setHidden(Post post, boolean hide) {
+        if (post == null || post.key == null) {
+            return;
+        }
+        final java.util.HashSet<String> set = hidden();
+        if (hide ? set.add(post.key) : set.remove(post.key)) {
+            // a bounded list: the oldest keys go first once it grows large
+            if (set.size() > 2000) {
+                final java.util.Iterator<String> it = set.iterator();
+                while (set.size() > 1500 && it.hasNext()) {
+                    it.next();
+                    it.remove();
+                }
+            }
+            hiddenPrefs().edit().putStringSet("keys", new java.util.HashSet<>(set)).apply();
+            rebuild();
+        }
+    }
+
     /** Merges all loaded channels into one list, newest first. */
     private void rebuild() {
         final ArrayList<Post> result = new ArrayList<>();
+        final java.util.HashSet<String> hiddenKeys = hidden();
         for (ArrayList<Post> list : byChannel.values()) {
-            result.addAll(list);
+            for (Post p : list) {
+                if (p.key == null || !hiddenKeys.contains(p.key)) {
+                    result.add(p);
+                }
+            }
         }
         Collections.sort(result, (a, b) -> Integer.compare(b.date, a.date));
         posts.clear();

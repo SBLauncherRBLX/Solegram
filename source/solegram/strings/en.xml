@@ -1777,4 +1777,6 @@
     <string name="SG_WalletCardGiftEmpty">You have no collectible gifts yet</string>
     <string name="SG_VaultOnChain">On the blockchain</string>
     <string name="SG_WalletLockedMoney">Unlock SoleWallet to open the wallet</string>
+    <string name="SG_FeedHidePost">Hide from Feed</string>
+    <string name="SG_FeedPostHidden">The post is hidden from the Feed</string>
 </resources>

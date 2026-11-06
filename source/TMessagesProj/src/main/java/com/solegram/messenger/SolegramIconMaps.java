@@ -722,7 +722,7 @@ final class SolegramIconMaps {
             R.drawable.sg_thin_tab_replies, R.drawable.sg_line_wallet,
             R.drawable.sg_thin_tab_article, R.drawable.sg_line_palette,
             R.drawable.msg_bots, R.drawable.sg_line_puzzle,
-            R.drawable.sg_settings_mark, R.drawable.sg_line_sun,
+            R.drawable.sg_settings_mark, R.drawable.sg_settings_mark, // the new mark itself, not a sun
             R.drawable.sg_plus_mark, R.drawable.sg_line_plus_circle,
             R.drawable.sg_ai_summary, R.drawable.sg_line_sparkle,
             R.drawable.msg_soledrop, R.drawable.sg_line_soledrop,

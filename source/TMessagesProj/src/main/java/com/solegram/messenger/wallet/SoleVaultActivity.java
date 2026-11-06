@@ -79,7 +79,18 @@ public class SoleVaultActivity extends BaseFragment {
     }
 
     @Override
+    public boolean isLightStatusBar() {
+        // the header is in the page's colour: dark status bar icons on a light page
+        return org.telegram.messenger.AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > 0.721f;
+    }
+
+    @Override
     public View createView(Context context) {
+        actionBar.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);
+        actionBar.setItemsBackgroundColor(getThemedColor(Theme.key_listSelector), false);
+        actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        actionBar.setCastShadows(false);
         actionBar.setBackButtonDrawable(new BackDrawable(false));
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(getString(R.string.SG_VaultTitle));
