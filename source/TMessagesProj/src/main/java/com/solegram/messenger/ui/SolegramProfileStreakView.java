@@ -94,7 +94,9 @@ public class SolegramProfileStreakView extends LinearLayout {
             }
             final float t = SystemClock.elapsedRealtime() / 1000f;
             canvas.save();
-            canvas.rotate(t * 6f % 360f, getWidth() / 2f, getHeight() / 2f);
+            // a slow breath instead of a turn (the mark is not a round sun any more)
+            final float breath = 1f + 0.03f * (float) Math.sin(t * 1.9f);
+            canvas.scale(breath, breath, getWidth() / 2f, getHeight() / 2f);
             canvas.drawBitmap(SolegramStreak.sun(color, days, size), (getWidth() - size) / 2f, (getHeight() - size) / 2f, paint);
             canvas.restore();
             if (isShown()) {

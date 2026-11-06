@@ -495,12 +495,11 @@ public class SoleWalletCardView extends View implements SensorEventListener {
         final int ink = ink();
         // the sun, pressed into the card in the top right, above the number
         final float ss = h * 0.56f;
+        // only the small mark at the bottom right (no large pressed logo in the background)
         if (giftImage != null) {
             final float gs = h * 0.4f;
             giftImage.setImageCoords(rect.right - pad - gs, rect.top + pad * 0.7f, gs, gs);
             giftImage.draw(canvas);
-        } else if (design < HOLO || design == TITANIUM) {
-            drawDeboss(canvas, rect.right - pad * 0.6f - ss, rect.top + h * 0.04f, ss);
         }
         // the wallet's name
         text.setColor(ColorUtils.setAlphaComponent(ink, 235));

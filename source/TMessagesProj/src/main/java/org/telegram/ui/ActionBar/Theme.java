@@ -8972,10 +8972,19 @@ public class Theme {
     }
 
     public static int getColor(int key, ResourcesProvider provider) {
+        key = solegramIconKey(key);
         if (provider != null) {
             return provider.getColor(key);
         }
         return getColor(key);
+    }
+
+    /**
+     * Solegram: with the line icon style, the grey of Telegram's icons is the theme's colour everywhere (settings
+     * rows, the screens that colour their icons again on a theme change...), so every icon has one colour.
+     */
+    private static int solegramIconKey(int key) {
+        return key == key_windowBackgroundWhiteGrayIcon && com.solegram.messenger.SolegramIcons.lineStyle() ? key_windowBackgroundWhiteBlueHeader : key;
     }
 
     public static int getCurrentColor(int key) {
@@ -8991,6 +9000,7 @@ public class Theme {
     }
 
     public static int getColor(int key, boolean[] isDefault, boolean ignoreAnimation) {
+        key = solegramIconKey(key);
         if (!ignoreAnimation && animatingColors != null) {
             int index = animatingColors.indexOfKey(key);
             if (index >= 0) {

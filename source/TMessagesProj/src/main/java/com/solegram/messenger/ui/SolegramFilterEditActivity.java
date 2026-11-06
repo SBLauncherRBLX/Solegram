@@ -211,7 +211,14 @@ public class SolegramFilterEditActivity extends UniversalFragment {
         };
         testField.setText(sample);
         testStatus = statusView(context);
-        testView = column(context, testField, testStatus);
+        // the verdict above the field: under it, the keyboard covered it and the test looked dead
+        testStatus.setPadding(dp(21), dp(10), dp(21), dp(2));
+        testStatus.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        testStatus.setTypeface(org.telegram.messenger.AndroidUtilities.bold());
+        testView = new LinearLayout(context);
+        testView.setOrientation(LinearLayout.VERTICAL);
+        testView.addView(testStatus, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        testView.addView(testField, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         titleField = new EditTextCell(context, getString(R.string.SG_FilterNameHint), false, false, 64, resourceProvider) {
             @Override

@@ -207,7 +207,7 @@ public class SolegramStreakSheet extends BottomSheet {
         fillChoices();
     }
 
-    /** The streak's sun, large: it turns slowly, breathes, and spins when tapped. */
+    /** The streak's mark, large: it breathes, and pops when tapped (it does not turn). */
     private class SunView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final long born = SystemClock.elapsedRealtime();
@@ -227,12 +227,11 @@ public class SolegramStreakSheet extends BottomSheet {
             if (spinAnimator != null) {
                 spinAnimator.cancel();
             }
-            final float from = spin;
             spinAnimator = ValueAnimator.ofFloat(0, 1);
-            spinAnimator.setDuration(900);
-            spinAnimator.setInterpolator(new OvershootInterpolator(1.4f));
+            spinAnimator.setDuration(420);
             spinAnimator.addUpdateListener(a -> {
-                spin = from + 180 * (float) a.getAnimatedValue();
+                // a short pop (the mark is not a round sun any more: it does not turn)
+                spin = (float) Math.sin(Math.PI * (float) a.getAnimatedValue());
                 invalidate();
             });
             spinAnimator.start();
@@ -246,9 +245,8 @@ public class SolegramStreakSheet extends BottomSheet {
                 return;
             }
             final float cx = getWidth() / 2f, cy = getHeight() / 2f;
-            final float breath = 1f + 0.025f * (float) Math.sin(t * 1.9f);
+            final float breath = (1f + 0.025f * (float) Math.sin(t * 1.9f)) * (1f + 0.12f * spin);
             canvas.save();
-            canvas.rotate(t * 7f + spin, cx, cy);
             canvas.scale(breath, breath, cx, cy);
             canvas.drawBitmap(SolegramStreak.sun(color, days, size), cx - size / 2f, cy - size / 2f, paint);
             canvas.restore();
