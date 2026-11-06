@@ -153,7 +153,7 @@ public class NotificationsCheckCell extends FrameLayout {
         textView.setText(text);
         if (imageView != null) {
             imageView.setImageResource(iconResId);
-            imageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_dialogIcon), PorterDuff.Mode.MULTIPLY));
+            imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.lineStyle() ? com.solegram.messenger.SolegramIcons.lineColor(null) : Theme.getColor(Theme.key_dialogIcon), PorterDuff.Mode.MULTIPLY));
         }
         checkBox.setChecked(checked, iconType, animationsEnabled);
         setMultiline(multiline);

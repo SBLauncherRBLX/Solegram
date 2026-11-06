@@ -132,7 +132,7 @@ public class TextCell extends FrameLayout {
 
         imageView = new RLottieImageView(context);
         imageView.setScaleType(ImageView.ScaleType.CENTER);
-        imageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(dialog ? Theme.key_dialogIcon : Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+        imageView.setColorFilter(new PorterDuffColorFilter(dialog ? Theme.getColor(Theme.key_dialogIcon, resourcesProvider) : com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
         addView(imageView);
 
         valueImageView = new ImageView(context);
@@ -315,7 +315,7 @@ public class TextCell extends FrameLayout {
         textView.setTextColor(textColor);
         if (imageView.getTag() instanceof Integer) {
             int colorKey = (int) imageView.getTag();
-            int color = Theme.getColor(colorKey, resourcesProvider);
+            int color = com.solegram.messenger.SolegramIcons.iconColor(colorKey, resourcesProvider);
             if (colorKey != Theme.key_dialogIcon && colorKey != Theme.key_windowBackgroundWhiteGrayIcon) {
                 color = processColor(color);
             }
@@ -330,7 +330,7 @@ public class TextCell extends FrameLayout {
         textView.setTextColor(Theme.getColor(text, resourcesProvider));
         textView.setTag(text);
         if (icon >= 0) {
-            imageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(icon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(icon, resourcesProvider), PorterDuff.Mode.SRC_IN));
             imageView.setTag(icon);
         }
         updateColors();

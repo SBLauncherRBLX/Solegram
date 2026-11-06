@@ -450,6 +450,19 @@ public class TextCheckCell extends FrameLayout {
         }
         imageView.setVisibility(VISIBLE);
         imageView.setPadding(AndroidUtilities.dp(2), AndroidUtilities.dp(2), AndroidUtilities.dp(2), AndroidUtilities.dp(2));
+        if (com.solegram.messenger.SolegramIcons.lineStyle()) {
+            // Solegram: a line glyph in the theme's colour, as on every other settings row
+            final int lineColor = com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider);
+            final android.graphics.drawable.Drawable line = com.solegram.messenger.SolegramIcons.lineIcon(getContext(), resId, lineColor);
+            if (line != null) {
+                imageView.setImageDrawable(line);
+            } else {
+                imageView.setImageResource(resId);
+            }
+            imageView.setColorFilter(new PorterDuffColorFilter(lineColor, PorterDuff.Mode.SRC_IN));
+            imageView.setBackground(null);
+            return;
+        }
         imageView.setImageResource(resId);
         imageView.setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN));
         imageView.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(9), color));

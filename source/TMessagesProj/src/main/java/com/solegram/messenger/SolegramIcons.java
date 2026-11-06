@@ -135,6 +135,17 @@ public final class SolegramIcons {
         return org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhiteBlueHeader, resourcesProvider);
     }
 
+    /**
+     * The colour of a settings row's icon: Telegram's grey icons take the theme's colour with the line style on, so
+     * every settings and feature icon is in one colour (red, blue... icons of special rows keep their own).
+     */
+    public static int iconColor(int colorKey, org.telegram.ui.ActionBar.Theme.ResourcesProvider resourcesProvider) {
+        if (lineStyle() && colorKey == org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhiteGrayIcon) {
+            return lineColor(resourcesProvider);
+        }
+        return org.telegram.ui.ActionBar.Theme.getColor(colorKey, resourcesProvider);
+    }
+
     /** The thin (line) glyph for a Telegram icon, whatever pack is on, tinted; Telegram's own when the thin pack has none. */
     public static Drawable lineIcon(Context context, int id, int color) {
         final Resources res = original(context.getResources());
