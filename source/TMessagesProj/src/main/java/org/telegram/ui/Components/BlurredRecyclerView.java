@@ -61,9 +61,18 @@ public class BlurredRecyclerView extends RecyclerListView {
         super.requestLayout();
     }
 
+    /**
+     * Solegram: under a floating header (Android 12+, where it is blurred) the rows above the list's top are drawn
+     * too, not skipped to save work: the blur under the header must have them, else it showed the bare background
+     * (a darkening) except while the list was pulled past its end.
+     */
+    private static boolean solegramDrawAll() {
+        return android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && com.solegram.messenger.SolegramConfig.floatingHeader;
+    }
+
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        if (blurTopPadding != 0 && !hasActiveEdgeEffects()) {
+        if (blurTopPadding != 0 && !hasActiveEdgeEffects() && !solegramDrawAll()) {
             canvas.clipRect(0, blurTopPadding, getMeasuredWidth(), getMeasuredHeight() + additionalClipBottom);
             super.dispatchDraw(canvas);
         } else {
@@ -80,7 +89,7 @@ public class BlurredRecyclerView extends RecyclerListView {
 
     @Override
     public boolean drawChild(Canvas canvas, View child, long drawingTime) {
-        if ((child.getY() + child.getMeasuredHeight() < blurTopPadding) && !alwaysDrawChild && !hasActiveEdgeEffects()) {
+        if ((child.getY() + child.getMeasuredHeight() < blurTopPadding) && !alwaysDrawChild && !hasActiveEdgeEffects() && !solegramDrawAll()) {
             return true;
         }
         return super.drawChild(canvas, child, drawingTime);

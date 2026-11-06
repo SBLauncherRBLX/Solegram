@@ -93,7 +93,11 @@ public class SolegramEdgeBlur {
         // the content around the band (with a margin, so the blur has something to take in at its edges)
         final int margin = (int) Math.ceil(sr * 2);
         final int bandTop = (int) Math.floor(top);
-        final int nodeTop = bandTop - margin, nodeHeight = height + margin * 2;
+        // only the inner side gets the margin: past the screen's edge there is no content, and a margin filled with
+        // the background colour there was blurred into the edge (it read as a darkening right at the edge); at the
+        // edge itself the blur clamps the last row of real content instead
+        final int nodeTop = fromTop ? bandTop : bandTop - margin;
+        final int nodeHeight = height + margin;
         content.setPosition(0, 0, width, nodeHeight);
         RecordingCanvas rc = content.beginRecording(width, nodeHeight);
         try {
