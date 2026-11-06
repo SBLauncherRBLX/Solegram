@@ -1779,4 +1779,6 @@
     <string name="SG_WalletLockedMoney">Откройте SoleWallet, чтобы зайти в кошелёк</string>
     <string name="SG_FeedHidePost">Скрыть из ленты</string>
     <string name="SG_FeedPostHidden">Пост скрыт из ленты</string>
+    <string name="SG_WalletMoneyUnavailable">Telegram ещё не открыл кошелёк для этого аккаунта</string>
+    <string name="SG_WalletMoneyUnavailableInfo">Кошелёк Telegram (граммы) включает сам Telegram, для каждого аккаунта отдельно, и его сервер пока не включил кошелёк для этого аккаунта. Официальное приложение Telegram его этому аккаунту тоже не покажет. Как только Telegram его включит, он появится прямо здесь, за кодом SoleWallet.</string>
 </resources>

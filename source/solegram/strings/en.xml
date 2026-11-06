@@ -1779,4 +1779,6 @@
     <string name="SG_WalletLockedMoney">Unlock SoleWallet to open the wallet</string>
     <string name="SG_FeedHidePost">Hide from Feed</string>
     <string name="SG_FeedPostHidden">The post is hidden from the Feed</string>
+    <string name="SG_WalletMoneyUnavailable">Telegram has not opened its wallet for this account yet</string>
+    <string name="SG_WalletMoneyUnavailableInfo">Telegram\'s wallet (Grams) is turned on by Telegram itself, account by account, and its server has not turned it on for this account yet. The official Telegram app does not show it to this account either. As soon as Telegram turns it on, it appears right here, behind your SoleWallet code.</string>
 </resources>

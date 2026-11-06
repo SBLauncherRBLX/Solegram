@@ -71,7 +71,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     private SoleWalletCardView card;
     private TextView balanceView;
     private View moneyRow;
-    private TextView moneyValue;
+    private TextView moneyValue, moneySub;
     private LinearLayout history;
     private LinearLayout goalsBox;
     private TextView asideView, collectionInfo;
@@ -144,6 +144,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             showLock();
         }
         SoleWallet.touch();
+        updateMoney(); // the server may have opened Telegram's wallet for this account since
     }
 
     @Override
@@ -964,13 +965,16 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
 
     // ------------------------------------------------------------------ Telegram's wallet
 
+    /** Whether Telegram's server has opened its wallet for this account (Telegram's own app shows it only then too). */
     private static boolean moneyAvailable(int account) {
-        return com.solegram.messenger.SolegramConfig.unifiedWallet && MessagesController.getInstance(account).config.walletAvailable.get();
+        return MessagesController.getInstance(account).config.walletAvailable.get();
     }
 
     /** A row for Telegram's wallet: its Grams balance, and a tap opens the wallet itself (sending, top-ups, on-chain gifts). */
     private View moneyRow(Context context) {
-        if (!moneyAvailable(currentAccount)) {
+        // the row is always there with one wallet: where Telegram has not opened its wallet for the account yet, it
+        // says so (it was left out, and there was nothing about money at all)
+        if (!com.solegram.messenger.SolegramConfig.unifiedWallet) {
             return null;
         }
         final LinearLayout row = new LinearLayout(context);
@@ -992,7 +996,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         title.setTypeface(AndroidUtilities.bold());
         title.setTextColor(text());
         texts.addView(title);
-        final TextView sub = new TextView(context);
+        final TextView sub = moneySub = new TextView(context);
         sub.setText(getString(R.string.SG_WalletMoneyInfo));
         sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         sub.setTextColor(gray());
@@ -1009,7 +1013,15 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         row.addView(arrow, LayoutHelper.createLinear(20, 20));
         row.setOnClickListener(v -> {
             SoleWallet.touch();
-            presentFragment(new org.telegram.ui.Wallet.WalletActivity());
+            if (moneyAvailable(currentAccount)) {
+                presentFragment(new org.telegram.ui.Wallet.WalletActivity());
+            } else {
+                new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity(), getResourceProvider())
+                    .setTitle(getString(R.string.SG_WalletMoney))
+                    .setMessage(getString(R.string.SG_WalletMoneyUnavailableInfo))
+                    .setPositiveButton(getString(R.string.OK), null)
+                    .show();
+            }
         });
         com.solegram.messenger.ui.SolegramMotion.pressable(row, com.solegram.messenger.ui.SolegramMotion.PRESS_CARD);
         updateMoney();
@@ -1018,6 +1030,14 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
 
     private void updateMoney() {
         if (moneyValue == null) {
+            return;
+        }
+        final boolean available = moneyAvailable(currentAccount);
+        if (moneySub != null) {
+            moneySub.setText(getString(available ? R.string.SG_WalletMoneyInfo : R.string.SG_WalletMoneyUnavailable));
+        }
+        if (!available) {
+            moneyValue.setText("");
             return;
         }
         try {
