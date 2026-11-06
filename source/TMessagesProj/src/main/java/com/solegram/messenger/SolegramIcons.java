@@ -27,14 +27,19 @@ import org.telegram.messenger.FileLog;
 public final class SolegramIcons {
 
     public static final int PACK_STANDARD = 0;
-    public static final int PACK_THIN = 1;
-    public static final int PACK_FILLED = 2;
+    public static final int PACK_PHOSPHOR = 1;
+    public static final int PACK_HUGEICONS = 2;
+    public static final int PACK_MINGCUTE = 3;
+    public static final int PACK_MAJESTICONS = 4;
+    public static final int PACK_SOLAR = 5;
+    public static final int PACK_COUNT = 6;
 
     /** Telegram id -> pack id of the active pack; null with the standard icons. */
     private static volatile SparseIntArray active;
     private static volatile int activePack = -1;
-    private static SparseIntArray thinMap, fillMap, lineMap;
-    private static int[] thinTabs, fillTabs;
+    private static final SparseIntArray[] maps = new SparseIntArray[PACK_COUNT];
+    private static SparseIntArray lineMap;
+    private static final int[][] tabs = new int[PACK_COUNT][], tabsSelected = new int[PACK_COUNT][];
 
     /** Called by SolegramConfig whenever settings are read. */
     static void setPack(int pack) {
@@ -49,20 +54,25 @@ public final class SolegramIcons {
         return active != null;
     }
 
+    private static int[] pairsOf(int pack) {
+        switch (pack) {
+            case PACK_PHOSPHOR: return SolegramIconMaps.phosphor();
+            case PACK_HUGEICONS: return SolegramIconMaps.hugeicons();
+            case PACK_MINGCUTE: return SolegramIconMaps.mingcute();
+            case PACK_MAJESTICONS: return SolegramIconMaps.majesticons();
+            case PACK_SOLAR: return SolegramIconMaps.solar();
+            default: return null;
+        }
+    }
+
     private static synchronized SparseIntArray map(int pack) {
-        if (pack == PACK_THIN) {
-            if (thinMap == null) {
-                thinMap = build(SolegramIconMaps.thin());
-            }
-            return thinMap;
+        if (pack <= PACK_STANDARD || pack >= PACK_COUNT) {
+            return null;
         }
-        if (pack == PACK_FILLED) {
-            if (fillMap == null) {
-                fillMap = build(SolegramIconMaps.fill());
-            }
-            return fillMap;
+        if (maps[pack] == null) {
+            maps[pack] = build(pairsOf(pack));
         }
-        return null;
+        return maps[pack];
     }
 
     private static SparseIntArray build(int[] pairs) {
@@ -159,7 +169,7 @@ public final class SolegramIcons {
                 line = lineMap;
             }
             final int own = line.get(id);
-            d = res.getDrawable(own != 0 ? own : map(id, map(PACK_THIN)));
+            d = res.getDrawable(own != 0 ? own : map(id, map(PACK_PHOSPHOR)));
         } catch (Throwable e) {
             d = null;
         }
@@ -181,23 +191,29 @@ public final class SolegramIcons {
 
     /**
      * The static icon a bottom or attach tab shows instead of its Lottie animation, or 0 with the standard pack
-     * (or a tab the pack has no icon for). Selected tabs show the filled glyph in both packs, as on iOS.
+     * (or a tab the pack has no icon for). A selected tab shows the pack's filled glyph where it has one.
      */
     public static int tabIcon(String tabName, boolean selected) {
         final int pack = activePack;
-        if (pack != PACK_THIN && pack != PACK_FILLED) {
+        if (pack <= PACK_STANDARD || pack >= PACK_COUNT) {
             return 0;
         }
         final String[] names = SolegramIconMaps.TAB_NAMES;
         for (int i = 0; i < names.length; i++) {
             if (names[i].equals(tabName)) {
                 synchronized (SolegramIcons.class) {
-                    if (thinTabs == null) {
-                        thinTabs = SolegramIconMaps.thinTabs();
-                        fillTabs = SolegramIconMaps.fillTabs();
+                    if (tabs[pack] == null) {
+                        switch (pack) {
+                            case PACK_PHOSPHOR: tabs[pack] = SolegramIconMaps.phosphorTabs(); tabsSelected[pack] = SolegramIconMaps.phosphorTabsSelected(); break;
+                            case PACK_HUGEICONS: tabs[pack] = SolegramIconMaps.hugeiconsTabs(); tabsSelected[pack] = SolegramIconMaps.hugeiconsTabsSelected(); break;
+                            case PACK_MINGCUTE: tabs[pack] = SolegramIconMaps.mingcuteTabs(); tabsSelected[pack] = SolegramIconMaps.mingcuteTabsSelected(); break;
+                            case PACK_MAJESTICONS: tabs[pack] = SolegramIconMaps.majesticonsTabs(); tabsSelected[pack] = SolegramIconMaps.majesticonsTabsSelected(); break;
+                            default: tabs[pack] = SolegramIconMaps.solarTabs(); tabsSelected[pack] = SolegramIconMaps.solarTabsSelected(); break;
+                        }
                     }
                 }
-                return (selected || pack == PACK_FILLED ? fillTabs : thinTabs)[i];
+                final int id = (selected ? tabsSelected[pack] : tabs[pack])[i];
+                return id != 0 ? id : tabs[pack][i];
             }
         }
         return 0;

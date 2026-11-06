@@ -12557,8 +12557,8 @@
     <string name="SG_IconPackStandard">Standard</string>
     <string name="SG_IconPackThin">Thin</string>
     <string name="SG_IconPackFilled">Filled</string>
-    <string name="SG_IconPackInfo">Icons of menus, settings, chats and tabs. Thin and filled icons are based on Phosphor Icons. A few icons change after a restart.</string>
-    <string name="SG_CreditsIcons">Icon packs: Phosphor Icons (MIT).</string>
+    <string name="SG_IconPackInfo">Icons of menus, settings, chats and tabs from one of five open icon sets. A few icons change after a restart.</string>
+    <string name="SG_CreditsIcons">Icon packs: Phosphor Icons (MIT), Hugeicons free (MIT), MingCute (Apache 2.0), Majesticons (MIT), Solar by 480 Design (CC BY 4.0).</string>
     <string name="SG_CameraScreen">Camera screen</string>
     <string name="SG_CameraControls">Settings right in the camera</string>
     <string name="SG_CameraControlsInfo">Flash and torch, HDR, self-timer, frame 4:3, 16:9 or 1:1, grid, zoom steps and exposure are set on the viewfinder before the shot, with photo and video modes under the shutter. With liquid glass on, the buttons are made of it. Off: the camera looks as in Telegram.</string>

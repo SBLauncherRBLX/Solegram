@@ -44,7 +44,7 @@ public class SolegramConfig {
     /** Chats screen title, see {@link SolegramUi#TITLE_APP}. */
     public static int mainTitle;
     public static String mainTitleText = "";
-    /** Icon pack, see {@link SolegramIcons#PACK_STANDARD}: Telegram's icons, thin or filled ones. */
+    /** Icon pack, see {@link SolegramIcons#PACK_STANDARD}: Telegram's icons or one of the packs (Phosphor, Hugeicons, MingCute, Majesticons, Solar). */
     public static int iconPack;
     /** Settings icons: SolegramIcons.STYLE_* (thin lines in the theme's colour, or coloured tiles). */
     public static int settingsIconStyle = 1;
@@ -390,7 +390,12 @@ public class SolegramConfig {
         avatarShapeInChats = p.getBoolean("avatarShapeInChats", false);
         mainTitle = clamp(p.getInt("mainTitle", 0), 0, 3);
         mainTitleText = p.getString("mainTitleText", "");
-        iconPack = clamp(p.getInt("iconPack", 0), 0, 2);
+        // the old two packs (1 thin, 2 filled) both were Phosphor: they become the Phosphor pack
+        if (!p.getBoolean("iconPacksV2", false)) {
+            final int was = p.getInt("iconPack", 0);
+            p.edit().putBoolean("iconPacksV2", true).putInt("iconPack", was == 2 ? SolegramIcons.PACK_PHOSPHOR : was).apply();
+        }
+        iconPack = clamp(p.getInt("iconPack", 0), 0, SolegramIcons.PACK_COUNT - 1);
         settingsIconStyle = clamp(p.getInt("settingsIconStyle", 1), 0, 1);
         SolegramIcons.setPack(iconPack);
 

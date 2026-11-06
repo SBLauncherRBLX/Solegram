@@ -44,7 +44,9 @@ import org.telegram.ui.Components.CubicBezierInterpolator;
 @SuppressLint("ViewConstructor")
 public class SolegramIconPackPicker extends View {
 
-    private static final int[] PACKS = {SolegramIcons.PACK_STANDARD, SolegramIcons.PACK_THIN, SolegramIcons.PACK_FILLED};
+    private static final int[] PACKS = {SolegramIcons.PACK_STANDARD, SolegramIcons.PACK_PHOSPHOR, SolegramIcons.PACK_HUGEICONS,
+        SolegramIcons.PACK_MINGCUTE, SolegramIcons.PACK_MAJESTICONS, SolegramIcons.PACK_SOLAR};
+    private static final int N = PACKS.length, COLS = 3, ROWS = (N + COLS - 1) / COLS;
     /** Icons everybody knows: chat, bell, gear on top, reply, pin, delete below. */
     private static final int[] PREVIEW = {R.drawable.msg_discussion, R.drawable.msg_notifications, R.drawable.msg_settings,
         R.drawable.menu_reply, R.drawable.msg_pin, R.drawable.msg_delete};
@@ -52,11 +54,11 @@ public class SolegramIconPackPicker extends View {
     private final Theme.ResourcesProvider resourcesProvider;
     private final Utilities.Callback<Integer> onSelect;
     // per card: the icons in the gray of the list and again in the accent, crossfaded by the selection
-    private final Drawable[][] gray = new Drawable[3][];
-    private final Drawable[][] accent = new Drawable[3][];
-    private final String[] names = new String[3];
-    private final AnimatedFloat[] selection = new AnimatedFloat[3];
-    private final AnimatedFloat[] press = new AnimatedFloat[3];
+    private final Drawable[][] gray = new Drawable[N][];
+    private final Drawable[][] accent = new Drawable[N][];
+    private final String[] names = new String[N];
+    private final AnimatedFloat[] selection = new AnimatedFloat[N];
+    private final AnimatedFloat[] press = new AnimatedFloat[N];
 
     private final Paint cardPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -79,9 +81,12 @@ public class SolegramIconPackPicker extends View {
         this.onSelect = onSelect;
         selected = SolegramConfig.iconPack;
         names[0] = LocaleController.getString(R.string.SG_IconPackStandard);
-        names[1] = LocaleController.getString(R.string.SG_IconPackThin);
-        names[2] = LocaleController.getString(R.string.SG_IconPackFilled);
-        for (int c = 0; c < 3; c++) {
+        names[1] = "Phosphor";
+        names[2] = "Hugeicons";
+        names[3] = "MingCute";
+        names[4] = "Majesticons";
+        names[5] = "Solar";
+        for (int c = 0; c < N; c++) {
             gray[c] = new Drawable[PREVIEW.length];
             accent[c] = new Drawable[PREVIEW.length];
             for (int i = 0; i < PREVIEW.length; i++) {
@@ -116,7 +121,20 @@ public class SolegramIconPackPicker extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(TOP + CARD_HEIGHT + LABEL + 18 + BOTTOM), MeasureSpec.EXACTLY));
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(TOP) + ROWS * rowHeight() + dp(BOTTOM), MeasureSpec.EXACTLY));
+    }
+
+    /** One row of cards with their labels and the gap to the next row. */
+    private static int rowHeight() {
+        return dp(CARD_HEIGHT + LABEL + 18 + GAP);
+    }
+
+    private float cardLeft(int c) {
+        return startX + (c % COLS) * (cardWidth + dp(GAP));
+    }
+
+    private float cardTop(int c) {
+        return dp(TOP) + (c / COLS) * rowHeight();
     }
 
     @Override
@@ -134,7 +152,7 @@ public class SolegramIconPackPicker extends View {
             lastAccent = accentColor;
             final PorterDuffColorFilter g = new PorterDuffColorFilter(grayColor, PorterDuff.Mode.SRC_IN);
             final PorterDuffColorFilter a = new PorterDuffColorFilter(accentColor, PorterDuff.Mode.SRC_IN);
-            for (int c = 0; c < 3; c++) {
+            for (int c = 0; c < N; c++) {
                 for (int i = 0; i < PREVIEW.length; i++) {
                     if (gray[c][i] != null) {
                         gray[c][i].setColorFilter(g);
@@ -157,12 +175,12 @@ public class SolegramIconPackPicker extends View {
         final boolean dark = ColorUtils.calculateLuminance(background) < 0.5;
         final int card = ColorUtils.blendARGB(background, text, dark ? 0.07f : 0.04f);
         final float iconSize = dp(21), rowGap = dp(12);
-        final float top = dp(TOP), cardHeight = dp(CARD_HEIGHT), radius = dp(16);
+        final float cardHeight = dp(CARD_HEIGHT), radius = dp(16);
 
-        for (int c = 0; c < 3; c++) {
+        for (int c = 0; c < N; c++) {
             final float p = selection[c].set(selected == c, !animate);
             final float s = 1f - 0.04f * press[c].set(pressed == c && SolegramConfig.pressScale, !animate);
-            final float left = startX + c * (cardWidth + dp(GAP));
+            final float left = cardLeft(c), top = cardTop(c);
             final float cx = left + cardWidth / 2f;
 
             canvas.save();
@@ -223,8 +241,13 @@ public class SolegramIconPackPicker extends View {
         if (y < dp(TOP) - dp(6) || y > getHeight() - dp(4)) {
             return -1;
         }
-        for (int c = 0; c < 3; c++) {
-            final float left = startX + c * (cardWidth + dp(GAP));
+        final int row = Math.max(0, Math.min(ROWS - 1, (int) ((y - dp(TOP) + dp(GAP) / 2f) / rowHeight())));
+        for (int col = 0; col < COLS; col++) {
+            final int c = row * COLS + col;
+            if (c >= N) {
+                break;
+            }
+            final float left = cardLeft(c);
             if (x >= left - dp(GAP) / 2f && x <= left + cardWidth + dp(GAP) / 2f) {
                 return c;
             }
@@ -265,7 +288,7 @@ public class SolegramIconPackPicker extends View {
     @Override
     public boolean performClick() {
         super.performClick();
-        choose((selected + 1) % 3);
+        choose((selected + 1) % N);
         return true;
     }
 
@@ -285,7 +308,7 @@ public class SolegramIconPackPicker extends View {
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
         info.setClassName("android.widget.RadioGroup");
-        info.setContentDescription(LocaleController.getString(R.string.SG_IconPack) + ": " + names[Math.max(0, Math.min(2, selected))]);
+        info.setContentDescription(LocaleController.getString(R.string.SG_IconPack) + ": " + names[Math.max(0, Math.min(N - 1, selected))]);
         info.setText(TextUtils.join(", ", names));
     }
 }

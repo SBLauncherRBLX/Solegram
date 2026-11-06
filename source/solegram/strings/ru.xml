@@ -936,8 +936,8 @@
     <string name="SG_IconPackStandard">Стандартные</string>
     <string name="SG_IconPackThin">Тонкие</string>
     <string name="SG_IconPackFilled">Заливка</string>
-    <string name="SG_IconPackInfo">Значки меню, настроек, чатов и вкладок. Тонкие и залитые иконки основаны на Phosphor Icons. Некоторые значки сменятся после перезапуска.</string>
-    <string name="SG_CreditsIcons">Наборы иконок — Phosphor Icons (MIT).</string>
+    <string name="SG_IconPackInfo">Иконки меню, настроек, чатов и вкладок из одного из пяти открытых наборов. Часть иконок меняется после перезапуска.</string>
+    <string name="SG_CreditsIcons">Наборы иконок: Phosphor Icons (MIT), Hugeicons free (MIT), MingCute (Apache 2.0), Majesticons (MIT), Solar от 480 Design (CC BY 4.0).</string>
     <string name="SG_CameraScreen">Экран камеры</string>
     <string name="SG_CameraControls">Настройки прямо в камере</string>
     <string name="SG_CameraControlsInfo">Вспышка и фонарик, HDR, автоспуск, формат кадра 4:3, 16:9 или 1:1, сетка, шаги зума и экспозиция настраиваются прямо в видоискателе до снимка, а под кнопкой спуска переключаются фото и видео. Если включено жидкое стекло, кнопки сделаны из него. Если выключить, камера будет как в Telegram.</string>
