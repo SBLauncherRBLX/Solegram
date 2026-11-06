@@ -1789,4 +1789,23 @@
     <string name="SG_BackgroundAndSound">Фоновая работа и звук</string>
     <string name="SG_AccountsSub">До 16 аккаунтов в одном приложении</string>
     <string name="SG_WalletUnifiedMenu">Единый кошелёк</string>
+    <string name="SG_GuardStoppedHeader">Остановлено во время работы</string>
+    <string name="SG_GuardStoppedInfo">Solegram остановил эти действия плагина во время работы: их не было в проверенном коде, или плагинам их нельзя делать вообще. Список хранится до перезапуска приложения.</string>
+    <string name="SG_SecChangedDisabled">Файл плагина %1$s изменился после проверки, поэтому он выключен. Проверьте его снова, чтобы включить.</string>
+    <string name="SG_SecStatusChanged">изменился после проверки</string>
+    <string name="SG_GuardBlockedNotice">Solegram остановил плагин %1$s: %2$s</string>
+    <string name="SG_GuardUnknownPlugin">один из плагинов</string>
+    <string name="SG_GuardKindAccount">действие с аккаунтом (вход, пароль, сеансы или платёж)</string>
+    <string name="SG_GuardKindNetwork">доступ в сеть, которого не было в проверке</string>
+    <string name="SG_GuardKindShell">запуск системных команд</string>
+    <string name="SG_GuardKindNative">загрузку нативного кода или классов</string>
+    <string name="SG_GuardKindExec">запуск кода, собранного на ходу</string>
+    <string name="SG_GuardKindSecrets">чтение ключей, настроек или базы аккаунта</string>
+    <string name="SG_GuardKindFiles">изменение файлов плагинов или приложения</string>
+    <string name="SG_GuardKindTamper">попытку обойти защиту</string>
+    <string name="SG_GuardKindInstall">установку приложений</string>
+    <string name="SG_GuardAllowPayments">Разрешить плагинам платежи</string>
+    <string name="SG_GuardAllowPaymentsInfo">Звёзды, подарки и передача чатов. Вход, пароль и сеансы закрыты для плагинов всегда</string>
+    <string name="SG_GuardAllowPaymentsWarn">Любой включённый плагин сможет без вопросов тратить ваши звёзды, дарить и передавать подарки и передавать ваши чаты. Включайте, только если полностью доверяете своим плагинам.</string>
+    <string name="SG_GuardAllowPaymentsConfirm">Разрешить</string>
 </resources>

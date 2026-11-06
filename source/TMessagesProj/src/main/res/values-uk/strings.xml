@@ -2056,5 +2056,24 @@
     <string name="SG_BackgroundAndSound">Background work and sound</string>
     <string name="SG_AccountsSub">Up to 16 accounts in one app</string>
     <string name="SG_WalletUnifiedMenu">One wallet</string>
+    <string name="SG_GuardStoppedHeader">Stopped while running</string>
+    <string name="SG_GuardStoppedInfo">Solegram stopped these actions of the plugin while it ran: they were not in its checked code, or a plugin may never do them. The list is kept until the app restarts.</string>
+    <string name="SG_SecChangedDisabled">The file of the plugin %1$s changed after you checked it, so it was turned off. Check it again to turn it on.</string>
+    <string name="SG_SecStatusChanged">changed after the check</string>
+    <string name="SG_GuardBlockedNotice">Solegram stopped the plugin %1$s: %2$s</string>
+    <string name="SG_GuardUnknownPlugin">a plugin</string>
+    <string name="SG_GuardKindAccount">an action with your account (login, password, sessions or payment)</string>
+    <string name="SG_GuardKindNetwork">network access not shown in its check</string>
+    <string name="SG_GuardKindShell">running system commands</string>
+    <string name="SG_GuardKindNative">loading native code or classes</string>
+    <string name="SG_GuardKindExec">running code built at run time</string>
+    <string name="SG_GuardKindSecrets">reading the account\'s keys, settings or database</string>
+    <string name="SG_GuardKindFiles">changing plugin or app files</string>
+    <string name="SG_GuardKindTamper">an attempt to get around the protection</string>
+    <string name="SG_GuardKindInstall">installing apps</string>
+    <string name="SG_GuardAllowPayments">Let plugins pay</string>
+    <string name="SG_GuardAllowPaymentsInfo">Stars, gifts and chat ownership. Logging in, the password and sessions stay closed to plugins always</string>
+    <string name="SG_GuardAllowPaymentsWarn">Any enabled plugin will be able to spend your Stars, send and transfer gifts and hand over your chats without asking. Turn this on only for plugins you trust completely.</string>
+    <string name="SG_GuardAllowPaymentsConfirm">Allow</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -104,6 +104,8 @@ public class PluginCell extends FrameLayout {
             status = LocaleController.getString(R.string.SG_SecStatusBlocklisted);
         } else if (meta.blocked == PluginGuard.BLOCK_DANGEROUS) {
             status = LocaleController.getString(R.string.SG_SecStatusDangerBlocked);
+        } else if (meta.blocked == PluginGuard.BLOCK_CHANGED) {
+            status = LocaleController.getString(R.string.SG_SecStatusChanged);
         } else if (report != null && report.verdict != PluginSecurity.VERDICT_SAFE) {
             status = PluginSecuritySheet.verdictTitle(report.verdict, false);
         }

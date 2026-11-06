@@ -312,6 +312,8 @@ public class SolegramConfig {
     public static boolean pluginsScanBeforeInstall = true;
     /** Refuse plugins rated dangerous instead of only warning. */
     public static boolean pluginsBlockDangerous;
+    /** Plugins may pay (Stars, gifts, chat ownership): off, see PluginRuntimeGuard. */
+    public static boolean pluginsAllowPayments;
     // endregion
 
     // region Updates
@@ -553,7 +555,12 @@ public class SolegramConfig {
         pluginsSafeMode = p.getBoolean("pluginsSafeMode", false);
         pluginsDevMode = p.getBoolean("pluginsDevMode", false);
         pluginsScanBeforeInstall = p.getBoolean("pluginsScanBeforeInstall", true);
-        pluginsBlockDangerous = p.getBoolean("pluginsBlockDangerous", false);
+        // plugin security v2: dangerous plugins are blocked unless the user turns it off (once on for everyone)
+        if (!p.getBoolean("pluginsSecurityV2", false)) {
+            p.edit().putBoolean("pluginsSecurityV2", true).putBoolean("pluginsBlockDangerous", true).apply();
+        }
+        pluginsBlockDangerous = p.getBoolean("pluginsBlockDangerous", true);
+        pluginsAllowPayments = p.getBoolean("pluginsAllowPayments", false);
 
         // before the modes there was only the check switch: whoever turned it off keeps updates off
         // automatic installing is gone: who had it is told about new versions instead, and installs them himself
@@ -696,6 +703,7 @@ public class SolegramConfig {
             case "backgroundConnection":
             case "pluginsEngine":
             case "pluginsScanBeforeInstall":
+            case "pluginsBlockDangerous":
             case "autoUpdateCheck":
             case "updateWifiOnly":
             case "showUserId":

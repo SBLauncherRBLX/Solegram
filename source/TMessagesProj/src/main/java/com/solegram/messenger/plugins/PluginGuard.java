@@ -53,6 +53,8 @@ public final class PluginGuard {
     public static final int BLOCK_NONE = 0;
     public static final int BLOCK_LIST = 1;
     public static final int BLOCK_DANGEROUS = 2;
+    /** The file is not the one the user accepted (it changed on disk): it runs again once looked at again. */
+    public static final int BLOCK_CHANGED = 3;
 
     // the list changes rarely: a few hours between downloads, and a failed one is not retried at once
     private static final long BLOCKLIST_TTL = 6 * 60 * 60 * 1000L;

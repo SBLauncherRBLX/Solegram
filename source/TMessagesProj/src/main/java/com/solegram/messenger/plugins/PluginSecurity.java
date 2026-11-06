@@ -36,7 +36,7 @@ import java.util.zip.Inflater;
 public final class PluginSecurity {
 
     /** Bump when the rules change: cached reports of an older analyzer are computed again. */
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     public static final int VERDICT_SAFE = 0;
     public static final int VERDICT_WARNING = 1;
@@ -304,6 +304,10 @@ public final class PluginSecurity {
         {"org.telegram.messenger.SendMessagesHelper", "act_send"}, {"com.solegram.messenger.plugins.PluginApi", "act_send"},
         // secrets and the app's own security
         {"com.solegram.messenger.plugins", "sec_plugins_control"}, {"java.security.KeyStore", "sec_keystore"},
+        // looking for the runtime guard: through the collector, other threads' frames, the bridge's internals
+        {"gc.get_objects", "sec_tamper"}, {"gc.get_referrers", "sec_tamper"}, {"gc.get_referents", "sec_tamper"},
+        {"sys._current_frames", "sec_tamper"}, {"java.chaquopy", "sec_tamper"}, {"builtins.__import__", "sec_tamper"},
+        {"solegram_guard", "sec_tamper"}, {"solegram_runtime", "sec_plugins_control"}, {"solegram_pip", "sec_plugins_control"},
         {"android.security.keystore", "sec_keystore"}, {"android.accounts", "sec_keystore"},
         {"org.telegram.messenger.SharedConfig", "ui_settings"}, {"com.solegram.messenger.SolegramConfig", "ui_settings"},
         // Solegram's own secrets: the app's api credentials and the user's encrypted keys
@@ -510,7 +514,8 @@ public final class PluginSecurity {
     /** Settings and files of the plugin security itself. */
     private static final String[] TAMPER_STRINGS = {
         "pluginsBlockDangerous", "pluginsScanBeforeInstall", "pluginsSafeMode", "solegram_plugins", "solegram_plugin_security",
-        "plugins_blocklist"};
+        "plugins_blocklist", "pluginsAllowPayments", "solegram_guard", "__sg_plugin__", "plugin_libs", "plugin_dex",
+        "PluginRuntimeGuard", "integrity_v1", "reviewed_"};
 
     /** Where stolen data is typically sent: throwaway endpoints and chat webhooks. */
     private static final String[] SUSPICIOUS_HOSTS = {

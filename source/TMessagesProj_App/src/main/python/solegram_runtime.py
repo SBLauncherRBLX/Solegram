@@ -16,6 +16,7 @@ from java import dynamic_proxy, jclass
 
 import log_utils
 import plugin_registry
+import solegram_guard as _guard
 from utils import metadata_parser
 
 _PluginHandle = jclass("com.solegram.messenger.plugins.PluginHandle")
@@ -60,6 +61,11 @@ def init(plugins_dir, libs_dir, dex_dir, app_version, sdk_version, dev_mode=Fals
         except Exception:
             _logger.error("dev server failed to start:\n%s", traceback.format_exc())
     _logger.info("plugin runtime ready: Python %s, SDK %s", platform.python_version(), sdk_version)
+
+
+def current_plugin():
+    """The plugin whose code runs on this thread (asked by Java before a critical request), or None."""
+    return _guard.current_plugin()
 
 
 def python_version():
@@ -129,6 +135,10 @@ def forget_plugin(plugin_id):
         solegram_pip.release(str(plugin_id))
     except Exception:
         _logger.error("releasing packages of %s failed:\n%s", plugin_id, traceback.format_exc())
+    try:
+        _guard.forget(str(plugin_id))
+    except Exception:
+        _logger.error("forgetting %s in the guard failed:\n%s", plugin_id, traceback.format_exc())
 
 
 # --------------------------------------------------------------------------- conversion helpers
@@ -338,6 +348,8 @@ def load_plugin(plugin_id, path):
         module.__file__ = path
         module.__dict__["__module_name__"] = module_name
         module.__dict__["__sg_plugin__"] = plugin_id
+        # from here on, what this module's code does is the plugin's (solegram_guard)
+        _guard.register(module.__dict__, plugin_id)
         sys.modules[module_name] = module
         _modules[plugin_id] = module_name
         # Plugin metadata assigns __name__ = "Display Name", so classes get __module__ = "Display Name";

@@ -3,6 +3,7 @@ from typing import Any
 
 from java import jclass
 
+import solegram_guard
 from log_utils import get_logger
 
 _Class = jclass("java.lang.Class")
@@ -15,6 +16,8 @@ JavaObject = Any
 
 def find_class(class_name: str):
     """Returns the java.lang.Class for a fully qualified name, or None."""
+    # the runtime guard: a class the plugin may not use is not found for it either
+    solegram_guard.check_java_class(class_name)
     try:
         loader = jclass("org.telegram.messenger.ApplicationLoader").applicationContext.getClassLoader()
         return _Class.forName(class_name, False, loader)

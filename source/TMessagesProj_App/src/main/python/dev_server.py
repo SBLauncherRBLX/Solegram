@@ -193,7 +193,8 @@ class DevServer:
                 f.write(content)
             try:
                 callback = _Install()
-                controller.install(_File(tmp), callback)
+                # the connection was allowed on the phone (PluginDevGate): what it installs counts as accepted
+                controller.install(_File(tmp), True, callback)
                 if not callback.event.wait(60):
                     return {"error": "timeout"}
                 if callback.meta is None:

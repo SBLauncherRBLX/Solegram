@@ -52,6 +52,7 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
     private static final int ID_CATALOG = 5;
     public static final int ID_SCAN = 6;
     public static final int ID_BLOCK_DANGEROUS = 7;
+    public static final int ID_ALLOW_PAYMENTS = 8;
     private static final int REQUEST_PICK_PLUGIN = 0x5052;
 
     @Override
@@ -173,6 +174,7 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
         items.add(UItem.asHeader(getString(R.string.SG_SecSection)));
         items.add(UItem.asButtonCheck(ID_SCAN, getString(R.string.SG_SecScanBeforeInstall), getString(R.string.SG_SecScanBeforeInstallInfo)).setChecked(SolegramConfig.pluginsScanBeforeInstall));
         items.add(UItem.asButtonCheck(ID_BLOCK_DANGEROUS, getString(R.string.SG_SecBlockDangerous), getString(R.string.SG_SecBlockDangerousInfo)).setChecked(SolegramConfig.pluginsBlockDangerous));
+        items.add(UItem.asButtonCheck(ID_ALLOW_PAYMENTS, getString(R.string.SG_GuardAllowPayments), getString(R.string.SG_GuardAllowPaymentsInfo)).setChecked(SolegramConfig.pluginsAllowPayments));
         items.add(UItem.asShadow(getString(R.string.SG_SecSettingsInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_Advanced)));
@@ -246,6 +248,21 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
                 boolean value = SolegramConfig.toggle("pluginsBlockDangerous");
                 ((NotificationsCheckCell) view).setChecked(value);
                 PluginsController.getInstance().applySecurityPolicy();
+                break;
+            }
+            case ID_ALLOW_PAYMENTS: {
+                if (SolegramConfig.pluginsAllowPayments) {
+                    ((NotificationsCheckCell) view).setChecked(SolegramConfig.toggle("pluginsAllowPayments"));
+                    break;
+                }
+                // turning it on is asked once more: a plugin could then spend Stars and give gifts away
+                showDialog(new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity(), getResourceProvider())
+                    .setTitle(getString(R.string.SG_GuardAllowPayments))
+                    .setMessage(getString(R.string.SG_GuardAllowPaymentsWarn))
+                    .setPositiveButton(getString(R.string.SG_GuardAllowPaymentsConfirm), (d, w) -> ((NotificationsCheckCell) view).setChecked(SolegramConfig.toggle("pluginsAllowPayments")))
+                    .setNegativeButton(getString(R.string.Cancel), null)
+                    .makeRed(org.telegram.ui.ActionBar.AlertDialog.BUTTON_POSITIVE)
+                    .create());
                 break;
             }
             case ID_INSTALL:

@@ -685,6 +685,8 @@ public class PluginSecuritySheet extends BottomSheet {
             } else if (SolegramConfig.pluginsBlockDangerous && report.verdict == PluginSecurity.VERDICT_DANGER) {
                 BulletinFactory.of(fragment).createErrorBulletin(LocaleController.formatString(R.string.SG_SecRefusedEnableDangerous, name)).show();
             } else {
+                // reviews are off (or this exact file was accepted): what is turned on now is what was accepted
+                PluginGuard.markReviewed(meta.id, report.sha256);
                 enable.run();
             }
         });
@@ -692,8 +694,14 @@ public class PluginSecuritySheet extends BottomSheet {
 
     /** A plugin was stopped by the security checks (blocklist, dangerous plugins blocked). */
     public static void showRefusedNotice(String name, int block) {
-        String text = LocaleController.formatString(block == PluginGuard.BLOCK_LIST ? R.string.SG_SecBlocklistDisabled : R.string.SG_SecDangerDisabled, name);
-        showGlobal(text, R.raw.error, 0);
+        final int res = block == PluginGuard.BLOCK_LIST ? R.string.SG_SecBlocklistDisabled
+            : block == PluginGuard.BLOCK_CHANGED ? R.string.SG_SecChangedDisabled : R.string.SG_SecDangerDisabled;
+        showGlobal(LocaleController.formatString(res, name), R.raw.error, 0);
+    }
+
+    /** The runtime guard stopped something a running plugin tried (PluginRuntimeGuard). */
+    public static void showBlockedActionNotice(String name, String kind) {
+        showGlobal(LocaleController.formatString(R.string.SG_GuardBlockedNotice, name, com.solegram.messenger.plugins.PluginRuntimeGuard.describeKind(kind)), R.raw.error, 0);
     }
 
     public static void showSafeModeNotice() {

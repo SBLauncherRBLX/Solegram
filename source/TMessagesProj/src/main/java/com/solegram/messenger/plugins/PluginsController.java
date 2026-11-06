@@ -364,6 +364,12 @@ public class PluginsController {
     }
 
     private void scanPlugins() {
+        // before the integrity check, plugins that were on had been accepted without a stored hash: they are
+        // trusted once, as they are now
+        final boolean integrityMigrated = statePrefs().getBoolean("integrity_v1", false);
+        if (!integrityMigrated) {
+            statePrefs().edit().putBoolean("integrity_v1", true).apply();
+        }
         File[] files = getPluginsDir().listFiles();
         if (files == null) {
             return;
@@ -380,6 +386,9 @@ public class PluginsController {
                 }
                 meta.enabled = isEnabledInPrefs(meta.id);
                 updateReport(meta, false);
+                if (!integrityMigrated && meta.enabled && meta.report != null && !PluginGuard.isReviewed(meta.id, meta.report.sha256)) {
+                    PluginGuard.markReviewed(meta.id, meta.report.sha256);
+                }
                 meta.blocked = PluginGuard.blockReason(meta.report);
                 plugins.put(meta.id, meta);
             } catch (Throwable e) {
@@ -429,6 +438,8 @@ public class PluginsController {
                     return;
                 }
             }
+            // what the plugin may do while it runs: what its accepted report shows (PluginRuntimeGuard)
+            PluginRuntimeGuard.register(meta);
             meta.handle = engine.load(meta);
             meta.loaded = true;
         } catch (Throwable e) {
@@ -437,6 +448,7 @@ public class PluginsController {
             meta.loaded = false;
             meta.handle = null;
             removeAllFor(meta.id);
+            PluginRuntimeGuard.unregister(meta.id);
         }
         postChanged(meta.id);
     }
@@ -461,6 +473,11 @@ public class PluginsController {
     private boolean passesSecurity(PluginMeta meta) {
         updateReport(meta, false);
         int block = PluginGuard.blockReason(meta.report);
+        // the file must be the one the user accepted (by its SHA-256): a plugin changed on disk since (by another
+        // plugin, by anything) does not run until the user has looked at it again
+        if (block == PluginGuard.BLOCK_NONE && meta.report != null && !PluginGuard.isReviewed(meta.id, meta.report.sha256)) {
+            block = PluginGuard.BLOCK_CHANGED;
+        }
         meta.blocked = block;
         if (block == PluginGuard.BLOCK_NONE) {
             return true;
@@ -472,7 +489,8 @@ public class PluginsController {
         postChanged(meta.id);
         if (wasEnabled) {
             String name = meta.name != null ? meta.name : meta.id;
-            AndroidUtilities.runOnUIThread(() -> com.solegram.messenger.ui.PluginSecuritySheet.showRefusedNotice(name, block));
+            final int reason = block;
+            AndroidUtilities.runOnUIThread(() -> com.solegram.messenger.ui.PluginSecuritySheet.showRefusedNotice(name, reason));
         }
         return false;
     }
@@ -558,6 +576,8 @@ public class PluginsController {
         } catch (Throwable e) {
             FileLog.e(e);
         }
+        // threads the plugin left behind keep running its code: they get no permissions any more
+        PluginRuntimeGuard.unregister(meta.id);
         postChanged(meta.id);
     }
 
@@ -687,7 +707,7 @@ public class PluginsController {
                 meta.enabled = true;
                 meta.report = report;
                 meta.sha256 = report.sha256;
-                if (reviewed) {
+                if (reviewed || !SolegramConfig.pluginsScanBeforeInstall) {
                     PluginGuard.markReviewed(meta.id, report.sha256);
                 }
                 statePrefs().edit().putBoolean("enabled_" + meta.id, true).apply();
@@ -1089,6 +1109,9 @@ public class PluginsController {
                 return r;
             }
             if (r.request != null) {
+                if (PluginRuntimeGuard.blockSwap(e.pluginId, current, r.request)) {
+                    continue;
+                }
                 current = r.request;
             }
             acc = new HookResult(HookResult.MODIFY);

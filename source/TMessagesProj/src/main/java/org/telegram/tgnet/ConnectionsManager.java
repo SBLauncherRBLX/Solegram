@@ -396,16 +396,48 @@ public class ConnectionsManager extends BaseController {
 
     public int sendRequestSync(final TLObject object, final RequestDelegate onComplete, final QuickAckDelegate onQuickAck, final WriteToSocketDelegate onWriteToSocket, final int flags, final int datacenterId, final int connectionType, final boolean immediate) {
         final int requestToken = lastRequestToken.getAndIncrement();
+        if (solegramShield(object, onComplete, null)) {
+            return requestToken;
+        }
         sendRequestInternal(object, onComplete, null, onQuickAck, onWriteToSocket, flags, datacenterId, connectionType, immediate, requestToken);
         return requestToken;
     }
 
     public int sendRequest(final TLObject object, final RequestDelegate onComplete, final RequestDelegateTimestamp onCompleteTimestamp, final QuickAckDelegate onQuickAck, final WriteToSocketDelegate onWriteToSocket, final int flags, final int datacenterId, final int connectionType, final boolean immediate) {
         final int requestToken = lastRequestToken.getAndIncrement();
+        // Solegram: checked here, on the caller's thread (the queue below loses who asked)
+        if (solegramShield(object, onComplete, onCompleteTimestamp)) {
+            return requestToken;
+        }
         Utilities.stageQueue.postRunnable(() -> {
             sendRequestInternal(object, onComplete, onCompleteTimestamp, onQuickAck, onWriteToSocket, flags, datacenterId, connectionType, immediate, requestToken);
         });
         return requestToken;
+    }
+
+    /**
+     * Solegram: a plugin may not take over the account or (unless allowed) pay (PluginRuntimeGuard). A request it
+     * may not send is not sent; its callback gets an error, so nothing waits for an answer forever.
+     */
+    private boolean solegramShield(TLObject object, RequestDelegate onComplete, RequestDelegateTimestamp onCompleteTimestamp) {
+        if (!com.solegram.messenger.plugins.PluginRuntimeGuard.blockRequest(currentAccount, object)) {
+            return false;
+        }
+        final TLRPC.TL_error error = new TLRPC.TL_error();
+        error.code = 403;
+        error.text = com.solegram.messenger.plugins.PluginRuntimeGuard.BLOCKED_ERROR;
+        Utilities.stageQueue.postRunnable(() -> {
+            try {
+                if (onComplete != null) {
+                    onComplete.run(null, error);
+                } else if (onCompleteTimestamp != null) {
+                    onCompleteTimestamp.run(null, error, 0);
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        });
+        return true;
     }
 
     private void sendRequestInternal(TLObject object, RequestDelegate onComplete, RequestDelegateTimestamp onCompleteTimestamp, QuickAckDelegate onQuickAck, WriteToSocketDelegate onWriteToSocket, int flags, int datacenterId, int connectionType, boolean immediate, int requestToken) {
@@ -1057,7 +1089,7 @@ public class ConnectionsManager extends BaseController {
     public static native int native_getCurrentDatacenterId(int currentAccount);
     public static native long native_getCurrentAuthKeyId(int currentAccount);
     public static native int native_getTimeDifference(int currentAccount);
-    public static native void native_sendRequest(int currentAccount, long object, int flags, int datacenterId, int connectionType, boolean immediate, int requestToken, int downloadSize);
+    private static native void native_sendRequest(int currentAccount, long object, int flags, int datacenterId, int connectionType, boolean immediate, int requestToken, int downloadSize);
     public static native void native_cancelRequest(int currentAccount, int token, boolean notifyServer);
     public static native void native_cleanUp(int currentAccount, boolean resetKeys);
     public static native void native_cancelRequestsForGuid(int currentAccount, int guid);

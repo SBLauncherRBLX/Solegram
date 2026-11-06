@@ -39,6 +39,10 @@ public class PythonEngine implements PluginEngine {
         if (!Python.isStarted()) {
             Python.start(new AndroidPlatform(ApplicationLoader.applicationContext));
         }
+        // the runtime guard goes first: no plugin code (and no plugin package) runs before it watches
+        Python.getInstance().getModule("solegram_guard").callAttr("install",
+            PyObject.fromJava(com.solegram.messenger.plugins.PluginRuntimeGuard.protectedRoots()),
+            ApplicationLoader.applicationContext.getPackageName());
         PyObject module = Python.getInstance().getModule("solegram_runtime");
         module.callAttr("init",
             PluginsController.getPluginsDir().getAbsolutePath(),
@@ -118,6 +122,16 @@ public class PythonEngine implements PluginEngine {
         } catch (Throwable e) {
             FileLog.e(e);
         }
+    }
+
+    @Override
+    public String currentPlugin() {
+        final PyObject rt = runtime;
+        if (rt == null) {
+            return null;
+        }
+        final PyObject id = rt.callAttr("current_plugin");
+        return id == null ? null : id.toString();
     }
 
     @Override

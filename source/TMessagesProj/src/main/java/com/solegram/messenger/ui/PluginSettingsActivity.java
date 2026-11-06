@@ -297,6 +297,19 @@ public class PluginSettingsActivity extends UniversalFragment implements Notific
         items.add(UItem.asButton(ID_SEC_HASH, R.drawable.msg_copy, getString(R.string.SG_SecHash), shortHash));
         items.add(UItem.asButton(ID_SEC_RECHECK, R.drawable.msg_retry, getString(R.string.SG_SecRecheck)).accent());
         items.add(UItem.asShadow(getString(R.string.SG_SecCheckedOnDevice)));
+
+        // what the runtime guard stopped while the plugin ran (since the app started)
+        final java.util.List<com.solegram.messenger.plugins.PluginRuntimeGuard.Event> stopped = com.solegram.messenger.plugins.PluginRuntimeGuard.eventsOf(meta.id);
+        if (!stopped.isEmpty()) {
+            items.add(UItem.asHeader(getString(R.string.SG_GuardStoppedHeader)));
+            final int shown = Math.min(stopped.size(), 10);
+            for (int i = 0; i < shown; i++) {
+                final com.solegram.messenger.plugins.PluginRuntimeGuard.Event e = stopped.get(i);
+                items.add(UItem.asButton(0, R.drawable.msg_block, com.solegram.messenger.plugins.PluginRuntimeGuard.describeKind(e.kind),
+                    LocaleController.formatDateTime(e.time / 1000, true)).setSolegramSubtitle(e.detail));
+            }
+            items.add(UItem.asShadow(getString(R.string.SG_GuardStoppedInfo)));
+        }
     }
 
     private void onSecurityClick(UItem item) {

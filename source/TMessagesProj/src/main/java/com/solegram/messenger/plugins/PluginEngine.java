@@ -39,6 +39,11 @@ public interface PluginEngine {
     default void onPluginDeleted(String pluginId) {
     }
 
+    /** The plugin whose code is running on this thread now (by its Python frames), or null. */
+    default String currentPlugin() {
+        return null;
+    }
+
     /** Developer mode switched: verbose logs and the desktop dev server. */
     default void setDevMode(boolean enabled) {
     }

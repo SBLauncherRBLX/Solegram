@@ -34,12 +34,55 @@ class PipError(Exception):
     pass
 
 
+# Files a package may not bring: native code and anything that runs at start-up or loads as classes.
+_FORBIDDEN_EXT = (".so", ".pyd", ".dylib", ".dll", ".dex", ".jar", ".apk", ".aar", ".pth", ".exe", ".elf", ".oat",
+                  ".odex", ".vdex")
+# Top-level names nobody's package may take: Python's own modules, the bridge to Java, the plugin SDK and the
+# runtime, start-up hooks, and the packages that come with Solegram (filled in by init)
+_protected_tops = set()
+
+
+def _protect_builtin_names():
+    names = set(getattr(sys, "stdlib_module_names", ())) | set(sys.builtin_module_names)
+    names |= {"java", "com", "android", "org", "dalvik", "chaquopy", "site", "sitecustomize", "usercustomize",
+              "pip", "setuptools", "pkg_resources", "_distutils_hack", "distutils", "solegram_guard",
+              "solegram_runtime", "solegram_pip"}
+    # the SDK and the runtime: every module next to this one
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        for entry in os.listdir(here):
+            names.add(entry[:-3] if entry.endswith(".py") else entry[:-4] if entry.endswith(".pyc") else entry)
+    except Exception:
+        pass
+    # the packages that come with Solegram (requests, Pillow, lxml...)
+    try:
+        for dist in importlib.metadata.distributions():
+            try:
+                location = str(dist.locate_file(""))
+            except Exception:
+                location = ""
+            if _libs_dir and location.startswith(_libs_dir):
+                continue
+            top_level = dist.read_text("top_level.txt") or ""
+            names.update(t.strip() for t in top_level.splitlines() if t.strip())
+            for f in dist.files or ():
+                part = str(f).split("/", 1)[0]
+                if part and not part.endswith((".dist-info", ".data")):
+                    names.add(part[:-3] if part.endswith(".py") else part)
+    except Exception:
+        pass
+    _protected_tops.update(n for n in names if n)
+
+
 def init(libs_dir):
     global _libs_dir
     _libs_dir = libs_dir
     os.makedirs(libs_dir, exist_ok=True)
-    if libs_dir not in sys.path:
-        sys.path.insert(0, libs_dir)
+    _protect_builtin_names()
+    # last on the path: a package never stands in for Python's modules, the SDK or the bundled packages
+    if libs_dir in sys.path:
+        sys.path.remove(libs_dir)
+    sys.path.append(libs_dir)
 
 
 def _state_path():
@@ -162,7 +205,11 @@ def _install_wheel(name, version, fileinfo):
             norm = os.path.normpath(member)
             if norm.startswith("..") or os.path.isabs(norm):
                 raise PipError(f"Unsafe path in wheel: {member}")
+            if member.lower().endswith(_FORBIDDEN_EXT):
+                raise PipError(f"{name}: the package brings native code or start-up files ({os.path.basename(member)}), which plugins may not install")
             tops.add(norm.split(os.sep, 1)[0])
+        _check_tops(name, tops)
+        _scan_package(name, zf)
         zf.extractall(_libs_dir)
         for member in zf.namelist():
             if member.endswith(".dist-info/METADATA"):
@@ -173,6 +220,39 @@ def _install_wheel(name, version, fileinfo):
                     elif not line.strip():
                         break
     return sorted(tops), requires
+
+
+def _check_tops(name, tops):
+    """A package may not stand in for another module: Python's, the SDK's, a bundled or another plugin's package."""
+    state = _load_state()
+    others = set()
+    for other, entry in state.get("packages", {}).items():
+        if other != name:
+            others.update(entry.get("files", []))
+    for top in tops:
+        if top.endswith((".dist-info", ".data")):
+            continue
+        module = top[:-3] if top.endswith(".py") else top
+        if module in _protected_tops or top in others:
+            raise PipError(f"{name}: the package would replace the module \"{module}\", which plugins may not do")
+
+
+def _scan_package(name, zf):
+    """The package's code goes through the same check as plugins: one that looks dangerous is not installed."""
+    try:
+        from java import jclass
+        security = jclass("com.solegram.messenger.plugins.PluginSecurity")
+    except Exception:
+        return
+    for member in zf.namelist():
+        if not member.endswith(".py"):
+            continue
+        data = zf.read(member)
+        if len(data) > 4 * 1024 * 1024:
+            raise PipError(f"{name}: {member} is too large to check")
+        report = security.analyze(data)
+        if report is not None and int(report.verdict) == int(security.VERDICT_DANGER):
+            raise PipError(f"{name}: {member} looks dangerous ({report.reason}), the package was not installed")
 
 
 def _ensure(req, plugin_id, state, chain, env):
