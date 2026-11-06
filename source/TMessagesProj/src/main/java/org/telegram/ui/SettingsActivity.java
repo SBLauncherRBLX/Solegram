@@ -399,7 +399,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             protected void onDraw(@NonNull Canvas canvas) {
                 if (solegramHeaderFade != null && !searchItem.isSearchFieldVisible2()) {
                     // floating header: no panel, the list fades out under the title (alpha follows the title's)
+                    canvas.save();
+                    canvas.translate(-getX(), -getY()); // into the content view's coordinates
                     solegramHeaderFade.draw(canvas, actionBar, getMeasuredWidth(), getThemedColor(Theme.key_windowBackgroundGray), 1f, new View[]{listView});
+                    canvas.restore();
                     return;
                 }
                 int top = actionBar.getHeight();

@@ -3245,6 +3245,11 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture, com
         canCaptureSectionsDecorator = allowed;
     }
 
+    /** Solegram: whether the cards (sections decoration) are captured too. */
+    public boolean solegramCaptureSectionsAllowed() {
+        return canCaptureSectionsDecorator;
+    }
+
     public View findViewByPosition(int position) {
         if (position == NO_POSITION) return null;
         for (int i = 0; i < getChildCount(); ++i) {

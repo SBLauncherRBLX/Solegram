@@ -7637,6 +7637,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      */
     private com.solegram.messenger.ui.SolegramEdgeBlur solegramEdgeBlur;
     private float solegramBubblesBandBottom, solegramBubblesBandAlpha;
+    private View[] solegramBlurLists;
 
     private void solegramInvalidateHeader() {
         if (fragmentView != null) {
@@ -7667,7 +7668,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         // under folder tabs the band reaches down to their bottom (their own fade is off then)
         final int band = Math.max(height, (int) (solegramBubblesBandAlpha > 0.01f ? solegramBubblesBandBottom - actionBar.getY() : 0));
-        solegramEdgeBlur.draw(canvas, viewPages, fragmentView.getMeasuredWidth(), actionBar.getY(), band, true, color, 0, alpha);
+        if (solegramBlurLists == null || solegramBlurLists.length != viewPages.length) {
+            solegramBlurLists = new View[viewPages.length];
+        }
+        for (int i = 0; i < viewPages.length; i++) {
+            final ViewPage page = viewPages[i];
+            solegramBlurLists[i] = page != null && page.getVisibility() == View.VISIBLE && page.getAlpha() > 0f ? page.listView : null;
+        }
+        solegramEdgeBlur.draw(canvas, solegramBlurLists, fragmentView, fragmentView.getMeasuredWidth(), actionBar.getY(), band, true, color, 0, alpha);
         // without blur (Android 11 and older): nothing, no darkening
     }
 

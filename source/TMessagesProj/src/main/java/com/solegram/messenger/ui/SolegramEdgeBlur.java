@@ -66,17 +66,43 @@ public class SolegramEdgeBlur {
      * @return false when the blur is not available here (the caller draws its old fade)
      */
     public boolean draw(Canvas canvas, View[] contents, int width, float top, int height, boolean fromTop, int background, int veilAlpha, float alpha) {
+        return draw(canvas, contents, null, width, top, height, fromTop, background, veilAlpha, alpha);
+    }
+
+    /** Same, with the contents anywhere under root (the view whose coordinates the canvas is in). */
+    public boolean draw(Canvas canvas, View[] contents, View root, int width, float top, int height, boolean fromTop, int background, int veilAlpha, float alpha) {
         if (!supported(canvas)) {
             return false;
         }
         if (alpha <= 0f || width <= 0 || height <= 0) {
             return true;
         }
-        return drawImpl(canvas, contents, width, top, height, fromTop, background, veilAlpha, alpha);
+        return drawImpl(canvas, contents, root, width, top, height, fromTop, background, veilAlpha, alpha);
+    }
+
+    private final float[] pos = new float[2];
+    private final android.graphics.RectF capturePos = new android.graphics.RectF();
+
+    /** A view's position in root (its parent's coordinates when root is null or not one of its parents). */
+    private static void offsetIn(View v, View root, float[] out) {
+        float x = v.getLeft() + v.getTranslationX(), y = v.getTop() + v.getTranslationY();
+        android.view.ViewParent p = v.getParent();
+        while (root != null && p instanceof View && p != root) {
+            final View pv = (View) p;
+            x += pv.getLeft() + pv.getTranslationX() - pv.getScrollX();
+            y += pv.getTop() + pv.getTranslationY() - pv.getScrollY();
+            p = pv.getParent();
+        }
+        if (root != null && p != root) {
+            x = v.getLeft() + v.getTranslationX();
+            y = v.getTop() + v.getTranslationY();
+        }
+        out[0] = x;
+        out[1] = y;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.S)
-    private boolean drawImpl(Canvas canvas, View[] contents, int width, float top, int height, boolean fromTop, int background, int veilAlpha, float alpha) {
+    private boolean drawImpl(Canvas canvas, View[] contents, View root, int width, float top, int height, boolean fromTop, int background, int veilAlpha, float alpha) {
         if (content == null) {
             content = new RenderNode("SolegramEdgeBlurContent");
             light = new RenderNode("SolegramEdgeBlurLight");
@@ -108,7 +134,8 @@ public class SolegramEdgeBlur {
                     if (v == null || v.getVisibility() != View.VISIBLE || v.getAlpha() <= 0f || v.getWidth() <= 0) {
                         continue;
                     }
-                    final float x = v.getLeft() + v.getTranslationX(), y = v.getTop() + v.getTranslationY();
+                    offsetIn(v, root, pos);
+                    final float x = pos[0], y = pos[1];
                     if (y >= nodeTop + nodeHeight || y + v.getHeight() <= nodeTop) {
                         continue;
                     }
@@ -118,7 +145,27 @@ public class SolegramEdgeBlur {
                     if (v.getAlpha() < 1f) {
                         rc.saveLayerAlpha(0, 0, v.getWidth(), v.getHeight(), (int) (255 * v.getAlpha()));
                     }
-                    v.draw(rc);
+                    if (v instanceof org.telegram.ui.Components.blur3.capture.IBlur3Capture) {
+                        // the way the app's glass sees a list (rows one by one, the cards under them): drawing the
+                        // whole list at once gave only the background here
+                        capturePos.set(0, nodeTop - y, v.getWidth(), nodeTop + nodeHeight - y);
+                        final org.telegram.ui.Components.RecyclerListView list = v instanceof org.telegram.ui.Components.RecyclerListView
+                            ? (org.telegram.ui.Components.RecyclerListView) v : null;
+                        final boolean sections = list != null && list.solegramCaptureSectionsAllowed();
+                        if (list != null) {
+                            list.setCaptureSectionsDecoratorAllowed(true);
+                        }
+                        try {
+                            ((org.telegram.ui.Components.blur3.capture.IBlur3Capture) v).capture(rc, capturePos);
+                        } catch (Throwable e) {
+                            org.telegram.messenger.FileLog.e(e);
+                        }
+                        if (list != null) {
+                            list.setCaptureSectionsDecoratorAllowed(sections);
+                        }
+                    } else {
+                        v.draw(rc);
+                    }
                     rc.restore();
                     if (v.getAlpha() < 1f) {
                         rc.restore();
