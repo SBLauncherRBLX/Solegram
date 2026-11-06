@@ -362,8 +362,13 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         final long duration;
         if (type == TabAnimation.SETTINGS) {
             duration = 720;
-        } else if (type == TabAnimation.FEED) {
+        } else if (type == TabAnimation.FEED || type == TabAnimation.ARTICLE || type == TabAnimation.FILES) {
             duration = 620;
+        } else if (type == TabAnimation.POLL || type == TabAnimation.CHECKLIST || type == TabAnimation.EMOJI
+            || type == TabAnimation.STICKER || type == TabAnimation.SYMBOLS || type == TabAnimation.REPLIES) {
+            duration = 600;
+        } else if (type == TabAnimation.COLORS || type == TabAnimation.WALLET || type == TabAnimation.GRAM || type == TabAnimation.MUSIC) {
+            duration = 680;
         } else if (type == TabAnimation.CALLS) {
             duration = 640;
         } else if (type == TabAnimation.SG_MUSIC) {
@@ -403,9 +408,54 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             if (t >= 1f) {
                 rotation = 0f;
             }
-        } else if (type == TabAnimation.FEED) {
-            solegramBands = t >= 1f ? -1f : t;
-            imageView.invalidate();
+        } else if (type == TabAnimation.FEED || type == TabAnimation.ARTICLE || type == TabAnimation.FILES) {
+            // a fresh page lands on the pile: it drops in, tilted, and settles flat with a soft bounce
+            solegramBands = -1f;
+            icon.setPivotY(icon.getHeight() * 0.85f);
+            final float e = CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.15f));
+            dy = -dp(6) * (1f - e);
+            rotation = -9f * (1f - e) + 3f * (float) Math.sin(Math.PI * 2 * Math.min(1f, t * 1.4f)) * (1f - t);
+            final float land = t > 0.3f && t < 0.62f ? (float) Math.sin(Math.PI * (t - 0.3f) / 0.32f) : 0f;
+            scaleX = 1f + 0.07f * land;
+            scaleY = 1f - 0.07f * land;
+        } else if (type == TabAnimation.POLL || type == TabAnimation.BOOSTS || type == TabAnimation.MONETIZATION) {
+            // the bars grow up from the base and settle with a spring
+            icon.setPivotY(icon.getHeight() * 0.8f);
+            scaleY = 0.55f + 0.45f * CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.1f));
+            scaleX = 1f + 0.06f * (float) Math.sin(Math.PI * Math.min(1f, t * 1.6f));
+        } else if (type == TabAnimation.CHECKLIST) {
+            // ticked: a quick press and a springy pop
+            final float press = t < 0.2f ? t / 0.2f : 0f;
+            final float pop = t >= 0.2f ? CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation((t - 0.2f) / 0.8f) : 0f;
+            scaleX = scaleY = t < 0.2f ? 1f - 0.12f * press : 0.88f + 0.12f * pop;
+            rotation = (float) (Math.sin(t * Math.PI * 2) * 6f * (1f - t));
+        } else if (type == TabAnimation.EMOJI || type == TabAnimation.STICKER || type == TabAnimation.SYMBOLS) {
+            // a wink: squashed for a moment, then a little nod
+            final float k = t < 0.22f ? (float) Math.sin(Math.PI / 2 * t / 0.22f) : 1f - CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation((t - 0.22f) / 0.78f);
+            scaleX = 1f + 0.1f * k;
+            scaleY = 1f - 0.14f * k;
+            rotation = (float) (Math.sin(t * Math.PI * 2.5f) * 10f * (1f - t));
+        } else if (type == TabAnimation.REPLIES) {
+            // the arrow swings back and returns
+            icon.setPivotX(icon.getWidth() * 0.7f);
+            final float sw = (float) (Math.sin(t * Math.PI * 2) * (1f - t));
+            dy = 0f;
+            rotation = -14f * sw;
+            scaleX = scaleY = 1f + 0.05f * (float) Math.sin(Math.PI * Math.min(1f, t * 1.8f));
+        } else if (type == TabAnimation.COLORS || type == TabAnimation.MODELS) {
+            // the palette turns a little and swings back
+            rotation = (float) (Math.sin(t * Math.PI * 2.4f) * 22f * (1f - t));
+            scaleX = scaleY = 1f + 0.08f * (float) Math.sin(Math.PI * Math.min(1f, t * 1.5f));
+        } else if (type == TabAnimation.WALLET || type == TabAnimation.GRAM) {
+            // the wallet opens a crack: wider for a moment, then shut with a bounce
+            final float k = (float) Math.sin(Math.PI * Math.min(1f, t * 1.6f));
+            scaleX = 1f + 0.12f * k * (1f - t * 0.5f);
+            scaleY = 1f - 0.06f * k;
+            dy = -dp(2) * k;
+        } else if (type == TabAnimation.MUSIC) {
+            // a beat: two pulses, the second softer
+            scaleX = scaleY = 1f + 0.12f * (float) Math.abs(Math.sin(t * Math.PI * 2)) * (1f - t);
+            rotation = (float) (Math.sin(t * Math.PI * 2) * 8f * (1f - t));
         } else if (type == TabAnimation.SG_MUSIC) {
             // the notes play: the drawable moves its heads, beam and waves; the tab only breathes with the beat
             // the notes fill and sway inside the drawable; the view itself stays put

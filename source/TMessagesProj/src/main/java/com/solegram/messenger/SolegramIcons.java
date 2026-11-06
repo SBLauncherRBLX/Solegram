@@ -191,7 +191,7 @@ public final class SolegramIcons {
 
     /**
      * The static icon a bottom or attach tab shows instead of its Lottie animation, or 0 with the standard pack
-     * (or a tab the pack has no icon for). A selected tab shows the pack's filled glyph where it has one.
+     * (or a tab the pack has no icon for). Selected or not, the tab keeps the same glyph.
      */
     public static int tabIcon(String tabName, boolean selected) {
         final int pack = activePack;
@@ -212,8 +212,9 @@ public final class SolegramIcons {
                         }
                     }
                 }
-                final int id = (selected ? tabsSelected[pack] : tabs[pack])[i];
-                return id != 0 ? id : tabs[pack][i];
+                // the same glyph selected or not: a pack's filled glyph is often drawn differently and the icon
+                // jumped to another shape on a tap; the selection shows in the colour and the tab's motion
+                return tabs[pack][i];
             }
         }
         return 0;
