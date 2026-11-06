@@ -363,7 +363,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         if (type == TabAnimation.SETTINGS) {
             duration = 720;
         } else if (type == TabAnimation.FEED || type == TabAnimation.ARTICLE || type == TabAnimation.FILES) {
-            duration = 640;
+            duration = 420;
         } else if (type == TabAnimation.POLL || type == TabAnimation.CHECKLIST || type == TabAnimation.EMOJI
             || type == TabAnimation.STICKER || type == TabAnimation.SYMBOLS || type == TabAnimation.REPLIES) {
             duration = 600;
@@ -413,7 +413,8 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             // ending at rest (no jump on the first frame, no bounce)
             solegramBands = -1f;
             icon.setPivotY(icon.getHeight() * 0.85f);
-            final float k = (float) Math.sin(Math.PI * CubicBezierInterpolator.EASE_BOTH.getInterpolation(t));
+            // a quick lift, then a smooth settle
+            final float k = (float) Math.sin(Math.PI * CubicBezierInterpolator.EASE_OUT.getInterpolation(t));
             dy = -dp(2.5f) * k;
             rotation = -4f * k;
             scaleX = scaleY = 1f + 0.04f * k;

@@ -191,6 +191,9 @@ public class SolegramEdgeBlur {
                             list.setCaptureSectionsDecoratorAllowed(sections);
                         }
                     } else {
+                        // draw() leaves out the view's own scroll (its parent applies it when it draws the view), so
+                        // a scrolled page was taken as if it were at its very top
+                        rc.translate(-v.getScrollX(), -v.getScrollY());
                         v.draw(rc);
                     }
                     rc.restore();

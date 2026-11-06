@@ -259,6 +259,14 @@ public abstract class BaseFragment {
         return true;
     }
 
+    /**
+     * Solegram: the screen lays itself out under a clear header of its own (it pads its pages for it) - the
+     * navigation container then places it at the very top instead of below the header.
+     */
+    public boolean solegramContentUnderHeader() {
+        return false;
+    }
+
     public boolean solegramInPreviewMode() {
         return inPreviewMode || inMenuMode || inBubbleMode;
     }

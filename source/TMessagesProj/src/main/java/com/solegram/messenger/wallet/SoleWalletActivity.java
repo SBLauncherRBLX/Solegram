@@ -155,6 +155,11 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     }
 
     @Override
+    public boolean solegramContentUnderHeader() {
+        return true; // the pages are padded for the clear header and blur under it (HeaderBlurRoot)
+    }
+
+    @Override
     public boolean isLightStatusBar() {
         // the header is in the page's colour: dark status bar icons on a light page
         return org.telegram.messenger.AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > 0.721f;

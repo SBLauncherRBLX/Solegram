@@ -138,6 +138,12 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             setWillNotDraw(false);
         }
 
+        /** Solegram: a screen that lays itself out under its own clear header (BaseFragment.solegramContentUnderHeader). */
+        private boolean solegramUnderHeader(ActionBar actionBar, View child) {
+            final BaseFragment fragment = actionBar != null ? actionBar.parentFragment : null;
+            return fragment != null && fragment.actionBar == actionBar && fragment.fragmentView == child && fragment.solegramContentUnderHeader();
+        }
+
         // Solegram floating header of ordinary screens (see SolegramFloatingScreen)
         private com.solegram.messenger.ui.SolegramFloatingScreen solegramFloatingFor(ActionBar actionBar) {
             if (actionBar == null || isLayersLayout || this == sheetContainer) {
@@ -441,6 +447,8 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         // Solegram: the screen goes on under its floating header, its list starts below it
                         floating.beforeMeasure(actionBarHeight);
                         measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
+                    } else if (solegramUnderHeader(solegramBar, child)) {
+                        measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
                     } else {
                         measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, actionBarHeight);
                     }
@@ -479,7 +487,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         );
                     } else {
                         // Solegram: a screen with a floating header starts at the top, under its header
-                        final int top = floating != null && child == floating.fragmentView ? 0 : actionBarHeight;
+                        final int top = floating != null && child == floating.fragmentView || solegramUnderHeader(solegramBar, child) ? 0 : actionBarHeight;
                         child.layout(
                             paddingLeft + layoutParams.leftMargin,
                             layoutParams.topMargin + top,
