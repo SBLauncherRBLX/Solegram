@@ -104,28 +104,21 @@ public class SolegramFloatingScreen {
         return true;
     }
 
-    private static final android.graphics.Paint softPaint = new android.graphics.Paint();
-    private static int softColor, softHeight;
+    private static SolegramEdgeBlur softBlur;
+    private static final View[] softViews = new View[1];
 
-    /** Under a soft header: the top of the screen fades into the header's colour. */
-    public static void drawSoftFade(Canvas canvas, ActionBar actionBar, int width) {
-        final int color = actionBar.solegramLockedColor();
-        if (color == 0) {
+    /** Under a soft header: the top of the screen blurs out of focus up to the header (no darkening; nothing without blur). */
+    public static void drawSoftFade(Canvas canvas, ActionBar actionBar, int width, View content) {
+        if (actionBar.solegramLockedColor() == 0 || content == null || !SolegramEdgeBlur.supported(canvas)) {
             return;
         }
-        final int height = dp(22);
-        if (softColor != color || softHeight != height) {
-            softColor = color;
-            softHeight = height;
-            softPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, height,
-                new int[]{ColorUtils.setAlphaComponent(color, 0xF0), ColorUtils.setAlphaComponent(color, 0x80), ColorUtils.setAlphaComponent(color, 0)},
-                new float[]{0f, 0.45f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+        if (softBlur == null) {
+            softBlur = new SolegramEdgeBlur();
         }
         final float top = actionBar.getY() + actionBar.getMeasuredHeight();
-        canvas.save();
-        canvas.translate(0, top);
-        canvas.drawRect(0, 0, width, height, softPaint);
-        canvas.restore();
+        softViews[0] = content;
+        softBlur.draw(canvas, softViews, width, top, dp(26), true, actionBar.solegramLockedColor(), 0, 1f);
+        softViews[0] = null;
     }
 
     private static boolean isScroll(View view) {

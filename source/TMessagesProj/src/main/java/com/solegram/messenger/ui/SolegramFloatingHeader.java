@@ -132,29 +132,7 @@ public class SolegramFloatingHeader {
                 return;
             }
         }
-        final int status = actionBar instanceof ActionBar && ((ActionBar) actionBar).getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0;
-        if (!hasShader || this.color != color || this.height != height || this.status != status) {
-            this.color = color;
-            this.height = height;
-            this.status = status;
-            hasShader = true;
-            final float statusPart = Utilities.clamp(status / (float) height, 0.6f, 0f);
-            final float rest = 1f - statusPart;
-            paint.setShader(new LinearGradient(0, 0, 0, height,
-                new int[]{
-                    ColorUtils.setAlphaComponent(color, 0xF2),
-                    ColorUtils.setAlphaComponent(color, 0xE0),
-                    ColorUtils.setAlphaComponent(color, 0xA8),
-                    ColorUtils.setAlphaComponent(color, 0x50),
-                    ColorUtils.setAlphaComponent(color, 0)
-                },
-                new float[]{0f, statusPart, statusPart + rest * 0.4f, statusPart + rest * 0.72f, 1f},
-                Shader.TileMode.CLAMP));
-        }
-        paint.setAlpha((int) (255 * Utilities.clamp(alpha, 1f, 0f)));
-        canvas.save();
-        canvas.translate(0, actionBar.getY());
-        canvas.drawRect(0, 0, width, height, paint);
-        canvas.restore();
+        // no blur here (Android 11 and older, or a software canvas such as a glass capture): nothing at all
+        // rather than a darkening
     }
 }

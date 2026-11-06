@@ -187,6 +187,11 @@ public final class SoleVault {
         return g != null && g.gift instanceof TL_stars.TL_starGiftUnique;
     }
 
+    /** A collectible that lives on the blockchain (moved to a TON wallet) rather than in Telegram. */
+    public static boolean onChain(TL_stars.SavedStarGift g) {
+        return collectible(g) && !android.text.TextUtils.isEmpty(((TL_stars.TL_starGiftUnique) g.gift).gift_address);
+    }
+
     /** What a collectible gift is worth, in US cents (Telegram's estimate); 0 when unknown. */
     public static long usdCents(TL_stars.SavedStarGift g) {
         return collectible(g) ? Math.max(0, ((TL_stars.TL_starGiftUnique) g.gift).value_usd_amount) : 0;

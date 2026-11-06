@@ -2788,6 +2788,13 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     }
                     showLayout(photoLayout);
                 } else if (num == LAYOUT_TYPE_MONEY) {
+                    if (com.solegram.messenger.wallet.SoleWalletActivity.moneyLocked(currentAccount) && baseFragment != null) {
+                        // Solegram: sending money needs SoleWallet open first (its code or fingerprint)
+                        final BaseFragment from = baseFragment;
+                        dismiss();
+                        AndroidUtilities.runOnUIThread(() -> com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(from), 200);
+                        return;
+                    }
                     if (gramLayout == null && baseFragment instanceof ChatActivity) {
                         final TLRPC.User recipient = ((ChatActivity) baseFragment).getCurrentUser();
                         if (isMoneyTabRecipient(recipient)) {

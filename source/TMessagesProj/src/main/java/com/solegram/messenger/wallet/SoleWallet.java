@@ -175,6 +175,28 @@ public final class SoleWallet {
         prefs().edit().putInt(k(account, "style"), style).apply();
     }
 
+    /** The collectible gift on the card (its slug), or null. */
+    public static String cardGift(int account) {
+        return prefs().getString(k(account, "gift"), null);
+    }
+
+    public static void setCardGift(int account, String slug) {
+        if (slug == null) {
+            prefs().edit().remove(k(account, "gift")).apply();
+        } else {
+            prefs().edit().putString(k(account, "gift"), slug).apply();
+        }
+    }
+
+    /** Whether the card takes the gift's backdrop colours. */
+    public static boolean cardGiftColor(int account) {
+        return prefs().getBoolean(k(account, "giftColor"), true);
+    }
+
+    public static void setCardGiftColor(int account, boolean on) {
+        prefs().edit().putBoolean(k(account, "giftColor"), on).apply();
+    }
+
     // ------------------------------------------------------------------ unlocking with a fingerprint
 
     public static boolean biometric(int account) {

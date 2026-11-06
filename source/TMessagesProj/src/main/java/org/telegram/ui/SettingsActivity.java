@@ -929,7 +929,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 presentSettingFragment(new TONIntroActivity());
                 break;
             case 25:
-                presentSettingFragment(new WalletActivity());
+                if (com.solegram.messenger.wallet.SoleWalletActivity.moneyLocked(currentAccount)) {
+                    com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(this);
+                } else {
+                    presentSettingFragment(new WalletActivity());
+                }
                 break;
             case 15:
                 presentSettingFragment(new PremiumPreviewFragment(PremiumPreviewFragment.FEATURES_BUSINESS, "settings"));

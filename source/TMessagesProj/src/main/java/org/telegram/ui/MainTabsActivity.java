@@ -453,7 +453,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                         return;
                     }
                 }
-                super.draw(canvas);
+                // no blur here: nothing (no darkening above the bar)
             }
         };
         BlurredBackgroundWithFadeDrawable fadeDrawable = new BlurredBackgroundWithFadeDrawable(iBlur3FactoryFade.create(fadeView, null));

@@ -2188,7 +2188,7 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
             BaseFragment fragment = delegate != null ? delegate.getBaseFragment() : null;
             if (fragment == null) fragment = LaunchActivity.getSafeLastFragment();
             if (fragment == null) return;
-            fragment.presentFragment(new WalletActivity());
+            com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(fragment);
         };
         final TL_wallet.walletTransaction transaction = t;
         if (!currentMessageObject.isOutOwner() && MessagesController.getInstance(currentAccount).pendingSuggestions.contains("WALLET_FIRST_INCOMING_TRANSFER")) {

@@ -1486,6 +1486,12 @@ public class LinkManager {
             nanos = 0;
         }
 
+        if (com.solegram.messenger.wallet.SoleWalletActivity.moneyLocked(currentAccount)) {
+            // Solegram: SoleWallet's code stands in front of Telegram's wallet; after unlocking the wallet opens (the link has to be tapped again)
+            final BaseFragment f = LaunchActivity.getSafeLastFragment();
+            com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(f);
+            return true;
+        }
         if (TextUtils.isEmpty(recipient)) {
             presentFragment(new WalletActivity());
         } else if (recipient.startsWith("@") || recipient.matches("[a-zA-Z0-9_]{1,32}")) {

@@ -83,6 +83,31 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         }
     }
 
+    /** Set when this screen is only the lock in front of Telegram's wallet: once unlocked, the wallet takes its place. */
+    private boolean thenMoney;
+
+    /** Whether SoleWallet's code stands in front of Telegram's wallet right now (a code is set and it is locked). */
+    public static boolean moneyLocked(int account) {
+        return com.solegram.messenger.SolegramConfig.unifiedWallet && SoleWallet.hasCode(account) && !SoleWallet.isUnlocked(account);
+    }
+
+    /**
+     * Opens Telegram's wallet: straight away when SoleWallet is open (or has no code), else through SoleWallet's lock,
+     * which gives way to the wallet once the code or the fingerprint is right.
+     */
+    public static void openTelegramWallet(BaseFragment from) {
+        if (from == null) {
+            return;
+        }
+        if (moneyLocked(from.getCurrentAccount())) {
+            final SoleWalletActivity lock = new SoleWalletActivity();
+            lock.thenMoney = true;
+            from.presentFragment(lock);
+        } else {
+            from.presentFragment(new org.telegram.ui.Wallet.WalletActivity());
+        }
+    }
+
     @Override
     public boolean onFragmentCreate() {
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.starBalanceUpdated);
@@ -735,6 +760,11 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         if (context == null) {
             return;
         }
+        if (thenMoney) {
+            // only the lock in front of Telegram's wallet: the wallet takes this screen's place
+            thenMoney = false;
+            AndroidUtilities.runOnUIThread(() -> presentFragment(new org.telegram.ui.Wallet.WalletActivity(), true));
+        }
         showingWallet = true;
         final LinearLayout column = new LinearLayout(context);
         column.setOrientation(LinearLayout.VERTICAL);
@@ -743,6 +773,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
 
         card = new SoleWalletCardView(context);
         card.set(SoleWallet.cardStyle(currentAccount), SoleWallet.cardNumberGrouped(currentAccount, false), SoleWallet.cardNumberGrouped(currentAccount, true), myName());
+        loadCardGift();
         column.addView(card, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         final TextView flipHint = new TextView(context);
         flipHint.setText(getString(R.string.SG_WalletFlipHint));
@@ -1500,7 +1531,141 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             row.addView(cell, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 2, 0, 2, 0));
         }
         column.addView(h);
+        addGiftPicker(context, column, sheet);
         sheet.setCustomView(column);
         showDialog(sheet);
+    }
+
+    // ------------------------------------------------------------------ a gift on the card
+
+    private ArrayList<TL_stars.SavedStarGift> myCollectibles;
+
+    /** The chosen collectible onto the card (found among the account's gifts by its slug). */
+    private void loadCardGift() {
+        final String slug = SoleWallet.cardGift(currentAccount);
+        if (slug == null || card == null) {
+            return;
+        }
+        SoleVault.loadGifts(currentAccount, getMessagesController().getInputPeer(getUserConfig().getClientUserId()), gifts -> {
+            myCollectibles = collectiblesOf(gifts);
+            for (TL_stars.SavedStarGift g : myCollectibles) {
+                if (slug.equals(((TL_stars.TL_starGiftUnique) g.gift).slug)) {
+                    if (card != null) {
+                        card.setGift(g.gift, SoleWallet.cardGiftColor(currentAccount));
+                    }
+                    return;
+                }
+            }
+            // the gift is gone (sold, sent, moved to the blockchain without being shown): the card goes back to its design
+            SoleWallet.setCardGift(currentAccount, null);
+        });
+    }
+
+    private static ArrayList<TL_stars.SavedStarGift> collectiblesOf(ArrayList<TL_stars.SavedStarGift> all) {
+        final ArrayList<TL_stars.SavedStarGift> out = new ArrayList<>();
+        if (all != null) {
+            for (TL_stars.SavedStarGift g : all) {
+                if (SoleVault.collectible(g)) {
+                    out.add(g);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** In the design sheet: the account's collectible gifts to put on the card, and whether it takes their colour. */
+    private void addGiftPicker(Context context, LinearLayout column, org.telegram.ui.ActionBar.BottomSheet sheet) {
+        final TextView title = new TextView(context);
+        title.setText(getString(R.string.SG_WalletCardGift));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        column.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 18, 20, 2));
+        final TextView info = new TextView(context);
+        info.setText(getString(R.string.SG_WalletCardGiftInfo));
+        info.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        info.setTextColor(gray());
+        column.addView(info, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 0, 20, 10));
+        final android.widget.HorizontalScrollView h = new android.widget.HorizontalScrollView(context);
+        h.setHorizontalScrollBarEnabled(false);
+        h.setClipToPadding(false);
+        h.setPadding(dp(16), 0, dp(16), 0);
+        final LinearLayout row = new LinearLayout(context);
+        h.addView(row);
+        column.addView(h, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 76));
+        final org.telegram.ui.Cells.TextCheckCell color = new org.telegram.ui.Cells.TextCheckCell(context, getResourceProvider());
+        color.setTextAndCheck(getString(R.string.SG_WalletCardGiftColor), SoleWallet.cardGiftColor(currentAccount), false);
+        color.setOnClickListener(v -> {
+            final boolean on = !SoleWallet.cardGiftColor(currentAccount);
+            SoleWallet.setCardGiftColor(currentAccount, on);
+            color.setChecked(on);
+            loadCardGift();
+        });
+        column.addView(color, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 6, 0, 0));
+        final Runnable fill = () -> {
+            row.removeAllViews();
+            final String chosen = SoleWallet.cardGift(currentAccount);
+            // "none" first
+            final TextView none = new TextView(context);
+            none.setText(getString(R.string.SG_WalletCardGiftNone));
+            none.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            none.setGravity(Gravity.CENTER);
+            none.setTextColor(chosen == null ? accent() : gray());
+            final GradientDrawable noneBg = new GradientDrawable();
+            noneBg.setCornerRadius(dp(16));
+            noneBg.setColor(Theme.multAlpha(gray(), 0.12f));
+            if (chosen == null) {
+                noneBg.setStroke(dp(2), accent());
+            }
+            none.setBackground(noneBg);
+            none.setOnClickListener(v -> {
+                SoleWallet.setCardGift(currentAccount, null);
+                if (card != null) {
+                    card.setGift(null, false);
+                    card.spin();
+                }
+                sheet.dismiss();
+            });
+            row.addView(none, LayoutHelper.createLinear(68, 68, 4, 0, 4, 0));
+            if (myCollectibles == null || myCollectibles.isEmpty()) {
+                final TextView empty = new TextView(context);
+                empty.setText(getString(myCollectibles == null ? R.string.SG_VaultLoading : R.string.SG_WalletCardGiftEmpty));
+                empty.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                empty.setTextColor(gray());
+                empty.setGravity(Gravity.CENTER_VERTICAL);
+                row.addView(empty, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 68, 10, 0, 10, 0));
+                return;
+            }
+            for (TL_stars.SavedStarGift g : myCollectibles) {
+                final TL_stars.TL_starGiftUnique u = (TL_stars.TL_starGiftUnique) g.gift;
+                final org.telegram.ui.Components.BackupImageView image = new org.telegram.ui.Components.BackupImageView(context);
+                StarsIntroActivity.setGiftImage(image.getImageReceiver(), g.gift, 56);
+                image.setPadding(dp(6), dp(6), dp(6), dp(6));
+                final GradientDrawable bg = new GradientDrawable();
+                bg.setCornerRadius(dp(16));
+                bg.setColor(Theme.multAlpha(gray(), 0.12f));
+                if (u.slug != null && u.slug.equals(chosen)) {
+                    bg.setStroke(dp(2), accent());
+                }
+                image.setBackground(bg);
+                image.setOnClickListener(v -> {
+                    SoleWallet.setCardGift(currentAccount, u.slug);
+                    if (card != null) {
+                        card.setGift(g.gift, SoleWallet.cardGiftColor(currentAccount));
+                        card.spin();
+                    }
+                    sheet.dismiss();
+                });
+                SolegramMotion.pressable(image, SolegramMotion.PRESS_CARD);
+                row.addView(image, LayoutHelper.createLinear(68, 68, 4, 0, 4, 0));
+            }
+        };
+        fill.run();
+        if (myCollectibles == null) {
+            SoleVault.loadGifts(currentAccount, getMessagesController().getInputPeer(getUserConfig().getClientUserId()), gifts -> {
+                myCollectibles = collectiblesOf(gifts);
+                fill.run();
+            });
+        }
     }
 }

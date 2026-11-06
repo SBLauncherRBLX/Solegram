@@ -2024,5 +2024,12 @@
     <string name="SG_WalletStarsShort">Звёзды</string>
     <string name="SG_WalletUnified">Единый кошелёк</string>
     <string name="SG_WalletUnifiedInfo">Кошелёк Telegram (граммы) показывается внутри SoleWallet, а не отдельным пунктом в настройках</string>
+    <string name="SG_WalletCardGift">Подарок на карте</string>
+    <string name="SG_WalletCardGiftInfo">Положите на карту один из своих коллекционных подарков</string>
+    <string name="SG_WalletCardGiftColor">Карта в цветах подарка</string>
+    <string name="SG_WalletCardGiftNone">Без подарка</string>
+    <string name="SG_WalletCardGiftEmpty">Коллекционных подарков пока нет</string>
+    <string name="SG_VaultOnChain">В блокчейне</string>
+    <string name="SG_WalletLockedMoney">Откройте SoleWallet, чтобы зайти в кошелёк</string>
     <!-- SOLEGRAM END -->
 </resources>

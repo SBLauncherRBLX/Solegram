@@ -13391,5 +13391,12 @@
     <string name="SG_WalletStarsShort">Stars</string>
     <string name="SG_WalletUnified">One wallet</string>
     <string name="SG_WalletUnifiedInfo">Telegram\'s wallet (Grams) shows inside SoleWallet instead of its own item in the settings</string>
+    <string name="SG_WalletCardGift">Gift on the card</string>
+    <string name="SG_WalletCardGiftInfo">Put one of your collectible gifts on the card</string>
+    <string name="SG_WalletCardGiftColor">Card in the gift\'s colours</string>
+    <string name="SG_WalletCardGiftNone">None</string>
+    <string name="SG_WalletCardGiftEmpty">You have no collectible gifts yet</string>
+    <string name="SG_VaultOnChain">On the blockchain</string>
+    <string name="SG_WalletLockedMoney">Unlock SoleWallet to open the wallet</string>
     <!-- SOLEGRAM END -->
 </resources>

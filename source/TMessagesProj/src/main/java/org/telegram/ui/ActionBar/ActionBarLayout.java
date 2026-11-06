@@ -293,7 +293,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         if (view instanceof ActionBar && view.getVisibility() == VISIBLE) {
                             final BaseFragment owner = ((ActionBar) view).parentFragment;
                             if (owner != null && owner.solegramSoftHeader && owner.fragmentView == child) {
-                                com.solegram.messenger.ui.SolegramFloatingScreen.drawSoftFade(canvas, (ActionBar) view, getMeasuredWidth());
+                                com.solegram.messenger.ui.SolegramFloatingScreen.drawSoftFade(canvas, (ActionBar) view, getMeasuredWidth(), child);
                             }
                             break;
                         }

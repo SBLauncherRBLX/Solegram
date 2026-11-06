@@ -80,6 +80,42 @@ public class SoleWalletCardView extends View implements SensorEventListener {
     private int design;
     private String number = "", numberMasked = "", name = "";
 
+    // a collectible gift on the card (as on Telegram's wallet cards), optionally colouring it with its backdrop
+    private org.telegram.messenger.ImageReceiver giftImage;
+    private int giftCenter, giftEdge;
+    private boolean giftColor;
+
+    /** Puts a collectible gift on the card (null takes it off); with color, the card takes the gift's backdrop colours. */
+    public void setGift(org.telegram.tgnet.tl.TL_stars.StarGift gift, boolean color) {
+        if (gift == null) {
+            if (giftImage != null) {
+                giftImage.onDetachedFromWindow();
+                giftImage = null;
+            }
+            giftColor = false;
+            invalidate();
+            return;
+        }
+        if (giftImage == null) {
+            giftImage = new org.telegram.messenger.ImageReceiver(this);
+            if (isAttachedToWindow()) {
+                giftImage.onAttachedToWindow();
+            }
+        }
+        org.telegram.ui.Stars.StarsIntroActivity.setGiftImage(giftImage, gift, 96);
+        giftCenter = giftEdge = 0;
+        if (gift instanceof org.telegram.tgnet.tl.TL_stars.TL_starGiftUnique) {
+            for (org.telegram.tgnet.tl.TL_stars.StarGiftAttribute a : ((org.telegram.tgnet.tl.TL_stars.TL_starGiftUnique) gift).attributes) {
+                if (a instanceof org.telegram.tgnet.tl.TL_stars.starGiftAttributeBackdrop) {
+                    giftCenter = ((org.telegram.tgnet.tl.TL_stars.starGiftAttributeBackdrop) a).center_color | 0xFF000000;
+                    giftEdge = ((org.telegram.tgnet.tl.TL_stars.starGiftAttributeBackdrop) a).edge_color | 0xFF000000;
+                }
+            }
+        }
+        giftColor = color && giftCenter != 0;
+        invalidate();
+    }
+
     private float rotY, tiltX, tiltY, tiltTargetX, tiltTargetY;
     private float downX, downRot;
     private boolean dragging;
@@ -144,6 +180,9 @@ public class SoleWalletCardView extends View implements SensorEventListener {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        if (giftImage != null) {
+            giftImage.onAttachedToWindow();
+        }
         if (!interactive) {
             return;
         }
@@ -161,6 +200,9 @@ public class SoleWalletCardView extends View implements SensorEventListener {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        if (giftImage != null) {
+            giftImage.onDetachedFromWindow();
+        }
         if (sensors != null) {
             sensors.unregisterListener(this);
         }
@@ -254,6 +296,9 @@ public class SoleWalletCardView extends View implements SensorEventListener {
     }
 
     private boolean lightDesign() {
+        if (giftColor) {
+            return androidx.core.graphics.ColorUtils.calculateLuminance(giftCenter) > 0.6;
+        }
         return LIGHT[design];
     }
 
@@ -331,6 +376,14 @@ public class SoleWalletCardView extends View implements SensorEventListener {
     // ------------------------------------------------------------------ designs
 
     private void drawDesign(Canvas canvas, float w, float h, float angle) {
+        if (giftColor) {
+            // the gift's backdrop: its centre colour round the gift, its edge colour at the card's corners
+            opaque(); paint.setShader(new android.graphics.RadialGradient(rect.right - h * 0.3f, rect.top + h * 0.3f, w,
+                giftCenter, giftEdge, Shader.TileMode.CLAMP));
+            canvas.drawRect(rect, paint);
+            paint.setShader(null);
+            return;
+        }
         final int base = BASES[design];
         switch (design) {
             case HOLO: {
@@ -442,7 +495,11 @@ public class SoleWalletCardView extends View implements SensorEventListener {
         final int ink = ink();
         // the sun, pressed into the card in the top right, above the number
         final float ss = h * 0.56f;
-        if (design < HOLO || design == TITANIUM) {
+        if (giftImage != null) {
+            final float gs = h * 0.4f;
+            giftImage.setImageCoords(rect.right - pad - gs, rect.top + pad * 0.7f, gs, gs);
+            giftImage.draw(canvas);
+        } else if (design < HOLO || design == TITANIUM) {
             drawDeboss(canvas, rect.right - pad * 0.6f - ss, rect.top + h * 0.04f, ss);
         }
         // the wallet's name

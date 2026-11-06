@@ -377,7 +377,12 @@ public class SoleVaultActivity extends BaseFragment {
         name.setEllipsize(TextUtils.TruncateAt.END);
         texts.addView(name);
         final long cents = SoleVault.usdCents(g);
-        final TextView sub = note(context, cents > 0 ? "≈ " + usd(cents) : getString(R.string.SG_VaultNoValue));
+        String where = cents > 0 ? "≈ " + usd(cents) : getString(R.string.SG_VaultNoValue);
+        if (SoleVault.onChain(g)) {
+            // moved to a blockchain wallet (and still shown here)
+            where += " · " + getString(R.string.SG_VaultOnChain);
+        }
+        final TextView sub = note(context, where);
         texts.addView(sub);
         row.addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
         if (vault || vaultOk) {

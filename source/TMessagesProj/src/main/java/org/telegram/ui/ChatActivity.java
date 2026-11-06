@@ -7073,6 +7073,9 @@ public class ChatActivity extends BaseFragment implements
         chatActivityFadeView.setup(navbarContentDrawableFactory);
         chatActivityFadeView.setFadeHeightTop(dp(48));
         chatActivityFadeView.setFadeHeightBottom(dp(48));
+        // Solegram: no fade of the messages into the wallpaper at the top and the bottom (it read as a darkening);
+        // the glass header and the glass input bar blur what is under them
+        chatActivityFadeView.setAlpha(0f);
         contentView.addView(chatActivityFadeView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         if (getDialogId() != getUserConfig().getClientUserId()) {

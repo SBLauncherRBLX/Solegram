@@ -6806,7 +6806,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             // Solegram floating header: with the tabs folded into the title row the header's own fade is there;
             // this one would draw a box of background round the tabs
             final float bubblesAlpha = Math.max(filtersTabVisibility, topPanelsVisibility) * (solegramFloatingHeader ? 1f - solegramCollapseFactor() : 1f);
-            if (solegramFloatingHeader && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (solegramFloatingHeader) {
                 // Solegram: no fade into the background under the folder tabs: the header's blur reaches down to
                 // the tabs' bottom instead (one blur, no darkening over it)
                 topBubblesFadeView.setAlpha(0f);
@@ -7667,34 +7667,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         // under folder tabs the band reaches down to their bottom (their own fade is off then)
         final int band = Math.max(height, (int) (solegramBubblesBandAlpha > 0.01f ? solegramBubblesBandBottom - actionBar.getY() : 0));
-        if (solegramEdgeBlur.draw(canvas, viewPages, fragmentView.getMeasuredWidth(), actionBar.getY(), band, true, color, 0, alpha)) {
-            return;
-        }
-        if (solegramFadePaint == null || solegramFadeColor != color || solegramFadeHeight != height || solegramFadeStatus != status) {
-            solegramFadeColor = color;
-            solegramFadeHeight = height;
-            solegramFadeStatus = status;
-            if (solegramFadePaint == null) {
-                solegramFadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            }
-            final float statusPart = Utilities.clamp(status / (float) height, 0.6f, 0f);
-            final float rest = 1f - statusPart;
-            solegramFadePaint.setShader(new LinearGradient(0, 0, 0, height,
-                new int[]{
-                    ColorUtils.setAlphaComponent(color, 0xF2),
-                    ColorUtils.setAlphaComponent(color, 0xE0),
-                    ColorUtils.setAlphaComponent(color, 0xA8),
-                    ColorUtils.setAlphaComponent(color, 0x50),
-                    ColorUtils.setAlphaComponent(color, 0)
-                },
-                new float[]{0f, statusPart, statusPart + rest * 0.4f, statusPart + rest * 0.72f, 1f},
-                Shader.TileMode.CLAMP));
-        }
-        solegramFadePaint.setAlpha((int) (255 * alpha));
-        canvas.save();
-        canvas.translate(0, actionBar.getY());
-        canvas.drawRect(0, 0, fragmentView.getMeasuredWidth(), height, solegramFadePaint);
-        canvas.restore();
+        solegramEdgeBlur.draw(canvas, viewPages, fragmentView.getMeasuredWidth(), actionBar.getY(), band, true, color, 0, alpha);
+        // without blur (Android 11 and older): nothing, no darkening
     }
 
     private boolean solegramRemembersFolder() {
