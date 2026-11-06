@@ -7070,12 +7070,16 @@ public class ChatActivity extends BaseFragment implements
         contentView.addView(chatListView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         chatActivityFadeView = new ChatActivityFadeView(context);
-        chatActivityFadeView.setup(navbarContentDrawableFactory);
+        // Solegram: at the top and the bottom the messages blur out of focus (the frosted copy of the wallpaper and
+        // the messages, faded in towards the edge), not fade into the wallpaper; nothing where there is no blur
+        if (glassBackgroundSourceFrostedRenderNode != null) {
+            chatActivityFadeView.setup(glassBackgroundDrawableFactoryFrosted);
+        } else {
+            chatActivityFadeView.setup(navbarContentDrawableFactory);
+            chatActivityFadeView.setAlpha(0f);
+        }
         chatActivityFadeView.setFadeHeightTop(dp(48));
         chatActivityFadeView.setFadeHeightBottom(dp(48));
-        // Solegram: no fade of the messages into the wallpaper at the top and the bottom (it read as a darkening);
-        // the glass header and the glass input bar blur what is under them
-        chatActivityFadeView.setAlpha(0f);
         contentView.addView(chatActivityFadeView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         if (getDialogId() != getUserConfig().getClientUserId()) {

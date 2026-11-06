@@ -80,6 +80,30 @@ public class SolegramEdgeBlur {
         return drawImpl(canvas, contents, root, width, top, height, fromTop, background, veilAlpha, alpha);
     }
 
+    private android.view.View host;
+    private final java.util.WeakHashMap<View, Boolean> followed = new java.util.WeakHashMap<>();
+
+    /** The view that draws the band: it is drawn again on every scroll of the blurred lists. */
+    public void setHost(View host) {
+        this.host = host;
+    }
+
+    private void follow(View v) {
+        if (host == null || !(v instanceof androidx.recyclerview.widget.RecyclerView) || followed.containsKey(v)) {
+            return;
+        }
+        followed.put(v, Boolean.TRUE);
+        ((androidx.recyclerview.widget.RecyclerView) v).addOnScrollListener(new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@androidx.annotation.NonNull androidx.recyclerview.widget.RecyclerView recyclerView, int dx, int dy) {
+                final View h = host;
+                if (h != null) {
+                    h.invalidate();
+                }
+            }
+        });
+    }
+
     private final float[] pos = new float[2];
     private final android.graphics.RectF capturePos = new android.graphics.RectF();
 
@@ -148,7 +172,10 @@ public class SolegramEdgeBlur {
                     if (v instanceof org.telegram.ui.Components.blur3.capture.IBlur3Capture) {
                         // the way the app's glass sees a list (rows one by one, the cards under them): drawing the
                         // whole list at once gave only the background here
-                        capturePos.set(0, nodeTop - y, v.getWidth(), nodeTop + nodeHeight - y);
+                        // every row, not only those under the band now: the copy holds the rows by reference and
+                        // they move on with a scroll, while this copy is only made again when the screen is redrawn
+                        capturePos.set(-100000, -100000, 100000, 100000);
+                        follow(v);
                         final org.telegram.ui.Components.RecyclerListView list = v instanceof org.telegram.ui.Components.RecyclerListView
                             ? (org.telegram.ui.Components.RecyclerListView) v : null;
                         final boolean sections = list != null && list.solegramCaptureSectionsAllowed();

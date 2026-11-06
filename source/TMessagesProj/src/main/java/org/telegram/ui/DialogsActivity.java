@@ -7665,6 +7665,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // Android 12+: the list blurs out of focus under the header instead of fading into the background
         if (solegramEdgeBlur == null) {
             solegramEdgeBlur = new com.solegram.messenger.ui.SolegramEdgeBlur();
+            solegramEdgeBlur.setHost(fragmentView);
         }
         // under folder tabs the band reaches down to their bottom (their own fade is off then)
         final int band = Math.max(height, (int) (solegramBubblesBandAlpha > 0.01f ? solegramBubblesBandBottom - actionBar.getY() : 0));

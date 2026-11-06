@@ -415,6 +415,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
         };
         contentView.addView(actionBarBackground, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 200, Gravity.TOP));
+        if (solegramHeaderFade != null) {
+            solegramHeaderFade.setHost(actionBarBackground);
+        }
         contentView.addView(actionBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
         if (solegramHeaderFade != null) {
             // the header's buttons in a bubble of glass that sees the list

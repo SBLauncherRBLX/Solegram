@@ -93,6 +93,12 @@ public class SolegramFloatingHeader {
     }
 
     private SolegramEdgeBlur blur;
+    private View host;
+
+    /** The view whose drawing draws this fade, when it is not the header's parent (it is drawn again on scrolls). */
+    public void setHost(View host) {
+        this.host = host;
+    }
     private View[] siblings = new View[0];
 
     /**
@@ -124,6 +130,7 @@ public class SolegramFloatingHeader {
             if (blur == null) {
                 blur = new SolegramEdgeBlur();
             }
+            blur.setHost(host != null ? host : actionBar.getParent() instanceof View ? (View) actionBar.getParent() : null);
             final boolean drawn = blur.draw(canvas, views, width, actionBar.getY(), height, true, color, 0, Utilities.clamp(alpha, 1f, 0f));
             if (views == siblings) {
                 java.util.Arrays.fill(siblings, null);
