@@ -13429,5 +13429,14 @@
     <string name="SG_GuardAllowPaymentsInfo">Stars, gifts and chat ownership. Logging in, the password and sessions stay closed to plugins always</string>
     <string name="SG_GuardAllowPaymentsWarn">Any enabled plugin will be able to spend your Stars, send and transfer gifts and hand over your chats without asking. Turn this on only for plugins you trust completely.</string>
     <string name="SG_GuardAllowPaymentsConfirm">Allow</string>
+    <string name="SG_IconAgency">Space agency</string>
+    <string name="SG_IconComic">Comic</string>
+    <string name="SG_IconMoney">Money</string>
+    <string name="SG_IconLab">Chemistry lab</string>
+    <string name="SG_IconBackrooms">Backrooms</string>
+    <string name="SG_IconDalgona">Dalgona</string>
+    <string name="SG_IconDoor">Purple door</string>
+    <string name="SG_IconPixel">8-bit</string>
+    <string name="SG_IconCandy">Match three</string>
     <!-- SOLEGRAM END -->
 </resources>

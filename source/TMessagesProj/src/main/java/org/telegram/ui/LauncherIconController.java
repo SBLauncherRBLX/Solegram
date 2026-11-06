@@ -220,7 +220,18 @@ public class LauncherIconController {
         SPRING("SpringIcon", R.mipmap.sg_icon_bg_spring, R.mipmap.sg_icon_fg_spring, R.string.SG_IconSpring, false, true),
         SUMMER("SummerIcon", R.mipmap.sg_icon_bg_summer, R.mipmap.sg_icon_fg_summer, R.string.SG_IconSummer, false, true),
         SPACE("SpaceIcon", R.mipmap.sg_icon_bg_space, R.mipmap.sg_icon_fg_space, R.string.SG_IconSpace, false, true),
-        NOIR("NoirIcon", R.mipmap.sg_icon_bg_noir, R.mipmap.sg_icon_fg_noir, R.string.SG_IconNoir, false, true);
+        NOIR("NoirIcon", R.mipmap.sg_icon_bg_noir, R.mipmap.sg_icon_fg_noir, R.string.SG_IconNoir, false, true),
+        // Solegram 3.1: homages (no names, logos or characters) to a space agency and to well-known shows
+        AGENCY("AgencyIcon", R.mipmap.sg_icon_bg_agency, R.mipmap.sg_icon_fg_agency, R.string.SG_IconAgency, false, true),
+        COMIC("ComicIcon", R.mipmap.sg_icon_bg_comic, R.mipmap.sg_icon_fg_comic, R.string.SG_IconComic, false, true),
+        MONEY("MoneyIcon", R.mipmap.sg_icon_bg_money, R.mipmap.sg_icon_fg_money, R.string.SG_IconMoney, false, true),
+        LAB("LabIcon", R.mipmap.sg_icon_bg_lab, R.mipmap.sg_icon_fg_lab, R.string.SG_IconLab, false, true),
+        BACKROOMS("BackroomsIcon", R.mipmap.sg_icon_bg_backrooms, R.mipmap.sg_icon_fg_backrooms, R.string.SG_IconBackrooms, false, true),
+        DALGONA("DalgonaIcon", R.mipmap.sg_icon_bg_dalgona, R.mipmap.sg_icon_fg_dalgona, R.string.SG_IconDalgona, false, true),
+        DOOR("DoorIcon", R.mipmap.sg_icon_bg_door, R.mipmap.sg_icon_fg_door, R.string.SG_IconDoor, false, true),
+        // homages to famous game styles (no names, characters or textures of any particular game)
+        PIXEL("PixelIcon", R.mipmap.sg_icon_bg_pixel, R.mipmap.sg_icon_fg_pixel, R.string.SG_IconPixel, false, true),
+        CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true);
 
         public final String key;
         public final int background;

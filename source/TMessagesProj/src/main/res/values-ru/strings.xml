@@ -2062,5 +2062,14 @@
     <string name="SG_GuardAllowPaymentsInfo">Звёзды, подарки и передача чатов. Вход, пароль и сеансы закрыты для плагинов всегда</string>
     <string name="SG_GuardAllowPaymentsWarn">Любой включённый плагин сможет без вопросов тратить ваши звёзды, дарить и передавать подарки и передавать ваши чаты. Включайте, только если полностью доверяете своим плагинам.</string>
     <string name="SG_GuardAllowPaymentsConfirm">Разрешить</string>
+    <string name="SG_IconAgency">Космическое агентство</string>
+    <string name="SG_IconComic">Комикс</string>
+    <string name="SG_IconMoney">Деньги</string>
+    <string name="SG_IconLab">Химическая лаборатория</string>
+    <string name="SG_IconBackrooms">Закулисье</string>
+    <string name="SG_IconDalgona">Дальгона</string>
+    <string name="SG_IconDoor">Фиолетовая дверь</string>
+    <string name="SG_IconPixel">8 бит</string>
+    <string name="SG_IconCandy">Три в ряд</string>
     <!-- SOLEGRAM END -->
 </resources>
