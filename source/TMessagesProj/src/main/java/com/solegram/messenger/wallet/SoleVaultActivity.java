@@ -110,6 +110,9 @@ public class SoleVaultActivity extends BaseFragment {
         final FrameLayout root = new SoleWalletActivity.HeaderBlurRoot(context, getThemedColor(Theme.key_windowBackgroundGray));
         root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
         final ScrollView scroll = new ScrollView(context);
+        // no stretch at the ends: the stretch is drawn outside the page's own drawing, so the blur and the glass
+        // under the header (which draw the page again) showed it unstretched and jumped while it lasted
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         column = new LinearLayout(context);
         column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(0, ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(8), 0, dp(24));

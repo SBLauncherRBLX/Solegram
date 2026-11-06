@@ -341,7 +341,7 @@
     <string name="SG_HideKeyboardOnScroll">Hide keyboard on scroll</string>
     <string name="SG_NoNextChannel">Don’t jump to the next channel</string>
     <string name="SG_HideShareButton">Hide share button near posts</string>
-    <string name="SG_Confirmations">Ask before sending</string>
+    <string name="SG_Confirmations">Confirmations</string>
     <string name="SG_ConfirmStickers">Stickers and GIFs</string>
     <string name="SG_ConfirmVoice">Voice and video messages</string>
     <string name="SG_ConfirmSendSticker">Send this sticker?</string>
@@ -696,7 +696,7 @@
     <string name="SG_Privacy">Privacy</string>
     <string name="SG_PrivacySub">Ghost mode, deleted and edited messages</string>
     <string name="SG_System">System</string>
-    <string name="SG_SystemSub">Notifications, battery, vibration, calls</string>
+    <string name="SG_SystemSub">Background work, sound, maps, accounts, wallet</string>
     <string name="SG_PluginsSub">Add features with plugins</string>
     <string name="SG_UpdatesSub">Version %1$s</string>
     <string name="SG_HideAndDeclutter">Hide</string>
@@ -763,7 +763,7 @@
     <string name="SG_CameraHd">Send camera photos in HD</string>
     <string name="SG_CameraHdInfo">Photos taken with the camera are sent at 2560 pixels instead of 1280, so details stay sharp. The HD button in the editor still switches it for a single photo.</string>
     <string name="SG_Proxy">Proxy</string>
-    <string name="SG_ProxySub">Telegram where it is blocked</string>
+    <string name="SG_ProxySub">Connect through a proxy when Telegram cannot connect</string>
     <string name="SG_ProxyFind">Find a working proxy</string>
     <string name="SG_ProxyFindSub">Checks public proxies and turns on the fastest</string>
     <string name="SG_ProxyLoading">Downloading proxy lists…</string>
@@ -2008,7 +2008,7 @@
     <string name="SG_WalletSendTapGift">Gift by a tap (SoleDrop)</string>
     <string name="SG_SettingsFeatures">Solegram features</string>
     <string name="SG_SettingsWalletSub">Stars, gifts, collection and savings goals</string>
-    <string name="SG_SettingsMovedInfo">The other Solegram settings are now next to Telegram ones: look and chats in Chat settings, privacy and anti-scam in Privacy and security, reminders in Notifications, browser, camera and proxy in Data and storage. SoleWallet, SoleDrop, profile, now playing and AI are in the main settings list.</string>
+    <string name="SG_SettingsMovedInfo">The other Solegram settings sit in Telegram\'s sections of the same kind: look, glass, main screen, chats and filters in Chat settings; privacy, anti-scam and security in Privacy and security; reminders, background work and sound in Notifications and sounds; browser, camera, proxy and maps in Data and storage. SoleWallet, SoleDrop, profile, now playing and AI are in the main settings list.</string>
     <string name="SG_Studio">Solegram Studio</string>
     <string name="SG_StudioSub">Records the app by scenes, for trailers and screenshots</string>
     <string name="SG_StudioInfo">Studio plays scenes by itself: each starts on the main screen with the folder you choose, opens screens, scrolls and taps like a finger, records each scene into its own video and takes frames. Before recording, Android asks once to allow screen capture. Choose a folder without private chats.</string>
@@ -2048,5 +2048,13 @@
     <string name="SG_FeedPostHidden">The post is hidden from the Feed</string>
     <string name="SG_WalletMoneyUnavailable">Telegram has not opened its wallet for this account yet</string>
     <string name="SG_WalletMoneyUnavailableInfo">Telegram\'s wallet (Grams) is turned on by Telegram itself, account by account, and its server has not turned it on for this account yet. The official Telegram app does not show it to this account either. As soon as Telegram turns it on, it appears right here, behind your SoleWallet code.</string>
+    <string name="SG_MainTitleHeader">Chat list title</string>
+    <string name="SG_SoundAndVibration">Sound and vibration</string>
+    <string name="SG_InChat">In the chat</string>
+    <string name="SG_MessageMenu">Message menu</string>
+    <string name="SG_ChannelsHeader">Channels</string>
+    <string name="SG_BackgroundAndSound">Background work and sound</string>
+    <string name="SG_AccountsSub">Up to 16 accounts in one app</string>
+    <string name="SG_WalletUnifiedMenu">One wallet</string>
     <!-- SOLEGRAM END -->
 </resources>

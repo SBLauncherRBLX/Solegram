@@ -65,7 +65,7 @@ import java.util.ArrayList;
  */
 public class SoleWalletActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
-    private static final int MENU_CODE = 1, MENU_REMOVE_CODE = 2, MENU_STYLE = 3, MENU_TOUR = 4, MENU_LOCK = 5, MENU_BIO = 6;
+    private static final int MENU_CODE = 1, MENU_REMOVE_CODE = 2, MENU_STYLE = 3, MENU_TOUR = 4, MENU_LOCK = 5, MENU_BIO = 6, MENU_UNIFIED = 7;
 
     private FrameLayout root;
     private SoleWalletCardView card;
@@ -75,7 +75,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     private LinearLayout history;
     private LinearLayout goalsBox;
     private TextView asideView, collectionInfo;
-    private org.telegram.ui.ActionBar.ActionBarMenuSubItem bioItem;
+    private org.telegram.ui.ActionBar.ActionBarMenuSubItem bioItem, unifiedItem;
     private boolean showingWallet;
 
     public static void open(BaseFragment from) {
@@ -195,6 +195,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                     showLock();
                 } else if (id == MENU_BIO) {
                     toggleBiometric();
+                } else if (id == MENU_UNIFIED) {
+                    toggleUnified();
                 }
             }
         });
@@ -205,6 +207,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         if (SoleWallet.biometricAvailable(context)) {
             bioItem = other.addSubItem(MENU_BIO, R.drawable.fingerprint, biometricLabel());
         }
+        // one wallet (Telegram's wallet inside SoleWallet, behind its code) is about the wallet: it is set here
+        unifiedItem = other.addSubItem(MENU_UNIFIED, R.drawable.msg_payment_card, getString(R.string.SG_WalletUnifiedMenu), true);
+        unifiedItem.setChecked(com.solegram.messenger.SolegramConfig.unifiedWallet);
         other.addSubItem(MENU_TOUR, R.drawable.msg_help, getString(R.string.SG_WalletTour));
         other.addSubItem(MENU_REMOVE_CODE, R.drawable.msg_delete, getString(R.string.SG_WalletRemoveCode));
 
@@ -223,6 +228,18 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             showWallet();
         }
         return root;
+    }
+
+    private void toggleUnified() {
+        final boolean value = com.solegram.messenger.SolegramConfig.toggle("unifiedWallet");
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "unifiedWallet");
+        if (unifiedItem != null) {
+            unifiedItem.setChecked(value);
+        }
+        if (showingWallet) {
+            showWallet(); // the Money row comes or goes
+        }
+        org.telegram.ui.Components.BulletinFactory.of(this).createSimpleBulletin(R.raw.info, getString(R.string.SG_WalletUnifiedInfo)).show();
     }
 
     private void swap(View page) {
@@ -881,6 +898,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         column.addView(history, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 0, 12, 0));
 
         final ScrollView scroll = new ScrollView(context);
+        // no stretch at the ends: the stretch is drawn outside the page's own drawing, so the blur and the glass
+        // under the header (which draw the page again) showed it unstretched and jumped while it lasted
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setClipChildren(false);
         scroll.addView(column);
         swap(scroll);
@@ -1811,10 +1831,27 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             super.onDetachedFromWindow();
         }
 
+        private boolean redrawPosted;
+
+        /**
+         * Something on the page changed (the card turning, a balance, a row): the band under the header draws the
+         * page again too, or it kept an old picture of it.
+         */
+        @Override
+        @androidx.annotation.RequiresApi(26)
+        public void onDescendantInvalidated(@androidx.annotation.NonNull View child, @androidx.annotation.NonNull View target) {
+            super.onDescendantInvalidated(child, target);
+            if (!redrawPosted) {
+                redrawPosted = true;
+                postInvalidateOnAnimation();
+            }
+        }
+
         private boolean blurDrawn;
 
         @Override
         protected void dispatchDraw(@androidx.annotation.NonNull Canvas canvas) {
+            redrawPosted = false;
             blurDrawn = false;
             super.dispatchDraw(canvas);
             if (!blurDrawn) {

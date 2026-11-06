@@ -85,6 +85,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     public static final int PAGE_SCAM = 14;
     public static final int PAGE_PREMIUM = 15;
     public static final int PAGE_SOLEDROP = 30;
+    public static final int PAGE_MAPS = 16;
 
     private final int page;
 
@@ -432,6 +433,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case PAGE_PREMIUM:
                 fillPremium(items);
                 break;
+            case PAGE_MAPS:
+                fillMaps(items);
+                break;
             default:
                 fillMain(items);
         }
@@ -447,15 +451,18 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCustomShadow(headerView()).setChecked(true)); // full width: the haze dissolves into the page, not a card; checked = its cell does not clip (the haze reaches the top)
         items.add(UItem.asShadow(null));
 
-        // Solegram's settings of the same kind as Telegram's now sit in Telegram's sections, its own features in the
-        // main settings list; what stays here is the app itself
+        // Solegram's settings sit in Telegram's sections of the same kind (and its own features in the main
+        // settings list); what stays here is the app itself
         items.add(UItem.asHeader(getString(R.string.SG_SectionApp)));
         String updateValue = UpdateController.getInstance().hasPendingUpdate() ? getString(R.string.SG_UpdateAvailableShort) : "";
         items.add(tile(UItem.asButton(ID_UPDATES, R.drawable.msg_download, getString(R.string.SG_Updates), updateValue), TILE_BLUE)
             .setSolegramSubtitle(LocaleController.formatString(R.string.SG_UpdatesSub, Solegram.getVersionName())));
         String pluginsValue = PluginsController.isEngineAvailable() ? String.valueOf(PluginsController.getInstance().getLoadedCount()) : "";
         items.add(category(ID_PLUGINS, R.drawable.msg_bots, R.string.SG_Plugins, R.string.SG_PluginsSub, pluginsValue, TILE_ORANGE));
-        items.add(category(ID_GENERAL, R.drawable.msg_settings, R.string.SG_System, R.string.SG_SystemSub, null, TILE_GRAY));
+        // accounts: up to 16 for free (UserConfig.MAX_ACCOUNT_COUNT)
+        items.add(tile(UItem.asButton(ID_ADD_ACCOUNT, R.drawable.outline_add_account, getString(R.string.SG_Accounts),
+            org.telegram.messenger.UserConfig.getActivatedAccountsCount() + " / " + org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT), TILE_BLUE)
+            .setSolegramSubtitle(getString(R.string.SG_AccountsSub)));
         // the Studio is for betas only: recording trailers is not a feature of the public app
         if (org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")) {
             items.add(category(ID_STUDIO, R.drawable.msg_camera, R.string.SG_Studio, R.string.SG_StudioSub, null, TILE_PINK));
@@ -489,15 +496,11 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
         items.add(UItem.asHeader(getString(R.string.SG_Interface)));
         items.add(UItem.asButtonCheck(ID_SYSTEM_FONT, getString(R.string.SG_SystemFont), getString(R.string.SG_SystemFontInfo)).setChecked(SolegramConfig.useSystemFont));
-        items.add(tile(UItem.asButton(ID_MAIN_TITLE, R.drawable.msg_edit, getString(R.string.SG_MainTitle), mainTitleName(SolegramConfig.mainTitle)), TILE_ORANGE));
-        items.add(tile(UItem.asButton(ID_TITLE_EMOJI, R.drawable.msg2_smile_status, getString(R.string.SG_TitleEmoji),
-            getString(com.solegram.messenger.SolegramTitleEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_YELLOW));
-        items.add(UItem.asCheck(ID_CENTER_TITLE, getString(R.string.SG_CenterTitle)).setChecked(SolegramConfig.centerTitle));
         if (Build.VERSION.SDK_INT >= 31) {
             items.add(UItem.asButtonCheck(ID_MONET, getString(R.string.SG_Monet), getString(R.string.SG_MonetInfo)).setChecked(SolegramConfig.monetAccent));
         }
         items.add(tile(UItem.asButton(ID_THEMES, R.drawable.msg_theme, getString(R.string.SG_ThemesAndIcons)), TILE_BLUE));
-        items.add(UItem.asShadow(getString(R.string.SG_NameEmojiInfo)));
+        items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_IconPack)));
         if (iconPackPicker == null) {
@@ -766,26 +769,36 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asButtonCheck(ID_SEND_SILENTLY, getString(R.string.SG_SendSilently), getString(R.string.SG_SendSilentlyInfo)).setChecked(SolegramConfig.sendSilently));
         items.add(UItem.asButtonCheck(ID_NO_LINK_PREVIEWS, getString(R.string.SG_NoLinkPreviews), getString(R.string.SG_NoLinkPreviewsInfo)).setChecked(SolegramConfig.disableLinkPreviews));
         items.add(UItem.asButtonCheck(ID_VOICE_ONLY, getString(R.string.SG_VoiceOnly), getString(R.string.SG_VoiceOnlyInfo)).setChecked(SolegramConfig.voiceOnlyRecord));
-        items.add(UItem.asCheck(ID_NO_SWIPE_REPLY, getString(R.string.SG_NoSwipeReply)).setChecked(SolegramConfig.disableSwipeToReply));
+        items.add(UItem.asButtonCheck(ID_FORWARD_NO_AUTHOR, getString(R.string.SG_ForwardNoAuthor), getString(R.string.SG_ForwardNoAuthorInfo)).setChecked(SolegramConfig.forwardWithoutAuthor));
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asHeader(getString(R.string.SG_Messages)));
-        items.add(UItem.asButtonCheck(ID_STREAKS, getString(R.string.SG_Streaks), getString(R.string.SG_StreaksInfo)).setChecked(SolegramConfig.streaks));
+        // in the chat: how messages look and what touching them does
+        items.add(UItem.asHeader(getString(R.string.SG_InChat)));
         items.add(tile(UItem.asButton(ID_DOUBLE_TAP, R.drawable.msg_reactions2, getString(R.string.SG_DoubleTap), doubleTapName(SolegramConfig.doubleTapAction)), TILE_PINK));
+        items.add(UItem.asCheck(ID_NO_SWIPE_REPLY, getString(R.string.SG_NoSwipeReply)).setChecked(SolegramConfig.disableSwipeToReply));
         items.add(UItem.asCheck(ID_SHOW_SECONDS, getString(R.string.SG_ShowSeconds)).setChecked(SolegramConfig.showSeconds));
         items.add(UItem.asCheck(ID_SHOW_MESSAGE_ID, getString(R.string.SG_ShowMessageId)).setChecked(SolegramConfig.showMessageId));
         items.add(UItem.asCheck(ID_HIDE_KEYBOARD, getString(R.string.SG_HideKeyboardOnScroll)).setChecked(SolegramConfig.hideKeyboardOnScroll));
-        items.add(UItem.asCheck(ID_NO_NEXT_CHANNEL, getString(R.string.SG_NoNextChannel)).setChecked(SolegramConfig.disableJumpToNextChannel));
-        items.add(UItem.asCheck(ID_HIDE_SHARE, getString(R.string.SG_HideShareButton)).setChecked(SolegramConfig.hideShareButton));
+        items.add(UItem.asButtonCheck(ID_STREAKS, getString(R.string.SG_Streaks), getString(R.string.SG_StreaksInfo)).setChecked(SolegramConfig.streaks));
+        items.add(UItem.asShadow(null));
+
+        // the menu of a message
+        items.add(UItem.asHeader(getString(R.string.SG_MessageMenu)));
         items.add(UItem.asButtonCheck(ID_MESSAGE_DETAILS, getString(R.string.SG_MessageDetailsItem), getString(R.string.SG_MessageDetailsItemInfo)).setChecked(SolegramConfig.messageDetails));
         items.add(UItem.asButtonCheck(ID_JUMP_TO_FIRST, getString(R.string.SG_JumpToFirstItem), getString(R.string.SG_JumpToFirstItemInfo)).setChecked(SolegramConfig.jumpToFirstInMenu));
-        items.add(UItem.asButtonCheck(ID_FORWARD_NO_AUTHOR, getString(R.string.SG_ForwardNoAuthor), getString(R.string.SG_ForwardNoAuthorInfo)).setChecked(SolegramConfig.forwardWithoutAuthor));
+        items.add(UItem.asShadow(null));
+
+        // channels
+        items.add(UItem.asHeader(getString(R.string.SG_ChannelsHeader)));
+        items.add(UItem.asCheck(ID_NO_NEXT_CHANNEL, getString(R.string.SG_NoNextChannel)).setChecked(SolegramConfig.disableJumpToNextChannel));
+        items.add(UItem.asCheck(ID_HIDE_SHARE, getString(R.string.SG_HideShareButton)).setChecked(SolegramConfig.hideShareButton));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_Confirmations)));
         items.add(UItem.asCheck(ID_CONFIRM_STICKERS, getString(R.string.SG_ConfirmStickers)).setChecked(SolegramConfig.confirmStickers));
         items.add(UItem.asCheck(ID_CONFIRM_GIFS, getString(R.string.SG_ConfirmGifs)).setChecked(SolegramConfig.confirmGifs));
         items.add(UItem.asCheck(ID_CONFIRM_VOICE, getString(R.string.SG_ConfirmVoice)).setChecked(SolegramConfig.confirmVoice));
+        items.add(UItem.asCheck(ID_CONFIRM_CALLS, getString(R.string.SG_ConfirmCalls)).setChecked(SolegramConfig.confirmCalls));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_PremiumChats)));
@@ -920,10 +933,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_APPEARANCE, 0, R.string.SG_IconPack, 18},
         {PAGE_APPEARANCE, ID_ICONS_LINES, R.string.SG_SettingsIcons, 18},
         {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_SystemFont, -1},
-        {PAGE_APPEARANCE, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
-        {PAGE_APPEARANCE, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
+        {PAGE_MAIN_SCREEN, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
+        {PAGE_MAIN_SCREEN, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
         {PAGE_PREMIUM, ID_NAME_EMOJI, R.string.SG_NameEmoji, -1},
-        {PAGE_APPEARANCE, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
+        {PAGE_MAIN_SCREEN, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
         {PAGE_APPEARANCE, ID_SMOOTH_TRANSITIONS, R.string.SG_SmoothTransitions, -1},
         {PAGE_APPEARANCE, ID_PRESS_SCALE, R.string.SG_PressScale, -1},
         {PAGE_APPEARANCE, ID_ANIMATE_LISTS, R.string.SG_AnimateLists, -1},
@@ -1024,18 +1037,19 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_PROXY, ID_PROXY_AUTO, R.string.SG_ProxyAuto, 11},
         {PAGE_PROXY, ID_PROXY_USE, R.string.SG_ProxyUse, 11},
         {PAGE_PROXY, ID_PROXY_CLEAR, R.string.SG_ProxyClear, 11},
-        {PAGE_GENERAL, 0, R.string.SG_System, -1},
+        {PAGE_GENERAL, 0, R.string.SG_BackgroundAndSound, -1},
+        {PAGE_MAPS, 0, R.string.SG_Maps, -1},
         {PAGE_GENERAL, ID_BACKGROUND, R.string.SG_BackgroundConnection, -1},
         {PAGE_GENERAL, ID_BATTERY, R.string.SG_BatteryOptimization, -1},
-        {PAGE_GENERAL, ID_CONFIRM_CALLS, R.string.SG_ConfirmCalls, -1},
+        {PAGE_CHATS, ID_CONFIRM_CALLS, R.string.SG_ConfirmCalls, -1},
         {PAGE_GENERAL, ID_PROXIMITY, R.string.SG_DisableProximity, -1},
         {PAGE_GENERAL, ID_NO_VIBRATION, R.string.SG_DisableVibration, -1},
-        {PAGE_GENERAL, ID_ADD_ACCOUNT, R.string.SG_Accounts, -1},
+        {PAGE_MAIN, ID_ADD_ACCOUNT, R.string.SG_Accounts, -1},
         {PAGE_UPDATES, 0, R.string.SG_Updates, 9},
         {PAGE_UPDATES, ID_AUTO_UPDATE, R.string.SG_AutoUpdate, 9},
         {PAGE_UPDATES, ID_BETA_CODE, R.string.SG_Beta, 9},
-        {PAGE_GENERAL, ID_MAP_ENGINE, R.string.SG_MapEngine, -1},
-        {PAGE_GENERAL, ID_MAPS_NAV, R.string.SG_MapsNavApp, -1},
+        {PAGE_MAPS, ID_MAP_ENGINE, R.string.SG_MapEngine, -1},
+        {PAGE_MAPS, ID_MAPS_NAV, R.string.SG_MapsNavApp, -1},
         {PAGE_MAIN, ID_EXPORT, R.string.SG_ExportSettings, 10},
         {PAGE_MAIN, ID_IMPORT, R.string.SG_ImportSettings, 10},
         {PAGE_PLUGINS, 0, R.string.SG_Plugins, 14},
@@ -1180,7 +1194,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case PAGE_GHOST:
                 return LocaleController.getString(R.string.SG_Privacy);
             case PAGE_GENERAL:
-                return LocaleController.getString(R.string.SG_System);
+                return LocaleController.getString(R.string.SG_BackgroundAndSound);
+            case PAGE_MAPS:
+                return LocaleController.getString(R.string.SG_Maps);
             case PAGE_UPDATES:
                 return LocaleController.getString(R.string.SG_Updates);
             case PAGE_ABOUT:
@@ -1966,35 +1982,36 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_BATTERY, R.drawable.msg2_battery, getString(R.string.SG_BatteryOptimization), isIgnoringBatteryOptimizations() ? getString(R.string.SG_Off) : getString(R.string.SG_On)), TILE_GREEN));
         items.add(UItem.asShadow(getString(R.string.SG_NotificationsInfo)));
 
-        items.add(UItem.asHeader(getString(R.string.SG_Behaviour)));
-        items.add(UItem.asCheck(ID_CONFIRM_CALLS, getString(R.string.SG_ConfirmCalls)).setChecked(SolegramConfig.confirmCalls));
+        items.add(UItem.asHeader(getString(R.string.SG_SoundAndVibration)));
         items.add(UItem.asCheck(ID_PROXIMITY, getString(R.string.SG_DisableProximity)).setChecked(SolegramConfig.disableProximitySensor));
         items.add(UItem.asButtonCheck(ID_NO_VIBRATION, getString(R.string.SG_DisableVibration), getString(R.string.SG_DisableVibrationInfo)).setChecked(SolegramConfig.disableVibration));
         items.add(UItem.asShadow(null));
 
+    }
+
+    private void fillMaps(ArrayList<UItem> items) {
         // maps: the map in the app and the app routes open in
         items.add(UItem.asHeader(getString(R.string.SG_Maps)));
         items.add(tile(UItem.asButton(ID_MAP_ENGINE, R.drawable.msg_location, getString(R.string.SG_MapEngine), com.solegram.messenger.maps.SolegramMaps.engineName(SolegramConfig.mapEngine)), TILE_GREEN));
         items.add(tile(UItem.asButton(ID_MAPS_NAV, R.drawable.msg_shareout, getString(R.string.SG_MapsNavApp), com.solegram.messenger.maps.SolegramMaps.navName(SolegramConfig.mapsNavApp)), TILE_BLUE));
         items.add(UItem.asShadow(getString(R.string.SG_MapsInfo)));
-
-        // accounts: up to 16 for free (UserConfig.MAX_ACCOUNT_COUNT)
-        final int maxAccounts = org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT;
-        final int accounts = org.telegram.messenger.UserConfig.getActivatedAccountsCount();
-        items.add(UItem.asHeader(getString(R.string.SG_Accounts)));
-        items.add(tile(UItem.asButton(ID_ADD_ACCOUNT, R.drawable.outline_add_account, getString(R.string.AddAccount), accounts + " / " + maxAccounts), TILE_BLUE));
-        items.add(UItem.asShadow(getString(R.string.SG_AccountsInfo)));
-
     }
 
     private void fillMainScreen(ArrayList<UItem> items) {
+        // the title of the chat list: what it says, its emoji, where it sits (were in Appearance)
+        items.add(UItem.asHeader(getString(R.string.SG_MainTitleHeader)));
+        items.add(tile(UItem.asButton(ID_MAIN_TITLE, R.drawable.msg_edit, getString(R.string.SG_MainTitle), mainTitleName(SolegramConfig.mainTitle)), TILE_ORANGE));
+        items.add(tile(UItem.asButton(ID_TITLE_EMOJI, R.drawable.msg2_smile_status, getString(R.string.SG_TitleEmoji),
+            getString(com.solegram.messenger.SolegramTitleEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_YELLOW));
+        items.add(UItem.asCheck(ID_CENTER_TITLE, getString(R.string.SG_CenterTitle)).setChecked(SolegramConfig.centerTitle));
+        items.add(UItem.asShadow(getString(R.string.SG_NameEmojiInfo)));
+
         items.add(UItem.asHeader(getString(R.string.SG_ChatsScreen)));
         items.add(UItem.asButtonCheck(ID_REMEMBER_FOLDER, getString(R.string.SG_RememberFolder), getString(R.string.SG_RememberFolderInfo)).setChecked(SolegramConfig.rememberFolder));
         items.add(UItem.asCheck(ID_MARK_ALL_READ, getString(R.string.SG_MarkAllReadInMenu)).setChecked(SolegramConfig.markAllReadInMenu));
         items.add(UItem.asCheck(ID_SAVED_IN_MENU, getString(R.string.SG_SavedInMenu)).setChecked(SolegramConfig.savedInMenu));
         items.add(tile(UItem.asButton(ID_TABS_LAYOUT, R.drawable.msg_list, getString(R.string.SG_TabsLayout), getString(com.solegram.messenger.SolegramTabs.isCustom() ? R.string.SG_TabsCustom : R.string.SG_TabsTelegram)), TILE_BLUE));
         items.add(UItem.asButtonCheck(ID_TABS_SEARCH, getString(R.string.SG_TabsSearchButton), getString(R.string.SG_TabsSearchButtonInfo)).setChecked(SolegramConfig.tabsSearchButton));
-        items.add(UItem.asButtonCheck(ID_UNIFIED_WALLET, getString(R.string.SG_WalletUnified), getString(R.string.SG_WalletUnifiedInfo)).setChecked(SolegramConfig.unifiedWallet));
         if (!com.solegram.messenger.SolegramTabs.isCustom()) {
             items.add(UItem.asCheck(ID_HIDE_CONTACTS_TAB, getString(SolegramConfig.feedInsteadOfContacts ? R.string.SG_HideFeedTab : R.string.SG_HideContactsTab)).setChecked(SolegramConfig.hideContactsTab));
             items.add(UItem.asCheck(ID_HIDE_PROFILE_TAB, getString(R.string.SG_HideProfileTab)).setChecked(SolegramConfig.hideProfileTab));

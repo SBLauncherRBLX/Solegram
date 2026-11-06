@@ -328,7 +328,7 @@
     <string name="SG_HideKeyboardOnScroll">Скрывать клавиатуру при прокрутке</string>
     <string name="SG_NoNextChannel">Не переходить к следующему каналу</string>
     <string name="SG_HideShareButton">Скрыть кнопку «Поделиться» у постов</string>
-    <string name="SG_Confirmations">Подтверждать отправку</string>
+    <string name="SG_Confirmations">Подтверждения</string>
     <string name="SG_ConfirmStickers">Стикеры и GIF</string>
     <string name="SG_ConfirmVoice">Голосовые и видеосообщения</string>
     <string name="SG_ConfirmSendSticker">Отправить этот стикер?</string>
@@ -683,7 +683,7 @@
     <string name="SG_Privacy">Приватность</string>
     <string name="SG_PrivacySub">Режим призрака, удалённые и изменённые сообщения</string>
     <string name="SG_System">Система</string>
-    <string name="SG_SystemSub">Уведомления, батарея, вибрация, звонки</string>
+    <string name="SG_SystemSub">Фоновая работа, звук, карты, аккаунты, кошелёк</string>
     <string name="SG_PluginsSub">Новые функции с помощью плагинов</string>
     <string name="SG_UpdatesSub">Версия %1$s</string>
     <string name="SG_HideAndDeclutter">Скрыть</string>
@@ -750,7 +750,7 @@
     <string name="SG_CameraHd">Отправлять фото с камеры в HD</string>
     <string name="SG_CameraHdInfo">Фото с камеры отправляются в 2560 пикселей вместо 1280, детали остаются чёткими. Кнопкой HD в редакторе это можно переключить для отдельного фото.</string>
     <string name="SG_Proxy">Прокси</string>
-    <string name="SG_ProxySub">Обход блокировок Telegram</string>
+    <string name="SG_ProxySub">Подключение через прокси, когда Telegram не может подключиться</string>
     <string name="SG_ProxyFind">Найти рабочий прокси</string>
     <string name="SG_ProxyFindSub">Проверит публичные прокси и включит самый быстрый</string>
     <string name="SG_ProxyLoading">Загружаю списки прокси…</string>
@@ -1995,7 +1995,7 @@
     <string name="SG_WalletSendTapGift">Подарок касанием (SoleDrop)</string>
     <string name="SG_SettingsFeatures">Возможности Solegram</string>
     <string name="SG_SettingsWalletSub">Звёзды, подарки, коллекция и копилки</string>
-    <string name="SG_SettingsMovedInfo">Остальные настройки Solegram теперь рядом с настройками Telegram: оформление и чаты — в «Настройках чатов», приватность и защита от мошенников — в «Конфиденциальности», напоминания — в «Уведомлениях», браузер, камера и прокси — в «Данных и памяти». SoleWallet, SoleDrop, профиль, «Сейчас играет» и ИИ — в общем списке настроек.</string>
+    <string name="SG_SettingsMovedInfo">Остальные настройки Solegram лежат в похожих по смыслу разделах Telegram: оформление, стекло, главный экран, чаты и фильтры — в «Настройках чатов»; приватность, защита от мошенников и безопасность — в «Конфиденциальности»; напоминания, фоновая работа и звук — в «Уведомлениях и звуках»; браузер, камера, прокси и карты — в «Данных и памяти». SoleWallet, SoleDrop, профиль, музыка и ИИ — в общем списке настроек.</string>
     <string name="SG_Studio">Solegram Studio</string>
     <string name="SG_StudioSub">Запись приложения по сценам — для трейлеров и скриншотов</string>
     <string name="SG_StudioInfo">Студия сама проигрывает сцены: каждая начинается на главном экране с выбранной папкой, открывает экраны, листает и нажимает как палец, записывает сцену в отдельное видео и делает кадры. Перед записью Android один раз спросит разрешение на запись экрана. Выберите папку без личных переписок.</string>
@@ -2035,5 +2035,13 @@
     <string name="SG_FeedPostHidden">Пост скрыт из ленты</string>
     <string name="SG_WalletMoneyUnavailable">Telegram ещё не открыл кошелёк для этого аккаунта</string>
     <string name="SG_WalletMoneyUnavailableInfo">Кошелёк Telegram (граммы) включает сам Telegram, для каждого аккаунта отдельно, и его сервер пока не включил кошелёк для этого аккаунта. Официальное приложение Telegram его этому аккаунту тоже не покажет. Как только Telegram его включит, он появится прямо здесь, за кодом SoleWallet.</string>
+    <string name="SG_MainTitleHeader">Заголовок списка чатов</string>
+    <string name="SG_SoundAndVibration">Звук и вибрация</string>
+    <string name="SG_InChat">В чате</string>
+    <string name="SG_MessageMenu">Меню сообщения</string>
+    <string name="SG_ChannelsHeader">Каналы</string>
+    <string name="SG_BackgroundAndSound">Фоновая работа и звук</string>
+    <string name="SG_AccountsSub">До 16 аккаунтов в одном приложении</string>
+    <string name="SG_WalletUnifiedMenu">Единый кошелёк</string>
     <!-- SOLEGRAM END -->
 </resources>
