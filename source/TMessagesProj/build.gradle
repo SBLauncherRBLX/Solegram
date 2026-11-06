@@ -119,10 +119,16 @@ android {
     ndkVersion "27.2.12479018"
 
 
-    externalNativeBuild {
-        cmake {
-            path 'jni/CMakeLists.txt'
+    // A machine without the NDK and the native submodules can build with libtmessages taken from a released APK
+    // (TMessagesProj/jniLibs/<abi>/libtmessages.49.so, git-ignored); the native code is the same.
+    if (!file('jniLibs/arm64-v8a/libtmessages.49.so').exists()) {
+        externalNativeBuild {
+            cmake {
+                path 'jni/CMakeLists.txt'
+            }
         }
+    } else {
+        sourceSets.main.jniLibs.srcDirs += 'jniLibs'
     }
 
     lintOptions {
@@ -161,11 +167,13 @@ android {
         buildConfigField "String", "SOLEGRAM_API_HASH", "\"" + (getSolegramProp("SOLEGRAM_API_HASH") ?: "") + "\""
         buildConfigField "String", "SOLEGRAM_UPDATE_CHANNEL", "\"" + (getSolegramProp("SOLEGRAM_UPDATE_CHANNEL") ?: "solegram_updates") + "\""
 
-        externalNativeBuild {
-            cmake {
-                version '3.22.1'
-                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' //, '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
-                targets 'tmessages.49'
+        if (!file('jniLibs/arm64-v8a/libtmessages.49.so').exists()) {
+            externalNativeBuild {
+                cmake {
+                    version '3.22.1'
+                    arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' //, '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                    targets 'tmessages.49'
+                }
             }
         }
     }

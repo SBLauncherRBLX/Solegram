@@ -433,7 +433,29 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
         iBlur3FactoryFade.setSourceRootView(viewPositionWatcher, contentView);
 
-        fadeView = new View(context);
+        // Solegram: above the tab bar the pages blur out of focus (Android 12+) instead of fading into the background
+        final com.solegram.messenger.ui.SolegramEdgeBlur sgEdgeBlur = new com.solegram.messenger.ui.SolegramEdgeBlur();
+        fadeView = new View(context) {
+            private final View[] pages = new View[1];
+
+            @Override
+            public void draw(Canvas canvas) {
+                if (viewPager != null && contentView != null && viewPager.getParent() == contentView
+                        && com.solegram.messenger.ui.SolegramEdgeBlur.supported(canvas) && getParent() == contentView) {
+                    final float top = getTop() + getTranslationY();
+                    pages[0] = viewPager;
+                    canvas.save();
+                    canvas.translate(-getLeft() - getTranslationX(), -top);
+                    final boolean drawn = sgEdgeBlur.draw(canvas, pages, getWidth(), top, getHeight(), false, getEstBackgroundColor(), 0x50, 1f);
+                    canvas.restore();
+                    pages[0] = null;
+                    if (drawn) {
+                        return;
+                    }
+                }
+                super.draw(canvas);
+            }
+        };
         BlurredBackgroundWithFadeDrawable fadeDrawable = new BlurredBackgroundWithFadeDrawable(iBlur3FactoryFade.create(fadeView, null));
         fadeDrawable.setFadeHeight(dp(60), true);
         fadeView.setBackground(fadeDrawable);
@@ -498,70 +520,15 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private final RectF sgLensRect = new RectF();
 
     private void sgCreateSearchButton(Context context, BlurredBackgroundDrawableViewFactory factory) {
-        sgSearchButton = new FrameLayout(context) {
-            // a soft white light under the finger, inside the glass circle (as on the app's other glass buttons)
-            private final android.graphics.Paint glowPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-            private final android.graphics.Path circle = new android.graphics.Path();
-            private float gx, gy;
-            private final com.solegram.messenger.ui.SolegramLiquid.Spring glow = new com.solegram.messenger.ui.SolegramLiquid.Spring(0).params(0.22f, 1f).rest(0.003f);
-            private long last;
-
-            @Override
-            public boolean onTouchEvent(android.view.MotionEvent e) {
-                switch (e.getActionMasked()) {
-                    case android.view.MotionEvent.ACTION_DOWN:
-                    case android.view.MotionEvent.ACTION_MOVE:
-                        gx = e.getX();
-                        gy = e.getY();
-                        glow.to(1);
-                        invalidate();
-                        break;
-                    case android.view.MotionEvent.ACTION_UP:
-                    case android.view.MotionEvent.ACTION_CANCEL:
-                        glow.params(0.4f, 1f);
-                        glow.to(0);
-                        invalidate();
-                        break;
-                }
-                return super.onTouchEvent(e);
-            }
-
-            @Override
-            protected void dispatchDraw(@NonNull Canvas canvas) {
-                super.dispatchDraw(canvas);
-                final long now = System.nanoTime();
-                final float dt = last == 0 ? 1f / 60f : Math.max(0, Math.min(1f / 30f, (now - last) / 1e9f));
-                last = now;
-                final boolean moving = glow.step(dt);
-                if (!moving) {
-                    last = 0;
-                    glow.params(0.22f, 1f);
-                }
-                final float a = Math.max(0, Math.min(1, glow.value));
-                if (a > 0.005f) {
-                    final float pad = dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f);
-                    final float cx = getWidth() / 2f, cy = getHeight() / 2f, r = Math.min(getWidth(), getHeight()) / 2f - pad;
-                    circle.rewind();
-                    circle.addCircle(cx, cy, r, android.graphics.Path.Direction.CW);
-                    final float lr = r * 1.3f;
-                    glowPaint.setShader(new android.graphics.RadialGradient(gx, gy, lr,
-                        new int[]{Theme.isCurrentThemeDark() ? 0x40FFFFFF : 0x66FFFFFF, Theme.isCurrentThemeDark() ? 0x14FFFFFF : 0x22FFFFFF, 0x00FFFFFF},
-                        new float[]{0f, 0.45f, 1f}, android.graphics.Shader.TileMode.CLAMP));
-                    glowPaint.setAlpha((int) (255 * a));
-                    canvas.save();
-                    canvas.clipPath(circle);
-                    canvas.drawCircle(gx, gy, lr, glowPaint);
-                    canvas.restore();
-                }
-                if (moving) {
-                    postInvalidateOnAnimation();
-                }
-            }
-        };
+        sgSearchButton = new FrameLayout(context);
         sgSearchBackground = factory.create(sgSearchButton, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
         sgSearchBackground.setRadius(dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
         sgSearchBackground.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
         sgSearchButton.setBackground(sgSearchBackground);
+        // the press light of Telegram's other buttons, inside the glass circle
+        sgSearchButton.setForeground(new android.graphics.drawable.InsetDrawable(
+            Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 6, dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f)),
+            dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f)));
         sgSearchIcon = new android.widget.ImageView(context);
         sgSearchIcon.setScaleType(android.widget.ImageView.ScaleType.CENTER);
         sgSearchIcon.setImageResource(R.drawable.outline_header_search);
@@ -1681,6 +1648,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         iBlur3SourceTabGlass.setSize(width, height);
         iBlur3SourceTabGlass.updateDisplayListIfNeeded();
+        if (fadeView != null) {
+            fadeView.invalidate(); // Solegram: the blur above the tab bar follows the list
+        }
     }
 
     private void blur3_updateFadeColors() {

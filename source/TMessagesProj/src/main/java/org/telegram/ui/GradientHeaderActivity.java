@@ -479,7 +479,7 @@ public abstract class GradientHeaderActivity extends BaseFragment {
                 return true;
             }
             if (child == actionBar && solegramHeaderAlpha > 0.01f) {
-                solegramFade.draw(canvas, actionBar, getMeasuredWidth(), headerBgPaint.getColor() | 0xFF000000, solegramHeaderAlpha);
+                solegramFade.draw(canvas, actionBar, getMeasuredWidth(), headerBgPaint.getColor() | 0xFF000000, solegramHeaderAlpha, new View[]{listView});
             }
             return super.drawChild(canvas, child, drawingTime);
         }

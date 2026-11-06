@@ -14,7 +14,24 @@ import org.telegram.ui.Components.ForegroundDetector;
 import java.util.Calendar;
 
 public class LauncherIconController {
+    /** Icons taken out of the picker; their launcher entries stay in the manifest so an install that has one on keeps an icon until the switch below. */
+    private static final String[] RETIRED = {"NeonIcon"};
+
     public static void tryFixLauncherIconIfNeeded() {
+        // Solegram: a retired icon that is still on gives way to the default one
+        try {
+            final Context ctx = ApplicationLoader.applicationContext;
+            final PackageManager pm = ctx.getPackageManager();
+            for (String key : RETIRED) {
+                final ComponentName cn = new ComponentName(ctx.getPackageName(), "org.telegram.messenger." + key);
+                if (pm.getComponentEnabledSetting(cn) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                    setIcon(LauncherIcon.DEFAULT);
+                    pm.setComponentEnabledSetting(cn, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+                }
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
         boolean any = false;
         for (LauncherIcon icon : LauncherIcon.values()) {
             if (isEnabled(icon)) {
@@ -195,7 +212,6 @@ public class LauncherIconController {
         SAKURA("SakuraIcon", R.drawable.sg_icon_bg_sakura, R.drawable.sg_icon_fg_sakura, R.string.SG_IconSakura),
         MINT("MintIcon", R.drawable.sg_icon_bg_mint, R.drawable.sg_icon_fg_mint, R.string.SG_IconMint),
         LAVENDER("LavenderIcon", R.drawable.sg_icon_bg_lavender, R.drawable.sg_icon_fg_lavender, R.string.SG_IconLavender),
-        NEON("NeonIcon", R.drawable.sg_icon_bg_neon, R.drawable.sg_icon_fg_neon, R.string.SG_IconNeon),
         SNOW("SnowIcon", R.drawable.sg_icon_bg_snow, R.drawable.sg_icon_fg_snow, R.string.SG_IconSnow),
         GRAPHITE("GraphiteIcon", R.drawable.sg_icon_bg_graphite, R.drawable.sg_icon_fg_graphite, R.string.SG_IconGraphite),
         // Solegram 2.5: themed icons (raster layers in mipmap), shown in their own row of the picker

@@ -89,12 +89,48 @@ public class SolegramFloatingHeader {
      * @param color     the screen's background colour (darkens in a dark theme, lightens in a light one)
      */
     public void draw(Canvas canvas, View actionBar, int width, int color, float alpha) {
+        draw(canvas, actionBar, width, color, alpha, null);
+    }
+
+    private SolegramEdgeBlur blur;
+    private View[] siblings = new View[0];
+
+    /**
+     * Same, with the views to blur under the header given (null: the header's siblings drawn before it). On
+     * Android 12+ the list blurs out of focus under the header; the plain fade stays for older versions.
+     * The canvas is in the coordinates of the header's parent.
+     */
+    public void draw(Canvas canvas, View actionBar, int width, int color, float alpha, @Nullable View[] contents) {
         if (alpha <= 0f || actionBar == null || width <= 0) {
             return;
         }
         final int height = actionBar.getMeasuredHeight();
         if (height <= 0) {
             return;
+        }
+        if (SolegramEdgeBlur.supported(canvas)) {
+            View[] views = contents;
+            if (views == null && actionBar.getParent() instanceof ViewGroup) {
+                final ViewGroup parent = (ViewGroup) actionBar.getParent();
+                final int index = parent.indexOfChild(actionBar);
+                if (siblings.length != Math.max(0, index)) {
+                    siblings = new View[Math.max(0, index)];
+                }
+                for (int i = 0; i < siblings.length; i++) {
+                    siblings[i] = parent.getChildAt(i);
+                }
+                views = siblings;
+            }
+            if (blur == null) {
+                blur = new SolegramEdgeBlur();
+            }
+            final boolean drawn = blur.draw(canvas, views, width, actionBar.getY(), height, true, color, 0x70, Utilities.clamp(alpha, 1f, 0f));
+            if (views == siblings) {
+                java.util.Arrays.fill(siblings, null);
+            }
+            if (drawn) {
+                return;
+            }
         }
         final int status = actionBar instanceof ActionBar && ((ActionBar) actionBar).getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0;
         if (!hasShader || this.color != color || this.height != height || this.status != status) {

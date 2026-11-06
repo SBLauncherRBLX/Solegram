@@ -7619,6 +7619,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * The top of the list fades into the background under the status bar and the title, as it does at the bottom
      * of the screen under the tabs: darker in a dark theme, lighter in a light one.
      */
+    private com.solegram.messenger.ui.SolegramEdgeBlur solegramEdgeBlur;
+
     private void solegramDrawTopFade(Canvas canvas) {
         final float alpha = 1f - solegramHeaderPanelAlpha();
         if (alpha <= 0f || actionBar == null || fragmentView == null) {
@@ -7628,6 +7630,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final int height = actionBar.getMeasuredHeight();
         final int color = getThemedColor(Theme.key_windowBackgroundWhite);
         if (height <= 0) {
+            return;
+        }
+        // Android 12+: the list blurs out of focus under the header instead of fading into the background
+        if (solegramEdgeBlur == null) {
+            solegramEdgeBlur = new com.solegram.messenger.ui.SolegramEdgeBlur();
+        }
+        if (solegramEdgeBlur.draw(canvas, viewPages, fragmentView.getMeasuredWidth(), actionBar.getY(), height, true, color, 0x70, alpha)) {
             return;
         }
         if (solegramFadePaint == null || solegramFadeColor != color || solegramFadeHeight != height || solegramFadeStatus != status) {
@@ -9420,11 +9429,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     /** Solegram: the tab bar's search button opens the chat search, as the header's search button does. */
     public void solegramOpenSearch() {
-        if (searchItem != null && searchItem.getVisibility() == View.VISIBLE) {
-            searchItem.callOnClick();
-        } else {
-            showSearch(true, false, true);
-        }
+        // the same way as the header's search button: the field opens with the search, so it can be closed again
+        if (animatorSearchVisible.getValue() || fragmentSearchField == null || fragmentSearchFieldWatcher == null) return;
+        showSearch(true, false, true);
+        fragmentSearchFieldWatcher.toggleSearch(true);
+        AndroidUtilities.runOnUIThread(() -> {
+            if (fragmentSearchField != null && animatorSearchVisible.getValue()) {
+                fragmentSearchField.editText.requestFocus();
+                AndroidUtilities.showKeyboard(fragmentSearchField.editText);
+            }
+        }, 100);
     }
 
     public void solegramOpenStories() {
