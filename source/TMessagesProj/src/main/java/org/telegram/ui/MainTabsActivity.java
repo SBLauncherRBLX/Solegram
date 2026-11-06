@@ -446,7 +446,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                     pages[0] = viewPager;
                     canvas.save();
                     canvas.translate(-getLeft() - getTranslationX(), -top);
-                    final boolean drawn = sgEdgeBlur.draw(canvas, pages, getWidth(), top, getHeight(), false, getEstBackgroundColor(), 0x50, 1f);
+                    final boolean drawn = sgEdgeBlur.draw(canvas, pages, getWidth(), top, getHeight(), false, getEstBackgroundColor(), 0, 1f);
                     canvas.restore();
                     pages[0] = null;
                     if (drawn) {
@@ -1365,6 +1365,14 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsView.setEnabled(factor > 1);
         tabsView.setAlpha(factor);
         tabsView.setVisibility(factor > 0 ? View.VISIBLE : View.GONE);
+        if (sgSearchButton != null) {
+            // Solegram: the round search button leaves with the tabs (while searching, in a chat's selection...)
+            sgSearchButton.setAlpha(factor);
+            sgSearchButton.setScaleX(scale);
+            sgSearchButton.setScaleY(scale);
+            sgSearchButton.setClickable(factor >= 1f);
+            sgSearchButton.setVisibility(factor > 0 ? View.VISIBLE : View.GONE);
+        }
         if (createChain != null) {
             // Solegram: the liquid glass of the bar moves and fades with it
             createChain.invalidate();

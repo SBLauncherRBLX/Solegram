@@ -124,7 +124,7 @@ public class SolegramFloatingHeader {
             if (blur == null) {
                 blur = new SolegramEdgeBlur();
             }
-            final boolean drawn = blur.draw(canvas, views, width, actionBar.getY(), height, true, color, 0x70, Utilities.clamp(alpha, 1f, 0f));
+            final boolean drawn = blur.draw(canvas, views, width, actionBar.getY(), height, true, color, 0, Utilities.clamp(alpha, 1f, 0f));
             if (views == siblings) {
                 java.util.Arrays.fill(siblings, null);
             }

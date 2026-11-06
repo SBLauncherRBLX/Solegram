@@ -124,12 +124,8 @@ public class SolegramEdgeBlur {
         } finally {
             content.endRecording();
         }
-        for (RenderNode node : new RenderNode[]{light, strong}) {
-            node.setPosition(0, 0, width, nodeHeight);
-            RecordingCanvas c = node.beginRecording(width, nodeHeight);
-            c.drawRenderNode(content);
-            node.endRecording();
-        }
+        record(light, width, nodeHeight);
+        record(strong, width, nodeHeight);
 
         checkShaders(height, fromTop, background, veilAlpha);
 
@@ -145,6 +141,14 @@ public class SolegramEdgeBlur {
         }
         canvas.restore();
         return true;
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private void record(RenderNode node, int width, int height) {
+        node.setPosition(0, 0, width, height);
+        final RecordingCanvas c = node.beginRecording(width, height);
+        c.drawRenderNode(content);
+        node.endRecording();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.S)

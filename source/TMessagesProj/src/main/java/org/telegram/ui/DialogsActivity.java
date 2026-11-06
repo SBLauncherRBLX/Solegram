@@ -6805,7 +6805,23 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             topBubblesFadeView.setPosition(s, Math.min(dp(40), topPanelsHeight + filtersTabHeight - s));
             // Solegram floating header: with the tabs folded into the title row the header's own fade is there;
             // this one would draw a box of background round the tabs
-            topBubblesFadeView.setAlpha(Math.max(filtersTabVisibility, topPanelsVisibility) * (solegramFloatingHeader ? 1f - solegramCollapseFactor() : 1f));
+            final float bubblesAlpha = Math.max(filtersTabVisibility, topPanelsVisibility) * (solegramFloatingHeader ? 1f - solegramCollapseFactor() : 1f);
+            if (solegramFloatingHeader && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Solegram: no fade into the background under the folder tabs: the header's blur reaches down to
+                // the tabs' bottom instead (one blur, no darkening over it)
+                topBubblesFadeView.setAlpha(0f);
+                topBubblesFadeView.setVisibility(View.GONE);
+                final float bottom = topBubblesFadeView.getTranslationY() + s + Math.min(dp(40), topPanelsHeight + filtersTabHeight - s);
+                if (solegramBubblesBandBottom != bottom || solegramBubblesBandAlpha != bubblesAlpha) {
+                    solegramBubblesBandBottom = bottom;
+                    solegramBubblesBandAlpha = bubblesAlpha;
+                    if (fragmentView != null) {
+                        fragmentView.invalidate();
+                    }
+                }
+            } else {
+                topBubblesFadeView.setAlpha(bubblesAlpha);
+            }
         }
     }
 
@@ -7620,6 +7636,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * of the screen under the tabs: darker in a dark theme, lighter in a light one.
      */
     private com.solegram.messenger.ui.SolegramEdgeBlur solegramEdgeBlur;
+    private float solegramBubblesBandBottom, solegramBubblesBandAlpha;
+
+    private void solegramInvalidateHeader() {
+        if (fragmentView != null) {
+            fragmentView.invalidate();
+        }
+        if (actionBar != null) {
+            actionBar.invalidate();
+        }
+        if (fragmentSearchField != null) {
+            fragmentSearchField.invalidate();
+        }
+    }
 
     private void solegramDrawTopFade(Canvas canvas) {
         final float alpha = 1f - solegramHeaderPanelAlpha();
@@ -7636,7 +7665,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (solegramEdgeBlur == null) {
             solegramEdgeBlur = new com.solegram.messenger.ui.SolegramEdgeBlur();
         }
-        if (solegramEdgeBlur.draw(canvas, viewPages, fragmentView.getMeasuredWidth(), actionBar.getY(), height, true, color, 0x70, alpha)) {
+        // under folder tabs the band reaches down to their bottom (their own fade is off then)
+        final int band = Math.max(height, (int) (solegramBubblesBandAlpha > 0.01f ? solegramBubblesBandBottom - actionBar.getY() : 0));
+        if (solegramEdgeBlur.draw(canvas, viewPages, fragmentView.getMeasuredWidth(), actionBar.getY(), band, true, color, 0, alpha)) {
             return;
         }
         if (solegramFadePaint == null || solegramFadeColor != color || solegramFadeHeight != height || solegramFadeStatus != status) {
@@ -14540,6 +14571,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             checkUi_searchFiltersVisibility();
             checkUi_searchFieldStyle();
             checkUi_communityAvatarImageVisibility();
+            // Solegram: the header's panel and the blur under it follow the search; the screen is drawn again
+            // on every step, so nothing of the search field is left once it has closed
+            solegramInvalidateHeader();
         } else if (id == ANIMATOR_ID_DONE_BUTTON_VISIBLE) {
             checkUi_menuItems();
             checkUi_searchFieldVisibility();
@@ -14566,6 +14600,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onFactorChangeFinished(int id, float finalFactor, FactorAnimator callee) {
+        if (id == ANIMATOR_ID_SEARCH_VISIBLE) {
+            checkUi_searchFieldVisibility();
+            solegramInvalidateHeader();
+            if (fragmentView != null) {
+                fragmentView.postOnAnimation(this::solegramInvalidateHeader); // and once more on the next frame
+            }
+        }
         if (id == ANIMATOR_ID_SPEED_BUTTON_VISIBLE && speedItem != null) {
             final AnimatedVectorDrawable drawable = (AnimatedVectorDrawable) speedItem.getIconView().getDrawable();
             if (animatorSpeedButtonVisible.getValue()) {

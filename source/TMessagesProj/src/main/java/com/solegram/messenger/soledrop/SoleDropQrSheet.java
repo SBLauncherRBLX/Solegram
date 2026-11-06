@@ -148,6 +148,31 @@ public class SoleDropQrSheet extends BottomSheet {
         final String name = self != null ? UserObject.getUserName(self) : "";
         final String username = self != null ? UserObject.getPublicUsername(self) : null;
         final int size = dp(220);
+        // the drop goes into the hole the writer leaves in the middle of the code (in place of Telegram's logo),
+        // a little inside its edge: no module round it is covered
+        final Drawable logo = ContextCompat.getDrawable(getContext(), R.drawable.sg_soledrop_logo);
+        final Drawable center = logo == null ? null : new Drawable() {
+            @Override
+            public void draw(@androidx.annotation.NonNull Canvas canvas) {
+                final android.graphics.Rect b = getBounds();
+                final int inset = Math.round(b.width() * 0.12f);
+                logo.setBounds(b.left + inset, b.top + inset, b.right - inset, b.bottom - inset);
+                logo.draw(canvas);
+            }
+
+            @Override
+            public void setAlpha(int alpha) {
+            }
+
+            @Override
+            public void setColorFilter(android.graphics.ColorFilter colorFilter) {
+            }
+
+            @Override
+            public int getOpacity() {
+                return android.graphics.PixelFormat.TRANSLUCENT;
+            }
+        };
         Utilities.globalQueue.postRunnable(() -> {
             Bitmap bitmap = null;
             // the same steps as Telegram's own QR screen: a small fixed version first (room for the logo), then any
@@ -157,14 +182,18 @@ public class SoleDropQrSheet extends BottomSheet {
             for (int version = 3; version <= 6 && bitmap == null; version++) {
                 try {
                     hints.put(EncodeHintType.QR_VERSION, version);
-                    bitmap = new TelegramQRCodeWriter().encode(link, size, size, hints, null, 0.75f, 0xFFFFFFFF, 0xFF000000);
+                    final TelegramQRCodeWriter writer = new TelegramQRCodeWriter();
+                    writer.setCenterDrawable(center);
+                    bitmap = writer.encode(link, size, size, hints, null, 0.75f, 0xFFFFFFFF, 0xFF000000);
                 } catch (Throwable ignore) {
                 }
             }
             if (bitmap == null) {
                 try {
                     hints.remove(EncodeHintType.QR_VERSION);
-                    bitmap = new TelegramQRCodeWriter().encode(link, size, size, hints, null, 0.75f, 0xFFFFFFFF, 0xFF000000);
+                    final TelegramQRCodeWriter writer = new TelegramQRCodeWriter();
+                    writer.setCenterDrawable(center);
+                    bitmap = writer.encode(link, size, size, hints, null, 0.75f, 0xFFFFFFFF, 0xFF000000);
                 } catch (Throwable e) {
                     org.telegram.messenger.FileLog.e(e);
                 }
@@ -209,7 +238,6 @@ public class SoleDropQrSheet extends BottomSheet {
         private String name = "";
         @Nullable
         private String sub;
-        private final Drawable drop;
         private int built;
 
         QrView(Context context) {
@@ -222,7 +250,6 @@ public class SoleDropQrSheet extends BottomSheet {
             subPaint.setColor(0xFF8E8E93);
             subPaint.setTextSize(dp(13));
             subPaint.setTextAlign(Paint.Align.CENTER);
-            drop = ContextCompat.getDrawable(context, R.drawable.sg_soledrop_logo);
         }
 
         void set(@Nullable Bitmap code, String name, @Nullable String sub) {
@@ -249,13 +276,6 @@ public class SoleDropQrSheet extends BottomSheet {
             if (code != null) {
                 final float left = (w - code.getWidth()) / 2f, top = dp(20);
                 canvas.drawBitmap(code, left, top, codePaint);
-                if (drop != null) {
-                    final int s = dp(40);
-                    final int cx = (int) (left + code.getWidth() / 2f), cy = (int) (top + code.getHeight() / 2f);
-                    canvas.drawCircle(cx, cy, s * 0.62f, white);
-                    drop.setBounds(cx - s / 2, cy - s / 2, cx + s / 2, cy + s / 2);
-                    drop.draw(canvas);
-                }
                 final float textTop = top + code.getHeight() + dp(28);
                 canvas.drawText(TextUtils.ellipsize(name, new android.text.TextPaint(namePaint), w - dp(32), TextUtils.TruncateAt.END).toString(), w / 2f, textTop, namePaint);
                 if (sub != null) {
