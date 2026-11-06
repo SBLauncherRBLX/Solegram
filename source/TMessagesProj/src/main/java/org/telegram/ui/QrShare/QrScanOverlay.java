@@ -598,6 +598,7 @@ public final class QrScanOverlay extends FrameLayout {
 
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
+        sgGlassIndex = 0; // Solegram: the liquid glass nodes are handed out again each frame
         updateShape();
         final float radius = lerp(button.height() / 2f, cornerRadius, stretch());
         final int save = canvas.save();
@@ -814,6 +815,49 @@ public final class QrScanOverlay extends FrameLayout {
     private android.graphics.LinearGradient sgRimShader;
     private float sgRimTop = Float.NaN, sgRimBottom = Float.NaN;
 
+    private final java.util.ArrayList<Object[]> sgGlass = new java.util.ArrayList<>();
+    private int sgGlassIndex;
+
+    /** Solegram's liquid glass (its shader) over the blurred camera, as on Solegram's camera; false where it can't. */
+    private boolean sgLiquid(Canvas canvas, RectF rect, float radius, float alpha) {
+        if (android.os.Build.VERSION.SDK_INT < 33) {
+            return false;
+        }
+        final int w = (int) Math.ceil(rect.width()), h = (int) Math.ceil(rect.height());
+        if (w <= 0 || h <= 0) {
+            return false;
+        }
+        try {
+            if (sgGlassIndex >= sgGlass.size()) {
+                final android.graphics.RenderNode node = new android.graphics.RenderNode("SolegramScanGlass");
+                sgGlass.add(new Object[]{node, new org.telegram.ui.Components.blur3.LiquidGlassEffect(node)});
+            }
+            final Object[] e = sgGlass.get(sgGlassIndex++);
+            final android.graphics.RenderNode node = (android.graphics.RenderNode) e[0];
+            final org.telegram.ui.Components.blur3.LiquidGlassEffect fx = (org.telegram.ui.Components.blur3.LiquidGlassEffect) e[1];
+            node.setPosition(0, 0, w, h);
+            final int thickness = Math.max(1, (int) Math.min(com.solegram.messenger.SolegramGlass.thickness(dp(11)),
+                com.solegram.messenger.SolegramGlass.thicknessLimit(Math.min(w, h))));
+            final float rr = Math.min(radius, Math.min(w, h) / 2f);
+            fx.update(0, 0, w, h, rr, rr, rr, rr, thickness,
+                com.solegram.messenger.SolegramGlass.intensity(0.75f), com.solegram.messenger.SolegramGlass.index(1.5f),
+                0x5C5C5C63);
+            final android.graphics.RecordingCanvas rc = node.beginRecording(w, h);
+            rc.translate(-rect.left + cameraView.getLeft(), -rect.top + cameraView.getTop());
+            QrRender.setAlpha(blurNode, 1f);
+            QrRender.draw(rc, blurNode);
+            node.endRecording();
+            final int save = alpha < 1f ? canvas.saveLayerAlpha(rect, (int) (255 * alpha)) : canvas.save();
+            canvas.translate(rect.left, rect.top);
+            canvas.drawRenderNode(node);
+            canvas.restoreToCount(save);
+            return true;
+        } catch (Throwable t) {
+            org.telegram.messenger.FileLog.e(t);
+            return false;
+        }
+    }
+
     private void sgDrawButtonBody(Canvas canvas, RectF rect, float radius, float alpha) {
         final boolean liquid = com.solegram.messenger.ui.SolegramCameraUi.liquid();
         if (liquid) {
@@ -821,7 +865,16 @@ public final class QrScanOverlay extends FrameLayout {
             sgShadow.setShadowLayer(dpf2(6f), 0, dpf2(1.5f), Color.argb((int) (0x38 * alpha), 0, 0, 0));
             canvas.drawRoundRect(rect, radius, radius, sgShadow);
         }
-        if (liquid && blurReady(canvas)) {
+        if (liquid && blurReady(canvas) && sgLiquid(canvas, rect, radius, alpha)) {
+            // real liquid glass (Solegram's shader) over the camera, with the same rim as below
+            if (sgRimShader == null || sgRimTop != rect.top || sgRimBottom != rect.bottom) {
+                sgRimTop = rect.top;
+                sgRimBottom = rect.bottom;
+                sgRimShader = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom, 0x6BFFFFFF, 0x24FFFFFF, android.graphics.Shader.TileMode.CLAMP);
+            }
+            sgStroke.setShader(sgRimShader);
+            sgStroke.setStrokeWidth(dpf2(1f));
+        } else if (liquid && blurReady(canvas)) {
             path.rewind();
             path.addRoundRect(rect, radius, radius, Path.Direction.CW);
             canvas.save();

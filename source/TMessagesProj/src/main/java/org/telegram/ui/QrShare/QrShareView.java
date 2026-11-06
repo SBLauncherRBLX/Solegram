@@ -2123,6 +2123,7 @@ public class QrShareView extends View {
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
+        sgGlassIndex = 0; // Solegram: the liquid glass nodes are handed out again each frame
         drawnOnce = true;
         updateTempLink();
         updatePaid();
@@ -4563,10 +4564,63 @@ public class QrShareView extends View {
         }
     }
 
+    // Solegram: the controls in Solegram's liquid glass (its shader, thickness, refraction and rim light from the glass
+    // settings) over the screen's blurred backdrop; one node per control drawn in a frame
+    private final java.util.ArrayList<Object[]> sgGlass = new java.util.ArrayList<>();
+    private int sgGlassIndex;
+    private final Paint sgRim = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private boolean sgDrawLiquid(Canvas c, RectF r, float radius, boolean light, float alpha) {
+        if (android.os.Build.VERSION.SDK_INT < 33 || !org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS) || !hasBlur(c)) {
+            return false;
+        }
+        final int w = (int) Math.ceil(r.width()), h = (int) Math.ceil(r.height());
+        if (w <= 0 || h <= 0) {
+            return false;
+        }
+        try {
+            if (sgGlassIndex >= sgGlass.size()) {
+                final android.graphics.RenderNode node = new android.graphics.RenderNode("SolegramQrGlass");
+                sgGlass.add(new Object[]{node, new org.telegram.ui.Components.blur3.LiquidGlassEffect(node)});
+            }
+            final Object[] e = sgGlass.get(sgGlassIndex++);
+            final android.graphics.RenderNode node = (android.graphics.RenderNode) e[0];
+            final org.telegram.ui.Components.blur3.LiquidGlassEffect fx = (org.telegram.ui.Components.blur3.LiquidGlassEffect) e[1];
+            node.setPosition(0, 0, w, h);
+            final int thickness = Math.max(1, (int) Math.min(com.solegram.messenger.SolegramGlass.thickness(dp(11)),
+                com.solegram.messenger.SolegramGlass.thicknessLimit(Math.min(w, h))));
+            final float rr = Math.min(radius, Math.min(w, h) / 2f);
+            fx.update(0, 0, w, h, rr, rr, rr, rr, thickness,
+                com.solegram.messenger.SolegramGlass.intensity(0.75f), com.solegram.messenger.SolegramGlass.index(1.5f),
+                light ? 0x14000000 : 0x2EFFFFFF);
+            final android.graphics.RecordingCanvas rc = node.beginRecording(w, h);
+            rc.translate(-r.left, -r.top);
+            drawBlurNode(rc, blurNode);
+            node.endRecording();
+            final int save = alpha < 1f ? c.saveLayerAlpha(r, (int) (255 * alpha)) : c.save();
+            c.translate(r.left, r.top);
+            c.drawRenderNode(node);
+            c.restoreToCount(save);
+            // the rim as on Solegram's buttons: light at the top, faint at the bottom
+            sgRim.setStyle(Paint.Style.STROKE);
+            sgRim.setStrokeWidth(dpf2(1f));
+            sgRim.setShader(new LinearGradient(0, r.top, 0, r.bottom, light ? 0x59FFFFFF : 0x6BFFFFFF, light ? 0x14000000 : 0x24FFFFFF, Shader.TileMode.CLAMP));
+            sgRim.setAlpha((int) (255 * alpha));
+            final float in = dpf2(0.5f);
+            c.drawRoundRect(r.left + in, r.top + in, r.right - in, r.bottom - in, rr - in, rr - in, sgRim);
+            return true;
+        } catch (Throwable t) {
+            org.telegram.messenger.FileLog.e(t);
+            return false;
+        }
+    }
+
     private void drawGlass(Canvas c, RectF r, float radius, boolean light, float alpha) {
         if (alpha <= 0) return;
         if (!glassSheet && !liftThis) {
-            sgDrawFlat(c, null, r, radius, light, alpha);
+            if (!sgDrawLiquid(c, r, radius, light, alpha)) {
+                sgDrawFlat(c, null, r, radius, light, alpha);
+            }
             return;
         }
         // sheets: the glass body covers the rim's grown 1dp band too (else raw backdrop shows between the glass edge

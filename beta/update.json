@@ -1,19 +1,19 @@
 {
-  "salt": "d78b3f173b69850a5bdf479f95105c9d",
+  "salt": "7dfcfcb1b0a691b7f1213ce44c07c205",
   "iter": 120000,
-  "check": "7031212c750c46859d4df82490801dd0e02c0550e44098d2be1592d668ac5a80",
-  "version": "3.1.0-beta10",
-  "build": 115,
-  "apk": "beta/Solegram-3.1.0-beta10-b115.sealed",
-  "size": 63743129,
-  "sha256": "c99a8851de9a1e3809d58c011cc9ae4da9d9190bca8bde0075a8829c096b2d34",
-  "sealedSize": 63743129,
-  "sealedSha256": "54b8dc32d43c53b2db522d1b429fa8274552e3ffe408d284bbec6ced9be0c413",
-  "iv": "071dc95d82edfe9a26b81c9ae3e644aa",
-  "mac": "68a2b02c377622165a438a7eb8550bd2239a0ba7320177f6241dd0c5ef7ae1d8",
+  "check": "9d4f68330da5b6df4412b4e29b9fc785358836d9e9a511c0e2048055be78814d",
+  "version": "3.1.0-beta11",
+  "build": 116,
+  "apk": "beta/Solegram-3.1.0-beta11-b116.sealed",
+  "size": 63744203,
+  "sha256": "4c31dcbbc8402811b102acc9a873d5337e48d039cdee3d2ba52b6cade68a199b",
+  "sealedSize": 63744203,
+  "sealedSha256": "46ffbcffb1929947e2405e027fafdec469fb70f7f18d075efb78a51d9bd12d40",
+  "iv": "b3115103e8f6a8441ae398fccc77d3ca",
+  "mac": "13c190e7031e7c05dbfc0cff727c414ec273a1c4fefd31c5c0238a340f11d777",
   "changelog": {
-    "iv": "a1bde2638ddffa16c68d3c712e98a052",
-    "data": "rs+7iCjmVVIxPhfm4tqgL3DaBL3KSHSzwSoIVv2ps2csbJWFK0M54seAUyba/ZyU22iPqegQrLJCge/scWIZlLR7Gmo0Mpi3ZXmtpmfoG+SM9JIX8ky3fmX/UKId8yiK0HKqRCuVdJcLffC1bKf4xTqgI7AtTL0h3Uy5B1T4ExgWm54HkhzgmTMn2UtVNVClEgm1oQ18yB1Ao+jKyogvktIXYUtCSsfM2NCwQ97uIxQvgEDp+8fI9fRIBnurpVehT/Pq+8bjoUXvyYsHL+lkCdzIPai+XQrJep/XGeSOIG2xJavRNl/Derr5Tzc=",
-    "mac": "ac731e0bc4fa11f6aa808d40f2cbaac4a2640660da1e0fc9c72004a5b5e0214e"
+    "iv": "eb58c281ed0c485f51bb7a38a55fca0c",
+    "data": "O/LvPpoIsKKkP3VknljkxdMGhDRIHbNt/wad9fl9EtXrcD8mdcJcd37HmDcmcyJLu5t3uYLQ5hpkaP6NMI8xwhd64Y9ndbtC7Oke/66AOYgqrXfDQl9NCp9b1+vVPo0qSVNKMQ7Lhxi8kEDoXiZOUeT6aI9YKChwBDMppB9Hkrx1PprCIhRMOliaqdDQliU0p0mr0Q3WD0J7nYqPEDlWIpjyMJyXz/J3omeBT2fpTCGh/q797cvbj1VMWXlR2l80Wlm8rVXC+hXh6GgtFzU5tVfsrQ1jxXezuj6TqEDySK9KIcU3H6v/4XDD+yt9XPIFnuinPviDCCo=",
+    "mac": "89335fe484eb72cadcabadf3e54275b90e1c4ba522614e563cc9878a05a1a9f7"
   }
 }
