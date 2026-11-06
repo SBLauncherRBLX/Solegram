@@ -820,7 +820,7 @@ public final class QrScanOverlay extends FrameLayout {
 
     /** Solegram's liquid glass (its shader) over the blurred camera, as on Solegram's camera; false where it can't. */
     private boolean sgLiquid(Canvas canvas, RectF rect, float radius, float alpha) {
-        if (android.os.Build.VERSION.SDK_INT < 33) {
+        if (android.os.Build.VERSION.SDK_INT < 33 || cameraView == null) {
             return false;
         }
         final int w = (int) Math.ceil(rect.width()), h = (int) Math.ceil(rect.height());
@@ -842,12 +842,23 @@ public final class QrScanOverlay extends FrameLayout {
             fx.update(0, 0, w, h, rr, rr, rr, rr, thickness,
                 com.solegram.messenger.SolegramGlass.intensity(0.75f), com.solegram.messenger.SolegramGlass.index(1.5f),
                 0x5C5C5C63);
+            // the camera's sharp picture under the glass (refraction, no blur), as on Solegram's camera
+            final android.view.TextureView texture = cameraView.getTextureView();
+            if (texture == null || !texture.isAvailable()) {
+                return false;
+            }
             final android.graphics.RecordingCanvas rc = node.beginRecording(w, h);
-            rc.translate(-rect.left + cameraView.getLeft(), -rect.top + cameraView.getTop());
-            QrRender.setAlpha(blurNode, 1f);
-            QrRender.draw(rc, blurNode);
+            rc.translate(-rect.left + cameraView.getLeft() + texture.getLeft(), -rect.top + cameraView.getTop() + texture.getTop());
+            final android.graphics.Matrix m = texture.getMatrix();
+            if (!m.isIdentity()) {
+                rc.concat(m);
+            }
+            texture.draw(rc);
             node.endRecording();
             final int save = alpha < 1f ? canvas.saveLayerAlpha(rect, (int) (255 * alpha)) : canvas.save();
+            path.rewind();
+            path.addRoundRect(rect, rr, rr, Path.Direction.CW);
+            canvas.clipPath(path); // only the button's own shape
             canvas.translate(rect.left, rect.top);
             canvas.drawRenderNode(node);
             canvas.restoreToCount(save);
@@ -865,7 +876,7 @@ public final class QrScanOverlay extends FrameLayout {
             sgShadow.setShadowLayer(dpf2(6f), 0, dpf2(1.5f), Color.argb((int) (0x38 * alpha), 0, 0, 0));
             canvas.drawRoundRect(rect, radius, radius, sgShadow);
         }
-        if (liquid && blurReady(canvas) && sgLiquid(canvas, rect, radius, alpha)) {
+        if (liquid && canvas.isHardwareAccelerated() && sgLiquid(canvas, rect, radius, alpha)) {
             // real liquid glass (Solegram's shader) over the camera, with the same rim as below
             if (sgRimShader == null || sgRimTop != rect.top || sgRimBottom != rect.bottom) {
                 sgRimTop = rect.top;
@@ -874,7 +885,7 @@ public final class QrScanOverlay extends FrameLayout {
             }
             sgStroke.setShader(sgRimShader);
             sgStroke.setStrokeWidth(dpf2(1f));
-        } else if (liquid && blurReady(canvas)) {
+        } else if (false) { // Solegram: no blurred buttons (glass refraction or the plain circles)
             path.rewind();
             path.addRoundRect(rect, radius, radius, Path.Direction.CW);
             canvas.save();

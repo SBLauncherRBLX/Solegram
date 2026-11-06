@@ -4510,16 +4510,10 @@ public class QrShareView extends View {
     /** Glass in any outline (the menu droplet): same blur, tint, sheen and rim as the rounded-rect glass. */
     private void drawGlassPath(Canvas c, Path p, RectF bounds, boolean light, float alpha) {
         if (alpha <= 0) return;
-        if (true) { // Solegram: the menu in the same plain look as the buttons, over a light blur for legibility
+        if (true) { // Solegram: the menu without blur, over the backdrop's own colour so its text stays readable
             c.save();
             c.clipPath(p);
-            if (QrRender.hasEffects() && hasBlur(c)) {
-                if (alpha < 1f) c.saveLayerAlpha(bounds, (int) (255 * alpha));
-                drawBlurNode(c, blurNode);
-                if (alpha < 1f) c.restore();
-            } else {
-                drawFrost(c, bounds, alpha);
-            }
+            drawFrost(c, bounds, alpha);
             c.restore();
             sgDrawFlat(c, p, bounds, 0, light, alpha);
             return;
@@ -4571,7 +4565,8 @@ public class QrShareView extends View {
     private final Paint sgRim = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private boolean sgDrawLiquid(Canvas c, RectF r, float radius, boolean light, float alpha) {
-        if (android.os.Build.VERSION.SDK_INT < 33 || !org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS) || !hasBlur(c)) {
+        if (android.os.Build.VERSION.SDK_INT < 33 || !org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS)
+            || !c.isHardwareAccelerated() || bgNode == null || !QrRender.hasDisplayList(bgNode)) {
             return false;
         }
         final int w = (int) Math.ceil(r.width()), h = (int) Math.ceil(r.height());
@@ -4593,11 +4588,16 @@ public class QrShareView extends View {
             fx.update(0, 0, w, h, rr, rr, rr, rr, thickness,
                 com.solegram.messenger.SolegramGlass.intensity(0.75f), com.solegram.messenger.SolegramGlass.index(1.5f),
                 light ? 0x14000000 : 0x2EFFFFFF);
+            // the sharp backdrop under the glass (as Solegram's glass: refraction, no blur)
             final android.graphics.RecordingCanvas rc = node.beginRecording(w, h);
             rc.translate(-r.left, -r.top);
-            drawBlurNode(rc, blurNode);
+            QrRender.draw(rc, bgNode);
             node.endRecording();
             final int save = alpha < 1f ? c.saveLayerAlpha(r, (int) (255 * alpha)) : c.save();
+            // only the button's own shape: no square around it
+            path.rewind();
+            path.addRoundRect(r, rr, rr, Path.Direction.CW);
+            c.clipPath(path);
             c.translate(r.left, r.top);
             c.drawRenderNode(node);
             c.restoreToCount(save);
