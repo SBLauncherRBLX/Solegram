@@ -210,6 +210,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         root = new HeaderBlurRoot(context, getThemedColor(Theme.key_windowBackgroundGray));
         root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
         fragmentView = root;
+        setupHeaderGlass(root);
 
         if (!SoleWallet.introSeen(currentAccount)) {
             showIntro(0);
@@ -221,6 +222,85 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             showWallet();
         }
         return root;
+    }
+
+    private org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode headerGlass;
+
+    /**
+     * The header's buttons in bubbles of liquid glass that see the wallet page under them, as on every other
+     * screen with a clear header (the picture is the page under the header, taken again as it scrolls).
+     */
+    private void setupHeaderGlass(FrameLayout root) {
+        final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
+        final org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor colorSource = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor();
+        colorSource.setColor(pageColor);
+        org.telegram.ui.Components.blur3.source.BlurredBackgroundSource glass = colorSource;
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            final org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode source = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode(null);
+            source.setupRenderer(new org.telegram.ui.Components.blur3.RenderNodeWithHash.Renderer() {
+                @Override
+                public void renderNodeUpdateDisplayList(Canvas canvas) {
+                    canvas.drawColor(pageColor | 0xFF000000);
+                    for (int i = 0, n = root.getChildCount(); i < n; i++) {
+                        final View page = root.getChildAt(i);
+                        if (page instanceof ActionBar || page.getVisibility() != View.VISIBLE || page.getAlpha() <= 0f) {
+                            continue;
+                        }
+                        canvas.save();
+                        canvas.translate(page.getLeft() + page.getTranslationX(), page.getTop() + page.getTranslationY());
+                        canvas.clipRect(0, 0, page.getWidth(), page.getHeight());
+                        if (page.getAlpha() < 1f) {
+                            canvas.saveLayerAlpha(0, 0, page.getWidth(), page.getHeight(), (int) (255 * page.getAlpha()));
+                        }
+                        canvas.translate(-page.getScrollX(), -page.getScrollY());
+                        page.draw(canvas);
+                        canvas.restore();
+                        if (page.getAlpha() < 1f) {
+                            canvas.restore();
+                        }
+                    }
+                }
+
+                @Override
+                public void renderNodeCalculateHash(org.telegram.ui.Components.blur3.capture.IBlur3Hash hash) {
+                    hash.add(root.getWidth());
+                    hash.add(root.getHeight());
+                    hash.add(root.getChildCount());
+                    for (int i = 0, n = root.getChildCount(); i < n; i++) {
+                        final View page = root.getChildAt(i);
+                        hash.add(System.identityHashCode(page));
+                        hash.add(page.getScrollY());
+                        hash.addF(page.getTranslationX());
+                        hash.addF(page.getAlpha());
+                        if (page.isDirty()) {
+                            hash.unsupported(); // something on the page is being redrawn: take the picture again
+                        }
+                    }
+                }
+            });
+            final boolean liquid = org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS);
+            final float radius = AndroidUtilities.dpf2(liquid ? 9f : 40f) * com.solegram.messenger.SolegramGlass.blurScale();
+            if (!liquid || com.solegram.messenger.SolegramGlass.vibrancy()) {
+                source.setBlur(radius, org.telegram.messenger.utils.RenderNodeEffects.getSaturationX3RenderEffect());
+            } else {
+                source.setBlur(radius);
+            }
+            headerGlass = source;
+            glass = source;
+            root.getViewTreeObserver().addOnPreDrawListener(() -> {
+                if (headerGlass != null && root.getWidth() > 0) {
+                    headerGlass.setSize(root.getWidth(), Math.min(root.getHeight(), ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(48)));
+                    headerGlass.updateDisplayListIfNeeded();
+                }
+                return true;
+            });
+            root.getViewTreeObserver().addOnScrollChangedListener(() -> actionBar.invalidate());
+        }
+        final org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory factory = new org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory(glass);
+        factory.setLiquidGlassEffectAllowed(org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS));
+        // the bar is clear and sits at the top of the screen, as the page does: the glass is placed from the bar
+        actionBar.solegramSetFloating(true);
+        actionBar.solegramSetupButtonsGlass(factory, org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.topPanel(getResourceProvider()));
     }
 
     private void swap(View page) {
