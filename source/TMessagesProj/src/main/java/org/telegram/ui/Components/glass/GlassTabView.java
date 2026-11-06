@@ -363,7 +363,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         if (type == TabAnimation.SETTINGS) {
             duration = 720;
         } else if (type == TabAnimation.FEED || type == TabAnimation.ARTICLE || type == TabAnimation.FILES) {
-            duration = 620;
+            duration = 640;
         } else if (type == TabAnimation.POLL || type == TabAnimation.CHECKLIST || type == TabAnimation.EMOJI
             || type == TabAnimation.STICKER || type == TabAnimation.SYMBOLS || type == TabAnimation.REPLIES) {
             duration = 600;
@@ -409,15 +409,14 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
                 rotation = 0f;
             }
         } else if (type == TabAnimation.FEED || type == TabAnimation.ARTICLE || type == TabAnimation.FILES) {
-            // a fresh page lands on the pile: it drops in, tilted, and settles flat with a soft bounce
+            // a page turns over gently: the icon lifts a little with a slight tilt and settles back, starting and
+            // ending at rest (no jump on the first frame, no bounce)
             solegramBands = -1f;
             icon.setPivotY(icon.getHeight() * 0.85f);
-            final float e = CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.15f));
-            dy = -dp(6) * (1f - e);
-            rotation = -9f * (1f - e) + 3f * (float) Math.sin(Math.PI * 2 * Math.min(1f, t * 1.4f)) * (1f - t);
-            final float land = t > 0.3f && t < 0.62f ? (float) Math.sin(Math.PI * (t - 0.3f) / 0.32f) : 0f;
-            scaleX = 1f + 0.07f * land;
-            scaleY = 1f - 0.07f * land;
+            final float k = (float) Math.sin(Math.PI * CubicBezierInterpolator.EASE_BOTH.getInterpolation(t));
+            dy = -dp(2.5f) * k;
+            rotation = -4f * k;
+            scaleX = scaleY = 1f + 0.04f * k;
         } else if (type == TabAnimation.POLL || type == TabAnimation.BOOSTS || type == TabAnimation.MONETIZATION) {
             // the bars grow up from the base and settle with a spring
             icon.setPivotY(icon.getHeight() * 0.8f);

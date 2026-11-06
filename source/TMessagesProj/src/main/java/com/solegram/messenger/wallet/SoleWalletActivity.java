@@ -10,6 +10,7 @@ import static org.telegram.messenger.LocaleController.formatString;
 import static org.telegram.messenger.LocaleController.getString;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -164,8 +165,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         actionBar.setBackButtonDrawable(new BackDrawable(false));
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle("SoleWallet");
-        // no dark bar on top: the header in the page's own colour, no shadow
-        actionBar.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        // no bar on top at all: a clear header, the page blurs out of focus under it (see the root below)
+        actionBar.setBackgroundColor(Color.TRANSPARENT);
         actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);
         actionBar.setItemsBackgroundColor(getThemedColor(Theme.key_listSelector), false);
         actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
@@ -201,7 +202,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         other.addSubItem(MENU_TOUR, R.drawable.msg_help, getString(R.string.SG_WalletTour));
         other.addSubItem(MENU_REMOVE_CODE, R.drawable.msg_delete, getString(R.string.SG_WalletRemoveCode));
 
-        root = new FrameLayout(context);
+        root = new HeaderBlurRoot(context, getThemedColor(Theme.key_windowBackgroundGray));
         root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
         fragmentView = root;
 
@@ -222,7 +223,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         root.addView(page, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         page.setAlpha(0f);
         page.setTranslationX(dp(24));
-        page.animate().alpha(1f).translationX(0).setDuration(260).start();
+        page.animate().alpha(1f).translationX(0).setDuration(260).setUpdateListener(a -> root.invalidate()).start();
         if (old != null) {
             old.animate().alpha(0f).translationX(-dp(24)).setDuration(200).withEndAction(() -> root.removeView(old)).start();
         }
@@ -1678,6 +1679,68 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                 myCollectibles = collectiblesOf(gifts);
                 fill.run();
             });
+        }
+    }
+
+    /**
+     * The screen's root under a clear header: the page goes out of focus under the header (no bar on top), into the
+     * page's colour at the very top. Android 12+; elsewhere the header is just clear.
+     */
+    static class HeaderBlurRoot extends FrameLayout {
+        private final com.solegram.messenger.ui.SolegramEdgeBlur headerBlur = new com.solegram.messenger.ui.SolegramEdgeBlur();
+        private final View[] pages = new View[2];
+        private final android.view.ViewTreeObserver.OnScrollChangedListener onScroll = this::invalidate;
+        private final int background;
+
+        HeaderBlurRoot(Context context, int background) {
+            super(context);
+            this.background = background;
+            headerBlur.setHost(this);
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            getViewTreeObserver().addOnScrollChangedListener(onScroll);
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            getViewTreeObserver().removeOnScrollChangedListener(onScroll);
+            super.onDetachedFromWindow();
+        }
+
+        private boolean blurDrawn;
+
+        @Override
+        protected void dispatchDraw(@androidx.annotation.NonNull Canvas canvas) {
+            blurDrawn = false;
+            super.dispatchDraw(canvas);
+            if (!blurDrawn) {
+                drawHeaderBlur(canvas);
+            }
+        }
+
+        @Override
+        protected boolean drawChild(@androidx.annotation.NonNull Canvas canvas, View child, long drawingTime) {
+            if (child instanceof ActionBar && !blurDrawn) {
+                drawHeaderBlur(canvas); // a header of this root's own stays sharp over the blur
+            }
+            return super.drawChild(canvas, child, drawingTime);
+        }
+
+        private void drawHeaderBlur(Canvas canvas) {
+            blurDrawn = true;
+            int k = 0;
+            for (int i = 0, n = getChildCount(); i < n && k < pages.length; i++) {
+                final View child = getChildAt(i);
+                if (!(child instanceof ActionBar)) {
+                    pages[k++] = child;
+                }
+            }
+            final int height = ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(12);
+            headerBlur.draw(canvas, pages, getMeasuredWidth(), 0, height, true, background, 0, 1f);
+            java.util.Arrays.fill(pages, null);
         }
     }
 }

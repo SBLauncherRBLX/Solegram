@@ -86,7 +86,7 @@ public class SoleVaultActivity extends BaseFragment {
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        actionBar.setBackgroundColor(android.graphics.Color.TRANSPARENT); // no bar: the page blurs under the header
         actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);
         actionBar.setItemsBackgroundColor(getThemedColor(Theme.key_listSelector), false);
         actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
@@ -102,7 +102,7 @@ public class SoleVaultActivity extends BaseFragment {
                 }
             }
         });
-        final FrameLayout root = new FrameLayout(context);
+        final FrameLayout root = new SoleWalletActivity.HeaderBlurRoot(context, getThemedColor(Theme.key_windowBackgroundGray));
         root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
         final ScrollView scroll = new ScrollView(context);
         column = new LinearLayout(context);
