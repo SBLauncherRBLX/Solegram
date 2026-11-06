@@ -79,6 +79,11 @@ public class SoleVaultActivity extends BaseFragment {
     }
 
     @Override
+    public boolean solegramContentUnderHeader() {
+        return true; // the page is padded for the clear header and blurs under it
+    }
+
+    @Override
     public boolean isLightStatusBar() {
         // the header is in the page's colour: dark status bar icons on a light page
         return org.telegram.messenger.AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > 0.721f;
@@ -110,8 +115,9 @@ public class SoleVaultActivity extends BaseFragment {
         column.setPadding(0, ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(8), 0, dp(24));
         scroll.addView(column);
         root.addView(scroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        root.addView(actionBar);
         fragmentView = root;
+        // the navigation container holds the header: the page sits under it (solegramContentUnderHeader)
+        SoleWalletActivity.HeaderBlurRoot.setupHeaderGlass(actionBar, root, getThemedColor(Theme.key_windowBackgroundGray), getResourceProvider());
         reload();
         return root;
     }

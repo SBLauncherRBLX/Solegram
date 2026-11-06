@@ -138,6 +138,41 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             setWillNotDraw(false);
         }
 
+        private final android.graphics.Paint solegramStripPaint = new android.graphics.Paint();
+
+        /**
+         * Solegram, a safety net: a clear header over a screen laid out below it leaves a strip nothing draws, and
+         * whatever was there before (the previous screen's header) stayed in it and smeared. The strip gets the
+         * screen's colour.
+         */
+        private void solegramFillUnderClearBar(Canvas canvas, ActionBar bar) {
+            final BaseFragment fragment = bar.parentFragment;
+            if (fragment == null || fragment.actionBar != bar || bar.getVisibility() != VISIBLE) {
+                return;
+            }
+            final View view = fragment.fragmentView;
+            if (view == null || view.getParent() != this || view.getTop() < bar.getBottom()) {
+                return; // the screen is under its header and paints there itself
+            }
+            final android.graphics.drawable.Drawable background = bar.getBackground();
+            if (background instanceof android.graphics.drawable.ColorDrawable
+                && android.graphics.Color.alpha(((android.graphics.drawable.ColorDrawable) background).getColor()) == 255) {
+                return;
+            }
+            if (background != null && !(background instanceof android.graphics.drawable.ColorDrawable)) {
+                return; // a drawable of the screen's own design
+            }
+            int color = 0;
+            if (view.getBackground() instanceof android.graphics.drawable.ColorDrawable) {
+                color = ((android.graphics.drawable.ColorDrawable) view.getBackground()).getColor();
+            }
+            if (android.graphics.Color.alpha(color) != 255) {
+                color = Theme.getColor(Theme.key_windowBackgroundWhite, fragment.getResourceProvider());
+            }
+            solegramStripPaint.setColor(color);
+            canvas.drawRect(0, bar.getTop() + bar.getTranslationY(), getMeasuredWidth(), view.getTop(), solegramStripPaint);
+        }
+
         /** Solegram: a screen that lays itself out under its own clear header (BaseFragment.solegramContentUnderHeader). */
         private boolean solegramUnderHeader(ActionBar actionBar, View child) {
             final BaseFragment fragment = actionBar != null ? actionBar.parentFragment : null;
@@ -257,6 +292,8 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                 if (floating != null) {
                     // the screen fades into the background under its clear header
                     floating.drawFade(canvas, getMeasuredWidth());
+                } else {
+                    solegramFillUnderClearBar(canvas, (ActionBar) child);
                 }
                 return super.drawChild(canvas, child, drawingTime);
             } else {
