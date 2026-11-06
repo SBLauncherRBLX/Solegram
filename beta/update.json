@@ -1,19 +1,19 @@
 {
-  "salt": "3add1599c82dee010b8c2b8da2fcd452",
+  "salt": "ab333bbd14dc0243d918b4c6352ad5d8",
   "iter": 120000,
-  "check": "8e4eb4e42dda7287a1b5689e5d6283099b57e2794e5bd7a0b472722cde32536c",
-  "version": "3.1.0-beta12",
-  "build": 117,
-  "apk": "beta/Solegram-3.1.0-beta12-b117.sealed",
-  "size": 63743935,
-  "sha256": "af13c762d4060d3f6f08f357a9fa08fb268cf1f2a73c7e28033904fd0b1ddcf2",
-  "sealedSize": 63743935,
-  "sealedSha256": "c2badeef4cdedb998fda724564512b20e200577af49e6a33740a6f736223304f",
-  "iv": "475cbc38ebed9ac7fb27f8a3ebdb50b8",
-  "mac": "586a952914b008d16316b79ae384536d40c67cb2d4b6d94403cde6c2a139de92",
+  "check": "b05f1bf628d9695b33d298b222022933f4093fcbfd1b7ca091e7e415ad952804",
+  "version": "3.1.0-beta13",
+  "build": 118,
+  "apk": "beta/Solegram-3.1.0-beta13-b118.sealed",
+  "size": 63743950,
+  "sha256": "3a44f92ed4521bc6ee365afe297cf2d9b417b2617cba7e38eb4af6d5b0532720",
+  "sealedSize": 63743950,
+  "sealedSha256": "0c553aeac54b70f1ae567b935b02686ae268737ea7ba1afad6032e1c6ca07ebb",
+  "iv": "2481a1d6d977df2e9a69b18e24b5016f",
+  "mac": "26d3404c1cd10cea302651f516398532030fda7fdfaf675bab329deab0c9efd1",
   "changelog": {
-    "iv": "61f901b749b11597a9073a9adf500ea6",
-    "data": "jNwCmsrT9B+zsljxirWqZz+K4lRzQafjUaoICcH6Arx9IMuVcsSeEqV+gp91DoR84pFpFEKbHnUrRxwHDc4ZfRkIVeSu2PdxrqTj8h3vCeF3QMEwYu9vIAPOT+vy/5KmEQMxMLLmAep2CC/bqnxnQuLopkPY/L7eAL4xPkkrSHigh6K5zWQroNTvjPSUSK9iIdf/O9f7kH0BT44Cqq1fqXeDapZ1JXXeZi0rexE7lvA1S7VkIP7FmrGcZrch7SoqTnY2z7fj+KYuuSSxM27YPpy0jHMJKUcJpeXXb+QO4uSeNxEhM8vIURIscKCuKkJxD4933oNn+gZ58s//IicStY3ZGo/cCmaB0A==",
-    "mac": "1e56ef3118c58f5cf6d3232c5f849969f4024b156284146cf9c9993ce3435763"
+    "iv": "ce3efb1696e19ac9438d04b1ab0fecb7",
+    "data": "ZGQ6fL14vW7zwNEDCvGgnRzg/mxGYvmQkAEQwx2xmChyiZ2oD+XNZf9xY5KtyVxSLZLCbMsJgs1PZ0OdzaW/Gbbmzv1qth1ufmSNthCe6dnnhfysEgmInSUsPWMF73H6t2vuE9g3OFeLMW3V6eOL9Fp4w8x/rIiJM6jPhUrxt+g6mIAp9rH5mqPQr1CItNea3zcT6OkU/xH5MprtLlxjVoUS9bVRerIA6pSBc5hyi1WOfGTtRK2Vf6CLvq6FHw0JStohiR+pNkKmreBUOOEiqGT+/ZJSQ0vjRLXr4LeKnr3n+RfxZHSxBYPmTdINXgUCRoDMZBNSh1bquBzEH1RD+mxcPOrZzRBm4XyB",
+    "mac": "fa07ef8b989b8ee57f61cc325cef48006e698ad52f8ff936d2cc77cd85bd442a"
   }
 }

@@ -599,6 +599,14 @@ public final class QrScanOverlay extends FrameLayout {
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
         sgGlassIndex = 0; // Solegram: the liquid glass nodes are handed out again each frame
+        sgLiveGlass = false;
+        sgDispatchDraw(canvas);
+        if (sgLiveGlass && isAttachedToWindow() && cameraView != null && cameraView.getVisibility() == VISIBLE) {
+            postInvalidateOnAnimation();
+        }
+    }
+
+    private void sgDispatchDraw(@NonNull Canvas canvas) {
         updateShape();
         final float radius = lerp(button.height() / 2f, cornerRadius, stretch());
         final int save = canvas.save();
@@ -817,6 +825,8 @@ public final class QrScanOverlay extends FrameLayout {
 
     private final java.util.ArrayList<Object[]> sgGlass = new java.util.ArrayList<>();
     private int sgGlassIndex;
+    /** The glass showed the camera this frame: it is drawn again with the next camera frame (else it froze until a touch). */
+    private boolean sgLiveGlass;
 
     /** Solegram's liquid glass (its shader) over the blurred camera, as on Solegram's camera; false where it can't. */
     private boolean sgLiquid(Canvas canvas, RectF rect, float radius, float alpha) {
@@ -855,6 +865,7 @@ public final class QrScanOverlay extends FrameLayout {
             }
             texture.draw(rc);
             node.endRecording();
+            sgLiveGlass = true;
             final int save = alpha < 1f ? canvas.saveLayerAlpha(rect, (int) (255 * alpha)) : canvas.save();
             path.rewind();
             path.addRoundRect(rect, rr, rr, Path.Direction.CW);
