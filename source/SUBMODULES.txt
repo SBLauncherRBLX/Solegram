@@ -1,6 +1,6 @@
-# path  url  commit (Telegram 13.0.3 native dependencies)
+# path  url  commit (Telegram 13.1.1 native dependencies)
 TMessagesProj/jni/td https://github.com/tdlib/td.git 022d60202e446ad1287b9fb68e687c8a0760788b
-TMessagesProj/jni/tgcalls https://github.com/TelegramMessenger/tgcalls.git 03d7b8662512af7528f476c02094862c1a37177d
+TMessagesProj/jni/tgcalls https://github.com/TelegramMessenger/tgcalls.git 1398c1648f52666b3249111ec3c5b531946e41e4
 TMessagesProj/jni/third_party/absl https://github.com/abseil/abseil-cpp.git 54fac219c4ef0bc379dfffb0b8098725d77ac81b
 TMessagesProj/jni/third_party/boost-regex https://github.com/boostorg/regex.git 4cbcd3078e6ae10d05124379623a1bf03fcb9350
 TMessagesProj/jni/third_party/boringssl https://github.com/google/boringssl.git 2b44a3701a4788e1ef866ddc7f143060a3d196c9

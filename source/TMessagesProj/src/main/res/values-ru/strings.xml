@@ -2018,5 +2018,11 @@
     <string name="SG_TabsSearchButton">Кнопка поиска рядом с панелью</string>
     <string name="SG_TabsSearchButtonInfo">Круглая стеклянная кнопка справа от вкладок открывает поиск по чатам, как на iOS</string>
     <string name="SG_Customization">Кастомизация</string>
+    <string name="SG_WalletMoney">Деньги</string>
+    <string name="SG_WalletMoneyInfo">Граммы в кошельке Telegram</string>
+    <string name="SG_WalletMoneyOpen">Открыть</string>
+    <string name="SG_WalletStarsShort">Звёзды</string>
+    <string name="SG_WalletUnified">Единый кошелёк</string>
+    <string name="SG_WalletUnifiedInfo">Кошелёк Telegram (граммы) показывается внутри SoleWallet, а не отдельным пунктом в настройках</string>
     <!-- SOLEGRAM END -->
 </resources>

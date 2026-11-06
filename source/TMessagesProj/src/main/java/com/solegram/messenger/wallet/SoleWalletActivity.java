@@ -32,6 +32,7 @@ import com.solegram.messenger.ui.SolegramMotion;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserObject;
@@ -68,6 +69,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     private FrameLayout root;
     private SoleWalletCardView card;
     private TextView balanceView;
+    private View moneyRow;
+    private TextView moneyValue;
     private LinearLayout history;
     private LinearLayout goalsBox;
     private TextView asideView, collectionInfo;
@@ -750,12 +753,15 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
 
         final TextView balanceLabel = new TextView(context);
         balanceLabel.setText(getString(R.string.SG_WalletBalance));
-        balanceLabel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        balanceLabel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        balanceLabel.setAllCaps(true);
+        balanceLabel.setLetterSpacing(0.08f);
         balanceLabel.setTextColor(gray());
         balanceLabel.setGravity(Gravity.CENTER);
         column.addView(balanceLabel, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 18, 0, 0));
         balanceView = new TextView(context);
-        balanceView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 38);
+        balanceView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 42);
+        balanceView.setLetterSpacing(-0.02f);
         balanceView.setTypeface(AndroidUtilities.bold());
         balanceView.setTextColor(text());
         balanceView.setGravity(Gravity.CENTER);
@@ -777,13 +783,19 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         actions.addView(action(context, R.drawable.msg_gift_premium, R.string.SG_WalletGifts, this::openGifts), LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
         column.addView(actions);
 
-        column.addView(collectionCard(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 20, 12, 0));
+        // Telegram's own wallet (Grams) lives here too: one wallet for Stars, Grams and gifts
+        moneyRow = moneyRow(context);
+        if (moneyRow != null) {
+            column.addView(moneyRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 20, 12, 0));
+        }
+
+        column.addView(collectionCard(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, moneyRow != null ? 10 : 20, 12, 0));
 
         final LinearLayout goalsHead = new LinearLayout(context);
         goalsHead.setGravity(Gravity.CENTER_VERTICAL);
         final TextView goalsTitle = new TextView(context);
         goalsTitle.setText(getString(R.string.SG_GoalsTitle));
-        goalsTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        goalsTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
         goalsTitle.setTypeface(AndroidUtilities.bold());
         goalsTitle.setTextColor(text());
         goalsHead.addView(goalsTitle, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
@@ -798,21 +810,21 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         goalsBox = new LinearLayout(context);
         goalsBox.setOrientation(LinearLayout.VERTICAL);
         final GradientDrawable goalsPanel = new GradientDrawable();
-        goalsPanel.setCornerRadius(dp(18));
+        goalsPanel.setCornerRadius(dp(22));
         goalsPanel.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         goalsBox.setBackground(goalsPanel);
         column.addView(goalsBox, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 0, 12, 0));
 
         final TextView historyTitle = new TextView(context);
         historyTitle.setText(getString(R.string.SG_WalletHistory));
-        historyTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        historyTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
         historyTitle.setTypeface(AndroidUtilities.bold());
         historyTitle.setTextColor(text());
         column.addView(historyTitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 24, 20, 8));
         history = new LinearLayout(context);
         history.setOrientation(LinearLayout.VERTICAL);
         final GradientDrawable panel = new GradientDrawable();
-        panel.setCornerRadius(dp(18));
+        panel.setCornerRadius(dp(22));
         panel.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         history.setBackground(panel);
         column.addView(history, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 0, 12, 0));
@@ -836,6 +848,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         if (showingWallet) {
             updateCollection();
             fillGoals();
+            updateMoney();
         }
     }
 
@@ -858,11 +871,14 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         circle.setScaleType(ImageView.ScaleType.CENTER);
         circle.setImageResource(icon);
         circle.setColorFilter(new PorterDuffColorFilter(accent(), PorterDuff.Mode.SRC_IN));
+        // a soft square in the accent's tint (the refreshed look), over the page's own card colour
         final GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        bg.setCornerRadius(dp(20));
+        bg.setColor(androidx.core.graphics.ColorUtils.compositeColors(
+            androidx.core.graphics.ColorUtils.setAlphaComponent(accent(), Theme.isCurrentThemeDark() ? 0x2E : 0x1F),
+            getThemedColor(Theme.key_windowBackgroundWhite)));
         circle.setBackground(bg);
-        cell.addView(circle, LayoutHelper.createLinear(58, 58));
+        cell.addView(circle, LayoutHelper.createLinear(60, 56));
         final TextView t = new TextView(context);
         t.setText(getString(label));
         t.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
@@ -896,6 +912,74 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         }
     }
 
+    // ------------------------------------------------------------------ Telegram's wallet
+
+    private static boolean moneyAvailable(int account) {
+        return com.solegram.messenger.SolegramConfig.unifiedWallet && MessagesController.getInstance(account).config.walletAvailable.get();
+    }
+
+    /** A row for Telegram's wallet: its Grams balance, and a tap opens the wallet itself (sending, top-ups, on-chain gifts). */
+    private View moneyRow(Context context) {
+        if (!moneyAvailable(currentAccount)) {
+            return null;
+        }
+        final LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dp(12), dp(14), dp(12));
+        final GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(22));
+        bg.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        row.setBackground(bg);
+        final ImageView icon = new ImageView(context);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        icon.setImageResource(Theme.isCurrentThemeDark() ? R.drawable.settings_wallet_dark : R.drawable.settings_wallet);
+        row.addView(icon, LayoutHelper.createLinear(36, 36, 0, 0, 12, 0));
+        final LinearLayout texts = new LinearLayout(context);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        final TextView title = new TextView(context);
+        title.setText(getString(R.string.SG_WalletMoney));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setTextColor(text());
+        texts.addView(title);
+        final TextView sub = new TextView(context);
+        sub.setText(getString(R.string.SG_WalletMoneyInfo));
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        sub.setTextColor(gray());
+        texts.addView(sub);
+        row.addView(texts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        moneyValue = new TextView(context);
+        moneyValue.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        moneyValue.setTypeface(AndroidUtilities.bold());
+        moneyValue.setTextColor(text());
+        row.addView(moneyValue, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 8, 0, 6, 0));
+        final ImageView arrow = new ImageView(context);
+        arrow.setImageResource(R.drawable.msg_arrowright);
+        arrow.setColorFilter(new PorterDuffColorFilter(gray(), PorterDuff.Mode.SRC_IN));
+        row.addView(arrow, LayoutHelper.createLinear(20, 20));
+        row.setOnClickListener(v -> {
+            SoleWallet.touch();
+            presentFragment(new org.telegram.ui.Wallet.WalletActivity());
+        });
+        com.solegram.messenger.ui.SolegramMotion.pressable(row, com.solegram.messenger.ui.SolegramMotion.PRESS_CARD);
+        updateMoney();
+        return row;
+    }
+
+    private void updateMoney() {
+        if (moneyValue == null) {
+            return;
+        }
+        try {
+            final long grams = org.telegram.ui.Wallet.GramWallet.getInstance(currentAccount).getBalance();
+            moneyValue.setText(grams > 0 ? org.telegram.ui.Wallet.GramWallet.formatGrams(grams) : getString(R.string.SG_WalletMoneyOpen));
+            moneyValue.setTextColor(grams > 0 ? text() : accent());
+        } catch (Throwable e) {
+            org.telegram.messenger.FileLog.e(e);
+            moneyValue.setText(getString(R.string.SG_WalletMoneyOpen));
+        }
+    }
+
     // ------------------------------------------------------------------ the collection
 
     /** A card to the collection: its worth as last seen, and the vault. */
@@ -904,7 +988,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
         final GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(18));
+        bg.setCornerRadius(dp(22));
         bg.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         card.setBackground(bg);
         final ImageView icon = new ImageView(context);

@@ -1764,4 +1764,10 @@
     <string name="SG_TabsSearchButton">Search button beside the bar</string>
     <string name="SG_TabsSearchButtonInfo">A round glass button next to the tabs that opens the chat search, as on iOS</string>
     <string name="SG_Customization">Customization</string>
+    <string name="SG_WalletMoney">Money</string>
+    <string name="SG_WalletMoneyInfo">Grams in Telegram\'s wallet</string>
+    <string name="SG_WalletMoneyOpen">Open</string>
+    <string name="SG_WalletStarsShort">Stars</string>
+    <string name="SG_WalletUnified">One wallet</string>
+    <string name="SG_WalletUnifiedInfo">Telegram\'s wallet (Grams) shows inside SoleWallet instead of its own item in the settings</string>
 </resources>

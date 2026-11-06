@@ -256,6 +256,8 @@ public class SolegramConfig {
     public static boolean hideProfileTab;
     /** A round glass search button beside the tab bar, as on iOS. */
     public static boolean tabsSearchButton;
+    /** Telegram's wallet (Grams) inside SoleWallet instead of its own item in the settings. */
+    public static boolean unifiedWallet;
     public static boolean savedInMenu = true;
     /** Bottom tab "Feed" (posts of subscribed channels) takes the place of Contacts. */
     public static boolean feedInsteadOfContacts = true;
@@ -512,6 +514,7 @@ public class SolegramConfig {
         hideContactsTab = p.getBoolean("hideContactsTab", false);
         hideProfileTab = p.getBoolean("hideProfileTab", false);
         tabsSearchButton = p.getBoolean("tabsSearchButton", false);
+        unifiedWallet = p.getBoolean("unifiedWallet", true);
         savedInMenu = p.getBoolean("savedInMenu", true);
         feedInsteadOfContacts = p.getBoolean("feedInsteadOfContacts", true);
         contactsSwipe = p.getBoolean("contactsSwipe", true);
@@ -681,6 +684,7 @@ public class SolegramConfig {
 
     private static boolean defaultBoolean(String key) {
         switch (key) {
+            case "unifiedWallet":
             case "profileCards":
             case "ghostReadOnInteract":
             case "ghostInDrawer":

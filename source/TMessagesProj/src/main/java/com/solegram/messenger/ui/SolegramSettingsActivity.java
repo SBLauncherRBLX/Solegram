@@ -317,6 +317,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_TABS_LAYOUT = 1143;
     private static final int ID_STUDIO = 1171;
     private static final int ID_TABS_SEARCH = 1172;
+    private static final int ID_UNIFIED_WALLET = 1173;
 
     // about
     private static final int ID_SOURCE = 601;
@@ -1993,6 +1994,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_SAVED_IN_MENU, getString(R.string.SG_SavedInMenu)).setChecked(SolegramConfig.savedInMenu));
         items.add(tile(UItem.asButton(ID_TABS_LAYOUT, R.drawable.msg_list, getString(R.string.SG_TabsLayout), getString(com.solegram.messenger.SolegramTabs.isCustom() ? R.string.SG_TabsCustom : R.string.SG_TabsTelegram)), TILE_BLUE));
         items.add(UItem.asButtonCheck(ID_TABS_SEARCH, getString(R.string.SG_TabsSearchButton), getString(R.string.SG_TabsSearchButtonInfo)).setChecked(SolegramConfig.tabsSearchButton));
+        items.add(UItem.asButtonCheck(ID_UNIFIED_WALLET, getString(R.string.SG_WalletUnified), getString(R.string.SG_WalletUnifiedInfo)).setChecked(SolegramConfig.unifiedWallet));
         if (!com.solegram.messenger.SolegramTabs.isCustom()) {
             items.add(UItem.asCheck(ID_HIDE_CONTACTS_TAB, getString(SolegramConfig.feedInsteadOfContacts ? R.string.SG_HideFeedTab : R.string.SG_HideContactsTab)).setChecked(SolegramConfig.hideContactsTab));
             items.add(UItem.asCheck(ID_HIDE_PROFILE_TAB, getString(R.string.SG_HideProfileTab)).setChecked(SolegramConfig.hideProfileTab));
@@ -2736,6 +2738,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_TABS_SEARCH:
                 toggleCheck(view, "tabsSearchButton");
                 restartBulletin();
+                return;
+            case ID_UNIFIED_WALLET:
+                toggleCheck(view, "unifiedWallet");
                 return;
             case ID_MARK_ALL_READ_NOW:
                 com.solegram.messenger.SolegramUi.markAllRead(this);
