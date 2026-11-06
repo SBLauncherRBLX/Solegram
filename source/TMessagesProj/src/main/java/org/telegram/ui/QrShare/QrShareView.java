@@ -1614,7 +1614,7 @@ public class QrShareView extends View {
     private void openLayer(int t) {
         if (!themeEditable) return;
         // gifts as a theme are for Premium only; the colours and the emoji presets are for everyone
-        if (t == SCENE_GIFT && !org.telegram.messenger.UserConfig.getInstance(currentAccount).isPremium()) {
+        if (false && t == SCENE_GIFT && !org.telegram.messenger.UserConfig.getInstance(currentAccount).isPremium()) { // Solegram: gifts for everyone
             showToast(0, org.telegram.messenger.LocaleController.getString(R.string.QrPremiumGiftsToast), org.telegram.messenger.LocaleController.getString(R.string.QrPremiumSubscribe));
             haptic();
             return;
@@ -4509,6 +4509,20 @@ public class QrShareView extends View {
     /** Glass in any outline (the menu droplet): same blur, tint, sheen and rim as the rounded-rect glass. */
     private void drawGlassPath(Canvas c, Path p, RectF bounds, boolean light, float alpha) {
         if (alpha <= 0) return;
+        if (true) { // Solegram: the menu in the same plain look as the buttons, over a light blur for legibility
+            c.save();
+            c.clipPath(p);
+            if (QrRender.hasEffects() && hasBlur(c)) {
+                if (alpha < 1f) c.saveLayerAlpha(bounds, (int) (255 * alpha));
+                drawBlurNode(c, blurNode);
+                if (alpha < 1f) c.restore();
+            } else {
+                drawFrost(c, bounds, alpha);
+            }
+            c.restore();
+            sgDrawFlat(c, p, bounds, 0, light, alpha);
+            return;
+        }
         c.save();
         c.clipPath(p);
         if (QrRender.hasEffects() && hasBlur(c)) {
@@ -4530,8 +4544,31 @@ public class QrShareView extends View {
         drawDarkOut(c, p, bounds, 0, alpha);
     }
 
+    // Solegram: plain controls instead of the glass texture (no blur, sheen, glint or rim): a soft fill and a hairline
+    private final Paint sgFlatStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private void sgDrawFlat(Canvas c, Path p, RectF r, float radius, boolean light, float alpha) {
+        fill.setColor(light ? 0x1F000000 : 0x2EFFFFFF);
+        fill.setAlpha((int) (Color.alpha(fill.getColor()) * alpha));
+        sgFlatStroke.setStyle(Paint.Style.STROKE);
+        sgFlatStroke.setStrokeWidth(Math.max(1f, dpf2(0.66f)));
+        sgFlatStroke.setColor(light ? 0x14000000 : 0x1FFFFFFF);
+        sgFlatStroke.setAlpha((int) (Color.alpha(sgFlatStroke.getColor()) * alpha));
+        if (p != null) {
+            c.drawPath(p, fill);
+            c.drawPath(p, sgFlatStroke);
+        } else {
+            c.drawRoundRect(r, radius, radius, fill);
+            c.drawRoundRect(r, radius, radius, sgFlatStroke);
+        }
+    }
+
     private void drawGlass(Canvas c, RectF r, float radius, boolean light, float alpha) {
         if (alpha <= 0) return;
+        if (!glassSheet && !liftThis) {
+            sgDrawFlat(c, null, r, radius, light, alpha);
+            return;
+        }
         // sheets: the glass body covers the rim's grown 1dp band too (else raw backdrop shows between the glass edge
         // and the outer dark ring: a second dark band along the sides)
         RectF gb = r;
@@ -4569,7 +4606,11 @@ public class QrShareView extends View {
         fill.setColor(glassFill != 0 ? glassFill : (light ? 0x12000000 : argb((RimTune.v[RimTune.FILL] + (liftThis ? RimTune.v[RimTune.SH_FILL] * sheetLift : 0f)) / 100f, 0xFFFFFF))); // tuner: glass fill white (+ the sheet's lift)
         fill.setAlpha((int) (Color.alpha(fill.getColor()) * alpha));
         c.drawRect(gb, fill);
-        // light from above: a soft sheen on the upper half
+        // Solegram: no sheen, glint or rim on the sheets either (a plain blurred panel)
+        if (glassSheet || liftThis) {
+            c.restore();
+            return;
+        }
         QrGlass.drawSheen(c, gb, light, alpha);
         // glint: the light band crossing this glass (same field, same frame as the pattern): a soft white sheen
         // following the band, sampled at the element's left / centre / right along the sweep, ≤ 10% white at peak

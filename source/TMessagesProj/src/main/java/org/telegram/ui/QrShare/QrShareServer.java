@@ -142,7 +142,8 @@ final class QrShareServer implements NotificationCenter.NotificationCenterDelega
         view.setTimerOnly(link.contactToken);
         view.setTemporaryLink(link.contactToken);
         final LocalTheme local = localThemes(account).get(link.peerId);
-        final TLRPC.ShareTheme cached = local != null ? local.theme : memoryFullTheme();
+        final TLRPC.ShareTheme keptOnDevice = sgOnDevice(account, link.peerId);
+        final TLRPC.ShareTheme cached = local != null ? local.theme : keptOnDevice != null ? keptOnDevice : memoryFullTheme();
         if (cached != null) {
             view.setInstantTheme(true);
             applyTheme(cached);
@@ -403,11 +404,54 @@ final class QrShareServer implements NotificationCenter.NotificationCenterDelega
         }
     }
 
+    // Solegram: a theme the server did not take (a Premium-only emoji, sticker or gift on an account without Premium)
+    // stays on this device: it is kept here and used instead of the server's
+    private static android.content.SharedPreferences sgPrefs() {
+        return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("solegram_qr_themes", android.content.Context.MODE_PRIVATE);
+    }
+
+    private static String sgKey(int account, long peerId) {
+        return account + "_" + peerId;
+    }
+
+    private static void sgKeepOnDevice(int account, long peerId, TLRPC.ShareTheme theme) {
+        try {
+            final org.telegram.tgnet.SerializedData data = new org.telegram.tgnet.SerializedData(theme.getObjectSize());
+            theme.serializeToStream(data);
+            sgPrefs().edit().putString(sgKey(account, peerId), android.util.Base64.encodeToString(data.toByteArray(), android.util.Base64.NO_WRAP)).apply();
+            data.cleanup();
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void sgForgetOnDevice(int account, long peerId) {
+        sgPrefs().edit().remove(sgKey(account, peerId)).apply();
+    }
+
+    private static @Nullable TLRPC.ShareTheme sgOnDevice(int account, long peerId) {
+        final String b64 = sgPrefs().getString(sgKey(account, peerId), null);
+        if (b64 == null) {
+            return null;
+        }
+        try {
+            final byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.NO_WRAP);
+            final org.telegram.tgnet.SerializedData data = new org.telegram.tgnet.SerializedData(bytes);
+            final TLRPC.ShareTheme t = TLRPC.ShareTheme.TLdeserialize(data, data.readInt32(false), false);
+            data.cleanup();
+            return t;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        }
+    }
+
     private void onFullTheme(@Nullable TLRPC.ShareTheme res) {
         if (released) {
             return;
         }
-        final TLRPC.ShareTheme theme = themeOf(res);
+        final TLRPC.ShareTheme kept = sgOnDevice(account, link.peerId);
+        final TLRPC.ShareTheme theme = kept != null ? kept : themeOf(res);
         final LocalTheme local = localThemes(account).get(link.peerId);
         if (local != null) {
             if (same(theme, local.theme)) {
@@ -670,15 +714,15 @@ final class QrShareServer implements NotificationCenter.NotificationCenterDelega
             if (sent != null && localThemes(account).get(peerId) == sent) {
                 if (err == null) {
                     sent.savedAt = SystemClock.elapsedRealtime();
+                    sgForgetOnDevice(account, peerId); // the server has this choice now
                 } else {
-                    localThemes(account).remove(peerId); // not saved: the server's full is right
+                    // Solegram: not taken by the server (Premium-only for this account): kept on this device instead
+                    sent.savedAt = SystemClock.elapsedRealtime();
+                    sgKeepOnDevice(account, peerId, sent.theme);
                 }
             }
             if (err != null) {
-                FileLog.e("QrShare: setShareTheme " + err.text);
-                if (!released) {
-                    view.showError(err.text);
-                }
+                FileLog.e("QrShare: setShareTheme " + err.text + " (kept on this device)");
             }
         });
     }

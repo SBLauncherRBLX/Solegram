@@ -134,7 +134,7 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
         super(context);
         this.account = account;
         this.delegate = delegate;
-        premium = org.telegram.messenger.UserConfig.getInstance(account).isPremium();
+        premium = true; // Solegram: every pack is open (no "Unlock")
 
         grid = new Grid(context);
         layoutManager = new GridLayoutManager(context, spanCount);
@@ -372,6 +372,21 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
         // the packs: installed custom emoji packs, their animated (Lottie) emoji only
         final ArrayList<Section> packs = new ArrayList<>();
         for (TLRPC.TL_messages_stickerSet set : data.getStickerSets(MediaDataController.TYPE_EMOJIPACKS)) {
+            if (set == null || set.set == null || set.documents == null) {
+                continue;
+            }
+            final ArrayList<TLRPC.Document> docs = new ArrayList<>();
+            for (TLRPC.Document d : set.documents) {
+                if (isLottie(d)) {
+                    docs.add(d);
+                }
+            }
+            if (!docs.isEmpty()) {
+                packs.add(new Section(KIND_PACK, set.set.title, set.set.id, docs));
+            }
+        }
+        // Solegram: the installed sticker packs too (their animated stickers), not only emoji
+        for (TLRPC.TL_messages_stickerSet set : data.getStickerSets(MediaDataController.TYPE_IMAGE)) {
             if (set == null || set.set == null || set.documents == null) {
                 continue;
             }
