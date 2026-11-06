@@ -1,6 +1,7 @@
 package org.telegram.ui.QrShare;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.AndroidUtilities.dpf2;
 import static org.telegram.messenger.AndroidUtilities.lerp;
 
 import android.animation.Animator;
@@ -805,8 +806,61 @@ public final class QrScanOverlay extends FrameLayout {
      * The glass of the QR screen: the blurred backdrop (here the camera), a faint white fill, a top sheen and the
      * Dark out rim. Without a blur source the fill is a little darker instead.
      */
+    // Solegram: the scanner's buttons as on Solegram's camera and SoleDrop's scanner: with liquid glass on, the
+    // blurred camera under a grey veil with a light rim at the top and a soft shadow; otherwise the camera's plain dark
+    // circles with a hairline (no Telegram glass sheen or rim)
+    private final Paint sgStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint sgShadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private android.graphics.LinearGradient sgRimShader;
+    private float sgRimTop = Float.NaN, sgRimBottom = Float.NaN;
+
+    private void sgDrawButtonBody(Canvas canvas, RectF rect, float radius, float alpha) {
+        final boolean liquid = com.solegram.messenger.ui.SolegramCameraUi.liquid();
+        if (liquid) {
+            sgShadow.setColor(0);
+            sgShadow.setShadowLayer(dpf2(6f), 0, dpf2(1.5f), Color.argb((int) (0x38 * alpha), 0, 0, 0));
+            canvas.drawRoundRect(rect, radius, radius, sgShadow);
+        }
+        if (liquid && blurReady(canvas)) {
+            path.rewind();
+            path.addRoundRect(rect, radius, radius, Path.Direction.CW);
+            canvas.save();
+            canvas.clipPath(path);
+            canvas.save();
+            canvas.translate(cameraView.getLeft(), cameraView.getTop());
+            QrRender.setAlpha(blurNode, alpha);
+            QrRender.draw(canvas, blurNode);
+            canvas.restore();
+            fill.setColor(Color.argb((int) (0x5C * alpha), 0x5C, 0x5C, 0x63));
+            canvas.drawRect(rect, fill);
+            canvas.restore();
+            if (sgRimShader == null || sgRimTop != rect.top || sgRimBottom != rect.bottom) {
+                sgRimTop = rect.top;
+                sgRimBottom = rect.bottom;
+                sgRimShader = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom, 0x6BFFFFFF, 0x24FFFFFF, android.graphics.Shader.TileMode.CLAMP);
+            }
+            sgStroke.setShader(sgRimShader);
+            sgStroke.setStrokeWidth(dpf2(1f));
+        } else {
+            fill.setColor(0x61232326);
+            fill.setAlpha((int) (0x61 * alpha));
+            canvas.drawRoundRect(rect, radius, radius, fill);
+            sgStroke.setShader(null);
+            sgStroke.setColor(0x2EFFFFFF);
+            sgStroke.setStrokeWidth(dpf2(0.66f));
+        }
+        sgStroke.setStyle(Paint.Style.STROKE);
+        sgStroke.setAlpha((int) (255 * alpha));
+        final float in = sgStroke.getStrokeWidth() / 2f;
+        canvas.drawRoundRect(rect.left + in, rect.top + in, rect.right - in, rect.bottom - in, radius - in, radius - in, sgStroke);
+    }
+
     private void drawGlassBody(Canvas canvas, RectF rect, float radius, float alpha, boolean blurred) {
         if (alpha <= 0f) {
+            return;
+        }
+        sgDrawButtonBody(canvas, rect, radius, alpha);
+        if (true) {
             return;
         }
         final int white = (int) (255 * Utilities.clamp01(RimTune.v[RimTune.FILL] / 100f));
