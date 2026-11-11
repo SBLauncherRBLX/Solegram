@@ -14316,6 +14316,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private void showItemOptions() {
         ItemOptions io = ItemOptions.makeOptions(this, optionsItem);
+        io.solegramCascade(); // the same opening as the ⋮ menus of the other screens
         io.setColors(getThemedColor(Theme.key_actionBarDefaultTitle), getThemedColor(Theme.key_actionBarDefaultTitle));
         io.setDimAlpha(0x08);
 
@@ -14425,7 +14426,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         if (getMessagesController().config.walletAvailable.get()) {
             io.add(R.drawable.ic_gram, LocaleController.getString(R.string.WalletAttachMoney), () -> {
-                presentFragment(new WalletActivity());
+                // Solegram: Telegram's wallet opens behind SoleWallet's code
+                if (com.solegram.messenger.SolegramConfig.unifiedWallet) {
+                    com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(this);
+                } else {
+                    presentFragment(new WalletActivity());
+                }
             });
         } else {
             TLRPC.TL_attachMenuBots menuBots = MediaDataController.getInstance(UserConfig.selectedAccount).getAttachMenuBots();

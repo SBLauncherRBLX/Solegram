@@ -4363,9 +4363,10 @@ public class ChatActivity extends BaseFragment implements
 
         otherIcon = new ComposeDrawable(
             context.getResources().getDrawable(R.drawable.ic_ab_other).mutate(),
-            context.getResources().getDrawable(R.drawable.mini_attach).mutate()
+            context.getResources().getDrawable(R.drawable.msg_input_attach2).mutate()
         );
         otherIcon.setIconTranslate(-dp(6), dp(6.66f));
+        otherIcon.solegramSetReplace(true); // a clean paperclip in place of the dots while there is text
 
         if (((chatMode == 0 && (threadMessageId == 0 || isTopic)) || chatMode == MODE_SUGGESTIONS) && !UserObject.isReplyUser(currentUser) && !isReport()) {
             TLRPC.UserFull userFull = null;
@@ -5200,6 +5201,7 @@ public class ChatActivity extends BaseFragment implements
                             animator.addUpdateListener(valueAnimator -> {
                                 pullingDownOffset = (float) valueAnimator.getAnimatedValue();
                                 chatListView.invalidate();
+                                solegramPullChanged();
                             });
                             animator.setDuration(200);
                             animator.setInterpolator(CubicBezierInterpolator.DEFAULT);
@@ -5221,6 +5223,7 @@ public class ChatActivity extends BaseFragment implements
                             animator.addUpdateListener(valueAnimator -> {
                                 pullingDownOffset = (float) valueAnimator.getAnimatedValue();
                                 chatListView.invalidate();
+                                solegramPullChanged();
                             });
                             animator.setDuration(400);
                             animator.setInterpolator(CubicBezierInterpolator.DEFAULT);
@@ -5229,6 +5232,7 @@ public class ChatActivity extends BaseFragment implements
                             animator2.addUpdateListener(valueAnimator -> {
                                 pullingDownOffset = (float) valueAnimator.getAnimatedValue();
                                 chatListView.invalidate();
+                                solegramPullChanged();
                             });
                             animator2.setStartDelay(600);
                             animator2.setDuration(ChatListItemAnimator.DEFAULT_DURATION);
@@ -5245,6 +5249,7 @@ public class ChatActivity extends BaseFragment implements
                             animator.addUpdateListener(valueAnimator -> {
                                 pullingDownOffset = (float) valueAnimator.getAnimatedValue();
                                 chatListView.invalidate();
+                                solegramPullChanged();
                             });
                             animator.setDuration(ChatListItemAnimator.DEFAULT_DURATION);
                             animator.setInterpolator(ChatListItemAnimator.DEFAULT_INTERPOLATOR);
@@ -6737,6 +6742,7 @@ public class ChatActivity extends BaseFragment implements
                         dy = (int) pullingDownOffset;
                         pullingDownOffset = 0;
                         chatListView.invalidate();
+                        solegramPullChanged();
                     } else {
                         dy = 0;
                     }
@@ -6794,6 +6800,7 @@ public class ChatActivity extends BaseFragment implements
                         scrollableViewNoiseSuppressor.onScrolled(0, (dy * k));
                     }
                     chatListView.invalidate();
+                    solegramPullChanged();
                 }
                 if (pullingDownOffset == 0) {
                     chatListView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
@@ -48875,6 +48882,14 @@ public class ChatActivity extends BaseFragment implements
     private static final int BLUR_INVALIDATE_FLAG_SCROLL = 1;
     private static final int BLUR_INVALIDATE_FLAG_POSITIONS = 1 << 1;
     private static final int BLUR_INVALIDATE_FLAG_CLIP = 1 << 2;
+
+    /**
+     * Solegram: the list moved by the pull to the next channel (not by a scroll): the glass over it takes its
+     * picture again, or it kept the one from before the pull.
+     */
+    private void solegramPullChanged() {
+        invalidateMergedVisibleBlurredPositionsAndSources(BLUR_INVALIDATE_FLAG_SCROLL | BLUR_INVALIDATE_FLAG_CLIP);
+    }
 
     private void invalidateMergedVisibleBlurredPositionsAndSourcesPositions() {
         invalidateMergedVisibleBlurredPositionsAndSources(BLUR_INVALIDATE_FLAG_POSITIONS);

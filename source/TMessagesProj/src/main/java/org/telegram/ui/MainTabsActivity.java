@@ -293,6 +293,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     @Override
     public void onResume() {
         super.onResume();
+        if (viewPager != null) {
+            viewPager.solegramSettle(); // a tab transition cut short while the screen was away
+        }
         solegramCheckLiquid();
         blur3_updateColors();
         checkContactsTabBadge();
@@ -386,6 +389,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                     return;
                 }
 
+                viewPager.solegramSettle(); // a transition left unfinished is finished before the next one
                 if (viewPager.getCurrentPosition() == position) {
                     final BaseFragment fragment = getCurrentVisibleFragment();
                     if (fragment instanceof MainTabsActivity.TabFragmentDelegate) {

@@ -91,8 +91,8 @@ public class BrightnessControlCell extends FrameLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        leftImageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
-        rightImageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
+        leftImageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
+        rightImageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
     }
 
     protected void didChangedValue(float value) {

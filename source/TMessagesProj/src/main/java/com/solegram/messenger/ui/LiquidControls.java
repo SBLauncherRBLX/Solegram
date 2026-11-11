@@ -162,6 +162,22 @@ public final class LiquidControls {
         drawThumb(canvas, cx, cy, width, height, active, lens, null, 0, 0);
     }
 
+    private static boolean plainLens;
+
+    /**
+     * A slider's thumb: clear glass only. The track runs straight on under it (no magnified blob of the fill's
+     * colour inside the glass), the light on its rim stays.
+     */
+    public static void drawSliderThumb(Canvas canvas, float cx, float cy, float width, float height, float active, LensContent lens,
+                                       Lens glass, int viewWidth, int viewHeight) {
+        plainLens = true;
+        try {
+            drawThumb(canvas, cx, cy, width, height, active, lens, null, viewWidth, viewHeight);
+        } finally {
+            plainLens = false;
+        }
+    }
+
     /**
      * @param glass      the view's {@link Lens} (shader refraction on Android 13+), may be null
      * @param viewWidth  size of the control: the shadow is kept inside it, so no edge ever cuts it off
@@ -205,7 +221,7 @@ public final class LiquidControls {
                 path.rewind();
                 path.addRoundRect(rect, r, r, Path.Direction.CW);
                 canvas.clipPath(path);
-                final float magnify = 1f + 0.24f * a;
+                final float magnify = plainLens ? 1f : 1f + 0.24f * a;
                 canvas.scale(magnify, magnify, cx, cy);
                 lens.draw(canvas);
                 canvas.restore();
@@ -214,7 +230,7 @@ public final class LiquidControls {
         }
 
         // white body fades to a faint tint (demo: background opacity 1 -> 0.1)
-        fillPaint.setColor(((int) (255 * (1f - 0.9f * a)) << 24) | 0xFFFFFF);
+        fillPaint.setColor(((int) (255 * (1f - (plainLens ? 0.84f : 0.9f) * a)) << 24) | 0xFFFFFF);
         canvas.drawRoundRect(rect, r, r, fillPaint);
 
         if (Build.VERSION.SDK_INT < 28) {

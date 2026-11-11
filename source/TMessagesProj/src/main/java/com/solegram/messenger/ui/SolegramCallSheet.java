@@ -65,13 +65,14 @@ public class SolegramCallSheet extends FrameLayout {
 
     /** Room around the glass panel for its shadow; the panel itself is inset by this much from the screen edges. */
     private static final int EDGE = 10;
-    private static final int RADIUS = 34;
-    private static final int GRABBER_ZONE = 28;
+    private static final int RADIUS = 36;
+    /** Room above the buttons row (there is no grabber: the sheet is not dragged, and a handle said it was). */
+    private static final int GRABBER_ZONE = 18;
     private static final int SIDE = 18;
     private static final int BOTTOM = 18;
-    private static final int END_HEIGHT = 56;
+    private static final int END_HEIGHT = 52;
     private static final int GAP_TO_END = 14;
-    private static final int WIDE_HEIGHT = 58;
+    private static final int WIDE_HEIGHT = 54;
     private static final int LABEL_TOP = 12;
     private static final int LABEL_HEIGHT = 20;
     private static final int REPLY_HEIGHT = 44;
@@ -192,6 +193,7 @@ public class SolegramCallSheet extends FrameLayout {
 
         grabber = new View(context);
         grabber.setBackground(Theme.createRoundRectDrawable(dp(3), 0x73FFFFFF));
+        grabber.setVisibility(GONE);
         addView(grabber, LayoutHelper.createFrame(40, 5, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 10, 0, 0));
 
         endButton = wideButton(context, LocaleController.getString(R.string.VoipEndCall2), 0xE6EB4040, R.drawable.calls_decline);
@@ -239,7 +241,7 @@ public class SolegramCallSheet extends FrameLayout {
             reply.setSingleLine(true);
             reply.setEllipsize(TextUtils.TruncateAt.END);
             reply.setPadding(dp(14), 0, dp(14), 0);
-            reply.setBackground(Theme.createRoundRectDrawable(dp(16), 0x1AFFFFFF));
+            reply.setBackground(Theme.createRoundRectDrawable(dp(22), 0x1AFFFFFF));
             reply.setOnClickListener(v -> {
                 if (!incomingHandled && !acceptPressed && !retryMode) {
                     incomingHandled = true;
@@ -265,7 +267,7 @@ public class SolegramCallSheet extends FrameLayout {
         button.setSingleLine(true);
         button.setEllipsize(TextUtils.TruncateAt.END);
         button.setText(text);
-        button.setBackground(Theme.createRoundRectDrawable(dp(29), color));
+        button.setBackground(Theme.createRoundRectDrawable(dp(27), color));
         if (iconRes != 0) {
             final Drawable icon = context.getResources().getDrawable(iconRes).mutate();
             icon.setBounds(0, 0, dp(26), dp(26));

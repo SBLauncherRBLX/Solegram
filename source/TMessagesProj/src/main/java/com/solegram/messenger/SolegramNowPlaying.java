@@ -115,6 +115,8 @@ public final class SolegramNowPlaying {
     private static final Map<MediaController, MediaController.Callback> callbacks = new HashMap<>();
     private static Track current;
     private static boolean started;
+    /** When each player was first seen paused (elapsed realtime). */
+    private static final java.util.WeakHashMap<MediaController, Long> pausedSince = new java.util.WeakHashMap<>();
 
     private SolegramNowPlaying() {
     }
@@ -341,12 +343,23 @@ public final class SolegramNowPlaying {
                 continue;
             }
             final boolean playing = state != null && (state.getState() == PlaybackState.STATE_PLAYING || state.getState() == PlaybackState.STATE_BUFFERING);
+            if (playing) {
+                pausedSince.remove(c);
+            }
             if (!playing) {
                 // stopped, or paused a while ago: nothing is being listened to any more
                 if (state == null || state.getState() != PlaybackState.STATE_PAUSED) {
                     continue;
                 }
-                final long since = state.getLastPositionUpdateTime() > 0 ? SystemClock.elapsedRealtime() - state.getLastPositionUpdateTime() : PAUSED_KEEP_MS;
+                Long seen = pausedSince.get(c);
+                if (seen == null) {
+                    // the pause as the player dates it, but never later than when it was first seen here: players
+                    // that keep refreshing a paused state kept the card for hours
+                    final long byPlayer = state.getLastPositionUpdateTime() > 0 ? state.getLastPositionUpdateTime() : SystemClock.elapsedRealtime() - PAUSED_KEEP_MS;
+                    seen = Math.min(SystemClock.elapsedRealtime(), byPlayer);
+                    pausedSince.put(c, seen);
+                }
+                final long since = SystemClock.elapsedRealtime() - seen;
                 if (since >= PAUSED_KEEP_MS) {
                     continue;
                 }
@@ -506,7 +519,14 @@ public final class SolegramNowPlaying {
     /** The track in someone's bio (the line Solegram writes, «🎧 Artist — Title»), or null. */
     @Nullable
     public static Track fromBio(@Nullable String about) {
-        if (TextUtils.isEmpty(about) || !about.contains(BIO_TAG)) {
+        if (TextUtils.isEmpty(about)) {
+            return null;
+        }
+        final Track hidden = fromHidden(about);
+        if (hidden != null || about.indexOf(HIDDEN_START) >= 0) {
+            return hidden; // a hidden track that is too old shows nothing
+        }
+        if (!about.contains(BIO_TAG)) {
             return null;
         }
         for (String line : about.split("\n")) {
@@ -527,13 +547,20 @@ public final class SolegramNowPlaying {
             if (title.isEmpty()) {
                 continue;
             }
-            return new Track(SOURCE_NONE, title, artist, 0, 0, 0, 1f, true, null, colorFor(title + artist), true);
+            return remoteTrack(SOURCE_NONE, title, artist);
         }
         return null;
     }
 
+    /** Someone else's track, with its cover when it was found already (it is looked up otherwise). */
+    private static Track remoteTrack(int source, String title, String artist) {
+        final Bitmap art = remoteArt(artist, title);
+        return new Track(source, title, artist, 0, 0, 0, 1f, true, art, art != null ? mainColor(art) : colorFor(title + artist), true);
+    }
+
     /** The bio without the music line (the card shows it), trimmed; empty when nothing else is there. */
     public static String stripBio(@Nullable String about) {
+        about = stripHidden(about);
         if (about == null || !about.contains(BIO_TAG)) {
             return about;
         }
@@ -551,6 +578,265 @@ public final class SolegramNowPlaying {
             out.append(line);
         }
         return out.toString().trim();
+    }
+    // endregion
+
+    // region The hidden track
+
+    /*
+     * The track travels in the bio as invisible characters after the user's own text, so the bio reads the same in
+     * Telegram and in other apps and only Solegram shows the music: an invisible times sign, then variation
+     * selectors, four bits each. The bytes: three of time (minutes, so a track left behind by a closed app goes
+     * away by itself), one of source, then the artist, a separator and the title in a one-byte alphabet (Latin,
+     * Cyrillic, a few signs; anything else escaped as UTF-16).
+     */
+    static final char HIDDEN_START = '\u2062';
+    private static final long STAMP_EPOCH_MIN = 28928160L; // 2025-01-01 00:00 UTC, in minutes
+    /** How long a hidden track is shown after it was written (the sender writes it anew every few minutes). */
+    private static final long HIDDEN_FRESH_MIN = 15;
+    private static final int ESCAPE = 0xFE, SEP = 0x01, CUT = 0xC5; // a cut is the ellipsis itself
+    private static final String SIGNS = "\u0401\u0451\u2014\u2013\u2019\u2026"; // Ё ё — – ’ … -> 0xC0..
+
+    private static void encodeChar(java.io.ByteArrayOutputStream out, char c) {
+        final int sign = SIGNS.indexOf(c);
+        if (c >= 0x20 && c <= 0x7E) {
+            out.write(c);
+        } else if (c >= 0x0410 && c <= 0x044F) {
+            out.write(0x80 + (c - 0x0410));
+        } else if (sign >= 0) {
+            out.write(0xC0 + sign);
+        } else {
+            out.write(ESCAPE);
+            out.write(c >> 8);
+            out.write(c & 0xFF);
+        }
+    }
+
+    private static int encodedSize(char c) {
+        return c >= 0x20 && c <= 0x7E || c >= 0x0410 && c <= 0x044F || SIGNS.indexOf(c) >= 0 ? 1 : 3;
+    }
+
+    /** As much of the text as fits into the bytes left (whole characters, a cut marked with an ellipsis). */
+    private static void encodeText(java.io.ByteArrayOutputStream out, String text, int bytes) {
+        int need = 0;
+        for (int i = 0; i < text.length(); i++) {
+            need += encodedSize(text.charAt(i));
+        }
+        if (need <= bytes) {
+            for (int i = 0; i < text.length(); i++) {
+                encodeChar(out, text.charAt(i));
+            }
+            return;
+        }
+        int used = 1; // the ellipsis
+        for (int i = 0; i < text.length(); i++) {
+            final char c = text.charAt(i);
+            if (used + encodedSize(c) > bytes || Character.isHighSurrogate(c) && used + 6 > bytes) {
+                break;
+            }
+            encodeChar(out, c);
+            used += encodedSize(c);
+        }
+        out.write(CUT);
+    }
+
+    /**
+     * The invisible block for this track, at most {@code room} characters long; null when even a short form does
+     * not fit (a long bio of the user's own).
+     */
+    @Nullable
+    static String hiddenBlock(Track t, int room) {
+        final String artist = t.artist == null ? "" : t.artist.trim();
+        final String title = t.title == null ? "" : t.title.trim();
+        final int bytes = (room - 1) / 2 - 4; // the start sign; three bytes of time and one of source
+        if (title.isEmpty() || bytes < 8) {
+            return null;
+        }
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        final long stamp = System.currentTimeMillis() / 60000L - STAMP_EPOCH_MIN;
+        out.write((int) (stamp >> 16) & 0xFF);
+        out.write((int) (stamp >> 8) & 0xFF);
+        out.write((int) stamp & 0xFF);
+        out.write(t.source & 0xFF);
+        if (!artist.isEmpty()) {
+            // the title keeps at least half of the room (and no less than six bytes)
+            encodeText(out, artist, Math.max(3, Math.min(bytes - 1 - Math.max(6, bytes / 2), bytes - 7)));
+            out.write(SEP);
+        }
+        encodeText(out, title, bytes - (out.size() - 4));
+        final byte[] data = out.toByteArray();
+        final StringBuilder sb = new StringBuilder(1 + data.length * 2);
+        sb.append(HIDDEN_START);
+        for (byte b : data) {
+            sb.append((char) (0xFE00 + ((b >> 4) & 0xF))).append((char) (0xFE00 + (b & 0xF)));
+        }
+        return sb.toString();
+    }
+
+    private static int hiddenEnd(String about, int start) {
+        int j = start + 1;
+        while (j < about.length() && about.charAt(j) >= 0xFE00 && about.charAt(j) <= 0xFE0F) {
+            j++;
+        }
+        return j;
+    }
+
+    /** The track hidden in a bio, null when there is none or it was written too long ago. */
+    @Nullable
+    private static Track fromHidden(String about) {
+        final int at = about.lastIndexOf(HIDDEN_START);
+        if (at < 0) {
+            return null;
+        }
+        final int end = hiddenEnd(about, at);
+        final int n = (end - at - 1) / 2;
+        if (n < 6) {
+            return null;
+        }
+        final int[] data = new int[n];
+        for (int i = 0; i < n; i++) {
+            data[i] = ((about.charAt(at + 1 + i * 2) - 0xFE00) << 4) | (about.charAt(at + 2 + i * 2) - 0xFE00);
+        }
+        final long stamp = ((long) data[0] << 16) | ((long) data[1] << 8) | data[2];
+        final long age = System.currentTimeMillis() / 60000L - STAMP_EPOCH_MIN - stamp;
+        if (age > HIDDEN_FRESH_MIN || age < -HIDDEN_FRESH_MIN) {
+            return null;
+        }
+        final StringBuilder artist = new StringBuilder(), title = new StringBuilder();
+        StringBuilder cur = title;
+        boolean hasArtist = false;
+        for (int i = 4; i < n; i++) {
+            if (data[i] == SEP) {
+                hasArtist = true;
+                break;
+            }
+        }
+        if (hasArtist) {
+            cur = artist;
+        }
+        for (int i = 4; i < n; i++) {
+            final int b = data[i];
+            if (b == SEP) {
+                cur = title;
+            } else if (b == ESCAPE) {
+                if (i + 2 >= n) {
+                    break;
+                }
+                cur.append((char) ((data[i + 1] << 8) | data[i + 2]));
+                i += 2;
+            } else if (b >= 0x20 && b <= 0x7E) {
+                cur.append((char) b);
+            } else if (b >= 0x80 && b <= 0xBF) {
+                cur.append((char) (0x0410 + b - 0x80));
+            } else if (b >= 0xC0 && b < 0xC0 + SIGNS.length()) {
+                cur.append(SIGNS.charAt(b - 0xC0));
+            }
+        }
+        if (title.length() == 0) {
+            return null;
+        }
+        final int source = data[3] == SOURCE_SPOTIFY || data[3] == SOURCE_SOUNDCLOUD ? data[3] : SOURCE_NONE;
+        return remoteTrack(source, title.toString(), artist.toString());
+    }
+
+    /** The bio without the hidden track. */
+    public static String stripHidden(@Nullable String about) {
+        if (about == null || about.indexOf(HIDDEN_START) < 0) {
+            return about;
+        }
+        final StringBuilder out = new StringBuilder(about.length());
+        for (int i = 0; i < about.length(); i++) {
+            if (about.charAt(i) == HIDDEN_START) {
+                i = hiddenEnd(about, i) - 1;
+                continue;
+            }
+            out.append(about.charAt(i));
+        }
+        return out.toString();
+    }
+    // endregion
+
+    // region Covers of other people's tracks
+
+    private static final android.util.LruCache<String, Bitmap> remoteArts = new android.util.LruCache<>(24);
+    private static final java.util.HashSet<String> remoteArtAsked = new java.util.HashSet<>();
+
+    private static String artKey(String artist, String title) {
+        return (artist == null ? "" : artist.trim().toLowerCase()) + "\n" + (title == null ? "" : title.trim().toLowerCase());
+    }
+
+    /**
+     * The cover of someone else's track: from the cache, or looked up once by artist and title (the same public
+     * search Telegram uses for the covers of audio files); the profile is told when it arrives.
+     */
+    @Nullable
+    private static Bitmap remoteArt(String artist, String title) {
+        final String key = artKey(artist, title);
+        final Bitmap cached = remoteArts.get(key);
+        if (cached != null || !remoteArtAsked.add(key)) {
+            return cached;
+        }
+        org.telegram.messenger.Utilities.globalQueue.postRunnable(() -> {
+            Bitmap found = null;
+            try {
+                final String cut = title.endsWith("\u2026") ? title.substring(0, title.length() - 1) : title;
+                final String term = java.net.URLEncoder.encode((artist + " " + cut).trim(), "UTF-8");
+                final String json = httpGet("https://itunes.apple.com/search?media=music&entity=song&limit=1&term=" + term, 256 * 1024);
+                final org.json.JSONArray results = new org.json.JSONObject(json).optJSONArray("results");
+                if (results != null && results.length() > 0) {
+                    String url = results.getJSONObject(0).optString("artworkUrl100", "");
+                    if (!url.isEmpty()) {
+                        url = url.replace("100x100", "300x300");
+                        final byte[] image = httpBytes(url, 2 * 1024 * 1024);
+                        final Bitmap b = android.graphics.BitmapFactory.decodeByteArray(image, 0, image.length);
+                        found = b != null ? scaled(b, 320) : null;
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            final Bitmap art = found;
+            handler.post(() -> {
+                if (art != null) {
+                    remoteArts.put(key, art);
+                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramNowPlayingChanged);
+                } else {
+                    // not found or no network: asked again after a while
+                    handler.postDelayed(() -> remoteArtAsked.remove(key), 10 * 60_000);
+                }
+            });
+        });
+        return null;
+    }
+
+    private static byte[] httpBytes(String address, int max) throws Exception {
+        final java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(address).openConnection();
+        try {
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            c.setRequestProperty("User-Agent", "Solegram");
+            if (c.getResponseCode() != 200) {
+                throw new java.io.IOException("HTTP " + c.getResponseCode());
+            }
+            try (java.io.InputStream in = c.getInputStream()) {
+                final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                final byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) > 0) {
+                    out.write(buf, 0, r);
+                    if (out.size() > max) {
+                        throw new java.io.IOException("too large");
+                    }
+                }
+                return out.toByteArray();
+            }
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    private static String httpGet(String address, int max) throws Exception {
+        return new String(httpBytes(address, max), java.nio.charset.StandardCharsets.UTF_8);
     }
     // endregion
 }

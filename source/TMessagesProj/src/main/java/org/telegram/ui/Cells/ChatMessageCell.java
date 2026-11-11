@@ -14745,7 +14745,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 } else {
                     menuDrawable = isDrawSelectionBackground() ? Theme.chat_msgInMenuSelectedDrawable : Theme.chat_msgInMenuDrawable;
                 }
-                setDrawableBounds(menuDrawable, otherX = (int) buttonX + backgroundWidth - dp(currentMessageObject.type == MessageObject.TYPE_TEXT ? 58 : 48) - dp(hasLinkPreview ? 18 : 0), otherY = (int) buttonY - dp(2));
+                setDrawableBounds(menuDrawable, otherX = (int) buttonX + backgroundWidth - dp(currentMessageObject.type == MessageObject.TYPE_TEXT ? 58 : 48) - dp(hasLinkPreview ? 18 : 0) - com.solegram.messenger.SolegramIcons.messageDotsShift(menuDrawable), otherY = (int) buttonY - dp(2));
                 if (transitionParams.animateChangeProgress != 1f && transitionParams.animateShouldDrawMenuDrawable) {
                     menuDrawable.setAlpha((int) (255 * transitionParams.animateChangeProgress));
                 }
@@ -15085,9 +15085,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             int subtitleY;
             if (drawPhotoImage) {
                 if (currentMessageObject.type == MessageObject.TYPE_TEXT) {
-                    setDrawableBounds(menuDrawable, otherX = (int) (photoImage.getImageX() + backgroundWidth - dp(56 + (hasLinkPreview ? 12 : 0))), otherY = (int) (photoImage.getImageY() + dp(4)));
+                    setDrawableBounds(menuDrawable, otherX = (int) (photoImage.getImageX() + backgroundWidth - dp(56 + (hasLinkPreview ? 12 : 0))) - com.solegram.messenger.SolegramIcons.messageDotsShift(menuDrawable), otherY = (int) (photoImage.getImageY() + dp(4)));
                 } else {
-                    setDrawableBounds(menuDrawable, otherX = (int) (photoImage.getImageX() + backgroundWidth - dp(40 + (hasLinkPreview ? 12 : 0))), otherY = (int) (photoImage.getImageY() + dp(4)));
+                    setDrawableBounds(menuDrawable, otherX = (int) (photoImage.getImageX() + backgroundWidth - dp(40 + (hasLinkPreview ? 12 : 0))) - com.solegram.messenger.SolegramIcons.messageDotsShift(menuDrawable), otherY = (int) (photoImage.getImageY() + dp(4)));
                 }
 
                 x = (int) (photoImage.getImageX() + photoImage.getImageWidth() + dp(10));
@@ -15133,7 +15133,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
                 }
             } else {
-                setDrawableBounds(menuDrawable, otherX = (int) buttonX + backgroundWidth - dp(currentMessageObject.type == MessageObject.TYPE_TEXT ? 58 : 48) - dp(hasLinkPreview ? 18 + 6 : 0), otherY = (int) buttonY - dp(2));
+                setDrawableBounds(menuDrawable, otherX = (int) buttonX + backgroundWidth - dp(currentMessageObject.type == MessageObject.TYPE_TEXT ? 58 : 48) - dp(hasLinkPreview ? 18 + 6 : 0) - com.solegram.messenger.SolegramIcons.messageDotsShift(menuDrawable), otherY = (int) buttonY - dp(2));
                 x = buttonX + dp(53);
                 titleY = (int) buttonY + dp(4);
                 subtitleY = (int) buttonY + dp(27);

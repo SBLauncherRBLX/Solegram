@@ -150,13 +150,24 @@ public final class SolegramIcons {
      * every settings and feature icon is in one colour (red, blue... icons of special rows keep their own).
      */
     public static int iconColor(int colorKey, org.telegram.ui.ActionBar.Theme.ResourcesProvider resourcesProvider) {
-        if (lineStyle() && colorKey == org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhiteGrayIcon) {
+        if (lineStyle() && (colorKey == org.telegram.ui.ActionBar.Theme.key_windowBackgroundWhiteGrayIcon || colorKey == org.telegram.ui.ActionBar.Theme.key_dialogIcon)) {
             return lineColor(resourcesProvider);
         }
         return org.telegram.ui.ActionBar.Theme.getColor(colorKey, resourcesProvider);
     }
 
-    /** The thin (line) glyph for a Telegram icon, whatever pack is on, tinted; Telegram's own when the thin pack has none. */
+    /**
+     * The colour of an icon in a popup menu: Telegram's grey takes the theme's colour too (with the line style on),
+     * a colour a menu item set for itself (red for "Delete") stays.
+     */
+    public static int menuIconColor(int color, org.telegram.ui.ActionBar.Theme.ResourcesProvider resourcesProvider) {
+        if (lineStyle() && color == org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_actionBarDefaultSubmenuItemIcon, resourcesProvider)) {
+            return lineColor(resourcesProvider);
+        }
+        return color;
+    }
+
+    /** The line glyph for a Telegram icon (Solar's, or the thin one), tinted; Telegram's own when neither pack has it. */
     public static Drawable lineIcon(Context context, int id, int color) {
         final Resources res = original(context.getResources());
         Drawable d;
@@ -168,7 +179,9 @@ public final class SolegramIcons {
                 }
                 line = lineMap;
             }
-            final int own = line.get(id);
+            // Solar's glyph first (soft, rounded, a little larger) unless another pack was chosen; then the thin one
+            final int solar = activePack == PACK_SOLAR || activePack == PACK_STANDARD ? map(id, map(PACK_SOLAR)) : id;
+            final int own = solar != id ? solar : line.get(id);
             d = res.getDrawable(own != 0 ? own : map(id, map(PACK_PHOSPHOR)));
         } catch (Throwable e) {
             d = null;
@@ -189,9 +202,59 @@ public final class SolegramIcons {
         return d == null ? null : d.mutate();
     }
 
+    private static int dotsShift = -1, dotsShiftPack = -1;
+
+    /**
+     * How far to the left a message's "more" dots go. Telegram's stand upright, a thin column in the middle of the
+     * icon; most packs draw them lying, and those end close to the bubble's edge. Measured from the glyph itself,
+     * so its right end keeps the distance Telegram's dots have.
+     */
+    public static int messageDotsShift(Drawable dots) {
+        if (active == null || dots == null) {
+            return 0;
+        }
+        if (dotsShiftPack == activePack && dotsShift >= 0) {
+            return dotsShift;
+        }
+        int shift = 0;
+        try {
+            final int w = dots.getIntrinsicWidth(), h = dots.getIntrinsicHeight();
+            if (w > 0 && h > 0) {
+                final android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+                final Drawable copy = dots.getConstantState() != null ? dots.getConstantState().newDrawable().mutate() : dots;
+                final android.graphics.Rect old = new android.graphics.Rect(copy.getBounds());
+                copy.setBounds(0, 0, w, h);
+                copy.setAlpha(255);
+                copy.draw(new android.graphics.Canvas(bitmap));
+                copy.setBounds(old);
+                final int[] px = new int[w * h];
+                bitmap.getPixels(px, 0, w, 0, 0, w, h);
+                bitmap.recycle();
+                int right = -1;
+                for (int x = w - 1; x >= 0 && right < 0; x--) {
+                    for (int y = 0; y < h; y++) {
+                        if ((px[y * w + x] >>> 24) > 40) {
+                            right = x;
+                            break;
+                        }
+                    }
+                }
+                if (right >= 0) {
+                    // Telegram's column of dots ends about 10dp before the icon's right side
+                    final int gap = w - 1 - right;
+                    shift = Math.max(0, org.telegram.messenger.AndroidUtilities.dp(10) - gap);
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        dotsShift = shift;
+        dotsShiftPack = activePack;
+        return shift;
+    }
+
     /**
      * The static icon a bottom or attach tab shows instead of its Lottie animation, or 0 with the standard pack
-     * (or a tab the pack has no icon for). Selected or not, the tab keeps the same glyph.
+     * (or a tab the pack has no icon for). The selected tab gets the pack's filled glyph.
      */
     public static int tabIcon(String tabName, boolean selected) {
         final int pack = activePack;
@@ -212,9 +275,9 @@ public final class SolegramIcons {
                         }
                     }
                 }
-                // the same glyph selected or not: a pack's filled glyph is often drawn differently and the icon
-                // jumped to another shape on a tap; the selection shows in the colour and the tab's motion
-                return tabs[pack][i];
+                // filled when selected, as Telegram's own tab icons are
+                final int filled = selected && tabsSelected[pack] != null && i < tabsSelected[pack].length ? tabsSelected[pack][i] : 0;
+                return filled != 0 ? filled : tabs[pack][i];
             }
         }
         return 0;

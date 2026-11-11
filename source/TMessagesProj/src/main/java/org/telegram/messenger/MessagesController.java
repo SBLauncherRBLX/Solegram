@@ -10939,6 +10939,12 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                 }
+                // Solegram: with ads hidden the proxy's sponsor channel is not shown at all (public service
+                // announcements are kept)
+                if (res.proxy && com.solegram.messenger.SolegramConfig.hideSponsored) {
+                    noDialog = true;
+                    nextPromoInfoCheckTime = res.expires;
+                }
                 promoDialogId = did;
                 if (res.proxy) {
                     promoDialogType = PROMO_TYPE_PROXY;

@@ -114,7 +114,7 @@ public class SessionBottomSheet extends BottomSheet {
         stringBuilder.append(" ").append(session.app_version);
         applicationItemView.valueText.setText(stringBuilder);
         Drawable drawable = ContextCompat.getDrawable(context, R.drawable.menu_devices).mutate();
-        drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.SRC_IN));
+        drawable.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.SRC_IN));
         applicationItemView.iconView.setImageDrawable(drawable);
         applicationItemView.descriptionText.setText(LocaleController.getString(R.string.Application));
 
@@ -125,7 +125,7 @@ public class SessionBottomSheet extends BottomSheet {
             ItemView locationItemView = new ItemView(context, false);
             locationItemView.valueText.setText(session.country);
             drawable = ContextCompat.getDrawable(context, R.drawable.msg_location).mutate();
-            drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.SRC_IN));
+            drawable.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.SRC_IN));
             locationItemView.iconView.setImageDrawable(drawable);
             locationItemView.descriptionText.setText(LocaleController.getString(R.string.Location));
 
@@ -155,7 +155,7 @@ public class SessionBottomSheet extends BottomSheet {
             ItemView locationItemView = new ItemView(context, false);
             locationItemView.valueText.setText(session.ip);
             drawable = ContextCompat.getDrawable(context, R.drawable.msg_language).mutate();
-            drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.SRC_IN));
+            drawable.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.SRC_IN));
             locationItemView.iconView.setImageDrawable(drawable);
             locationItemView.descriptionText.setText(LocaleController.getString(R.string.IpAddress));
 
@@ -188,7 +188,7 @@ public class SessionBottomSheet extends BottomSheet {
             ItemView acceptSecretChats = new ItemView(context, true);
             acceptSecretChats.valueText.setText(LocaleController.getString(R.string.AcceptSecretChats));
             drawable = ContextCompat.getDrawable(context, R.drawable.msg_secret).mutate();
-            drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.SRC_IN));
+            drawable.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.SRC_IN));
             acceptSecretChats.iconView.setImageDrawable(drawable);
             acceptSecretChats.switchView.setChecked(!session.encrypted_requests_disabled, false);
             acceptSecretChats.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), 7));
@@ -213,7 +213,7 @@ public class SessionBottomSheet extends BottomSheet {
             ItemView acceptCalls = new ItemView(context, true);
             acceptCalls.valueText.setText(LocaleController.getString(R.string.AcceptCalls));
             drawable = ContextCompat.getDrawable(context, R.drawable.msg_calls).mutate();
-            drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.SRC_IN));
+            drawable.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.SRC_IN));
             acceptCalls.iconView.setImageDrawable(drawable);
             acceptCalls.switchView.setChecked(!session.call_requests_disabled, false);
             acceptCalls.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), 7));

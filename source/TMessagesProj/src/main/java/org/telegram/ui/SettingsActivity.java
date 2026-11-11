@@ -760,6 +760,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
         items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
         items.add(SettingCell.Factory.of(6, IconBackgroundColors.BLUE_DEEP.top, IconBackgroundColors.BLUE_DEEP.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
+        // Solegram: the proxy and the transfer speed, a section of their own
+        items.add(SettingCell.Factory.of(107, 0xFF4CD9C0, 0xFF1FA391, R.drawable.outline_shield_check, getString(R.string.SG_ProxySection), getString(R.string.SG_ProxySectionSub)));
         items.add(SettingCell.Factory.of(7, IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom, R.drawable.settings_folders, getString(R.string.SettingsFolders), getString(R.string.SettingsFoldersInfo)));
         items.add(SettingCell.Factory.of(8, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
@@ -896,6 +898,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             case 106:
                 presentSettingFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
+                break;
+            case 107:
+                presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_PROXY));
                 break;
             case 1:
                 presentSettingFragment(new UserInfoActivity());
@@ -1292,10 +1297,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             final Drawable line = lines && icon != 0
                 ? com.solegram.messenger.SolegramIcons.lineIcon(getContext(), icon, com.solegram.messenger.SolegramIcons.lineColor(resourcesProvider)) : null;
             if (line != null) {
-                // Solegram: a thin line glyph in the theme's colour, no tile
+                // Solegram: a line glyph in the theme's colour, no tile, a little larger than in a tile
                 iconView.setImageDrawable(line);
+                iconView.setScaleX(1.14f);
+                iconView.setScaleY(1.14f);
             } else {
                 iconView.setImageResource(icon);
+                iconView.setScaleX(1f);
+                iconView.setScaleY(1f);
             }
             titleView.setText(title);
             subtitleView.setVisibility((twoLines = !TextUtils.isEmpty(subtitle)) ? View.VISIBLE : View.GONE);

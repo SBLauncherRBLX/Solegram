@@ -67,7 +67,6 @@ public final class SolegramSettingsLinks {
             case DATA:
                 l.add(new Link(R.drawable.msg_language, R.string.SG_Browser, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_BROWSER))));
                 l.add(new Link(R.drawable.msg_camera, R.string.SG_Camera, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_CAMERA))));
-                l.add(new Link(R.drawable.outline_shield_check, R.string.SG_Proxy, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_PROXY))));
                 l.add(new Link(R.drawable.msg_location, R.string.SG_Maps, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_MAPS))));
                 break;
         }

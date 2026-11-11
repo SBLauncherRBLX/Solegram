@@ -88,11 +88,46 @@ public class SolegramEdgeBlur {
         this.host = host;
     }
 
+    private boolean redrawPosted;
+
+    /** The band is drawn again on the next frame, and once more when the list's animations are over. */
+    private void redrawHost() {
+        final View h = host;
+        if (h == null) {
+            return;
+        }
+        h.invalidate();
+        if (!redrawPosted) {
+            redrawPosted = true;
+            h.postDelayed(() -> {
+                redrawPosted = false;
+                final View now = host;
+                if (now != null) {
+                    now.invalidate();
+                }
+            }, 420);
+        }
+    }
+
     private void follow(View v) {
         if (host == null || !(v instanceof androidx.recyclerview.widget.RecyclerView) || followed.containsKey(v)) {
             return;
         }
         followed.put(v, Boolean.TRUE);
+        // rows that come and go (a chat unpinned, a row removed): the copy holds the rows it was made with, so a row
+        // that left the list stayed in the blur under the header until the next scroll
+        ((androidx.recyclerview.widget.RecyclerView) v).addOnChildAttachStateChangeListener(new androidx.recyclerview.widget.RecyclerView.OnChildAttachStateChangeListener() {
+            @Override
+            public void onChildViewAttachedToWindow(@androidx.annotation.NonNull View view) {
+                redrawHost();
+            }
+
+            @Override
+            public void onChildViewDetachedFromWindow(@androidx.annotation.NonNull View view) {
+                redrawHost();
+            }
+        });
+        v.addOnLayoutChangeListener((view, l, t, r, b, ol, ot, or, ob) -> redrawHost());
         ((androidx.recyclerview.widget.RecyclerView) v).addOnScrollListener(new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@androidx.annotation.NonNull androidx.recyclerview.widget.RecyclerView recyclerView, int dx, int dy) {

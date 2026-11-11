@@ -270,6 +270,9 @@ public class ViewPagerFixed extends FrameLayout {
                     removeView(viewPages[1]);
                     setTranslationX(viewPages[0], 0);
                     viewPages[1] = null;
+                } else if (viewPages[0] != null) {
+                    // Solegram: the second page was taken away during the scroll: the one left must not stay shifted
+                    setTranslationX(viewPages[0], 0);
                 }
                 manualScrolling = null;
                 onTabAnimationUpdate(true);
@@ -285,7 +288,48 @@ public class ViewPagerFixed extends FrameLayout {
         manualScrolling.setDuration(getManualScrollDuration());
         manualScrolling.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
         manualScrolling.start();
+        // Solegram: a scroll that did not finish (its pages were rebuilt under it) is put right afterwards
+        removeCallbacks(solegramSettleRunnable);
+        postDelayed(solegramSettleRunnable, getManualScrollDuration() + 260);
         return true;
+    }
+
+    private final Runnable solegramSettleRunnable = this::solegramSettle;
+
+    /**
+     * Solegram: puts the pager at rest when no scroll is running: one page, not shifted. A page transition that was
+     * cut short (the pages' views rebuilt after a theme or interface change) left two half-shifted pages on screen
+     * until the app was restarted.
+     */
+    public void solegramSettle() {
+        if (manualScrolling != null && manualScrolling.isRunning() || tabsAnimation != null && tabsAnimation.isRunning()
+                || startedTracking || maybeStartTracking || tabsAnimationInProgress) {
+            return;
+        }
+        manualScrolling = null;
+        boolean changed = false;
+        if (viewPages[1] != null) {
+            // the scroll is finished for it: the page it was going to becomes the current one
+            swapViews();
+            viewsByType.put(viewTypes[1], viewPages[1]);
+            removeView(viewPages[1]);
+            viewPages[1] = null;
+            changed = true;
+        }
+        if (viewPages[0] != null && viewPages[0].getTranslationX() != 0f) {
+            setTranslationX(viewPages[0], 0);
+            changed = true;
+        }
+        if (changed) {
+            currentProgress = 1f;
+            onTabAnimationUpdate(true);
+            if (tabsView != null) {
+                tabsView.listView.invalidateViews();
+                tabsView.invalidate();
+            }
+            onScrollEnd();
+            invalidate();
+        }
     }
 
     protected long getManualScrollDuration() {

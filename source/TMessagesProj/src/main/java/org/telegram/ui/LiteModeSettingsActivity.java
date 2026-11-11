@@ -452,7 +452,7 @@ public class LiteModeSettingsActivity extends BaseFragment {
             setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
 
             imageView = new ImageView(context);
-            imageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.MULTIPLY));
+            imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.MULTIPLY));
             imageView.setVisibility(View.GONE);
             addView(imageView, LayoutHelper.createFrame(24, 24, Gravity.CENTER_VERTICAL | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT), 20, 0, 20, 0));
 

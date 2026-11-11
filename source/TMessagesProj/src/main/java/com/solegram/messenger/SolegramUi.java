@@ -116,6 +116,62 @@ public final class SolegramUi {
         return controller;
     }
 
+    /** Settings screens of Telegram that are not built on UniversalFragment (which animates its list itself). */
+    private static final java.util.HashSet<String> APPEAR_SCREENS = new java.util.HashSet<>(java.util.Arrays.asList(
+        "ThemeActivity", "SessionsActivity", "FiltersSetupActivity", "FilterCreateActivity", "LanguageSelectActivity",
+        "RestrictedLanguagesSelectActivity", "CacheControlActivity", "DataUsage2Activity", "DataAutoDownloadActivity",
+        "StickersActivity", "ReactionsDoubleTapManageActivity", "ProxyListActivity", "AutoDeleteMessagesActivity",
+        "PrivacyControlActivity", "PrivacyUsersActivity", "ProfileNotificationsActivity", "NotificationsSoundActivity",
+        "TwoStepVerificationActivity", "PluginsActivity"));
+
+    /**
+     * A settings screen was built: its list gets the same appearance as the others (rows fade and rise in one after
+     * another), whatever the screen is made of. Screens with content of their own (chats, feed, pickers) are left alone.
+     */
+    public static void appearOnOpen(org.telegram.ui.ActionBar.BaseFragment fragment, android.view.View root) {
+        try {
+            if (root == null || fragment == null || !SolegramConfig.animateLists || !com.solegram.messenger.ui.SolegramMotion.enabled()) {
+                return;
+            }
+            Class<?> c = fragment.getClass();
+            while (c != null && c.getSimpleName().isEmpty()) {
+                c = c.getSuperclass();      // an anonymous subclass
+            }
+            if (c == null) {
+                return;
+            }
+            final String name = c.getSimpleName();
+            final boolean own = c.getName().startsWith("com.solegram.messenger.ui.") && name.endsWith("Activity") && !name.startsWith("Feed");
+            if (!own && !name.contains("Settings") && !APPEAR_SCREENS.contains(name)) {
+                return;
+            }
+            final androidx.recyclerview.widget.RecyclerView list = firstList(root, 0);
+            if (list != null && list.getLayoutAnimation() == null) {
+                list.setLayoutAnimation(listAppearAnimation());
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static androidx.recyclerview.widget.RecyclerView firstList(android.view.View view, int depth) {
+        if (view instanceof androidx.recyclerview.widget.RecyclerView) {
+            // a horizontal strip (themes, tabs) is not the screen's list
+            final androidx.recyclerview.widget.RecyclerView.LayoutManager lm = ((androidx.recyclerview.widget.RecyclerView) view).getLayoutManager();
+            return lm == null || lm.canScrollVertically() ? (androidx.recyclerview.widget.RecyclerView) view : null;
+        }
+        if (depth > 4 || !(view instanceof android.view.ViewGroup)) {
+            return null;
+        }
+        final android.view.ViewGroup group = (android.view.ViewGroup) view;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            final androidx.recyclerview.widget.RecyclerView found = firstList(group.getChildAt(i), depth + 1);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
     /** Android 12+ can blur what lies behind a window (menus, dialogs, sheets) unless the system turned it off. */
     public static boolean canBlurWindows() {
         return android.os.Build.VERSION.SDK_INT >= 31 && org.telegram.ui.LaunchActivity.systemBlurEnabled;

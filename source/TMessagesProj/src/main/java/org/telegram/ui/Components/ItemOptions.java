@@ -1410,7 +1410,7 @@ public class ItemOptions {
         actionBarPopupWindow.setOutsideTouchable(true);
         actionBarPopupWindow.setFocusable(!dontFocus);
         actionBarPopupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        actionBarPopupWindow.setAnimationStyle(R.style.PopupContextAnimation);
+        actionBarPopupWindow.setAnimationStyle(solegramCascade ? 0 : R.style.PopupContextAnimation);
         if (allowShowingOnTopOfKeyboard) {
             actionBarPopupWindow.setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
             actionBarPopupWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
@@ -1544,7 +1544,7 @@ public class ItemOptions {
             }
         }
         actionBarPopupWindow.setScaleOut(scaleOut);
-        if (scrimView != null && !allowMoveScrim && animateToWidth == 0 && scrimView.isAttachedToWindow()) {
+        if (!solegramCascade && scrimView != null && !allowMoveScrim && animateToWidth == 0 && scrimView.isAttachedToWindow()) {
             // Solegram: the menu flows out of the view it is for (a whole cell: out of its edge next to the menu)
             final int[] loc = new int[2];
             scrimView.getLocationOnScreen(loc);
@@ -1558,6 +1558,9 @@ public class ItemOptions {
             (int) (offsetX = (X + this.translateX)),
             (int) (offsetY = (Y + this.translateY))
         );
+        if (solegramCascade) {
+            actionBarPopupWindow.startAnimation(); // its items come in one after another, as in a header's menu
+        }
 
         if (longPressSelectionEnabled) {
             installHoverReleaseListener();
@@ -1567,6 +1570,14 @@ public class ItemOptions {
             installFollowListeners();
         }
 
+        return this;
+    }
+
+    private boolean solegramCascade;
+
+    /** Solegram: the menu opens as a header's own menu does (it grows out of the button, its items one by one). */
+    public ItemOptions solegramCascade() {
+        solegramCascade = true;
         return this;
     }
 

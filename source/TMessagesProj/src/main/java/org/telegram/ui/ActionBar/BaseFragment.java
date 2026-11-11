@@ -306,6 +306,8 @@ public abstract class BaseFragment {
     @CallSuper
     protected void onViewCreated(View view) {
         glassEngine.setRoot(view);
+        // Solegram: the rows of every settings screen rise in one after another, not only of the newer screens
+        com.solegram.messenger.SolegramUi.appearOnOpen(this, view);
     }
 
     protected View createView(Context context) {

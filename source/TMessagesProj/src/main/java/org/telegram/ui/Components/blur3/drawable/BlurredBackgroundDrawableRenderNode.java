@@ -144,6 +144,19 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
                 c.drawColor(backgroundColor);
             }
         }
+        // Solegram: the surface of iOS glass (a faint body with grain, an edge that takes the colour of what is
+        // under it) on floating glass, in place of Telegram's two plain lines; bars and panels get the body only
+        final boolean solegramLook = Color.alpha(backgroundColor) != 255 && com.solegram.messenger.SolegramGlass.previewLook();
+        final boolean solegramEdge = solegramLook && solegramPreviewLook();
+        if (solegramLook) {
+            com.solegram.messenger.ui.SolegramGlassLook.draw(c, boundProps.boundsWithPadding.width(), boundProps.boundsWithPadding.height(),
+                boundProps.radii, androidx.core.graphics.ColorUtils.calculateLuminance(backgroundColor | 0xFF000000) < 0.4,
+                solegramEdge && !solegramStrokeHidden, liquidGlassEffect != null && Build.VERSION.SDK_INT >= 33);
+        }
+        if (solegramEdge) {
+            renderNode.endRecording();
+            return;
+        }
         if (strokeColorTop != 0 && !solegramStrokeHidden) { // Solegram: see solegramSetStrokeHidden
             drawStroke(c, 0, 0, boundProps.boundsWithPadding.width(),
                     boundProps.boundsWithPadding.height(), boundProps.radii,
@@ -192,8 +205,11 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
             final int color = Theme.multAlpha(com.solegram.messenger.SolegramGlass.previewShadowColor(), renderNode.getAlpha() * shadowAlpha);
             if (Color.alpha(color) != 0) {
                 // the whole soft edge stays inside that room: a shadow cut off by the element's bounds read as a dark box
-                final float radius = Math.min(dp(10), boundProps.padding / 2.1f);
-                paintShadow.setShadowLayer(radius, 0, radius * 0.3f, color);
+                // as under iOS glass: wide and very soft, hardly moved down, with a closer, fainter one inside it
+                final float radius = Math.min(dp(12), boundProps.padding / 2.1f);
+                paintShadow.setShadowLayer(radius, 0, radius * 0.16f, Theme.multAlpha(color, 0.62f));
+                boundProps.drawShadows(canvas, paintShadow, inAppKeyboardOptimization);
+                paintShadow.setShadowLayer(radius * 0.3f, 0, dp(0.66f), Theme.multAlpha(color, 0.42f));
                 boundProps.drawShadows(canvas, paintShadow, inAppKeyboardOptimization);
             }
         } else {

@@ -415,9 +415,10 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
             icon.setPivotY(icon.getHeight() * 0.85f);
             // a quick lift, then a smooth settle
             final float k = (float) Math.sin(Math.PI * CubicBezierInterpolator.EASE_OUT.getInterpolation(t));
-            dy = -dp(2.5f) * k;
-            rotation = -4f * k;
-            scaleX = scaleY = 1f + 0.04f * k;
+            // as lively as the other tabs' icons (it read as slow: a small move over the same time)
+            dy = -dp(4f) * k;
+            rotation = -7f * k;
+            scaleX = scaleY = 1f + 0.07f * k;
         } else if (type == TabAnimation.POLL || type == TabAnimation.BOOSTS || type == TabAnimation.MONETIZATION) {
             // the bars grow up from the base and settle with a spring
             icon.setPivotY(icon.getHeight() * 0.8f);

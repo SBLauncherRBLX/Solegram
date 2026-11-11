@@ -4,7 +4,7 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.134" android:scaleY="1.134" android:translateX="0" android:translateY="0">
+    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.076" android:scaleY="1.076" android:translateX="0" android:translateY="0">
         <path android:pathData="M9 21c0-.932 0-1.398-.152-1.765a2 2 0 0 0-1.083-1.083C7.398 18 6.932 18 6 18s-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083C3 19.602 3 20.068 3 21m12 0c0-.932 0-1.398-.152-1.765a2 2 0 0 0-1.083-1.083C13.398 18 12.932 18 12 18s-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083C9 19.602 9 20.068 9 21m12 0c0-.932 0-1.398-.152-1.765a2 2 0 0 0-1.083-1.083C19.398 18 18.932 18 18 18s-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083C15 19.602 15 20.068 15 21M14 3c0 4.4 3.6 8 8 8" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
         <path android:pathData="M19 3c0 5 3 8 3 8s-2 1-2 4M10 3c0 4.4-3.6 8-8 8" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
         <path android:pathData="M5 3c0 5-3 8-3 8s2 1 2 4" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>

@@ -117,6 +117,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private String[] messages;
     private int currentViewPagerPage;
     private EGLThread eglThread;
+    private com.solegram.messenger.ui.SolegramIntroView solegramIntroView;
     private long currentDate;
     private boolean justEndDragging;
     private boolean dragging;
@@ -132,21 +133,22 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     public boolean onFragmentCreate() {
         MessagesController.getGlobalMainSettings().edit().putLong("intro_crashed_time", System.currentTimeMillis()).apply();
 
+        // Solegram: the welcome screen tells about Solegram
         titles = new CharSequence[]{
-                null,
-                LocaleController.getString(R.string.Page2Title),
-                LocaleController.getString(R.string.Page3Title),
-                LocaleController.getString(R.string.Page5Title),
-                LocaleController.getString(R.string.Page4Title),
-                LocaleController.getString(R.string.Page6Title)
+                com.solegram.messenger.Solegram.NAME,
+                LocaleController.getString(R.string.SG_Intro2Title),
+                LocaleController.getString(R.string.SG_Intro3Title),
+                LocaleController.getString(R.string.SG_Intro4Title),
+                LocaleController.getString(R.string.SG_Intro5Title),
+                LocaleController.getString(R.string.SG_Intro6Title)
         };
         messages = new String[]{
-                LocaleController.getString(R.string.Page1Message),
-                LocaleController.getString(R.string.Page2Message),
-                LocaleController.getString(R.string.Page3Message),
-                LocaleController.getString(R.string.Page5Message),
-                LocaleController.getString(R.string.Page4Message),
-                LocaleController.getString(R.string.Page6Message)
+                LocaleController.getString(R.string.SG_Intro1Message),
+                LocaleController.getString(R.string.SG_Intro2Message),
+                LocaleController.getString(R.string.SG_Intro3Message),
+                LocaleController.getString(R.string.SG_Intro4Message),
+                LocaleController.getString(R.string.SG_Intro5Message),
+                LocaleController.getString(R.string.SG_Intro6Message)
         };
         return true;
     }
@@ -155,9 +157,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     public View createView(Context context) {
         logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
         logoDrawable.setBounds(0, dp(8.666f), dp(115), dp(35));
-        SpannableStringBuilder ssb = new SpannableStringBuilder(LocaleController.getString(R.string.Page1Title));
-        ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        titles[0] = ssb;
+        // Solegram: its own name as the first title, in plain letters (Telegram's logo picture is not ours to show)
 
 
         actionBar.setAddToContainer(false);
@@ -248,7 +248,13 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         frameContainerView.addView(frameLayout2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 78, 0, 0));
 
         TextureView textureView = new TextureView(context);
-        frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
+        // Solegram: its own animated mark in place of Telegram's 3D pictures (the texture view is never attached,
+        // so its surface, and the thread drawing Telegram's intro, never start)
+        solegramIntroView = new com.solegram.messenger.ui.SolegramIntroView(context);
+        frameLayout2.addView(solegramIntroView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
+        // its glow reaches past the picture's own bounds
+        frameLayout2.setClipChildren(false);
+        frameContainerView.setClipChildren(false);
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
@@ -308,6 +314,9 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 }
                 float offset = (position * width + positionOffsetPixels - currentViewPagerPage * width) / width;
                 Intro.setScrollOffset(offset);
+                if (solegramIntroView != null) {
+                    solegramIntroView.setPage(position + positionOffset);
+                }
             }
 
             @Override

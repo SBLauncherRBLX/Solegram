@@ -4,7 +4,7 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.134" android:scaleY="1.134" android:translateX="0" android:translateY="0">
+    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.076" android:scaleY="1.076" android:translateX="0" android:translateY="0">
         <path android:pathData="M22 12H2" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round"/>
         <path android:pathData="M12 2V22" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round"/>
         <path android:pathData="M13 12C13 14.2091 14.7909 16 17 16" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round"/>

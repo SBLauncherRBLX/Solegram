@@ -50,7 +50,10 @@ public final class SolegramNowPlayingBio {
 
     private static long lastSent;
     private static boolean busy;
-    private static String pending;
+    /** The track to write (null: nothing plays). */
+    private static SolegramNowPlaying.Track pending;
+    /** A track that plays on is written anew this often, so its time mark stays fresh for those who look. */
+    private static final long REFRESH_INTERVAL = 8 * 60_000;
     private static int restoreAttempts;
 
     private static final Runnable writeRunnable = SolegramNowPlayingBio::writePending;
@@ -98,8 +101,13 @@ public final class SolegramNowPlayingBio {
         }
         if (track != null && track.playing) {
             AndroidUtilities.cancelRunOnUIThread(restoreRunnable);
-            pending = SolegramNowPlaying.bioLine(track, MessagesController.getInstance(sharingAccount()).getAboutLimit());
-            AndroidUtilities.runOnUIThread(writeRunnable, WRITE_DELAY);
+            final boolean same = pending != null && pending.sameSong(track);
+            pending = track;
+            if (!same || prefs().getString(KEY_WRITTEN + UserConfig.getInstance(sharingAccount()).getClientUserId(), null) == null) {
+                AndroidUtilities.runOnUIThread(writeRunnable, WRITE_DELAY);
+            } else {
+                AndroidUtilities.runOnUIThread(writeRunnable, REFRESH_INTERVAL); // the same song, written already
+            }
         } else {
             pending = null;
             AndroidUtilities.cancelRunOnUIThread(restoreRunnable);
@@ -133,9 +141,9 @@ public final class SolegramNowPlayingBio {
     }
 
     private static void writePending() {
-        final String text = pending == null ? null : SolegramNameEmojiShare.withMark(sharingAccount() < 0 ? 0 : sharingAccount(), pending);
+        final SolegramNowPlaying.Track track = pending;
         final int account = sharingAccount();
-        if (text == null || account < 0 || !sharing()) {
+        if (track == null || account < 0 || !sharing()) {
             return;
         }
         if (busy || SystemClock.elapsedRealtime() - lastSent < MIN_INTERVAL) {
@@ -149,27 +157,42 @@ public final class SolegramNowPlayingBio {
                 AndroidUtilities.runOnUIThread(writeRunnable, 15_000);
                 return;
             }
-            if (!sharing() || !TextUtils.equals(SolegramNameEmojiShare.strip(text), pending)) {
+            if (!sharing() || pending == null || !pending.sameSong(track)) {
                 onTrackChanged(SolegramNowPlaying.get()); // things changed meanwhile: decide again
                 return;
             }
             final long user = full.id;
             final String about = full.about == null ? "" : full.about;
             final String written = prefs().getString(KEY_WRITTEN + user, null);
-            if (written == null || !same(about, written)) {
-                // the first replacement, or the user wrote a bio meanwhile: that one comes back later
-                prefs().edit().putString(KEY_ORIGINAL + user, withoutMusic(about, written)).apply();
-            }
-            if (same(about, text)) {
-                prefs().edit().putString(KEY_WRITTEN + user, text).apply();
+            // the user's own bio: the one kept while an old visible music line stood in for it, else what is there
+            // now without the music and the marks
+            String own = written != null && written.contains(SolegramNowPlaying.BIO_TAG) && same(about, written)
+                ? prefs().getString(KEY_ORIGINAL + user, "") : withoutMusic(about, written);
+            own = plain(own == null ? "" : own).trim();
+            prefs().edit().putString(KEY_ORIGINAL + user, own).apply();
+            // the track goes after the bio as invisible characters: the bio reads the same everywhere, only
+            // Solegram shows the music
+            final String nameMark = SolegramNameEmojiShare.ownMark();
+            final int limit = MessagesController.getInstance(account).getAboutLimit();
+            final String block = SolegramNowPlaying.hiddenBlock(track, limit - own.codePointCount(0, own.length()) - nameMark.length());
+            if (block == null) {
+                // the bio leaves no room for it: nothing is shared, a track written before goes
+                if (written != null) {
+                    AndroidUtilities.cancelRunOnUIThread(restoreRunnable);
+                    AndroidUtilities.runOnUIThread(restoreRunnable, 1000);
+                }
                 return;
             }
+            final String text = own + block + nameMark;
             // noted before sending: whatever happens next, the restore knows what to look for
             prefs().edit().putString(KEY_WRITTEN + user, text).apply();
             send(account, text, ok -> {
                 if (ok && !sharing()) {
                     AndroidUtilities.cancelRunOnUIThread(restoreRunnable);
                     AndroidUtilities.runOnUIThread(restoreRunnable, 1000);
+                } else if (ok && pending != null && pending.sameSong(track)) {
+                    AndroidUtilities.cancelRunOnUIThread(writeRunnable);
+                    AndroidUtilities.runOnUIThread(writeRunnable, REFRESH_INTERVAL);
                 }
             });
         });
@@ -182,7 +205,7 @@ public final class SolegramNowPlayingBio {
             if (!config.isClientActivated() || prefs().getString(KEY_WRITTEN + config.getClientUserId(), null) == null) {
                 continue;
             }
-            if (sharing() && a == sharingAccount() && pending != null) {
+            if (sharing() && a == sharingAccount() && pending != null && pending.playing) {
                 continue; // this one is playing on
             }
             restore(a);
@@ -213,7 +236,15 @@ public final class SolegramNowPlayingBio {
                 return;
             }
             String target;
-            if (same(about, written)) {
+            if (!written.contains(SolegramNowPlaying.BIO_TAG)) {
+                // a hidden track: the bio itself was never replaced, only the invisible block goes
+                if (about.indexOf(SolegramNowPlaying.HIDDEN_START) < 0) {
+                    forget.run(); // gone already (the user edited the bio)
+                    AndroidUtilities.runOnUIThread(restoreRunnable);
+                    return;
+                }
+                target = SolegramNowPlaying.stripHidden(about);
+            } else if (same(about, written)) {
                 target = original;
             } else if (plain(about).contains(plain(written).trim())) {
                 // the user added to the bio around the music line: theirs stays, the line goes
@@ -260,7 +291,7 @@ public final class SolegramNowPlayingBio {
 
     /** Without the invisible marks (the music line's, the shared name emoji's), in case Telegram drops them. */
     private static String plain(@Nullable String s) {
-        return s == null ? "" : SolegramNameEmojiShare.strip(s).replace("\u2060", "");
+        return s == null ? "" : SolegramNowPlaying.stripHidden(SolegramNameEmojiShare.strip(s)).replace("\u2060", "");
     }
 
     /** Whether the music line stands in this user's bio now (the name emoji mark goes with it). */
@@ -275,7 +306,8 @@ public final class SolegramNowPlayingBio {
     /** The bio without the music line: the one Solegram recognises, or else the exact line it wrote. */
     private static String withoutMusic(String about, @Nullable String written) {
         final String stripped = SolegramNowPlaying.stripBio(about);
-        if (written == null || !plain(stripped).contains(plain(written).trim())) {
+        // only an old visible music line is looked for by its text (a hidden track leaves the bio's lines alone)
+        if (written == null || !written.contains(SolegramNowPlaying.BIO_TAG) || !plain(stripped).contains(plain(written).trim())) {
             return stripped;
         }
         final StringBuilder out = new StringBuilder();

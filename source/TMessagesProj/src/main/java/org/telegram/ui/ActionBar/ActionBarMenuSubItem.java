@@ -76,7 +76,7 @@ public class ActionBarMenuSubItem extends FrameLayout {
         this.bottom = bottom;
 
         textColor = getThemedColor(Theme.key_actionBarDefaultSubmenuItem);
-        iconColor = getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon);
+        iconColor = com.solegram.messenger.SolegramIcons.menuIconColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon), resourcesProvider); // Solegram: the theme's colour
         iconColorMode = PorterDuff.Mode.MULTIPLY;
         selectorColor = getThemedColor(Theme.key_dialogButtonSelector);
 
@@ -265,6 +265,7 @@ public class ActionBarMenuSubItem extends FrameLayout {
     }
 
     public void setIconColor(int iconColor, PorterDuff.Mode mode) {
+        iconColor = com.solegram.messenger.SolegramIcons.menuIconColor(iconColor, resourcesProvider); // Solegram
         if (this.iconColor != iconColor || this.iconColorMode != mode) {
             imageView.setColorFilter(new PorterDuffColorFilter(this.iconColor = iconColor, this.iconColorMode = mode));
         }

@@ -307,6 +307,17 @@ public class FileLoadOperation {
             maxDownloadRequests = 4;
             maxDownloadRequestsBig = 4;
         }
+        // Solegram: faster transfers - larger parts and more of them at once (Data and network settings)
+        final int solegramBoost = forceSmallChunk ? 0 : com.solegram.messenger.SolegramConfig.transferBoost;
+        if (solegramBoost >= 2) {
+            downloadChunkSizeBig = 1024 * 1024;
+            maxDownloadRequests = 12;
+            maxDownloadRequestsBig = 12;
+        } else if (solegramBoost == 1) {
+            downloadChunkSizeBig = 1024 * 512;
+            maxDownloadRequests = 8;
+            maxDownloadRequestsBig = 8;
+        }
         maxCdnParts = (int) (FileLoader.DEFAULT_MAX_FILE_SIZE / downloadChunkSizeBig);
     }
 
@@ -847,6 +858,15 @@ public class FileLoadOperation {
             boolean premium = UserConfig.getInstance(currentAccount).isPremium();
             downloadConnectionsCount = premium ? ConnectionsManager.DownloadConnectionsCount : 2;
             int byteBudget = (premium ? 16 : 2) * 1024 * 1024;
+            // Solegram: faster transfers - more connections and more data on the way at once
+            final int solegramBoost = com.solegram.messenger.SolegramConfig.transferBoost;
+            if (solegramBoost >= 2) {
+                downloadConnectionsCount = ConnectionsManager.DownloadConnectionsCount;
+                byteBudget = 16 * 1024 * 1024;
+            } else if (solegramBoost == 1 && !premium) {
+                downloadConnectionsCount = 4;
+                byteBudget = 8 * 1024 * 1024;
+            }
             currentMaxDownloadRequests = byteBudget / currentDownloadChunkSize;
         }
     }

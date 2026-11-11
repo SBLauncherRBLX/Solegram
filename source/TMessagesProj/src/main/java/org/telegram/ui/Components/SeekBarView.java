@@ -612,7 +612,7 @@ public class SeekBarView extends FrameLayout {
             }
             final float lensTop = top, lensBottom = bottom, lensLeft = left, lensRight = right;
             final int lensThumbX = thumbX;
-            com.solegram.messenger.ui.LiquidControls.drawThumb(canvas, solegramCx, centerY, solegramTw, solegramTh, solegramActiveValue, c -> {
+            com.solegram.messenger.ui.LiquidControls.drawSliderThumb(canvas, solegramCx, centerY, solegramTw, solegramTh, solegramActiveValue, c -> {
                 // the same track as above (it is left out under the glass): background, buffered part, fill
                 innerPaint1.setColor(getThemedColor(Theme.key_player_progressBackground));
                 drawProgressBar(c, solegramTrackRect, innerPaint1);

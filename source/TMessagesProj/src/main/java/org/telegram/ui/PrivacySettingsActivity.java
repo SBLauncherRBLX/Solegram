@@ -1190,7 +1190,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                         }
                         textCell.setTextAndValue(addPremiumStar(getString(R.string.PrivacyVoiceMessages)), value, noncontactsRow != -1);
                         ImageView imageView = textCell.getValueImageView();
-                        imageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.MULTIPLY));
+                        imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_windowBackgroundWhiteGrayIcon, null), PorterDuff.Mode.MULTIPLY));
                     } else if (position == noncontactsRow) {
                         value = getString(feeValue ? R.string.ContactsAndFee : noncontactsValue ? R.string.ContactsAndPremium : R.string.P2PEverybody);
                         textCell.setTextAndValue(getMessagesController().newNoncontactPeersRequirePremiumWithoutOwnpremium && !getMessagesController().starsPaidMessagesAvailable ? getString(R.string.PrivacyMessages) : addPremiumStar(getString(R.string.PrivacyMessages)), value, musicRow != -1);

@@ -36,6 +36,13 @@ public class ComposeDrawable extends Drawable {
         views.add(view);
     }
 
+    /** Solegram: the icon takes the background's place (a cross-fade in the centre) instead of sitting over it. */
+    private boolean solegramReplace;
+
+    public void solegramSetReplace(boolean replace) {
+        solegramReplace = replace;
+    }
+
     public void setIconTranslate(int tx, int ty) {
         this.tx = tx;
         this.ty = ty;
@@ -56,6 +63,32 @@ public class ComposeDrawable extends Drawable {
     @Override
     public void draw(@NonNull Canvas canvas) {
         final float iconVisible = animatedIconVisible.set(this.iconVisible);
+
+        if (solegramReplace) {
+            // the dots give way to the paperclip: Telegram's small clip beside its vertical dots sat on top of
+            // Solegram's horizontal ones
+            final android.graphics.Rect b = getBounds();
+            if (iconVisible < 1f) {
+                background.setAlpha((int) (alpha * (1f - iconVisible)));
+                background.setBounds(b);
+                final float s = lerp(1.0f, 0.6f, iconVisible);
+                canvas.save();
+                canvas.scale(s, s, b.centerX(), b.centerY());
+                background.draw(canvas);
+                canvas.restore();
+            }
+            if (iconVisible > 0) {
+                final int w = icon.getIntrinsicWidth(), h = icon.getIntrinsicHeight();
+                icon.setAlpha((int) (alpha * iconVisible));
+                icon.setBounds(b.centerX() - w / 2, b.centerY() - h / 2, b.centerX() - w / 2 + w, b.centerY() - h / 2 + h);
+                final float s = lerp(0.6f, 1.0f, iconVisible);
+                canvas.save();
+                canvas.scale(s, s, b.centerX(), b.centerY());
+                icon.draw(canvas);
+                canvas.restore();
+            }
+            return;
+        }
 
         background.setAlpha(alpha);
         background.setBounds(getBounds());

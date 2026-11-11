@@ -141,7 +141,8 @@ public class SolegramTabsSheet extends BottomSheet {
         });
         dragger.attachToRecyclerView(list);
         adapter.dragger = dragger;
-        column.addView(list, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        // the rows sit in rounded cards, away from the sides, as the sections of the settings do
+        column.addView(list, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 12, 0, 12, 0));
 
         final LinearLayout buttons = new LinearLayout(context);
         buttons.setPadding(dp(14), dp(12), dp(14), 0);
@@ -256,7 +257,7 @@ public class SolegramTabsSheet extends BottomSheet {
                 h.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
                 h.setTypeface(AndroidUtilities.bold());
                 h.setTextColor(color(Theme.key_dialogTextGray3));
-                h.setPadding(dp(20), dp(14), dp(20), dp(6));
+                h.setPadding(dp(16), dp(18), dp(16), dp(8));
                 h.setText(getString(R.string.SG_TabsNotInBar));
                 h.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
                 return new RecyclerView.ViewHolder(h) {
@@ -264,8 +265,7 @@ public class SolegramTabsSheet extends BottomSheet {
             }
             final LinearLayout row = new LinearLayout(context);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(18), dp(8), dp(10), dp(8));
-            row.setBackgroundColor(color(Theme.key_dialogBackground));
+            row.setPadding(dp(16), dp(8), dp(8), dp(8));
             final ImageView icon = new ImageView(context);
             icon.setScaleType(ImageView.ScaleType.CENTER);
             row.addView(icon, LayoutHelper.createLinear(30, 30, 0, 0, 14, 0));
@@ -279,7 +279,7 @@ public class SolegramTabsSheet extends BottomSheet {
             final ImageView handle = new ImageView(context);
             handle.setScaleType(ImageView.ScaleType.CENTER);
             handle.setImageResource(R.drawable.list_reorder);
-            handle.setColorFilter(new PorterDuffColorFilter(color(Theme.key_dialogTextGray3), PorterDuff.Mode.SRC_IN));
+            handle.setColorFilter(new PorterDuffColorFilter(Theme.multAlpha(color(Theme.key_windowBackgroundWhiteBlueHeader), 0.6f), PorterDuff.Mode.SRC_IN));
             row.addView(handle, LayoutHelper.createLinear(40, 40));
             row.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             final RecyclerView.ViewHolder holder = new RecyclerView.ViewHolder(row) {
@@ -306,12 +306,21 @@ public class SolegramTabsSheet extends BottomSheet {
             final ImageView action = (ImageView) row.getChildAt(2);
             final View handle = row.getChildAt(3);
             final int accent = color(Theme.key_windowBackgroundWhiteBlueHeader);
+            // a card per group: round at the first row's top and at the last row's bottom
+            final boolean first = position == 0 || position == inBar.size() + 1;
+            final boolean last = position == inBar.size() - 1 || position == getItemCount() - 1;
+            final float top = first ? dp(16) : 0, bottom = last ? dp(16) : 0;
+            final android.graphics.drawable.GradientDrawable card = new android.graphics.drawable.GradientDrawable();
+            card.setColor(androidx.core.graphics.ColorUtils.blendARGB(color(Theme.key_dialogBackground), color(Theme.key_dialogTextBlack), 0.055f));
+            card.setCornerRadii(new float[]{top, top, top, top, bottom, bottom, bottom, bottom});
+            row.setBackground(card);
             if (SolegramTabs.MUSIC.equals(kind)) {
                 icon.setImageDrawable(new SolegramMusicTabIcon(24));
             } else {
                 icon.setImageResource(SolegramTabs.icon(kind));
             }
-            icon.setColorFilter(new PorterDuffColorFilter(inside ? accent : color(Theme.key_dialogTextGray3), PorterDuff.Mode.SRC_IN));
+            // every icon in the theme's colour; what is not in the bar is told apart by its fainter row
+            icon.setColorFilter(new PorterDuffColorFilter(accent, PorterDuff.Mode.SRC_IN));
             name.setText(getString(SolegramTabs.name(kind)));
             final boolean locked = SolegramTabs.CHATS.equals(kind);
             handle.setVisibility(inside && !locked ? View.VISIBLE : View.INVISIBLE);
@@ -338,7 +347,7 @@ public class SolegramTabsSheet extends BottomSheet {
                 notifyDataSetChanged();
                 updatePreview();
             });
-            row.setAlpha(inside ? 1f : 0.85f);
+            row.setAlpha(inside ? 1f : 0.72f);
         }
     }
 }

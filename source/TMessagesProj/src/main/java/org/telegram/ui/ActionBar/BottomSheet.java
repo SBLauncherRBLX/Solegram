@@ -1058,7 +1058,7 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
 
             imageView = new ImageView(context);
             imageView.setScaleType(ImageView.ScaleType.CENTER);
-            imageView.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_dialogIcon), PorterDuff.Mode.MULTIPLY));
+            imageView.setColorFilter(new PorterDuffColorFilter(com.solegram.messenger.SolegramIcons.iconColor(Theme.key_dialogIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
             addView(imageView, LayoutHelper.createFrame(56, 48, Gravity.CENTER_VERTICAL | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT)));
 
             imageView2 = new ImageView(context);

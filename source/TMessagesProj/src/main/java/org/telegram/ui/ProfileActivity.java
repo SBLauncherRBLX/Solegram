@@ -10697,7 +10697,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (userInfo == null) {
             return null;
         }
-        final String about = com.solegram.messenger.SolegramNameEmojiShare.strip(com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about);
+        final String about = com.solegram.messenger.SolegramNameEmojiShare.strip(com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : com.solegram.messenger.SolegramNowPlaying.stripHidden(userInfo.about));
         if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || TextUtils.isEmpty(about)) {
             return about;
         }
@@ -10719,7 +10719,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || userInfo == null || TextUtils.isEmpty(userInfo.about)) {
             return null;
         }
-        final String about = com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : userInfo.about;
+        final String about = com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : com.solegram.messenger.SolegramNowPlaying.stripHidden(userInfo.about);
         final java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> links = com.solegram.messenger.SolegramProfileLinks.parse(about).links;
         return links.isEmpty() ? null : links;
     }

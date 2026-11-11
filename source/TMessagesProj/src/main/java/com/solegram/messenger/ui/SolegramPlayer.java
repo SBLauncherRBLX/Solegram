@@ -220,6 +220,21 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
     @SuppressLint("ClickableViewAccessibility")
     private View build(Context context) {
         root = new FrameLayout(context) {
+            // the player drawn through a live source: the glass of the sheets and menus over it shows the player
+            // (its cover, its background), with the glass settings of the rest of the app
+            private final SolegramLiveGlass.Host glassSource = new SolegramLiveGlass.Host(this, c -> super.draw(c));
+
+            {
+                setWillNotDraw(false); // draw() must run for the source to record
+            }
+
+            @Override
+            public void draw(android.graphics.Canvas canvas) {
+                if (!glassSource.draw(canvas)) {
+                    super.draw(canvas);
+                }
+            }
+
             private float downY, downX;
             private boolean draggingSheet;
             private VelocityTracker velocity;

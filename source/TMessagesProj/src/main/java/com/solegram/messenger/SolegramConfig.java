@@ -61,6 +61,12 @@ public class SolegramConfig {
     public static int glassOpacity = 70;
     public static int glassBlur = 30;
     public static int glassHighlight = 150;
+    /** Faster transfers: 0 as Telegram, 1 fast (larger parts, more at once), 2 the most the servers take. */
+    public static volatile int transferBoost = 1;
+    /** SolegramGlass.STYLE_REGULAR or STYLE_CLEAR. */
+    public static int glassStyle;
+    /** The glass switch of the Glass page; off takes the glass of menus, sheets, controls and the rest with it. */
+    public static boolean glassOn = true;
     public static int glassTint;
     public static int glassTintAmount = 25;
     public static boolean glassShadow = true;
@@ -397,22 +403,35 @@ public class SolegramConfig {
             final int was = p.getInt("iconPack", 0);
             p.edit().putBoolean("iconPacksV2", true).putInt("iconPack", was == 2 ? SolegramIcons.PACK_PHOSPHOR : was).apply();
         }
-        iconPack = clamp(p.getInt("iconPack", 0), 0, SolegramIcons.PACK_COUNT - 1);
+        // Solar became the default pack: once, those still on Telegram's icons get it (they can choose Telegram's again)
+        if (!p.getBoolean("iconSolarDefault", false)) {
+            final SharedPreferences.Editor e = p.edit().putBoolean("iconSolarDefault", true);
+            if (p.getInt("iconPack", 0) == SolegramIcons.PACK_STANDARD) {
+                e.putInt("iconPack", SolegramIcons.PACK_SOLAR);
+            }
+            e.apply();
+        }
+        // Solar by default; Telegram's own icons stay one of the choices
+        iconPack = clamp(p.getInt("iconPack", SolegramIcons.PACK_SOLAR), 0, SolegramIcons.PACK_COUNT - 1);
         settingsIconStyle = clamp(p.getInt("settingsIconStyle", 1), 0, 1);
         SolegramIcons.setPack(iconPack);
 
-        glassThickness = clamp(p.getInt("glassThickness", 70), 25, 300);
-        glassRefraction = clamp(p.getInt("glassRefraction", 100), 0, 300);
-        glassIndex = clamp(p.getInt("glassIndex", 130), 100, 250);
-        glassDispersion = clamp(p.getInt("glassDispersion", 40), 0, 100);
-        glassRim = clamp(p.getInt("glassRim", 10), 0, 100);
-        glassOpacity = clamp(p.getInt("glassOpacity", 70), 10, 100);
-        glassBlur = clamp(p.getInt("glassBlur", 30), 0, 300);
-        glassHighlight = clamp(p.getInt("glassHighlight", 150), 0, 300);
+        // the glass of iOS, fixed (see SolegramGlass): the fine tuning of earlier versions is gone
+        glassThickness = 110;   // the bevel: 12dp
+        glassRefraction = 100;
+        glassIndex = 150;       // Telegram's own index
+        glassDispersion = 24;
+        glassRim = 55;
+        glassOpacity = 70;
+        glassBlur = 30;         // about 2.7dp under liquid glass
+        glassStyle = clamp(p.getInt("glassStyle", 0), 0, 1);
+        transferBoost = clamp(p.getInt("transferBoost", 1), 0, 2);
+        glassHighlight = 150;
+        glassOn = p.getBoolean("glassOn", true);
         glassTint = clamp(p.getInt("glassTint", 0), 0, SolegramGlass.TINT_COLORS.length - 1);
         glassTintAmount = clamp(p.getInt("glassTintAmount", 25), 0, 60);
         glassShadow = p.getBoolean("glassShadow", true);
-        glassVibrancy = p.getBoolean("glassVibrancy", true);
+        glassVibrancy = true;
         glassMenus = p.getBoolean("glassMenus", true);
         streaks = p.getBoolean("streaks", true);
         newPlayer = p.getBoolean("newPlayer", true);
@@ -421,11 +440,11 @@ public class SolegramConfig {
         glassDialogs = p.getBoolean("glassDialogs", true);
         glassSheets = p.getBoolean("glassSheets", true);
         liquidControls = p.getBoolean("liquidControls", true);
-        glassPreviewLook = p.getBoolean("glassPreviewLook", true);
+        glassPreviewLook = true;
         typingAnimation = p.getBoolean("typingAnimation", true);
         translateHere = p.getBoolean("translateHere", true);
         frostedHeaders = p.getBoolean("frostedHeaders", true);
-        floatingHeader = p.getBoolean("floatingHeader", true);
+        floatingHeader = true;  // always: the bar behind the title is gone for good, the list fades under it
         glassHeaderButtons = p.getBoolean("glassHeaderButtons", true);
         aiSummary = p.getBoolean("aiSummary", true);
         aiSummaryButton = p.getBoolean("aiSummaryButton", true);
@@ -450,6 +469,10 @@ public class SolegramConfig {
         nameEmoji = readLong(p, "nameEmoji");
         nameEmojiShare = p.getBoolean("nameEmojiShare", true);
         glassCallScreen = p.getBoolean("glassCallScreen", true);
+        if (!glassOn) {
+            // glass switched off on the Glass page: off everywhere, the separate switches keep their values for later
+            glassMenus = glassDialogs = glassSheets = liquidControls = frostedHeaders = glassHeaderButtons = glassCallScreen = false;
+        }
         liquidMotion = p.getBoolean("liquidMotion", true);
         iosInputBar = p.getBoolean("iosInputBar", true);
         nowPlaying = p.getBoolean("nowPlaying", true);
@@ -514,7 +537,7 @@ public class SolegramConfig {
         filterJunk = p.getBoolean("filterJunk", false);
         filterInvites = p.getBoolean("filterInvites", false);
         filterAdsStrict = p.getBoolean("filterAdsStrict", false);
-        hideSponsored = p.getBoolean("hideSponsored", false);
+        hideSponsored = p.getBoolean("hideSponsored", true);
 
         rememberFolder = p.getBoolean("rememberFolder", false);
         markAllReadInMenu = p.getBoolean("markAllReadInMenu", true);
@@ -704,6 +727,7 @@ public class SolegramConfig {
             case "pluginsEngine":
             case "pluginsScanBeforeInstall":
             case "pluginsBlockDangerous":
+            case "hideSponsored":
             case "autoUpdateCheck":
             case "updateWifiOnly":
             case "showUserId":
@@ -874,19 +898,11 @@ public class SolegramConfig {
 
     /** Everything on the Glass page, written out with Solegram's look (the same values as the defaults above). */
     private static void writeGlassDefaults(SharedPreferences.Editor editor) {
-        editor.putInt("glassThickness", 70)
-            .putInt("glassRefraction", 100)
-            .putInt("glassIndex", 130)
-            .putInt("glassDispersion", 40)
-            .putInt("glassRim", 10)
-            .putInt("glassOpacity", 70)
-            .putInt("glassBlur", 30)
-            .putInt("glassHighlight", 150)
+        editor.putInt("glassStyle", 0)
+            .putBoolean("glassOn", true)
             .putInt("glassTint", 0)
             .putInt("glassTintAmount", 25)
-            .putBoolean("glassPreviewLook", true)
             .putBoolean("glassShadow", true)
-            .putBoolean("glassVibrancy", true)
             .putBoolean("liquidControls", true)
             .putBoolean("floatingHeader", true)
             .putBoolean("glassHeaderButtons", true)

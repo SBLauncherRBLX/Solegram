@@ -457,7 +457,7 @@
     <string name="SG_RestartNow">Перезапустить сейчас</string>
     <string name="SG_GlassSettings">Настройка стекла</string>
     <string name="SG_GlassPreviewInfo">Живое превью: верх экрана Telegram с настоящими стеклянными кнопками и строкой поиска. Листайте чаты под ними. Изменения видны здесь сразу, на экранах приложения — после перезапуска.</string>
-    <string name="SG_GlassFrostedOnlyInfo">Жидкое стекло недоступно (нужен Android 13) или текстурное стекло выключено, поэтому здесь только настройки размытия.</string>
+    <string name="SG_GlassFrostedOnlyInfo">Жидкое стекло недоступно (нужен Android 13) или стекло выключено, поэтому здесь оно матовое, без преломления.</string>
     <string name="SG_GlassThickness">Толщина края</string>
     <string name="SG_GlassRefraction">Сила преломления</string>
     <string name="SG_GlassIndex">Коэффициент преломления</string>
@@ -654,8 +654,8 @@
     <string name="SG_FeedSummarizing">Пересказываю…</string>
     <string name="SG_AiConsent">Пересказ делает бесплатный сервис Pollinations.ai: текст этого сообщения будет отправлен ему. Аккаунт и ключ не нужны. Больше спрашивать не будем; сервис можно сменить в настройках Solegram, раздел «Чаты».</string>
     <string name="SG_AiConsentAgree">Продолжить</string>
-    <string name="SG_TexturedGlass">Текстурное стекло</string>
-    <string name="SG_TexturedGlassInfo">Жидкое стекло с преломлением (Android 13+) и матовое размытие под шапками и панелями одним переключателем</string>
+    <string name="SG_TexturedGlass">Стекло</string>
+    <string name="SG_TexturedGlassInfo">Жидкое стекло с преломлением (Android 13+) и матовое размытие. Выключатель общий: вместе с ним выключается стекло в меню, окнах, панелях, переключателях и на экране звонка</string>
     <string name="SG_TexturedGlassUnsupported">Недоступно на этом устройстве</string>
     <string name="SG_TitleEmoji">Эмодзи у названия</string>
     <string name="SG_TitleEmojiSet">Выбрано</string>
@@ -688,7 +688,7 @@
     <string name="SG_UpdatesSub">Версия %1$s</string>
     <string name="SG_HideAndDeclutter">Скрыть</string>
     <string name="SG_SettingsSearchPath">Solegram</string>
-    <string name="SG_NowPlaying">Музыка в профиле</string>
+    <string name="SG_NowPlaying">Музыка</string>
     <string name="SG_NowPlayingSub">Spotify и SoundCloud: что вы слушаете</string>
     <string name="SG_NowPlayingSwitch">Показывать, что я слушаю</string>
     <string name="SG_NowPlayingSwitchInfo">Карточка с текущим треком в вашем профиле</string>
@@ -2071,5 +2071,31 @@
     <string name="SG_IconDoor">Фиолетовая дверь</string>
     <string name="SG_IconPixel">8 бит</string>
     <string name="SG_IconCandy">Три в ряд</string>
+    <string name="SG_GlassStyle">Стиль стекла</string>
+    <string name="SG_GlassStyleRegular">Обычное</string>
+    <string name="SG_GlassStyleClear">Прозрачное</string>
+    <string name="SG_GlassStyleInfo">Стекло устроено как в iOS: лёгкое размытие, преломление по краю, едва заметная текстура и кромка, которая берёт цвет того, что рядом и под ней. «Обычное» плотнее и лучше читается, «Прозрачное» почти не закрывает то, что под ним.</string>
+    <string name="SG_TintWhite">Белый</string>
+    <string name="SG_TintGrey">Серый</string>
+    <string name="SG_TintBlack">Чёрный</string>
+    <string name="SG_ProxySection">Прокси и сеть</string>
+    <string name="SG_ProxySectionSub">Подключение, скорость загрузки</string>
+    <string name="SG_TransferSpeed">Скорость передачи</string>
+    <string name="SG_TransferBoost">Ускорение загрузки и отправки</string>
+    <string name="SG_TransferBoostOff">Как в Telegram</string>
+    <string name="SG_TransferBoostFast">Быстро</string>
+    <string name="SG_TransferBoostMax">Максимум</string>
+    <string name="SG_TransferBoostInfo">Файлы, фото и видео качаются и отправляются более крупными частями и по нескольким соединениям сразу. Действует на новые загрузки. Предел скорости для аккаунтов без Premium задают серверы Telegram, а через прокси скорость ограничена самим прокси — на «Максимуме» слабый прокси может работать хуже, чем на «Быстро».</string>
+    <string name="SG_Intro1Message">Telegram со своим характером: **стекло**, плавность и десятки удобных мелочей.</string>
+    <string name="SG_Intro2Title">Жидкое стекло</string>
+    <string name="SG_Intro2Message">Интерфейс **как в iOS**: преломление, мягкие тени, живые анимации и темы под ваш вкус.</string>
+    <string name="SG_Intro3Title">Удобнее в чатах</string>
+    <string name="SG_Intro3Message">**Лента каналов**, перевод на месте, пересказ длинных чатов, напоминания и поиск по смыслу.</string>
+    <string name="SG_Intro4Title">Музыка и профиль</string>
+    <string name="SG_Intro4Message">Новый **плеер**, музыка в профиле, карточка профиля и наборы иконок.</string>
+    <string name="SG_Intro5Title">Плагины</string>
+    <string name="SG_Intro5Message">Расширяйте Solegram **плагинами**: каждый проверяется перед установкой и работает под защитой.</string>
+    <string name="SG_Intro6Title">Под защитой</string>
+    <string name="SG_Intro6Message">**Скрытые чаты** под паролем, предупреждения о мошенниках и открытый исходный код.</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -51,6 +51,13 @@ public class SolegramSavedTagsActivity extends UniversalFragment {
     }
 
     @Override
+    public android.view.View createView(android.content.Context context) {
+        final android.view.View view = super.createView(context);
+        listView.setSections(); // rounded section cards, as on the other Solegram pages
+        return view;
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         if (listView != null && listView.adapter != null) {
