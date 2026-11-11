@@ -87,7 +87,7 @@ public class SolegramScamBanner extends LinearLayout implements NotificationCent
         setGravity(Gravity.CENTER_VERTICAL);
         setPadding(dp(12), dp(8), dp(10), dp(8));
 
-        icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, SolegramScamGuard.levelTileColors(SolegramScamRules.CAUTION), 30);
+        icon = PluginSecuritySheet.tileIcon(context, R.drawable.sg_shield_warning, SolegramScamGuard.levelTileColors(SolegramScamRules.CAUTION), 30);
         addView(icon, LayoutHelper.createLinear(30, 30, Gravity.CENTER_VERTICAL, 0, 0, 10, 0));
 
         final LinearLayout texts = new LinearLayout(context);

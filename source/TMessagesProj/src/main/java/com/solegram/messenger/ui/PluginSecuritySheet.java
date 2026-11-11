@@ -505,7 +505,7 @@ public class PluginSecuritySheet extends BottomSheet {
         if (blocked) {
             return R.drawable.msg_block;
         }
-        return verdict == PluginSecurity.VERDICT_SAFE ? R.drawable.outline_shield_check : R.drawable.msg_warning;
+        return verdict == PluginSecurity.VERDICT_SAFE ? R.drawable.outline_shield_check : R.drawable.sg_shield_warning;
     }
 
     public static String verdictTitle(int verdict, boolean blocked) {

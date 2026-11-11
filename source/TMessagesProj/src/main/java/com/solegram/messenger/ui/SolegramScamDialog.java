@@ -74,7 +74,7 @@ public final class SolegramScamDialog {
         final LinearLayout root = column(context);
         root.setPadding(dp(20), dp(22), dp(20), dp(12));
 
-        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, SolegramScamGuard.levelTileColors(level), 56);
+        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.sg_shield_warning, SolegramScamGuard.levelTileColors(level), 56);
         root.addView(icon, LayoutHelper.createLinear(56, 56, Gravity.CENTER_HORIZONTAL));
 
         final TextView title = text(context, getString(R.string.SG_ScamLinkTitle), 20, textColor);
@@ -263,7 +263,7 @@ public final class SolegramScamDialog {
         final LinearLayout root = column(context);
         root.setPadding(dp(20), dp(22), dp(20), dp(12));
 
-        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.msg_warning, SolegramScamGuard.levelTileColors(level), 56);
+        final View icon = PluginSecuritySheet.tileIcon(context, R.drawable.sg_shield_warning, SolegramScamGuard.levelTileColors(level), 56);
         root.addView(icon, LayoutHelper.createLinear(56, 56, Gravity.CENTER_HORIZONTAL));
 
         final TextView title = text(context, getString(R.string.SG_ScamBannerTitle), 20, textColor);
