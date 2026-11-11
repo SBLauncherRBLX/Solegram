@@ -36,19 +36,6 @@ public final class SolegramGlass {
         0xFF000000, // black
     };
 
-    /*
-     * The glass is the glass of iOS, as Telegram for iOS builds it (GlassBackgroundComponent, LegacyGlassView):
-     * a light blur of 2pt under it with the colours behind made richer, refraction in a band of 12pt along the
-     * edge, a fill of 70% (85% when dark), an edge line of 0.8pt lit from the top left, a wide soft shadow. These
-     * are fixed now; what is left to choose is the style (regular or clear) and the tint.
-     */
-    public static final int STYLE_REGULAR = 0, STYLE_CLEAR = 1;
-
-    /** The clear style: hardly any fill, the picture behind stays, a firmer edge. */
-    public static boolean clear() {
-        return SolegramConfig.glassStyle == STYLE_CLEAR;
-    }
-
     /** Edge (bevel) width of liquid glass. */
     public static float thickness(float base) {
         return base * SolegramConfig.glassThickness / 100f;
@@ -85,9 +72,8 @@ public final class SolegramGlass {
 
     /** Opacity of the glass tint layer. Telegram uses 0.85 for liquid and 0.76 for frosted glass. */
     public static float alpha(boolean liquid) {
-        final boolean dark = Theme.isCurrentThemeDark();
-        final float value = clear() ? (dark ? 0.30f : 0.22f) : (dark ? 0.82f : 0.70f);
-        return liquid ? value : Math.max(value, dark ? 0.80f : 0.72f); // frosted glass has no picture to keep clear
+        final float value = SolegramConfig.glassOpacity / 100f;
+        return liquid ? value : value * (0.76f / 0.85f);
     }
 
     /** Multiplier for the blur radius under the glass. */

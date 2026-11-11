@@ -44,6 +44,8 @@ public final class SolegramNowPlayingBio {
 
     // all keys start with "nowPlayingBio": they stay on the device (not in backups, kept through a reset)
     private static final String KEY_ORIGINAL = "nowPlayingBio_";
+    /** The track stands in for the whole bio (the bio left no room for it); the user's own comes back after. */
+    private static final String KEY_REPLACED = "nowPlayingBioReplaced_";
     private static final String KEY_WRITTEN = "nowPlayingBioWritten_";
     /** The user id of the account that shares its music. */
     public static final String KEY_USER = "nowPlayingBioUser";
@@ -166,7 +168,9 @@ public final class SolegramNowPlayingBio {
             final String written = prefs().getString(KEY_WRITTEN + user, null);
             // the user's own bio: the one kept while an old visible music line stood in for it, else what is there
             // now without the music and the marks
+            final boolean wasReplaced = prefs().getBoolean(KEY_REPLACED + user, false);
             String own = written != null && written.contains(SolegramNowPlaying.BIO_TAG) && same(about, written)
+                || wasReplaced && written != null && plain(about).trim().isEmpty()
                 ? prefs().getString(KEY_ORIGINAL + user, "") : withoutMusic(about, written);
             own = plain(own == null ? "" : own).trim();
             prefs().edit().putString(KEY_ORIGINAL + user, own).apply();
@@ -174,7 +178,14 @@ public final class SolegramNowPlayingBio {
             // Solegram shows the music
             final String nameMark = SolegramNameEmojiShare.ownMark();
             final int limit = MessagesController.getInstance(account).getAboutLimit();
-            final String block = SolegramNowPlaying.hiddenBlock(track, limit - own.codePointCount(0, own.length()) - nameMark.length());
+            String block = SolegramNowPlaying.hiddenBlock(track, limit - own.codePointCount(0, own.length()) - nameMark.length());
+            boolean replace = false;
+            if (block == null && !own.isEmpty()) {
+                // the bio leaves no room: while the music plays, the track stands in for the bio (people without
+                // Solegram see an empty bio), and the user's own comes back when it stops - as the music line did
+                block = SolegramNowPlaying.hiddenBlock(track, limit - nameMark.length());
+                replace = block != null;
+            }
             if (block == null) {
                 // the bio leaves no room for it: nothing is shared, a track written before goes
                 if (written != null) {
@@ -183,9 +194,9 @@ public final class SolegramNowPlayingBio {
                 }
                 return;
             }
-            final String text = own + block + nameMark;
+            final String text = (replace ? "" : own) + block + nameMark;
             // noted before sending: whatever happens next, the restore knows what to look for
-            prefs().edit().putString(KEY_WRITTEN + user, text).apply();
+            prefs().edit().putString(KEY_WRITTEN + user, text).putBoolean(KEY_REPLACED + user, replace).apply();
             send(account, text, ok -> {
                 if (ok && !sharing()) {
                     AndroidUtilities.cancelRunOnUIThread(restoreRunnable);
@@ -230,7 +241,7 @@ public final class SolegramNowPlayingBio {
             final String about = full.about == null ? "" : full.about;
             final String written = prefs().getString(KEY_WRITTEN + user, null);
             final String original = prefs().getString(KEY_ORIGINAL + user, "");
-            final Runnable forget = () -> prefs().edit().remove(KEY_WRITTEN + user).remove(KEY_ORIGINAL + user).apply();
+            final Runnable forget = () -> prefs().edit().remove(KEY_WRITTEN + user).remove(KEY_ORIGINAL + user).remove(KEY_REPLACED + user).apply();
             if (written == null) {
                 restoreAll();
                 return;
@@ -244,6 +255,9 @@ public final class SolegramNowPlayingBio {
                     return;
                 }
                 target = SolegramNowPlaying.stripHidden(about);
+                if (prefs().getBoolean(KEY_REPLACED + user, false) && plain(about).trim().isEmpty()) {
+                    target = original; // the track stood in for the bio: the user's own comes back
+                }
             } else if (same(about, written)) {
                 target = original;
             } else if (plain(about).contains(plain(written).trim())) {

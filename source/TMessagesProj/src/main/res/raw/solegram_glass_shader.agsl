@@ -1,6 +1,6 @@
 // Solegram: Telegram's liquid glass shader with two extra controls.
 // dispersion - splits colours along the refracted edge (0 = off)
-// rim        - light on the glass's edge, from the top left, in the colour of what is near it (0 = off)
+// rim        - light on the glass's edge, from the top left (0 = off)
 uniform shader img;
 
 uniform float2 resolution;
@@ -64,37 +64,27 @@ half4 main(in float2 fragCoord) {
                   c0.a * 0.15 + c1.a * 0.2 + color.a * 0.3 + c3.a * 0.2 + c4.a * 0.15);
     color.rgb = min(color.rgb, half3(color.a));
   }
-  half4 glass = srcOver(half4(foreground_color_premultiplied), color);
   if (rim > 0.0 && sd < 0.0) {
-    // The edge of the glass. Light comes from the top left, as on iOS: the edges facing it and the opposite
-    // ones shine, the two flanks much less. And the light is not white: an edge of real glass shows what is
-    // next to it and under it, so it takes the hue of the picture just outside the glass and of the picture
-    // refracted in the bevel (white where those are white or grey). It is laid over the fill, not under it,
-    // or the fill would wash it out.
+    // light from the top left, as on real glass: the edges facing it and the opposite ones shine, the flanks
+    // much less; a crisp line right on the outline gives the glass its edge, a soft glow across the bevel its
+    // thickness, and a faint shade along the far inner edge its depth (it used to be one even glow all round)
     half2 n2 = half2(sdfRect(p + half2(1.0, 0.0), radius) - sd, sdfRect(p + half2(0.0, 1.0), radius) - sd);
     half nl = length(n2);
     n2 = nl > 0.0001 ? n2 / nl : half2(0.0, -1.0);
     half facing = dot(n2, half2(-0.7071, -0.7071));
-    half lit = 0.34 + 0.66 * facing * facing;
-    half near = facing > 0.0 ? 1.0 : 0.72;
-    half strength = rim / 0.35;                                  // 0..1
-
-    half4 outside = img.eval(fragCoord + n2 * (thickness * 0.45 - sd));
-    half3 around = outside.rgb * 0.55 + color.rgb * 0.45;
-    half top = max(max(around.r, around.g), around.b);
-    half3 hue = top > 0.03 ? around / top : half3(1.0);
-    half3 light = mix(half3(1.0), hue, 0.72);
-
+    half lit = 0.3 + 0.7 * facing * facing;
+    half near = facing > 0.0 ? 1.0 : 0.7;
+    half strength = rim / 0.35;                                  // the setting, 0..1
+    half lineK = 0.2 + 0.55 * strength;
+    half glowK = 0.05 + 0.25 * strength;
     half outline = 1.0 - smoothstep(0.8, 2.8, -sd);
     half e = edge * edge;
-    half lineK = 0.25 + 0.6 * strength;
-    half glowK = 0.04 + 0.2 * strength;
     half spec = clamp((lineK * outline + glowK * e * e) * lit * near, 0.0, 1.0);
-    glass.rgb = mix(glass.rgb, light * glass.a, spec);
-    // a faint shade along the far inner edge: the depth of the glass
+    // screen blend, premultiplied: bright on dark glass, gentle on light
+    color.rgb = color.rgb + half3(spec) * (half3(color.a) - color.rgb);
     half far = facing < 0.0 ? -facing : 0.0;
-    glass.rgb *= 1.0 - 0.06 * strength * far * e;
+    color.rgb *= 1.0 - 0.07 * strength * far * e;
   }
 
-  return glass;
+  return srcOver(half4(foreground_color_premultiplied), color);
 }

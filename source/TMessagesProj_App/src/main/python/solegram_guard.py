@@ -93,6 +93,14 @@ def install(roots, package):
             return True
         return under(path, plugins_dir) and path.lower().endswith(plugin_code_ext)
 
+    def caller(depth):
+        """The frame `depth` levels above the one asking, or None when there is none: a call made straight from
+        Java (Chaquopy calls jclass from Java while the engine starts) has no Python code above it."""
+        try:
+            return sys._getframe(depth + 1)
+        except ValueError:
+            return None
+
     def plugin_at(frame, immediate=False):
         f = frame
         while f is not None:
@@ -154,7 +162,7 @@ def install(roots, package):
             local.busy = False
 
     def check(event, args):
-        frame = sys._getframe(2)  # check <- hook <- the Python code that called the audited function
+        frame = caller(2)  # check <- hook <- the Python code that called the audited function
         if event == "open":
             if not args:
                 return
@@ -269,12 +277,12 @@ def install(roots, package):
 
     def check_java_class(name):
         """For SDK helpers that look classes up by name for a plugin (hook_utils.find_class)."""
-        check_java(name, sys._getframe(1))
+        check_java(name, caller(1))
 
     original_jclass = java.jclass
 
     def guarded_jclass(name, *args, **kwargs):
-        check_java(name, sys._getframe(1))
+        check_java(name, caller(1))
         return original_jclass(name, *args, **kwargs)
 
     guarded_jclass.__doc__ = getattr(original_jclass, "__doc__", None)
@@ -292,11 +300,11 @@ def install(roots, package):
                     if not isinstance(item, str) or item == "*":
                         continue
                     if frame is None:
-                        frame = sys._getframe(1)
+                        frame = caller(1)
                     check_java(name + "." + item, frame)
             elif name == "solegram_guard":
                 # the plugin's own import statement only (the SDK imports the guard for it)
-                pid = plugin_at(sys._getframe(1), immediate=True)
+                pid = plugin_at(caller(1), immediate=True)
                 if pid is not None:
                     deny(pid, "tamper", name)
         return original_import(name, globals, locals, fromlist, level)
@@ -313,7 +321,7 @@ def install(roots, package):
 
     def current_plugin():
         try:
-            return plugin_at(sys._getframe(1))
+            return plugin_at(caller(1))
         except Exception:
             return None
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: a Solar glyph for the settings rows, with the size and line weight of the line icons -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group android:pivotX="12" android:pivotY="12" android:scaleX="0.993" android:scaleY="0.993" android:translateX="0" android:translateY="0">
+        <path android:pathData="M12 19.5C12 20.8807 10.8807 22 9.5 22C8.11929 22 7 20.8807 7 19.5C7 18.1193 8.11929 17 9.5 17C10.8807 17 12 18.1193 12 19.5Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+        <path android:pathData="M22 17.5C22 18.8807 20.8807 20 19.5 20C18.1193 20 17 18.8807 17 17.5C17 16.1193 18.1193 15 19.5 15C20.8807 15 22 16.1193 22 17.5Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+        <path android:pathData="M22 8L12 12" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+        <path android:pathData="M12 19.0004V8.84787C12 7.5574 12 6.91217 12.335 6.40878C12.67 5.90539 13.2652 5.65627 14.4556 5.15803L16.4556 4.32094C18.9626 3.27164 20.2161 2.747 21.1081 3.34059C22 3.93418 22 5.29305 22 8.01078V17.1542" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+        <path android:pathData="M7 11V6.5V2" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+        <path android:pathData="M2,10.5 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+        <path android:pathData="M10 5C8.75736 5 7 4.07107 7 2" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.883" android:strokeLineCap="round"/>
+    </group>
+</vector>

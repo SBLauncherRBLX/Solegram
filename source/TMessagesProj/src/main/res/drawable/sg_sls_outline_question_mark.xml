@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: a Solar glyph for the settings rows, with the size and line weight of the line icons -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group android:pivotX="12" android:pivotY="12" android:scaleX="0.909" android:scaleY="0.909" android:translateX="0" android:translateY="0">
+        <path android:pathData="M2,12 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.056" android:strokeLineCap="round"/>
+        <path android:pathData="M8,12 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.056" android:strokeLineCap="round"/>
+        <path android:pathData="M14.8281 9.17154L19.0722 4.92773" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.056" android:strokeLineCap="round"/>
+        <path android:pathData="M4.92773 19.0723L9.17155 14.8286" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.056" android:strokeLineCap="round"/>
+        <path android:pathData="M9.17182 9.17157L4.92876 4.92822" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.056" android:strokeLineCap="round"/>
+        <path android:pathData="M19.0723 19.0723L14.8284 14.8286" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.056" android:strokeLineCap="round"/>
+    </group>
+</vector>

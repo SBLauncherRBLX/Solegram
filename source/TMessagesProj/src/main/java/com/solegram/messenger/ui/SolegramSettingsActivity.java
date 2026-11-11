@@ -196,7 +196,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
     // glass
     private static final int ID_GLASS_TINT = 120;
-    private static final int ID_GLASS_STYLE = 119;
     private static final int ID_GLASS_SHADOW = 121;
     private static final int ID_GLASS_VIBRANCY = 122;
     private static final int ID_GLASS_RESTART = 123;
@@ -594,18 +593,26 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asShadow(getString(R.string.SG_GlassInfo)));
 
         if (SolegramConfig.glassOn) {
-            // the glass itself is the glass of iOS, with nothing to tune: two looks and an optional colour
-            items.add(tile(UItem.asButton(ID_GLASS_STYLE, R.drawable.msg_blur_radial, getString(R.string.SG_GlassStyle), glassStyleName(SolegramConfig.glassStyle)), TILE_BLUE));
-            items.add(UItem.asCheck(ID_GLASS_SHADOW, getString(R.string.SG_GlassShadow)).setChecked(SolegramConfig.glassShadow));
-            items.add(UItem.asShadow(getString(R.string.SG_GlassStyleInfo)));
+            if (liquid) {
+                glassSlider(items, R.string.SG_GlassThickness, "glassThickness", 25, 300, SolegramConfig.glassThickness, v -> v + "%");
+                glassSlider(items, R.string.SG_GlassRefraction, "glassRefraction", 0, 300, SolegramConfig.glassRefraction, v -> v == 0 ? getString(R.string.SG_Off) : v + "%");
+                glassSlider(items, R.string.SG_GlassIndex, "glassIndex", 100, 250, SolegramConfig.glassIndex, v -> String.format(java.util.Locale.US, "%.2f", v / 100f));
+                glassSlider(items, R.string.SG_GlassDispersion, "glassDispersion", 0, 100, SolegramConfig.glassDispersion, v -> v == 0 ? getString(R.string.SG_Off) : v + "%");
+                glassSlider(items, R.string.SG_GlassRim, "glassRim", 0, 100, SolegramConfig.glassRim, v -> v == 0 ? getString(R.string.SG_Off) : v + "%");
+                items.add(UItem.asShadow(getString(R.string.SG_GlassRefractionInfo)));
+            }
 
-            items.add(UItem.asHeader(getString(R.string.SG_GlassTint)));
-            items.add(tile(UItem.asButton(ID_GLASS_TINT, R.drawable.msg_palette, getString(R.string.SG_GlassTintColor), glassTintName(SolegramConfig.glassTint)), TILE_PINK));
-            if (SolegramConfig.glassTint != com.solegram.messenger.SolegramGlass.TINT_NONE) {
-                glassSlider(items, R.string.SG_GlassTintAmount, "glassTintAmount", 0, 60, SolegramConfig.glassTintAmount, v -> v + "%");
+            glassSlider(items, R.string.SG_GlassOpacity, "glassOpacity", 10, 100, SolegramConfig.glassOpacity, v -> v + "%");
+            glassSlider(items, R.string.SG_GlassBlur, "glassBlur", 0, 300, SolegramConfig.glassBlur, v -> v + "%");
+            glassSlider(items, R.string.SG_GlassHighlight, "glassHighlight", 0, 300, SolegramConfig.glassHighlight, v -> v == 0 ? getString(R.string.SG_Off) : v + "%");
+            items.add(UItem.asButtonCheck(ID_GLASS_PREVIEW_LOOK, getString(R.string.SG_GlassPreviewLook), getString(R.string.SG_GlassPreviewLookInfo)).setChecked(SolegramConfig.glassPreviewLook));
+            items.add(UItem.asCheck(ID_GLASS_SHADOW, getString(R.string.SG_GlassShadow)).setChecked(SolegramConfig.glassShadow));
+            if (liquid) {
+                items.add(UItem.asButtonCheck(ID_GLASS_VIBRANCY, getString(R.string.SG_GlassVibrancy), getString(R.string.SG_GlassVibrancyInfo)).setChecked(SolegramConfig.glassVibrancy));
             }
             items.add(UItem.asShadow(null));
 
+            // with the glass switch off, the glass of the other places is off too, so their switches are not shown
             final boolean windowBlur = com.solegram.messenger.SolegramUi.canBlurWindows();
             items.add(UItem.asHeader(getString(R.string.SG_GlassElsewhere)));
             items.add(UItem.asButtonCheck(ID_LIQUID_CONTROLS, getString(R.string.SG_LiquidControls), getString(R.string.SG_LiquidControlsInfo)).setChecked(SolegramConfig.liquidControls));
@@ -616,6 +623,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(UItem.asButtonCheck(ID_GLASS_SHEETS, getString(R.string.SG_GlassSheets), getString(R.string.SG_GlassSheetsInfo)).setChecked(SolegramConfig.glassSheets));
             items.add(UItem.asButtonCheck(ID_GLASS_CALL, getString(R.string.SG_GlassCallScreen), getString(R.string.SG_GlassCallScreenInfo)).setChecked(SolegramConfig.glassCallScreen));
             items.add(UItem.asShadow(getString(windowBlur ? R.string.SG_GlassElsewhereInfo : R.string.SG_GlassElsewhereUnavailable)));
+
+            items.add(UItem.asHeader(getString(R.string.SG_GlassTint)));
+            items.add(tile(UItem.asButton(ID_GLASS_TINT, R.drawable.msg_palette, getString(R.string.SG_GlassTintColor), glassTintName(SolegramConfig.glassTint)), TILE_PINK));
+            if (SolegramConfig.glassTint != com.solegram.messenger.SolegramGlass.TINT_NONE) {
+                glassSlider(items, R.string.SG_GlassTintAmount, "glassTintAmount", 0, 60, SolegramConfig.glassTintAmount, v -> v + "%");
+            }
         }
 
         items.add(UItem.asShadow(getString(R.string.SG_GlassApplyInfo)));
@@ -623,22 +636,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asShadow(null));
         items.add(UItem.asButton(ID_GLASS_RESET, R.drawable.msg_reset, getString(R.string.SG_GlassResetDefaults)).red());
         items.add(UItem.asShadow(null));
-    }
-
-    public static String glassStyleName(int style) {
-        return getString(style == com.solegram.messenger.SolegramGlass.STYLE_CLEAR ? R.string.SG_GlassStyleClear : R.string.SG_GlassStyleRegular);
-    }
-
-    private void showGlassStyleSelector() {
-        final String[] names = {glassStyleName(0), glassStyleName(1)};
-        showDialog(org.telegram.ui.Components.AlertsCreator.createSingleChoiceDialog(getParentActivity(), names, getString(R.string.SG_GlassStyle), SolegramConfig.glassStyle, (d, which) -> {
-            SolegramConfig.putInt("glassStyle", which);
-            if (glassPreview != null) {
-                glassPreview.refresh();
-            }
-            listView.adapter.update(true);
-            restartBulletin();
-        }));
     }
 
     private void glassSlider(ArrayList<UItem> items, int title, String key, int min, int max, int value, org.telegram.messenger.Utilities.CallbackReturn<Integer, CharSequence> format) {
@@ -2655,9 +2652,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             // glass
             case ID_GLASS_TINT:
                 showGlassTintSelector();
-                return;
-            case ID_GLASS_STYLE:
-                showGlassStyleSelector();
                 return;
             case ID_TRANSFER_BOOST:
                 showTransferBoostSelector();

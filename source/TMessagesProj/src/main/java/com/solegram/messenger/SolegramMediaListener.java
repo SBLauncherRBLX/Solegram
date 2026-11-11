@@ -60,6 +60,15 @@ public class SolegramMediaListener extends NotificationListenerService {
         instance = null;
         AndroidUtilities.runOnUIThread(SolegramNowPlaying::stop);
         super.onListenerDisconnected();
+        // the system lets go of listeners now and then (memory, updates): ask to be bound again while wanted,
+        // or the players went unwatched until a profile happened to ask
+        if (SolegramConfig.nowPlaying && android.os.Build.VERSION.SDK_INT >= 24 && SolegramNowPlaying.hasAccess()) {
+            try {
+                requestRebind(new android.content.ComponentName(ApplicationLoader.applicationContext, SolegramMediaListener.class));
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }
     }
 
     @Override

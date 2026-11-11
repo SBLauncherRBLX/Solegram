@@ -203,7 +203,7 @@
     <string name="SG_RestartNow">Restart now</string>
     <string name="SG_GlassSettings">Glass settings</string>
     <string name="SG_GlassPreviewInfo">Live preview: the top of a Telegram screen with its real glass buttons and search field. Scroll the chats underneath. Changes show here right away, on the app screens after a restart.</string>
-    <string name="SG_GlassFrostedOnlyInfo">Liquid glass is not available (it needs Android 13) or glass is switched off, so the glass here is frosted, without refraction.</string>
+    <string name="SG_GlassFrostedOnlyInfo">Liquid glass is not available here (needs Android 13) or textured glass is off, so only the blur settings are shown.</string>
     <string name="SG_GlassThickness">Edge thickness</string>
     <string name="SG_GlassRefraction">Refraction strength</string>
     <string name="SG_GlassIndex">Refractive index</string>
@@ -1817,10 +1817,6 @@
     <string name="SG_IconDoor">Purple door</string>
     <string name="SG_IconPixel">8-bit</string>
     <string name="SG_IconCandy">Match three</string>
-    <string name="SG_GlassStyle">Glass style</string>
-    <string name="SG_GlassStyleRegular">Regular</string>
-    <string name="SG_GlassStyleClear">Clear</string>
-    <string name="SG_GlassStyleInfo">The glass is built like the glass of iOS: a light blur, refraction along the edge, a barely visible texture and an edge that takes the colour of what is next to it and under it. Regular is denser and reads better, Clear hardly covers what is under it.</string>
     <string name="SG_TintWhite">White</string>
     <string name="SG_TintGrey">Grey</string>
     <string name="SG_TintBlack">Black</string>

@@ -483,7 +483,12 @@ public final class SolegramNowPlaying {
         current = track;
         // posted, not sent right away: a profile asking for the track while building its rows must not rebuild them inside
         handler.post(() -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramNowPlayingChanged));
-        SolegramNowPlayingBio.onTrackChanged(track);
+        try {
+            SolegramNowPlayingBio.onTrackChanged(track);
+        } catch (Throwable e) {
+            // sharing in the bio must never stop the player being watched (start() stops everything on an error)
+            FileLog.e(e);
+        }
     }
     // endregion
 

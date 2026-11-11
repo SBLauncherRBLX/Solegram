@@ -63,8 +63,6 @@ public class SolegramConfig {
     public static int glassHighlight = 150;
     /** Faster transfers: 0 as Telegram, 1 fast (larger parts, more at once), 2 the most the servers take. */
     public static volatile int transferBoost = 1;
-    /** SolegramGlass.STYLE_REGULAR or STYLE_CLEAR. */
-    public static int glassStyle;
     /** The glass switch of the Glass page; off takes the glass of menus, sheets, controls and the rest with it. */
     public static boolean glassOn = true;
     public static int glassTint;
@@ -416,22 +414,20 @@ public class SolegramConfig {
         settingsIconStyle = clamp(p.getInt("settingsIconStyle", 1), 0, 1);
         SolegramIcons.setPack(iconPack);
 
-        // the glass of iOS, fixed (see SolegramGlass): the fine tuning of earlier versions is gone
-        glassThickness = 110;   // the bevel: 12dp
-        glassRefraction = 100;
-        glassIndex = 150;       // Telegram's own index
-        glassDispersion = 24;
-        glassRim = 55;
-        glassOpacity = 70;
-        glassBlur = 30;         // about 2.7dp under liquid glass
-        glassStyle = clamp(p.getInt("glassStyle", 0), 0, 1);
+        glassThickness = clamp(p.getInt("glassThickness", 70), 25, 300);
+        glassRefraction = clamp(p.getInt("glassRefraction", 100), 0, 300);
+        glassIndex = clamp(p.getInt("glassIndex", 130), 100, 250);
+        glassDispersion = clamp(p.getInt("glassDispersion", 40), 0, 100);
+        glassRim = clamp(p.getInt("glassRim", 10), 0, 100);
+        glassOpacity = clamp(p.getInt("glassOpacity", 70), 10, 100);
+        glassBlur = clamp(p.getInt("glassBlur", 30), 0, 300);
         transferBoost = clamp(p.getInt("transferBoost", 1), 0, 2);
-        glassHighlight = 150;
+        glassHighlight = clamp(p.getInt("glassHighlight", 150), 0, 300);
         glassOn = p.getBoolean("glassOn", true);
         glassTint = clamp(p.getInt("glassTint", 0), 0, SolegramGlass.TINT_COLORS.length - 1);
         glassTintAmount = clamp(p.getInt("glassTintAmount", 25), 0, 60);
         glassShadow = p.getBoolean("glassShadow", true);
-        glassVibrancy = true;
+        glassVibrancy = p.getBoolean("glassVibrancy", true);
         glassMenus = p.getBoolean("glassMenus", true);
         streaks = p.getBoolean("streaks", true);
         newPlayer = p.getBoolean("newPlayer", true);
@@ -440,7 +436,7 @@ public class SolegramConfig {
         glassDialogs = p.getBoolean("glassDialogs", true);
         glassSheets = p.getBoolean("glassSheets", true);
         liquidControls = p.getBoolean("liquidControls", true);
-        glassPreviewLook = true;
+        glassPreviewLook = p.getBoolean("glassPreviewLook", true);
         typingAnimation = p.getBoolean("typingAnimation", true);
         translateHere = p.getBoolean("translateHere", true);
         frostedHeaders = p.getBoolean("frostedHeaders", true);
@@ -898,7 +894,16 @@ public class SolegramConfig {
 
     /** Everything on the Glass page, written out with Solegram's look (the same values as the defaults above). */
     private static void writeGlassDefaults(SharedPreferences.Editor editor) {
-        editor.putInt("glassStyle", 0)
+        editor.putInt("glassThickness", 70)
+            .putInt("glassRefraction", 100)
+            .putInt("glassIndex", 130)
+            .putInt("glassDispersion", 40)
+            .putInt("glassRim", 10)
+            .putInt("glassOpacity", 70)
+            .putInt("glassBlur", 30)
+            .putInt("glassHighlight", 150)
+            .putBoolean("glassPreviewLook", true)
+            .putBoolean("glassVibrancy", true)
             .putBoolean("glassOn", true)
             .putInt("glassTint", 0)
             .putInt("glassTintAmount", 25)

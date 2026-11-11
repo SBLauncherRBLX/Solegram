@@ -457,7 +457,7 @@
     <string name="SG_RestartNow">Перезапустить сейчас</string>
     <string name="SG_GlassSettings">Настройка стекла</string>
     <string name="SG_GlassPreviewInfo">Живое превью: верх экрана Telegram с настоящими стеклянными кнопками и строкой поиска. Листайте чаты под ними. Изменения видны здесь сразу, на экранах приложения — после перезапуска.</string>
-    <string name="SG_GlassFrostedOnlyInfo">Жидкое стекло недоступно (нужен Android 13) или стекло выключено, поэтому здесь оно матовое, без преломления.</string>
+    <string name="SG_GlassFrostedOnlyInfo">Жидкое стекло недоступно (нужен Android 13) или текстурное стекло выключено, поэтому здесь только настройки размытия.</string>
     <string name="SG_GlassThickness">Толщина края</string>
     <string name="SG_GlassRefraction">Сила преломления</string>
     <string name="SG_GlassIndex">Коэффициент преломления</string>
@@ -2071,10 +2071,6 @@
     <string name="SG_IconDoor">Фиолетовая дверь</string>
     <string name="SG_IconPixel">8 бит</string>
     <string name="SG_IconCandy">Три в ряд</string>
-    <string name="SG_GlassStyle">Стиль стекла</string>
-    <string name="SG_GlassStyleRegular">Обычное</string>
-    <string name="SG_GlassStyleClear">Прозрачное</string>
-    <string name="SG_GlassStyleInfo">Стекло устроено как в iOS: лёгкое размытие, преломление по краю, едва заметная текстура и кромка, которая берёт цвет того, что рядом и под ней. «Обычное» плотнее и лучше читается, «Прозрачное» почти не закрывает то, что под ним.</string>
     <string name="SG_TintWhite">Белый</string>
     <string name="SG_TintGrey">Серый</string>
     <string name="SG_TintBlack">Чёрный</string>

@@ -39,6 +39,7 @@ public final class SolegramIcons {
     private static volatile int activePack = -1;
     private static final SparseIntArray[] maps = new SparseIntArray[PACK_COUNT];
     private static SparseIntArray lineMap;
+    private static SparseIntArray solarLineMap;
     private static final int[][] tabs = new int[PACK_COUNT][], tabsSelected = new int[PACK_COUNT][];
 
     /** Called by SolegramConfig whenever settings are read. */
@@ -179,9 +180,17 @@ public final class SolegramIcons {
                 }
                 line = lineMap;
             }
-            // Solar's glyph first (soft, rounded, a little larger) unless another pack was chosen; then the thin one
-            final int solar = activePack == PACK_SOLAR || activePack == PACK_STANDARD ? map(id, map(PACK_SOLAR)) : id;
-            final int own = solar != id ? solar : line.get(id);
+            // Solar's glyph first (soft and rounded, at the size and line weight of the line icons) unless another
+            // pack was chosen; then the line one
+            final SparseIntArray solarLine;
+            synchronized (SolegramIcons.class) {
+                if (solarLineMap == null) {
+                    solarLineMap = build(SolegramIconMaps.solarLine());
+                }
+                solarLine = solarLineMap;
+            }
+            final int solar = activePack == PACK_SOLAR || activePack == PACK_STANDARD ? solarLine.get(id) : 0;
+            final int own = solar != 0 ? solar : line.get(id);
             d = res.getDrawable(own != 0 ? own : map(id, map(PACK_PHOSPHOR)));
         } catch (Throwable e) {
             d = null;
