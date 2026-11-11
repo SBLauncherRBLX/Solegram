@@ -372,7 +372,9 @@ public class GlassCaptureSourceCanvas {
             renderNode = new RenderNode("cap-" + index);
             renderNode.setUseCompositingLayer(true, null);
             renderNodeGlass = new RenderNode("glass-" + index);
-            renderNodeGlass.setRenderEffect(RenderNodeEffects.getSaturationX3RenderEffect());
+            if (com.solegram.messenger.SolegramGlass.vibrancy()) { // Solegram: the glass settings' vibrancy
+                renderNodeGlass.setRenderEffect(RenderNodeEffects.getSaturationX3RenderEffect());
+            }
             renderNodeGlassFrosted = new RenderNode("glass-frosted-" + index);
             renderNodeFiltered = new RenderNode("filtered-" + index);
             renderNodeFiltered.setRenderEffect(RenderEffect.createColorFilterEffect(IDENTITY_FILTER));
@@ -422,14 +424,15 @@ public class GlassCaptureSourceCanvas {
         ) {
             if (this.glassDownsample != glassDownsample) {
                 this.glassDownsample = glassDownsample;
-                glassRadius = blurRadiusForDownsample(dpf2(7), glassDownsample);
+                // Solegram: the blur follows the glass settings, as in the other screens
+                glassRadius = Math.max(0.5f, blurRadiusForDownsample(dpf2(7) * com.solegram.messenger.SolegramGlass.blurScale(), glassDownsample));
                 renderNode.setRenderEffect(RenderEffect.createBlurEffect(
                         glassRadius, glassRadius, Shader.TileMode.CLAMP));
             }
             if (this.frostedGlassDownsample != frostedGlassDownsample) {
                 this.frostedGlassDownsample = frostedGlassDownsample;
-                frostedGlassRadius = blurRadiusForDownsample(
-                        dpf2(36), frostedGlassDownsample);
+                frostedGlassRadius = Math.max(0.5f, blurRadiusForDownsample(
+                        dpf2(36) * com.solegram.messenger.SolegramGlass.blurScale(), frostedGlassDownsample));
                 renderNodeGlassFrosted.setRenderEffect(RenderEffect.createBlurEffect(
                         frostedGlassRadius, frostedGlassRadius, Shader.TileMode.CLAMP));
                 renderNodeFrostedFiltered.setRenderEffect(RenderEffect.createBlurEffect(

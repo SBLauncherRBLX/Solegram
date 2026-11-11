@@ -169,7 +169,9 @@ public class BaseFragmentSimpleGlass {
 
         glassBlurredFadeDrawable.setDirection(GlassFadeDirection.TOP);
         glassBlurredFadeDrawable.setOverlayColorSource(glassBackgroundSourceColor);
-        glassBlurredFadeDrawable.setOverlayAlpha(160);
+        // Solegram: only the blur under the header and over the navigation bar, no shade of the background over it
+        // (the colour is kept for when the blur is off: there it alone keeps the list apart from the header)
+        glassBlurredFadeDrawable.setOverlayAlpha(0);
         glassBlurredFadeDrawable.setMaskRange(gradientRangeMask);
         glassBlurredFadeDrawable.setOverlayRange(gradientRangeFade);
 
@@ -194,7 +196,9 @@ public class BaseFragmentSimpleGlass {
 
         glassBlurredFadeDrawable.setDirection(GlassFadeDirection.BOTTOM);
         glassBlurredFadeDrawable.setOverlayColorSource(glassBackgroundSourceColor);
-        glassBlurredFadeDrawable.setOverlayAlpha(160);
+        // Solegram: only the blur under the header and over the navigation bar, no shade of the background over it
+        // (the colour is kept for when the blur is off: there it alone keeps the list apart from the header)
+        glassBlurredFadeDrawable.setOverlayAlpha(0);
         glassBlurredFadeDrawable.setMaskRange(gradientRangeMask);
         glassBlurredFadeDrawable.setOverlayRange(gradientRangeFade);
 
