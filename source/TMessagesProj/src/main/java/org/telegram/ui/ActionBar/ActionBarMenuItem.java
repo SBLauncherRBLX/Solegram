@@ -871,12 +871,36 @@ public class ActionBarMenuItem extends FrameLayout {
 
     @Nullable
     SimpleActionBarMenuOverlay getSubMenuOverlay() {
-        return subMenuOverlayProvider != null ? subMenuOverlayProvider.run() : null;
+        final Utilities.Callback0Return<SimpleActionBarMenuOverlay> provider = solegramOverlayProvider();
+        return provider != null ? provider.run() : null;
     }
 
     @Nullable
     MenuOverlayHost getSubMenuOverlayHost() {
-        return subMenuOverlayProvider != null && parentMenu != null ? parentMenu.parentActionBar : null;
+        return solegramOverlayProvider() != null && parentMenu != null ? parentMenu.parentActionBar : null;
+    }
+
+    /**
+     * Solegram: the overlay this item's menu grows out of the glass in: the one it was given, else, on a bar with glass
+     * buttons, the bar's screen's one (with glass menus on); none for a bar without glass (the popup menu then).
+     */
+    @Nullable
+    private Utilities.Callback0Return<SimpleActionBarMenuOverlay> solegramOverlayProvider() {
+        if (subMenuOverlayProvider != null) {
+            return subMenuOverlayProvider;
+        }
+        final ActionBar bar = parentMenu != null ? parentMenu.parentActionBar : null;
+        if (bar == null || bar.solegramMenuOverlayProvider == null || !bar.solegramHasMenuGlass() || parentMenu.isActionMode
+            || !com.solegram.messenger.SolegramConfig.glassMenus) {
+            return null;
+        }
+        return bar.solegramMenuOverlayProvider;
+    }
+
+    /** Solegram: the bar this item is on, or null. */
+    @Nullable
+    public ActionBar solegramParentActionBar() {
+        return parentMenu != null ? parentMenu.parentActionBar : null;
     }
 
     boolean canOpenSubMenuOverlay() {

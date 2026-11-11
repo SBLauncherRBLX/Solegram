@@ -198,7 +198,7 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
         open(host, null, content);
     }
 
-    void open(MenuOverlayHost bar, @Nullable ActionBarMenuItem item, ActionBarPopupWindow.ActionBarPopupWindowLayout content) {
+    public void open(MenuOverlayHost bar, @Nullable ActionBarMenuItem item, ActionBarPopupWindow.ActionBarPopupWindowLayout content) {
         if (opened && this.bar == bar && this.item == item) {
             return;
         }

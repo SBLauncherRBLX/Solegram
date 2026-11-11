@@ -1365,6 +1365,9 @@ public class ItemOptions {
         }
 
         setupSelectors();
+        if (solegramCascade && solegramShowInOverlay()) {
+            return this;
+        }
 
         if (fixedWidthDp > 0) {
             for (int j = 0; j < layout.getChildCount() - 1; ++j) {
@@ -1679,6 +1682,38 @@ public class ItemOptions {
     }
 
     private boolean solegramCascade;
+    private org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay solegramOverlay;
+
+    /**
+     * Solegram: a menu of a button on a glass header grows out of the button, as Telegram 13.2's header menus do
+     * (in the screen's overlay, the button's glass going over to frosted glass); false: the popup window then.
+     */
+    private boolean solegramShowInOverlay() {
+        if (fragment == null || !(scrimView instanceof org.telegram.ui.ActionBar.ActionBarMenuItem)
+            || !(layout instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) || !com.solegram.messenger.SolegramConfig.glassMenus) {
+            return false;
+        }
+        final org.telegram.ui.ActionBar.ActionBarMenuItem item = (org.telegram.ui.ActionBar.ActionBarMenuItem) scrimView;
+        final org.telegram.ui.ActionBar.ActionBar bar = item.solegramParentActionBar();
+        if (bar == null || !bar.solegramHasMenuGlass()) {
+            return false;
+        }
+        final org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay overlay = fragment.getSimpleMenuOverlay();
+        if (overlay == null) {
+            return false;
+        }
+        solegramOverlay = overlay;
+        overlay.setOnClosed(() -> {
+            solegramOverlay = null;
+            if (dismissListener != null) {
+                final Runnable r = dismissListener;
+                dismissListener = null;
+                r.run();
+            }
+        });
+        overlay.open(bar, item, (ActionBarPopupWindow.ActionBarPopupWindowLayout) layout);
+        return true;
+    }
 
     /** Solegram: the menu opens as a header's own menu does (it grows out of the button, its items one by one). */
     public ItemOptions solegramCascade() {
@@ -1999,6 +2034,10 @@ public class ItemOptions {
     public void dismiss() {
         if (dontDismiss) {
             dontDismiss = false;
+            return;
+        }
+        if (solegramOverlay != null) {
+            solegramOverlay.close(true);
             return;
         }
         if (actionBarPopupWindow != null) {

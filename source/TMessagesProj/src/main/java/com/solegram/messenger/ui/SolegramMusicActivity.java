@@ -125,6 +125,12 @@ public class SolegramMusicActivity extends BaseFragment implements NotificationC
         return iBlur3SourceGlass;
     }
 
+    /** The frosted picture for the tab bar when liquid glass is off (Telegram 13.2's tab bar reads it from the page). */
+    @Override
+    public org.telegram.utils.glass.source.GlassSourceRenderNode getFrostedGlassSource() {
+        return iBlur3SourceGlassFrosted;
+    }
+
     private void blur3_InvalidateBlur() {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S || scrollableViewNoiseSuppressor == null || fragmentView == null || iBlur3Capture == null) {
             return;

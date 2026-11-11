@@ -225,6 +225,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
     }
 
     private void onBoundPropsChanged() {
+        solegramCheckAutoLiquid();
         if (renderNodeImpl != null) {
             renderNodeImpl.onBoundPropsChanged();
         }
@@ -954,7 +955,29 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
     }
 
     private boolean isLiquidGlassEffectEnabled() {
-        return liquidGlassEffectAllowed && getGlassSettings().isLiquidGlassEnabled && Build.VERSION.SDK_INT >= 33;
+        return (liquidGlassEffectAllowed || solegramAutoLiquid) && getGlassSettings().isLiquidGlassEnabled && Build.VERSION.SDK_INT >= 33;
+    }
+
+    /**
+     * Solegram: a button or a pill of glass (small and round) is liquid glass wherever it is, as before Telegram 13.2,
+     * which left some of them (the profile's buttons and others) only blurred. Panels and sheets keep their look.
+     */
+    private boolean solegramAutoLiquid;
+
+    private void solegramCheckAutoLiquid() {
+        boolean auto = false;
+        if (com.solegram.messenger.SolegramConfig.glassOn && !boundProps.boundsWithPadding.isEmpty()) {
+            final float w = boundProps.body.width(), h = boundProps.body.height();
+            float minRadius = Float.MAX_VALUE;
+            for (float r : boundProps.radii) {
+                minRadius = Math.min(minRadius, r);
+            }
+            auto = w > 0 && h > 0 && h <= dp(72) && minRadius >= Math.min(dp(12), h / 2f - 1);
+        }
+        if (auto != solegramAutoLiquid) {
+            solegramAutoLiquid = auto;
+            implInvalidated = true;
+        }
     }
 
     private GlassSource pickSource() {

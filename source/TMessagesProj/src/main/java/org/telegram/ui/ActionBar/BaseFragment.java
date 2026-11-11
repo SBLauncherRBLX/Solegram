@@ -582,6 +582,8 @@ public abstract class BaseFragment {
 
     public ActionBar createActionBar(Context context) {
         ActionBar actionBar = new ActionBar(context, getResourceProvider());
+        // Solegram: the menus of its glass buttons grow out of them in this screen's overlay
+        actionBar.solegramMenuOverlayProvider = this::getSimpleMenuOverlay;
         ThemeBind.backgroundColor(actionBar, Theme.key_actionBarDefault, themedColors);
         ThemeBind.actionBarItemsBackgroundColor(actionBar, Theme.key_actionBarDefaultSelector, themedColors, false);
         ThemeBind.actionBarItemsBackgroundColor(actionBar, Theme.key_actionBarActionModeDefaultSelector, themedColors, true);

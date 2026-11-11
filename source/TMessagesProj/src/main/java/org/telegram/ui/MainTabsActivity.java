@@ -1699,8 +1699,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         }
 
         final int updateLayoutHeight = updateLayoutWrapper != null && updateLayoutWrapper.isUpdateLayoutVisible() ? dp(UpdateLayoutWrapper.HEIGHT) : 0;
+        // Solegram: its tab bar is lifted, and the selection's liquid drop bulges past it: the capture under the bar
+        // covers all of that (it ended under Telegram's lower bar, and the top of Solegram's showed empty, black)
         final int bottom = contentView.getHeight() - navigationBarHeight - updateLayoutHeight - dp(DialogsActivity.MAIN_TABS_MARGIN);
-        final int top = bottom - dp(DialogsActivity.MAIN_TABS_HEIGHT);
+        final int top = bottom - dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_LIFT + 12);
 
         for (int a = 0, N = fragmentsArr.size(); a < N; a++) {
             final BaseFragment fragment = fragmentsArr.valueAt(a).fragment;

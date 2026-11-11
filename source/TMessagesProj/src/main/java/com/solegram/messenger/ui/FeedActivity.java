@@ -642,4 +642,10 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
     public GlassSourceRenderNode getGlassSource() {
         return iBlur3SourceGlass;
     }
+
+    /** The frosted picture for the tab bar when liquid glass is off (Telegram 13.2's tab bar reads it from the page). */
+    @Override
+    public GlassSourceRenderNode getFrostedGlassSource() {
+        return iBlur3SourceGlassFrosted;
+    }
 }

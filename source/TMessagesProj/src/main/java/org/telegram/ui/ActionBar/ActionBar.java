@@ -402,6 +402,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     }
 
     void solegramDrawMenuBubble(Canvas canvas) {
+        if (isMenuPillInOverlay()) {
+            return; // its menu grows out of it: the overlay draws the bubble meanwhile
+        }
         if (!solegramButtonsGlass || glassDrawableMenu == null || menu == null || glassOnlyBack || doNotDrawGlassMenu) {
             return;
         }
@@ -596,6 +599,9 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         solegramTonal = false;
         solegramMenuFactory = factory;
         solegramMenuColors = colorProvider;
+        // the menus of its buttons grow out of this glass (Telegram 13.2's menus in the overlay of the screen)
+        glassFactory = factory;
+        glassColorProvider = colorProvider;
         setClipChildren(false);
         glassDrawableBack = factory.create(this)
             .setColorProvider(colorProvider)
@@ -617,6 +623,17 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     }
 
     /* Menus in the overlay of the screen (see ActionBarMenuItem#setSubMenuOverlayProvider) */
+
+    /**
+     * Solegram: the overlay of the screen this bar is on (its fragment's). Every menu of a button on glass grows out of
+     * that glass, as Telegram 13.2 does it in its new headers, not only the menus Telegram set up for it.
+     */
+    public org.telegram.messenger.Utilities.Callback0Return<SimpleActionBarMenuOverlay> solegramMenuOverlayProvider;
+
+    /** Solegram: a menu of this bar can grow out of its glass (the bar has glass buttons). */
+    public boolean solegramHasMenuGlass() {
+        return glassFactory != null;
+    }
 
     private BlurredBackgroundDrawableViewFactory glassFactory;
     private BlurredBackgroundColorProvider glassColorProvider;
