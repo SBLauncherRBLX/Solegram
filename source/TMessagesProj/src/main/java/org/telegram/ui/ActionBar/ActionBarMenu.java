@@ -660,6 +660,9 @@ public class ActionBarMenu extends LinearLayout {
         if (parentActionBar != null && parentActionBar.menu == this) {
             // Solegram: the buttons' glass bubble lives with them - it fades and moves as the menu does
             parentActionBar.solegramDrawMenuBubble(canvas);
+        } else if (parentActionBar != null && isActionMode && parentActionBar.solegramIsActionMode(this)) {
+            // Solegram: the selection bar's buttons get bubbles too, grown out of the header's own
+            parentActionBar.solegramDrawActionModeBubbles(canvas);
         }
         super.dispatchDraw(canvas);
     }

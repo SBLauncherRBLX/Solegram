@@ -143,7 +143,7 @@ public class SolegramGlassPreview extends FrameLayout {
         final BlurredBackgroundDrawableViewFactory factory;
         if (sourceGlass != null) {
             factory = new BlurredBackgroundDrawableViewFactory(sourceGlass);
-            factory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            factory.setLiquidGlassEffectAllowed(true);
         } else {
             factory = new BlurredBackgroundDrawableViewFactory(sourceColor);
         }

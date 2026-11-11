@@ -914,6 +914,11 @@ public class ActionBarMenuItem extends FrameLayout {
         if (overlay == null || popupWindow != null && popupWindow.isShowing()) {
             return false;
         }
+        // Solegram: the screen's overlay only for a bar in the screen's own window (not in a sheet or a dialog over it):
+        // elsewhere it cannot tell where the button is, the popup menu is used there
+        if (subMenuOverlayProvider == null && (!isShown() || overlay.getRootView() != getRootView())) {
+            return false;
+        }
         layoutLazyItems();
         if (!hasSubMenu() || !canOpenSubMenuOverlay()) {
             return true;
@@ -1137,6 +1142,12 @@ public class ActionBarMenuItem extends FrameLayout {
         return searchContainer != null && searchContainer.getVisibility() == VISIBLE;
     }
 
+    /** Solegram: the frame of the search field in the bar while it shows or fades away, else null. */
+    View solegramSearchFrame() {
+        final View frame = wrappedSearchFrameLayout != null ? wrappedSearchFrameLayout : searchContainer;
+        return frame != null && frame.getVisibility() == VISIBLE && frame.getParent() == parentMenu && frame.getWidth() > 0 ? frame : null;
+    }
+
     public boolean isSearchFieldVisible2() {
         return searchContainer != null && searchContainer.getTag() != null;
     }
@@ -1177,11 +1188,16 @@ public class ActionBarMenuItem extends FrameLayout {
             }
             searchContainerAnimator = new AnimatorSet();
             searchContainerAnimator.playTogether(ObjectAnimator.ofFloat(searchContainer, View.ALPHA, searchContainer.getAlpha(), 0f));
+            // Solegram: the field slides back into its button as it goes
+            final View frame = wrappedSearchFrameLayout != null ? wrappedSearchFrameLayout : searchContainer;
+            final ObjectAnimator slideOut = ObjectAnimator.ofFloat(frame, View.TRANSLATION_X, frame.getTranslationX(), AndroidUtilities.dp(LocaleController.isRTL ? -28 : 28));
+            slideOut.setInterpolator(org.telegram.ui.Components.CubicBezierInterpolator.EASE_OUT_QUINT);
+            searchContainerAnimator.playTogether(slideOut);
             for (int i = 0; i < menuIcons.size(); i++) {
                 menuIcons.get(i).setAlpha(0f);
                 searchContainerAnimator.playTogether(ObjectAnimator.ofFloat(menuIcons.get(i), View.ALPHA, menuIcons.get(i).getAlpha(), 1f));
             }
-            searchContainerAnimator.setDuration(150);
+            searchContainerAnimator.setDuration(220);
             searchContainerAnimator.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
@@ -1190,6 +1206,7 @@ public class ActionBarMenuItem extends FrameLayout {
                         menuIcons.get(i).setAlpha(1f);
                     }
                     searchContainer.setVisibility(View.GONE);
+                    frame.setTranslationX(0);
                 }
             });
             searchContainerAnimator.start();
@@ -1224,10 +1241,15 @@ public class ActionBarMenuItem extends FrameLayout {
             }
             searchContainerAnimator = new AnimatorSet();
             searchContainerAnimator.playTogether(ObjectAnimator.ofFloat(searchContainer, View.ALPHA, searchContainer.getAlpha(), 1f));
+            // Solegram: the field comes out of its button (the button's glass stretches over it, see ActionBar)
+            final View frame = wrappedSearchFrameLayout != null ? wrappedSearchFrameLayout : searchContainer;
+            final ObjectAnimator slideIn = ObjectAnimator.ofFloat(frame, View.TRANSLATION_X, frame.getTranslationX() != 0 ? frame.getTranslationX() : AndroidUtilities.dp(LocaleController.isRTL ? -28 : 28), 0);
+            slideIn.setInterpolator(org.telegram.ui.Components.CubicBezierInterpolator.EASE_OUT_QUINT);
+            searchContainerAnimator.playTogether(slideIn);
             for (int i = 0; i < menuIcons.size(); i++) {
                 searchContainerAnimator.playTogether(ObjectAnimator.ofFloat(menuIcons.get(i), View.ALPHA, menuIcons.get(i).getAlpha(), 0f));
             }
-            searchContainerAnimator.setDuration(150);
+            searchContainerAnimator.setDuration(220);
             searchContainerAnimator.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {

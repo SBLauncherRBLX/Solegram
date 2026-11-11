@@ -1807,7 +1807,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                 root.getViewTreeObserver().addOnScrollChangedListener(() -> actionBar.invalidate());
             }
             final org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory factory = new org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory(glass);
-            factory.setLiquidGlassEffectAllowed(org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS));
+            factory.setLiquidGlassEffectAllowed(true);
             // the bar is clear and sits at the top of the screen, as the page does: the glass is placed from the bar
             actionBar.solegramSetFloating(true);
             actionBar.solegramSetupButtonsGlass(factory, org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.topPanel(resourcesProvider));

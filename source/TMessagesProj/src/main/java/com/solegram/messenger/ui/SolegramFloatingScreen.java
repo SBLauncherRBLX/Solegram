@@ -251,7 +251,7 @@ public class SolegramFloatingScreen {
             colorSource = new GlassSourceColor();
         }
         final BlurredBackgroundDrawableViewFactory factory = new BlurredBackgroundDrawableViewFactory(source != null ? source : colorSource);
-        factory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+        factory.setLiquidGlassEffectAllowed(true);
 
         actionBar.solegramSetFloating(true);
         checkPageColor();

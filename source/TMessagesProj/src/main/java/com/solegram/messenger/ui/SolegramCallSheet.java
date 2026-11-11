@@ -185,7 +185,7 @@ public class SolegramCallSheet extends FrameLayout {
             factory = new BlurredBackgroundDrawableViewFactory(color);
         }
         factory.setSourceRootView(new ViewPositionWatcher(root), root);
-        factory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+        factory.setLiquidGlassEffectAllowed(true);
         glass = factory.create(this, BlurredBackgroundProviderImpl.solegramCallSheet(null));
         glass.setRadius(dp(RADIUS));
         glass.setPadding(dp(EDGE));

@@ -57,7 +57,7 @@ public class SolegramFloatingHeader {
             source = color;
         }
         final BlurredBackgroundDrawableViewFactory factory = new BlurredBackgroundDrawableViewFactory(source);
-        factory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+        factory.setLiquidGlassEffectAllowed(true);
         factory.setSourceRootView(new ViewPositionWatcher(root), root);
         return factory;
     }

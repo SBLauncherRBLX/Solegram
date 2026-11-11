@@ -1699,8 +1699,8 @@ public class ItemOptions {
             return false;
         }
         final org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay overlay = fragment.getSimpleMenuOverlay();
-        if (overlay == null) {
-            return false;
+        if (overlay == null || !item.isShown() || overlay.getRootView() != item.getRootView()) {
+            return false; // a bar in another window (a sheet): the overlay can't tell where its button is
         }
         solegramOverlay = overlay;
         overlay.setOnClosed(() -> {

@@ -603,7 +603,9 @@ public class GlassEngine {
 
     private static void checkGlassSettings() {
         final boolean isBlurEnabled = LiteMode.isEnabled(LiteMode.FLAG_CHAT_BLUR);
-        final boolean isLiquidGlassEnabled = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS);
+        // Solegram: the liquid glass goes with Solegram's glass switch, as before Telegram 13.2 (which made it a lite
+        // mode option, and switched it off for everyone coming from an older version)
+        final boolean isLiquidGlassEnabled = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) && com.solegram.messenger.SolegramConfig.glassOn;
 
         final boolean glassSettingsInvalidated = glassSettings == null
             || glassSettings.isBlurEnabled != isBlurEnabled

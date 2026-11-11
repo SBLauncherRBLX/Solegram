@@ -351,7 +351,6 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         return extraHeight;
     }
     // the menu's bubble changing between a circle and a capsule
-    private boolean solegramCapsule;
     private org.telegram.ui.Components.AnimatedFloat solegramBubbleMorph;
     private float solegramMorphFromLeft, solegramMorphFromRight;
     private BlurredBackgroundDrawableViewFactory solegramMenuFactory;
@@ -406,20 +405,30 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             return; // its menu grows out of it: the overlay draws the bubble meanwhile
         }
         if (!solegramButtonsGlass || glassDrawableMenu == null || menu == null || glassOnlyBack || doNotDrawGlassMenu) {
+            solegramClipSearchField(null, 0, 0);
             return;
         }
+        // an open search field sits in this bubble: the bubble stretches out of the buttons over the field and
+        // shrinks back into them when it closes, as the search of Telegram 13.2 grows out of its button
+        final View field = solegramSearchFrame();
+        final boolean searchShape = field != null && isSearchFieldVisible;
+        final boolean searchMorph = field != null || solegramMorphFromSearch && solegramBubbleMorph != null && solegramBubbleMorph.isInProgress();
         // when the selection bar fades the menu itself, the bubble (drawn in the menu) already fades with it
-        float alpha = (menu.getAlpha() < 1f ? 1f : 1f - solegramActionModeFactor()) * (1f - searchFieldVisibleAlpha) * solegramMenuGlassAlpha
-            * (hasForcedMenuWidth ? 1f : animatorHasMenuItems.getFloatValue());
+        float alpha = (menu.getAlpha() < 1f ? 1f : 1f - solegramActionModeFactor()) * (searchMorph ? 1f : 1f - searchFieldVisibleAlpha) * solegramMenuGlassAlpha
+            * (hasForcedMenuWidth || searchMorph ? 1f : animatorHasMenuItems.getFloatValue());
         final int menuWidth = solegramMenuWidth();
-        if (alpha <= 0f || menuWidth <= 0) {
+        if (alpha <= 0f || menuWidth <= 0 && !searchMorph) {
+            solegramClipSearchField(null, 0, 0);
             return;
         }
-        float left = Float.POSITIVE_INFINITY, right = Float.NEGATIVE_INFINITY;
+        float left = Float.POSITIVE_INFINITY, right = Float.NEGATIVE_INFINITY, anyRight = Float.NEGATIVE_INFINITY;
         boolean textLeft = false, textRight = false;
         float buttonsAlpha = 0f;
         for (int i = 0, n = menu.getChildCount(); i < n; i++) {
             final View child = menu.getChildAt(i);
+            if (child != field && child.getVisibility() == VISIBLE && child.getWidth() > 0) {
+                anyRight = Math.max(anyRight, child.getRight());
+            }
             if (solegramShown(child)) {
                 final boolean text = child instanceof ActionBarMenuItem && ((ActionBarMenuItem) child).getTextView() != null;
                 if (child.getRight() > right) {
@@ -433,17 +442,29 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                 buttonsAlpha = Math.max(buttonsAlpha, child.getAlpha());
             }
         }
-        if (right == Float.NEGATIVE_INFINITY) {
+        if (right == Float.NEGATIVE_INFINITY && !searchShape) {
+            solegramClipSearchField(null, 0, 0);
             return;
         }
-        alpha *= Math.min(1f, buttonsAlpha); // the bubble fades with its buttons
+        alpha *= searchMorph ? 1f : Math.min(1f, buttonsAlpha); // the bubble fades with its buttons
         final int p = dp(6);
         final int s = dp(46);
         // the row of buttons in the bar, in the menu's coordinates
         final int t = (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0) + (getCurrentActionBarHeight() - s) / 2 - p - (int) menu.getY();
-        final boolean capsule = textLeft || textRight;
+        final int shape;
         int boundsLeft, boundsRight;
-        if (capsule) {
+        if (searchShape) {
+            shape = SOLEGRAM_SHAPE_SEARCH;
+            // from the back button's bubble (with a gap) to the last button: the buttons that stay beside the field
+            // (with hidden icons) and its clear button are in it
+            final int back = backButtonImageView != null && backButtonImageView.getVisibility() == VISIBLE
+                ? s + p + dp(6) : dp(10);
+            final int l = Math.max(field.getLeft() - dp(8), (int) (back - menu.getX()));
+            final int r = (int) Math.max(field.getRight(), anyRight) - dp(SOLEGRAM_BUBBLE_INSET);
+            boundsLeft = l - p;
+            boundsRight = Math.max(r, l + s) + p;
+        } else if (textLeft || textRight) {
+            shape = SOLEGRAM_SHAPE_CAPSULE;
             // a word ("Save", "Done") gets a capsule round it with even room on both sides, not an icon's circle
             final int textPad = dp(10);
             int l = (int) left + (textLeft ? -textPad : dp(SOLEGRAM_BUBBLE_INSET));
@@ -456,19 +477,33 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             boundsLeft = l - p;
             boundsRight = r + p;
         } else {
+            shape = SOLEGRAM_SHAPE_BUTTONS;
             boundsRight = (int) right - dp(SOLEGRAM_BUBBLE_INSET) + p;
             boundsLeft = boundsRight - Math.max(s, menuWidth) - p * 2;
         }
-        // a circle turning into a capsule (a word appears among the buttons) and back changes shape smoothly
-        if (capsule != solegramCapsule) {
-            solegramCapsule = capsule;
+        // a circle turning into a capsule (a word appears among the buttons), the buttons stretching into the search
+        // field, and back: the bubble changes shape smoothly
+        if (shape != solegramBubbleShape) {
+            final boolean wasSearch = solegramBubbleShape == SOLEGRAM_SHAPE_SEARCH;
+            solegramBubbleShape = shape;
             final android.graphics.Rect was = glassDrawableMenu.getBounds();
-            if (!was.isEmpty() && glassDrawableMenu.getAlpha() > 0) {
-                solegramMorphFromLeft = was.left;
-                solegramMorphFromRight = was.right;
+            final boolean search = wasSearch || shape == SOLEGRAM_SHAPE_SEARCH;
+            final boolean drawn = !was.isEmpty() && glassDrawableMenu.getAlpha() > 0;
+            if (drawn || search) {
+                if (drawn) {
+                    // from where it is drawn now, also when it turns back halfway
+                    solegramMorphFromLeft = was.left;
+                    solegramMorphFromRight = was.right;
+                } else {
+                    // a bar with no bubble yet: the search field still grows out of a button-sized one at its end
+                    solegramMorphFromLeft = boundsRight - s - p * 2;
+                    solegramMorphFromRight = boundsRight;
+                }
                 if (solegramBubbleMorph == null) {
                     solegramBubbleMorph = new org.telegram.ui.Components.AnimatedFloat(menu, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
                 }
+                solegramBubbleMorph.setDuration(search ? 420 : 320);
+                solegramMorphFromSearch = search;
                 solegramBubbleMorph.set(0f, true);
             }
         }
@@ -480,6 +515,11 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             }
         }
         glassDrawableMenu.setBounds(boundsLeft, t, boundsRight, t + s + p * 2);
+        if (solegramActionModeFactor() <= 0f && !searchMorph) {
+            solegramMenuBubbleFrom.set(boundsLeft, t, boundsRight, t + s + p * 2);
+        }
+        // the field shows only inside the bubble, so it comes out of the button with it
+        solegramClipSearchField(field, boundsLeft + p, boundsRight - p);
         if (solegramManualGlassOffset) {
             glassDrawableMenu.setSourceOffset(getX() + menu.getX(), getY() + menu.getY());
         }
@@ -490,6 +530,140 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         // fluid touch moves the whole menu (its buttons share this bubble): the bubble goes with it, and the glass
         // follows the menu's real position, so what it shows keeps changing as it moves
         glassDrawableMenu.draw(canvas);
+    }
+
+    private BlurredBackgroundDrawable solegramActionBackGlass, solegramActionMenuGlass;
+
+    boolean solegramIsActionMode(ActionBarMenu menu) {
+        return menu != null && menu == actionMode;
+    }
+    private final android.graphics.Rect solegramMenuBubbleFrom = new android.graphics.Rect();
+
+    /**
+     * Solegram: bubbles of the selection bar, drawn by it over its own panel (in its coordinates): one under the
+     * close button and one round its buttons. The latter grows out of the header's bubble as the bar comes in and
+     * goes back into it, so the buttons look like they change, not like a second bar crossfading in.
+     */
+    void solegramDrawActionModeBubbles(Canvas canvas) {
+        if (!solegramButtonsGlass || solegramMenuFactory == null || actionMode == null || glassOnlyBack) {
+            return;
+        }
+        final float factor = solegramActionModeFactor();
+        if (factor <= 0f) {
+            return;
+        }
+        final int p = dp(6);
+        final int s = dp(46);
+        final float ox = actionMode.getX();
+        final float oy = actionMode.getY();
+        final int t = (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0) + (getCurrentActionBarHeight() - s) / 2 - p - (int) oy;
+        final int b = t + s + p * 2;
+        if (backButtonImageView != null && backButtonImageView.getVisibility() == VISIBLE && backButtonImageView.getAlpha() > 0.02f) {
+            if (solegramActionBackGlass == null) {
+                solegramActionBackGlass = solegramMenuFactory.create(actionMode)
+                    .setColorProvider(solegramMenuColors)
+                    .setRadius(dp(23))
+                    .setPadding(p);
+            }
+            solegramActionBackGlass.setBounds((int) -ox, t, (int) (s + p * 2 - ox), b);
+            if (solegramManualGlassOffset) {
+                solegramActionBackGlass.setSourceOffset(getX() + ox, getY() + oy);
+            }
+            final int alpha255 = (int) (255 * backButtonImageView.getAlpha());
+            if (solegramActionBackGlass.getAlpha() != alpha255) {
+                solegramActionBackGlass.setAlpha(alpha255);
+            }
+            solegramDrawFluid(canvas, solegramActionBackGlass, backButtonImageView);
+        }
+        float left = Float.POSITIVE_INFINITY, right = Float.NEGATIVE_INFINITY;
+        boolean textLeft = false, textRight = false;
+        for (int i = 0, n = actionMode.getChildCount(); i < n; i++) {
+            final View child = actionMode.getChildAt(i);
+            if (!(child instanceof ActionBarMenuItem) || !solegramShown(child)) {
+                continue; // the counter and other views of the bar are not buttons
+            }
+            final boolean text = ((ActionBarMenuItem) child).getTextView() != null;
+            if (child.getRight() > right) {
+                right = child.getRight();
+                textRight = text;
+            }
+            if (child.getLeft() < left) {
+                left = child.getLeft();
+                textLeft = text;
+            }
+        }
+        if (right == Float.NEGATIVE_INFINITY) {
+            return;
+        }
+        final int textPad = dp(10);
+        int l = (int) left + (textLeft ? -textPad : dp(SOLEGRAM_BUBBLE_INSET));
+        int r = (int) right + (textRight ? textPad : -dp(SOLEGRAM_BUBBLE_INSET));
+        if (r - l < s) {
+            final int grow = (s - (r - l) + 1) / 2;
+            l -= grow;
+            r += grow;
+        }
+        int boundsLeft = l - p, boundsRight = r + p;
+        // out of the header's bubble (where it was last drawn), back into it as the bar goes
+        if (factor < 1f && glassDrawableMenu != null && menu != null && !solegramMenuBubbleFrom.isEmpty()) {
+            final float k = CubicBezierInterpolator.EASE_OUT.getInterpolation(factor);
+            final float dx = menu.getX() - ox;
+            boundsLeft = (int) AndroidUtilities.lerp(solegramMenuBubbleFrom.left + dx, boundsLeft, k);
+            boundsRight = (int) AndroidUtilities.lerp(solegramMenuBubbleFrom.right + dx, boundsRight, k);
+        }
+        if (solegramActionMenuGlass == null) {
+            solegramActionMenuGlass = solegramMenuFactory.create(actionMode)
+                .setColorProvider(solegramMenuColors)
+                .setRadius(dp(23))
+                .setPadding(p);
+        }
+        solegramActionMenuGlass.setBounds(boundsLeft, t, boundsRight, b);
+        if (solegramManualGlassOffset) {
+            solegramActionMenuGlass.setSourceOffset(getX() + ox, getY() + oy);
+        }
+        solegramActionMenuGlass.draw(canvas);
+    }
+
+    private static final int SOLEGRAM_SHAPE_BUTTONS = 0, SOLEGRAM_SHAPE_CAPSULE = 1, SOLEGRAM_SHAPE_SEARCH = 2;
+    private int solegramBubbleShape;
+    private boolean solegramMorphFromSearch;
+    private View solegramClippedField;
+    private final android.graphics.Rect solegramFieldClip = new android.graphics.Rect();
+
+    /** Solegram: the frame of this bar's search field while it shows (also while it fades away), else null. */
+    private View solegramSearchFrame() {
+        if (menu == null) {
+            return null;
+        }
+        for (int i = 0, n = menu.getChildCount(); i < n; i++) {
+            final View child = menu.getChildAt(i);
+            if (child instanceof ActionBarMenuItem) {
+                final View frame = ((ActionBarMenuItem) child).solegramSearchFrame();
+                if (frame != null) {
+                    return frame;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Solegram: lets the search field show only between these edges of the menu (null field: no clip). */
+    private void solegramClipSearchField(View field, int left, int right) {
+        if (solegramClippedField != null && solegramClippedField != field) {
+            solegramClippedField.setClipBounds(null);
+            solegramClippedField = null;
+        }
+        if (field == null) {
+            return;
+        }
+        // in the field's own coordinates: it may still be sliding in
+        final int x = (int) field.getX();
+        solegramFieldClip.set(left - x, 0, Math.max(left, right) - x, field.getHeight());
+        final android.graphics.Rect now = field.getClipBounds();
+        if (now == null || !now.equals(solegramFieldClip)) {
+            field.setClipBounds(solegramFieldClip);
+        }
+        solegramClippedField = field;
     }
 
     /**
@@ -631,8 +805,12 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     public org.telegram.messenger.Utilities.Callback0Return<SimpleActionBarMenuOverlay> solegramMenuOverlayProvider;
 
     /** Solegram: a menu of this bar can grow out of its glass (the bar has glass buttons). */
+    /**
+     * Solegram: its menus can grow out of its glass in the screen's overlay - a bar whose glass sees the screen. The
+     * tonal bubbles of an ordinary header see nothing (a veil of a colour): their menus stay live glass popups.
+     */
     public boolean solegramHasMenuGlass() {
-        return glassFactory != null;
+        return glassFactory != null && !solegramTonal;
     }
 
     private BlurredBackgroundDrawableViewFactory glassFactory;
@@ -701,6 +879,25 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     @Override
     public boolean getMenuItemGlassRect(ActionBarMenuItem item, RectF out) {
         final int p = dp(6);
+        if (solegramButtonsGlass) {
+            // Solegram: the bubble is drawn by the menu, its bounds are in the menu's coordinates, not the bar's
+            if (item.getParent() == menu && glassDrawableMenu != null && menu != null && !doNotDrawGlassMenu && !glassOnlyBack
+                    && solegramBubbleShape != SOLEGRAM_SHAPE_SEARCH && solegramActionModeFactor() == 0
+                    && !glassDrawableMenu.getBounds().isEmpty() && glassDrawableMenu.getAlpha() > 0) {
+                out.set(glassDrawableMenu.getBounds());
+                out.offset(menu.getX(), menu.getY());
+                out.inset(p, p);
+                return true;
+            }
+            // a button of the selection bar (or a bar without its bubble): a circle round it, on the row of buttons
+            final int s = dp(46);
+            final float half = s / 2f;
+            final View itemMenu = (View) item.getParent();
+            final float cx = (itemMenu != null ? itemMenu.getX() : 0) + item.getX() + item.getWidth() / 2f;
+            final float cy = (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0) + getCurrentActionBarHeight() / 2f;
+            out.set(cx - half, cy - half, cx + half, cy + half);
+            return false;
+        }
         if (item.getParent() == menu && glassDrawableMenu != null && !doNotDrawGlassMenu && !glassOnlyBack
                 && searchFactor == 0 && getActionModeFactor() == 0 && !glassDrawableMenu.getBounds().isEmpty()) {
             out.set(glassDrawableMenu.getBounds());
@@ -2960,9 +3157,10 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
             }
         }
 
-        // Solegram: the back button's bubble, over the header's own panel; it gives way to the selection bar and the search field
+        // Solegram: the back button's bubble, over the header's own panel; it gives way to the selection bar
         if (solegramButtonsGlass && glassDrawableBack != null && hasBackButton) {
-            final float alpha = (1f - solegramActionModeFactor()) * (1f - searchFieldVisibleAlpha) * backButtonImageView.getAlpha();
+            // it stays while the search is open: the search field's bubble stretches up to it
+            final float alpha = (1f - solegramActionModeFactor()) * (solegramSearchFrame() != null ? 1f : 1f - searchFieldVisibleAlpha) * backButtonImageView.getAlpha();
             if (alpha > 0) {
                 glassDrawableBack.setBounds(0, t, s + p * 2, b);
                 if (solegramManualGlassOffset) {

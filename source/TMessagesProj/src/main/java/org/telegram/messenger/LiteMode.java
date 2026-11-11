@@ -340,6 +340,12 @@ public class LiteMode {
         }
         int prevValue = value;
         value = preferences.getInt("lite_mode6", defaultValue);
+        if (Build.VERSION.SDK_INT >= 33 && !preferences.getBoolean("sg_liquid_glass_on", false)) {
+            // Solegram: once, the liquid glass back on for those whose Telegram migration (lite_mode5 -> 6) took it away;
+            // the lite mode's switch keeps working after that
+            value |= FLAG_LIQUID_GLASS;
+            preferences.edit().putInt("lite_mode6", value).putBoolean("sg_liquid_glass_on", true).apply();
+        }
         if (loaded) {
             onFlagsUpdate(prevValue, value);
         }
