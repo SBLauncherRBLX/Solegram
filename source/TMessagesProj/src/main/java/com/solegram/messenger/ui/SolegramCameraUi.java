@@ -67,7 +67,7 @@ import org.telegram.ui.Components.blur3.RenderNodeWithHash;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
 import java.util.ArrayList;
@@ -783,13 +783,13 @@ public final class SolegramCameraUi {
      * by every button as the glass in chats is.
      */
     private final class Glass {
-        private final BlurredBackgroundSourceRenderNode source;
+        private final GlassSourceRenderNode source;
         private final BlurredBackgroundDrawableViewFactory factory;
         private final BlurredBackgroundProvider provider;
         private final Matrix tmpMatrix = new Matrix();
 
         Glass() {
-            source = new BlurredBackgroundSourceRenderNode(null);
+            source = new GlassSourceRenderNode(null);
             source.setupRenderer(new RenderNodeWithHash.Renderer() {
                 @Override
                 public void renderNodeUpdateDisplayList(Canvas canvas) {

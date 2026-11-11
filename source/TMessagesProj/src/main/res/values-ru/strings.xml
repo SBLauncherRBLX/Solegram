@@ -2104,5 +2104,8 @@
     <string name="SG_ProfileMusicInfo">Песня, закреплённая в профиле Telegram, показывается отдельной карточкой с обложкой. Нажмите на карточку, чтобы слушать, или на кнопку, чтобы поставить на паузу. Добавить песню в свой профиль можно в плеере: «⋮» → «Добавить в профиль».</string>
     <string name="SG_ProfileMusicPreviewInfo">Так музыка выглядит в профилях. Если в вашем профиле есть песня, здесь показана она — нажмите, чтобы послушать.</string>
     <string name="SG_ProfileMusicSampleTitle">Рассвет</string>
+    <string name="SG_CallQuickReply1">Не могу говорить. Что случилось?</string>
+    <string name="SG_CallQuickReply2">Сейчас перезвоню.</string>
+    <string name="SG_CallQuickReply3">Перезвоню позже.</string>
     <!-- SOLEGRAM END -->
 </resources>

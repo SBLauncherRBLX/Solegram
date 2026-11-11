@@ -42,8 +42,8 @@ import org.telegram.ui.ActionIntroActivity;
 import org.telegram.ui.ChannelCreateActivity;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.ContactsActivity;
 import org.telegram.ui.GroupCreateActivity;
 
@@ -141,7 +141,7 @@ public class SolegramCreateChain {
     // glass
     @Nullable
     private final BlurredBackgroundDrawable liveDrawable;
-    private final BlurredBackgroundSourceColor colorSource;
+    private final GlassSourceColor colorSource;
     private final Paint colorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final SolegramLiquid.GlassFill fill = this::fillGlass;
     private float fillOffsetY;
@@ -159,7 +159,7 @@ public class SolegramCreateChain {
      *                   colour of {@code colorSource}, as the tab bar has it
      */
     public SolegramCreateChain(Context context, Delegate delegate, Theme.ResourcesProvider resourcesProvider,
-                               @Nullable BlurredBackgroundSourceRenderNode liveSource, BlurredBackgroundSourceColor colorSource) {
+                               @Nullable GlassSourceRenderNode liveSource, GlassSourceColor colorSource) {
         this.delegate = delegate;
         this.resourcesProvider = resourcesProvider;
         this.colorSource = colorSource;

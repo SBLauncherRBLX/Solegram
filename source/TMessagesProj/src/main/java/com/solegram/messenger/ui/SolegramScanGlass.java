@@ -30,7 +30,7 @@ import org.telegram.ui.Components.blur3.RenderNodeWithHash;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
 /**
@@ -49,7 +49,7 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
     private final ViewGroup root;
     private final CameraSource cameraSource;
     @Nullable
-    private BlurredBackgroundSourceRenderNode source;
+    private GlassSourceRenderNode source;
     @Nullable
     private BlurredBackgroundDrawableViewFactory factory;
     @Nullable
@@ -113,7 +113,7 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
     }
 
     private void build() {
-        source = new BlurredBackgroundSourceRenderNode(null);
+        source = new GlassSourceRenderNode(null);
         source.setupRenderer(new RenderNodeWithHash.Renderer() {
             @Override
             public void renderNodeUpdateDisplayList(Canvas canvas) {

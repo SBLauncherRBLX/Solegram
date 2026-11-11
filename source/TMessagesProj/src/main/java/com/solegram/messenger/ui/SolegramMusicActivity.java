@@ -82,8 +82,8 @@ public class SolegramMusicActivity extends BaseFragment implements NotificationC
     // the glass of the tab bar and the header sees this list (the same scheme as the other main tabs)
     private final int ADDITIONAL_LIST_HEIGHT_DP = android.os.Build.VERSION.SDK_INT >= 31 ? 48 : 0;
     private final @androidx.annotation.Nullable org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor scrollableViewNoiseSuppressor;
-    private final @androidx.annotation.Nullable org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode iBlur3SourceGlassFrosted;
-    private final @androidx.annotation.Nullable org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode iBlur3SourceGlass;
+    private final @androidx.annotation.Nullable org.telegram.utils.glass.source.GlassSourceRenderNode iBlur3SourceGlassFrosted;
+    private final @androidx.annotation.Nullable org.telegram.utils.glass.source.GlassSourceRenderNode iBlur3SourceGlass;
     private org.telegram.ui.Components.blur3.capture.IBlur3Capture iBlur3Capture;
     private SolegramFloatingHeader headerFade;
     private org.telegram.ui.Components.SizeNotifierFrameLayout contentView;
@@ -95,8 +95,8 @@ public class SolegramMusicActivity extends BaseFragment implements NotificationC
         super(args);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             scrollableViewNoiseSuppressor = new org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor();
-            iBlur3SourceGlassFrosted = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode(null);
-            iBlur3SourceGlass = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode(null);
+            iBlur3SourceGlassFrosted = new org.telegram.utils.glass.source.GlassSourceRenderNode(null);
+            iBlur3SourceGlass = new org.telegram.utils.glass.source.GlassSourceRenderNode(null);
         } else {
             scrollableViewNoiseSuppressor = null;
             iBlur3SourceGlassFrosted = null;
@@ -121,7 +121,7 @@ public class SolegramMusicActivity extends BaseFragment implements NotificationC
     }
 
     @Override
-    public org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode getGlassSource() {
+    public org.telegram.utils.glass.source.GlassSourceRenderNode getGlassSource() {
         return iBlur3SourceGlass;
     }
 

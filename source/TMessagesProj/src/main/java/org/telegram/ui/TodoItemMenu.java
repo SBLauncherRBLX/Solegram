@@ -60,6 +60,7 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Cells.BaseCell;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
@@ -78,7 +79,7 @@ import org.telegram.ui.Components.ScrimOptions;
 import org.telegram.ui.Components.ViewPagerFixed;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceBitmap;
+import org.telegram.utils.glass.source.GlassSourceBitmap;
 import org.telegram.ui.Components.blur3.utils.Blur3Utils;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
@@ -107,7 +108,7 @@ public class TodoItemMenu extends Dialog {
     private float openProgress;
     private float openProgress2;
 
-    private final BlurredBackgroundSourceBitmap iBlur3SourceBitmap;
+    private final GlassSourceBitmap iBlur3SourceBitmap;
     private final BlurredBackgroundDrawableViewFactory iBlur3Factory;
 
     public TodoItemMenu(Context context, Theme.ResourcesProvider resourcesProvider) {
@@ -164,9 +165,8 @@ public class TodoItemMenu extends Dialog {
             dismiss();
         });
 
-        iBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
-        // Solegram: its menus are live glass, frosted like the blurred backdrop round them (Telegram's picture without it)
-        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
+        iBlur3SourceBitmap = new GlassSourceBitmap();
+        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED); // Solegram: live glass, frosted like the backdrop
         iBlur3Factory.setSourceRootView(new ViewPositionWatcher(windowView), windowView);
 
         containerView = new FrameLayout(context) {
@@ -603,7 +603,7 @@ public class TodoItemMenu extends Dialog {
             FrameLayout backContainer = new FrameLayout(getContext());
 
             LinearLayout linearLayout = new LinearLayout(getContext());
-            linearLayout.setBackgroundColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
+            ThemeBind.backgroundColor(linearLayout, Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider);
             linearLayout.setOrientation(LinearLayout.VERTICAL);
             RecyclerListView listView2 = finalMessageSeenView.createListView();
             backContainer.addView(cell);

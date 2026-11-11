@@ -1743,11 +1743,11 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
          * screen with a clear header (the picture is the page under the header, taken again as it scrolls).
          */
         static void setupHeaderGlass(ActionBar actionBar, FrameLayout root, int pageColor, Theme.ResourcesProvider resourcesProvider) {
-            final org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor colorSource = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor();
+            final org.telegram.utils.glass.source.GlassSourceColor colorSource = new org.telegram.utils.glass.source.GlassSourceColor();
             colorSource.setColor(pageColor);
-            org.telegram.ui.Components.blur3.source.BlurredBackgroundSource glass = colorSource;
+            org.telegram.utils.glass.source.GlassSource glass = colorSource;
             if (android.os.Build.VERSION.SDK_INT >= 31) {
-                final org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode source = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode(null);
+                final org.telegram.utils.glass.source.GlassSourceRenderNode source = new org.telegram.utils.glass.source.GlassSourceRenderNode(null);
                 source.setupRenderer(new org.telegram.ui.Components.blur3.RenderNodeWithHash.Renderer() {
                     @Override
                     public void renderNodeUpdateDisplayList(Canvas canvas) {

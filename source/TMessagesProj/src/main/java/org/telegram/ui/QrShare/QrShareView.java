@@ -21,7 +21,6 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.SweepGradient;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -2432,8 +2431,6 @@ public class QrShareView extends View {
 
     // --- pattern field
 
-    private final java.util.ArrayList<android.graphics.Rect> exclusion = new java.util.ArrayList<>();
-
     /** The system bars over this view: none where the screen is not under them (a tablet shows it as a floating layer). */
     private int insetTop = AndroidUtilities.statusBarHeight, insetBottom = AndroidUtilities.navigationBarHeight;
 
@@ -2466,15 +2463,6 @@ public class QrShareView extends View {
         // at inset + bar / 2 − 20dp; the share button 22dp from the side, its bottom at inset + 20dp
         insetTop = Math.max(insetTop(this), dp(9) + dp(20) - ActionBar.getCurrentActionBarHeight() / 2);
         insetBottom = Math.max(insetBottom(this), dp(22) - dp(20));
-        if (Build.VERSION.SDK_INT >= 29 && changed) {
-            // the system back gesture must not steal backdrop drags: exclude 200dp (the system cap) on both edges,
-            // centred on the QR card where the backdrop is usually dragged
-            final int w = r - l, cy = (int) (cardTop() + cardH() / 2f), half = dp(100), edge = dp(24);
-            exclusion.clear();
-            exclusion.add(new android.graphics.Rect(0, cy - half, edge, cy + half));
-            exclusion.add(new android.graphics.Rect(w - edge, cy - half, w, cy + half));
-            setSystemGestureExclusionRects(exclusion);
-        }
     }
 
     @Override
@@ -4582,12 +4570,9 @@ public class QrShareView extends View {
             final android.graphics.RenderNode node = (android.graphics.RenderNode) e[0];
             final org.telegram.ui.Components.blur3.LiquidGlassEffect fx = (org.telegram.ui.Components.blur3.LiquidGlassEffect) e[1];
             node.setPosition(0, 0, w, h);
-            final int thickness = Math.max(1, (int) Math.min(com.solegram.messenger.SolegramGlass.thickness(dp(11)),
-                com.solegram.messenger.SolegramGlass.thicknessLimit(Math.min(w, h))));
+            final int thickness = dp(11); // the glass settings are applied by LiquidGlassEffect
             final float rr = Math.min(radius, Math.min(w, h) / 2f);
-            fx.update(0, 0, w, h, rr, rr, rr, rr, thickness,
-                com.solegram.messenger.SolegramGlass.intensity(0.75f), com.solegram.messenger.SolegramGlass.index(1.5f),
-                light ? 0x14000000 : 0x2EFFFFFF);
+            fx.update(w, h, 0, 0, rr, rr, rr, rr, thickness, 0.75f, 1.5f, light ? 0x14000000 : 0x2EFFFFFF, 0, 0, 1);
             // the sharp backdrop under the glass (as Solegram's glass: refraction, no blur)
             final android.graphics.RecordingCanvas rc = node.beginRecording(w, h);
             rc.translate(-r.left, -r.top);
@@ -4982,7 +4967,7 @@ public class QrShareView extends View {
         super.onAttachedToWindow();
         prepareCardShadow(); // ready before the open's first frame
         prewarmIslandColors(); // the packs island colours for all the backdrops, ahead of any open
-        org.telegram.messenger.NotificationCenter.getInstance(currentAccount).addObserver(giftsObserver, org.telegram.messenger.NotificationCenter.starUserGiftsLoaded);
+        org.telegram.messenger.NotificationCenter.getInstance(currentAccount).addWeakObserver(giftsObserver, org.telegram.messenger.NotificationCenter.starUserGiftsLoaded);
         loadGifts(); // pages that came while detached
         sensors = (android.hardware.SensorManager) getContext().getSystemService(Context.SENSOR_SERVICE);
         final android.hardware.Sensor g = sensors != null ? sensors.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY) : null;

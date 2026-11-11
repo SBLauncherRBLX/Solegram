@@ -50,12 +50,11 @@ import org.telegram.ui.Components.PipRoundVideoView;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
-import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawableRenderNode;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSource;
+import org.telegram.utils.glass.source.GlassSource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +73,7 @@ import java.util.List;
  * read (a window that isn't a host, a SurfaceView or WebView whose position or functor must stay in one window),
  * popups keep their plain look.
  */
-public final class SolegramLiveGlass implements BlurredBackgroundSource, View.OnAttachStateChangeListener, ViewTreeObserver.OnPreDrawListener {
+public final class SolegramLiveGlass implements GlassSource, org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory.DrawableOwner, View.OnAttachStateChangeListener, ViewTreeObserver.OnPreDrawListener {
 
     /** The glass of the chat's floating controls: a light blur, the refraction shows. */
     public static final int CLEAR = 0;
@@ -488,13 +487,13 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
         }
     }
 
-    public final BlurredBackgroundDrawableRenderNode drawable;
+    public final BlurredBackgroundDrawable drawable;
     private final View owner;
     private final int recipe;
     @Nullable
     private final Host partHost;
     @Nullable
-    private BlurredBackgroundSource fallback;
+    private GlassSource fallback;
     @Nullable
     private View fallbackRef;
 
@@ -519,7 +518,7 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
         this.recipe = recipe;
         this.partHost = partHost;
         blurNode = new RenderNode("SolegramLiveGlass");
-        drawable = new BlurredBackgroundDrawableRenderNode(this);
+        drawable = new BlurredBackgroundDrawable(this);
         drawable.setLiquidGlassEffectAllowed(); // Telegram's liquid glass shader, with the glass settings (SolegramGlass)
         owner.addOnAttachStateChangeListener(this);
         if (owner.isAttachedToWindow()) {
@@ -531,7 +530,7 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
      * Drawn in place of the live picture when there is none (Telegram's own blurred picture of its scrim menus):
      * {@code ref} is the view its coordinates are relative to.
      */
-    public void setFallback(@Nullable BlurredBackgroundSource fallback, @Nullable View ref) {
+    public void setFallback(@Nullable GlassSource fallback, @Nullable View ref) {
         this.fallback = fallback;
         this.fallbackRef = ref;
     }
@@ -979,12 +978,12 @@ public final class SolegramLiveGlass implements BlurredBackgroundSource, View.On
      * them, refracting at the rim.
      */
     public static class Factory extends BlurredBackgroundDrawableViewFactory {
-        private final BlurredBackgroundSource fallbackSource;
+        private final GlassSource fallbackSource;
         private final int recipe;
         @Nullable
         private View ref;
 
-        public Factory(BlurredBackgroundSource source, int recipe) {
+        public Factory(GlassSource source, int recipe) {
             super(source);
             this.fallbackSource = source;
             this.recipe = recipe;

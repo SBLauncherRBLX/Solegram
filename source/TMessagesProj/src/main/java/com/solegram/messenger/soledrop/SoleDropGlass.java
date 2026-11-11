@@ -32,7 +32,7 @@ import org.telegram.ui.Components.blur3.capture.IBlur3Hash;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProviderBuilder;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
 /**
@@ -44,7 +44,7 @@ import org.telegram.ui.Components.chat.ViewPositionWatcher;
 final class SoleDropGlass {
 
     @Nullable
-    private final BlurredBackgroundSourceRenderNode source;
+    private final GlassSourceRenderNode source;
     @Nullable
     private final BlurredBackgroundDrawableViewFactory factory;
     private final SoleDropStage stage;
@@ -69,7 +69,7 @@ final class SoleDropGlass {
             .setStrokeWidth(dpf2(1f), dpf2(0.8f))
             .build();
         if (Build.VERSION.SDK_INT >= 31) {
-            source = new BlurredBackgroundSourceRenderNode(null);
+            source = new GlassSourceRenderNode(null);
             source.setupRenderer(new RenderNodeWithHash.Renderer() {
                 @Override
                 public void renderNodeUpdateDisplayList(Canvas canvas) {

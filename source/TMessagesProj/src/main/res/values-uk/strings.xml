@@ -2117,5 +2117,8 @@
     <string name="SG_ProfileMusicInfo">The song pinned to a Telegram profile is shown as a card of its own, with its cover. Tap the card to listen, or the button to pause. To put a song on your profile, use the player: ⋮ → Add to Profile.</string>
     <string name="SG_ProfileMusicPreviewInfo">This is how music looks on profiles. If your profile has a song, it is shown here: tap to listen.</string>
     <string name="SG_ProfileMusicSampleTitle">Sunrise</string>
+    <string name="SG_CallQuickReply1">Can\'t talk now. What\'s up?</string>
+    <string name="SG_CallQuickReply2">I\'ll call you right back.</string>
+    <string name="SG_CallQuickReply3">I\'ll call you later.</string>
     <!-- SOLEGRAM END -->
 </resources>

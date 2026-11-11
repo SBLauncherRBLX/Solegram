@@ -44,8 +44,8 @@ import org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor;
 import org.telegram.ui.Components.blur3.ViewGroupPartRenderer;
 import org.telegram.ui.Components.blur3.capture.IBlur3Capture;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
 import java.util.ArrayList;
@@ -66,8 +66,8 @@ public class SolegramGlassPreview extends FrameLayout {
     private final ActionBar actionBar;
     private final FragmentSearchField searchField;
     private final ViewPositionWatcher positionWatcher;
-    private final BlurredBackgroundSourceColor sourceColor = new BlurredBackgroundSourceColor();
-    private final BlurredBackgroundSourceRenderNode sourceGlass;
+    private final GlassSourceColor sourceColor = new GlassSourceColor();
+    private final GlassSourceRenderNode sourceGlass;
     private DownscaleScrollableNoiseSuppressor noiseSuppressor;
     private final IBlur3Capture capture;
     private final ArrayList<RectF> blurPositions = new ArrayList<>();
@@ -83,7 +83,7 @@ public class SolegramGlassPreview extends FrameLayout {
         setClipChildren(false);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            sourceGlass = new BlurredBackgroundSourceRenderNode(null);
+            sourceGlass = new GlassSourceRenderNode(null);
             noiseSuppressor = new DownscaleScrollableNoiseSuppressor();
         } else {
             sourceGlass = null;

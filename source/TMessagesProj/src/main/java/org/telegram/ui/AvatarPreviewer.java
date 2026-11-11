@@ -59,7 +59,7 @@ import org.telegram.ui.Components.RadialProgress2;
 import org.telegram.ui.Components.ScrimOptions;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceBitmap;
+import org.telegram.utils.glass.source.GlassSourceBitmap;
 import org.telegram.ui.Components.blur3.utils.Blur3Utils;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
@@ -384,7 +384,7 @@ public class AvatarPreviewer {
         private final ActionBarPopupWindow.ActionBarPopupWindowLayout menu;
         private final Callback callback;
         private final Theme.ResourcesProvider resourcesProvider;
-        private final BlurredBackgroundSourceBitmap iBlur3SourceBitmap = new BlurredBackgroundSourceBitmap();
+        private final GlassSourceBitmap iBlur3SourceBitmap = new GlassSourceBitmap();
         // Solegram: its menu is live glass, frosted like the blurred backdrop round it (Telegram's picture without it)
         private final BlurredBackgroundDrawableViewFactory iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED);
 
@@ -469,8 +469,8 @@ public class AvatarPreviewer {
         @Override
         protected void onAttachedToWindow() {
             super.onAttachedToWindow();
-            NotificationCenter.getInstance(UserConfig.selectedAccount).addObserver(this, NotificationCenter.fileLoaded);
-            NotificationCenter.getInstance(UserConfig.selectedAccount).addObserver(this, NotificationCenter.fileLoadProgressChanged);
+            NotificationCenter.getInstance(UserConfig.selectedAccount).addWeakObserver(this, NotificationCenter.fileLoaded);
+            NotificationCenter.getInstance(UserConfig.selectedAccount).addWeakObserver(this, NotificationCenter.fileLoadProgressChanged);
         }
 
         @Override

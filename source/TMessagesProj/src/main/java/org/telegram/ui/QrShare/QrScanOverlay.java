@@ -846,12 +846,9 @@ public final class QrScanOverlay extends FrameLayout {
             final android.graphics.RenderNode node = (android.graphics.RenderNode) e[0];
             final org.telegram.ui.Components.blur3.LiquidGlassEffect fx = (org.telegram.ui.Components.blur3.LiquidGlassEffect) e[1];
             node.setPosition(0, 0, w, h);
-            final int thickness = Math.max(1, (int) Math.min(com.solegram.messenger.SolegramGlass.thickness(dp(11)),
-                com.solegram.messenger.SolegramGlass.thicknessLimit(Math.min(w, h))));
+            final int thickness = dp(11); // the glass settings are applied by LiquidGlassEffect
             final float rr = Math.min(radius, Math.min(w, h) / 2f);
-            fx.update(0, 0, w, h, rr, rr, rr, rr, thickness,
-                com.solegram.messenger.SolegramGlass.intensity(0.75f), com.solegram.messenger.SolegramGlass.index(1.5f),
-                0x5C5C5C63);
+            fx.update(w, h, 0, 0, rr, rr, rr, rr, thickness, 0.75f, 1.5f, 0x5C5C5C63, 0, 0, 1);
             // the camera's sharp picture under the glass (refraction, no blur), as on Solegram's camera
             final android.view.TextureView texture = cameraView.getTextureView();
             if (texture == null || !texture.isAvailable()) {

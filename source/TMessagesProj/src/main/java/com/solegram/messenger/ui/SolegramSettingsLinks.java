@@ -49,6 +49,7 @@ public final class SolegramSettingsLinks {
         final ArrayList<Link> l = new ArrayList<>();
         switch (where) {
             case CHATS:
+                l.add(new Link(R.drawable.msg_theme, R.string.SG_Appearance, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_APPEARANCE))));
                 l.add(new Link(R.drawable.msg_customize, R.string.SG_GlassSettings, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_GLASS))));
                 l.add(new Link(R.drawable.msg_home, R.string.SG_MainScreen, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_MAIN_SCREEN))));
                 l.add(new Link(R.drawable.msg_discussion, R.string.SG_Chats, () -> f.presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_CHATS))));
@@ -95,11 +96,6 @@ public final class SolegramSettingsLinks {
         }
         column.addView(section);
         column.addView(new ShadowSectionCell(context, rp), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        if (where == CHATS) {
-            // Customization holds the Appearance settings themselves, not a link to them
-            column.addView(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_APPEARANCE).createEmbeddedList(f),
-                LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        }
         return column;
     }
 }

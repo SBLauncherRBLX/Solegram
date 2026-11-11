@@ -42,7 +42,10 @@ public class BuildVars {
     public static boolean IS_BILLING_UNAVAILABLE = true;
 
     // works only on official app ids, disable on your forks
-    public static boolean SUPPORTS_PASSKEYS = false;
+    public static boolean SUPPORTS_PASSKEYS = false; // Solegram: needs Google sign-in set up for its own package
+    // the second main tab: News, or Contacts as before them
+
+    public static boolean SUPPORTS_FPNV = false; // Solegram: SIM login needs Firebase, which Solegram does not use
 
     static {
         if (ApplicationLoader.applicationContext != null) {

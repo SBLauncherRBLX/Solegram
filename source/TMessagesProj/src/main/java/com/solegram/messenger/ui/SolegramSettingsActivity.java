@@ -3063,23 +3063,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         return embeddedHost != null ? embeddedHost : this;
     }
 
-    /**
-     * This page as a list inside another screen (the page is not opened itself): its rows, their switches and
-     * what they open work as on the page, through the host's navigation.
-     */
-    public View createEmbeddedList(org.telegram.ui.ActionBar.BaseFragment host) {
-        embeddedHost = host;
-        setParentLayout(host.getParentLayout());
-        listView = new org.telegram.ui.Components.UniversalRecyclerView(this, this::fillItems, this::onClick, this::onLongClick);
-        listView.setSections();
-        // the host's list scrolls; this one shows all its rows
-        listView.setNestedScrollingEnabled(false);
-        listView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        listView.setVerticalScrollBarEnabled(false);
-        listView.setLayoutParams(new androidx.recyclerview.widget.RecyclerView.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-        return listView;
-    }
-
     private void restartBulletin() {
         BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.info, getString(R.string.SG_RestartRequired), getString(R.string.SG_Restart), () -> Solegram.restartApp(getParentActivity())).show();
     }

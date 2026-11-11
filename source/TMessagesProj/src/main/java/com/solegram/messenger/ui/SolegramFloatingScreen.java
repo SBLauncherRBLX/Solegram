@@ -36,8 +36,8 @@ import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.RenderNodeWithHash;
 import org.telegram.ui.Components.blur3.capture.IBlur3Hash;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.DialogsActivity;
 
 /**
@@ -197,8 +197,8 @@ public class SolegramFloatingScreen {
     private final View scrollRoot;
     private final Theme.ResourcesProvider resourcesProvider;
     private final SolegramFloatingHeader fade = new SolegramFloatingHeader();
-    private final BlurredBackgroundSourceRenderNode source;
-    private final BlurredBackgroundSourceColor colorSource;
+    private final GlassSourceRenderNode source;
+    private final GlassSourceColor colorSource;
     private int paddingBase, paddingApplied = -1;
     private int lastPageColor;
     // full-height overlays and the top margins they had of their own / were given
@@ -216,7 +216,7 @@ public class SolegramFloatingScreen {
         this.resourcesProvider = fragment.getResourceProvider();
 
         if (Build.VERSION.SDK_INT >= 31) {
-            source = new BlurredBackgroundSourceRenderNode(null);
+            source = new GlassSourceRenderNode(null);
             source.setupRenderer(new RenderNodeWithHash.Renderer() {
                 @Override
                 public void renderNodeUpdateDisplayList(Canvas canvas) {
@@ -248,7 +248,7 @@ public class SolegramFloatingScreen {
             colorSource = null;
         } else {
             source = null;
-            colorSource = new BlurredBackgroundSourceColor();
+            colorSource = new GlassSourceColor();
         }
         final BlurredBackgroundDrawableViewFactory factory = new BlurredBackgroundDrawableViewFactory(source != null ? source : colorSource);
         factory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));

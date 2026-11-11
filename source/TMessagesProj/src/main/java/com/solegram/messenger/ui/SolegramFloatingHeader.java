@@ -25,8 +25,8 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSource;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
+import org.telegram.utils.glass.source.GlassSource;
+import org.telegram.utils.glass.source.GlassSourceColor;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 
 /**
@@ -47,12 +47,12 @@ public class SolegramFloatingHeader {
      * @param fallback colour of the glass without a picture
      * @param root     the screen's root view; the bubbles follow their position in it
      */
-    public static BlurredBackgroundDrawableViewFactory factory(@Nullable BlurredBackgroundSource glass, int fallback, ViewGroup root) {
-        final BlurredBackgroundSource source;
+    public static BlurredBackgroundDrawableViewFactory factory(@Nullable GlassSource glass, int fallback, ViewGroup root) {
+        final GlassSource source;
         if (glass != null) {
             source = glass;
         } else {
-            final BlurredBackgroundSourceColor color = new BlurredBackgroundSourceColor();
+            final GlassSourceColor color = new GlassSourceColor();
             color.setColor(fallback);
             source = color;
         }

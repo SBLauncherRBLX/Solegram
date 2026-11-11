@@ -43,8 +43,8 @@ import org.telegram.ui.Components.blur3.RenderNodeWithHash;
 import org.telegram.ui.Components.blur3.capture.IBlur3Hash;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 import org.telegram.ui.Components.voip.VoIpGradientLayout;
 
@@ -110,7 +110,7 @@ public class SolegramCallSheet extends FrameLayout {
     private final TextView replyLabel;
     private final TextView[] replyButtons = new TextView[3];
     private final BlurredBackgroundDrawable glass;
-    private final BlurredBackgroundSourceRenderNode liveSource;
+    private final GlassSourceRenderNode liveSource;
     private final Matrix tmpMatrix = new Matrix();
     private final float[] tmpValues = new float[9];
 
@@ -156,7 +156,7 @@ public class SolegramCallSheet extends FrameLayout {
         // the same glass as the tab bar: a live picture of the call screen under the sheet
         BlurredBackgroundDrawableViewFactory factory;
         if (Build.VERSION.SDK_INT >= 31) {
-            liveSource = new BlurredBackgroundSourceRenderNode(null);
+            liveSource = new GlassSourceRenderNode(null);
             liveSource.setupRenderer(new RenderNodeWithHash.Renderer() {
                 @Override
                 public void renderNodeUpdateDisplayList(Canvas canvas) {
@@ -180,7 +180,7 @@ public class SolegramCallSheet extends FrameLayout {
             factory = new BlurredBackgroundDrawableViewFactory(liveSource);
         } else {
             liveSource = null;
-            final BlurredBackgroundSourceColor color = new BlurredBackgroundSourceColor();
+            final GlassSourceColor color = new GlassSourceColor();
             color.setColor(0xFF1E2433);
             factory = new BlurredBackgroundDrawableViewFactory(color);
         }
