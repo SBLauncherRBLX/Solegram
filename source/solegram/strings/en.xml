@@ -435,7 +435,7 @@
     <string name="SG_HideAndDeclutter">Hide</string>
     <string name="SG_SettingsSearchPath">Solegram</string>
     <string name="SG_NowPlaying">Music</string>
-    <string name="SG_NowPlayingSub">Spotify and SoundCloud: what you listen to</string>
+    <string name="SG_NowPlayingSub">The player and music on profiles</string>
     <string name="SG_NowPlayingSwitch">Show what I’m listening to</string>
     <string name="SG_NowPlayingSwitchInfo">A card with the current track in your profile</string>
     <string name="SG_NowPlayingSources">Players</string>
@@ -1455,7 +1455,7 @@
     <string name="SG_TilePhone">Phone</string>
     <string name="SG_TileBio">Bio</string>
     <string name="SG_TileLinks">Links</string>
-    <string name="SG_TileMusic">Now playing</string>
+    <string name="SG_TileMusic">Profile music</string>
     <string name="SG_TileUsername">Username</string>
     <string name="SG_TileId">ID</string>
     <string name="SG_TileBirthday">Birthday</string>
@@ -1839,4 +1839,15 @@
     <string name="SG_Intro5Message">Extend Solegram with **plugins**: each is checked before it is installed and runs under protection.</string>
     <string name="SG_Intro6Title">Protected</string>
     <string name="SG_Intro6Message">**Hidden chats** behind a passcode, scam warnings and open source code.</string>
+    <string name="SG_ProfileMusicSection">Music on profiles</string>
+    <string name="SG_ProfileMusicTitle">Profile music</string>
+    <string name="SG_ProfileMusicPlaying">Playing</string>
+    <string name="SG_ProfileMusicListen">Listen</string>
+    <string name="SG_ProfileMusicOpenPlayer">Open player</string>
+    <string name="SG_ProfileMusicLook">Look of profile music</string>
+    <string name="SG_ProfileMusicStyleTelegram">As in Telegram</string>
+    <string name="SG_ProfileMusicStyleTelegramInfo">A slim line under the profile photo</string>
+    <string name="SG_ProfileMusicInfo">The song pinned to a Telegram profile is shown as a card of its own, with its cover. Tap the card to listen, or the button to pause. To put a song on your profile, use the player: ⋮ → Add to Profile.</string>
+    <string name="SG_ProfileMusicPreviewInfo">This is how music looks on profiles. If your profile has a song, it is shown here: tap to listen.</string>
+    <string name="SG_ProfileMusicSampleTitle">Sunrise</string>
 </resources>

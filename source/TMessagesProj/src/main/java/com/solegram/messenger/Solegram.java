@@ -99,9 +99,7 @@ public final class Solegram {
         });
         AndroidUtilities.runOnUIThread(() -> {
             try {
-                // music in the profile: watch the players, and bring a bio left with music back after a restart
-                SolegramMediaListener.setWanted(SolegramConfig.nowPlaying);
-                SolegramNowPlaying.start();
+                // "now playing" is gone: a bio an older version left with music in it gets the user's own back
                 SolegramNowPlayingBio.checkOnStart();
                 org.telegram.messenger.AndroidUtilities.runOnUIThread(SolegramNameEmojiShare::scheduleSync, 25_000);
             } catch (Throwable e) {

@@ -148,6 +148,8 @@ public class SolegramConfig {
     public static boolean nowPlayingShareBio = false;
     /** The profile player: NOW_PLAYING_STYLE_* (the cover's colours, frosted glass of the cover, one slim line). */
     public static int nowPlayingStyle = 0;
+    /** How profiles show their music: Solegram's card in one of its looks (0..2, as nowPlayingStyle) or 3, Telegram's line under the photo. */
+    public static int profileMusicStyle = 0;
     /** The cover as a rounded square, or as a record that turns while the music plays. */
     public static boolean nowPlayingVinyl = false;
     /** The song's progress and time on the own card. */
@@ -471,11 +473,14 @@ public class SolegramConfig {
         }
         liquidMotion = p.getBoolean("liquidMotion", true);
         iosInputBar = p.getBoolean("iosInputBar", true);
-        nowPlaying = p.getBoolean("nowPlaying", true);
+        // "now playing" (players on the phone, the track in the bio) is gone: Telegram's own music on the profile
+        // has Solegram's card instead (profileMusicStyle)
+        nowPlaying = false;
         nowPlayingSpotify = p.getBoolean("nowPlayingSpotify", true);
         nowPlayingSoundCloud = p.getBoolean("nowPlayingSoundCloud", true);
         nowPlayingShareBio = p.getBoolean("nowPlayingShareBio", false);
         nowPlayingStyle = clamp(p.getInt("nowPlayingStyle", 0), 0, 2);
+        profileMusicStyle = clamp(p.getInt("profileMusicStyle", nowPlayingStyle), 0, 3);
         nowPlayingVinyl = p.getBoolean("nowPlayingVinyl", false);
         nowPlayingProgress = p.getBoolean("nowPlayingProgress", true);
         nowPlayingEqualizer = p.getBoolean("nowPlayingEqualizer", true);

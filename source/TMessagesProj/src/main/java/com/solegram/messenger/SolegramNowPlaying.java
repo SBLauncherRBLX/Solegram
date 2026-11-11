@@ -36,7 +36,7 @@ import java.util.Map;
 
 /**
  * Music in the profile: what plays now in Spotify or SoundCloud on this phone, read from the players' media
- * sessions (Android shows them to an app with notification access, see SolegramMediaListener). Nothing leaves
+ * sessions (Android shows them to an app with notification access). Nothing leaves
  * the device unless the user turns on sharing in the bio (SolegramNowPlayingBio).
  */
 public final class SolegramNowPlaying {
@@ -125,9 +125,6 @@ public final class SolegramNowPlaying {
         return ApplicationLoader.applicationContext;
     }
 
-    private static ComponentName listenerComponent() {
-        return new ComponentName(context(), SolegramMediaListener.class);
-    }
 
     /** The user let Solegram see the players (notification access). */
     public static boolean hasAccess() {
@@ -149,18 +146,6 @@ public final class SolegramNowPlaying {
         }
     }
 
-    /** The system screen where notification access for Solegram is turned on. */
-    public static Intent accessSettingsIntent() {
-        if (Build.VERSION.SDK_INT >= 30) {
-            final Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS);
-            intent.putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, listenerComponent().flattenToString());
-            if (intent.resolveActivity(context().getPackageManager()) != null) {
-                return intent;
-            }
-        }
-        return new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
-    }
-
     /** Opens the player app (for the own card). */
     public static boolean openPlayer(Context from, int source) {
         final String pkg = source == SOURCE_SOUNDCLOUD ? SOUNDCLOUD : SPOTIFY;
@@ -176,6 +161,19 @@ public final class SolegramNowPlaying {
         return false;
     }
 
+    /**
+     * The profile's music (Telegram's music on the profile) as a card track.
+     *
+     * @param durationMs 0 when unknown
+     * @param positionMs where it stands while it plays (or is paused part way), else 0
+     */
+    public static Track pinned(String title, String artist, long durationMs, boolean playing, long positionMs, @Nullable Bitmap art) {
+        final String t = TextUtils.isEmpty(title) ? "" : title;
+        final String a = artist == null ? "" : artist;
+        return new Track(SOURCE_NONE, t, a, Math.max(0, durationMs), Math.max(0, positionMs), playing ? SystemClock.elapsedRealtime() : 0, 1f,
+            playing, art, art != null ? mainColor(art) : colorFor(t + a), false);
+    }
+
     public static String sourceName(int source) {
         return source == SOURCE_SOUNDCLOUD ? "SoundCloud" : "Spotify";
     }
@@ -184,7 +182,7 @@ public final class SolegramNowPlaying {
     @Nullable
     public static Track get() {
         if (!SolegramConfig.nowPlaying) {
-            return null;
+            return null; // always now: the players on the phone are not watched any more
         }
         if (!started) {
             start();
@@ -198,6 +196,9 @@ public final class SolegramNowPlaying {
 
     /** Starts watching the players (when allowed and turned on); safe to call any number of times. */
     public static void start() {
+        if (!SolegramConfig.nowPlaying) {
+            return; // the players on the phone are not watched any more
+        }
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(SolegramNowPlaying::start);
             return;
@@ -211,9 +212,9 @@ public final class SolegramNowPlaying {
                 return;
             }
             sessionsListener = SolegramNowPlaying::onSessionsChanged;
-            manager.addOnActiveSessionsChangedListener(sessionsListener, listenerComponent(), handler);
+            manager.addOnActiveSessionsChangedListener(sessionsListener, null, handler);
             started = true;
-            onSessionsChanged(manager.getActiveSessions(listenerComponent()));
+            onSessionsChanged(manager.getActiveSessions(null));
         } catch (Throwable e) {
             // access was taken back between the check and the call
             FileLog.e(e);
@@ -246,7 +247,6 @@ public final class SolegramNowPlaying {
 
     /** After the settings changed: start, stop or pick again. */
     public static void onSettingsChanged() {
-        SolegramMediaListener.setWanted(SolegramConfig.nowPlaying);
         if (!SolegramConfig.nowPlaying) {
             stop();
             return;

@@ -47,7 +47,7 @@ import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 
 /**
- * Music in the profile: the card with what someone listens to now, in one of three looks (see
+ * Music in the profile: the card with the profile's music (Telegram's music on the profile), in one of three looks (see
  * {@link SolegramConfig#nowPlayingStyle}): washed with the cover's colours, frosted glass made of the cover, or one
  * slim line. The cover may be a record that turns while the music plays; the own card shows the song's progress.
  */
@@ -68,6 +68,10 @@ public class SolegramNowPlayingView extends View {
     private final Theme.ResourcesProvider resourcesProvider;
     private SolegramNowPlaying.Track track;
     private boolean self;
+    /** The profile's own music (Telegram's music on the profile): its title, a play button, progress while it plays. */
+    private boolean pinned;
+    private final Path buttonPath = new Path();
+    private final RectF button = new RectF();
     private CharSequence emptyText;
 
     private final RectF card = new RectF();
@@ -166,6 +170,30 @@ public class SolegramNowPlayingView extends View {
         invalidate();
     }
 
+    /** The card shows the profile's music (see {@link #pinned}). */
+    public void setPinned(boolean pinned) {
+        if (this.pinned != pinned) {
+            this.pinned = pinned;
+            titleShown = null;
+            artistShown = null;
+            updateDescription();
+            requestLayout();
+            invalidate();
+        }
+    }
+
+    private float lastTouchX = -1, lastTouchY = -1;
+
+    /** The last tap was on the play button (with some room around it). */
+    public boolean tappedButton() {
+        if (button.isEmpty()) {
+            return false;
+        }
+        tmp.set(button);
+        tmp.inset(-dp(10), -dp(10));
+        return tmp.contains(lastTouchX, lastTouchY);
+    }
+
     public SolegramNowPlaying.Track getTrack() {
         return track;
     }
@@ -189,12 +217,16 @@ public class SolegramNowPlayingView extends View {
             setContentDescription(emptyText);
             return;
         }
-        setContentDescription(LocaleController.getString(self ? R.string.SG_NowPlayingListeningSelf : R.string.SG_NowPlayingListening)
+        setContentDescription(LocaleController.getString(pinned ? R.string.SG_ProfileMusicTitle : self ? R.string.SG_NowPlayingListeningSelf : R.string.SG_NowPlayingListening)
             + ": " + (TextUtils.isEmpty(track.artist) ? "" : track.artist + " — ") + track.title);
     }
 
     private boolean hasProgress() {
-        return self && track != null && !track.remote && track.duration > 0 && SolegramConfig.nowPlayingProgress;
+        if (track == null || track.duration <= 0 || !SolegramConfig.nowPlayingProgress) {
+            return false;
+        }
+        // the profile's music: while it plays (or stands paused part way)
+        return pinned ? track.playing || track.position > 0 : self && !track.remote;
     }
 
     private boolean playing() {
@@ -339,7 +371,15 @@ public class SolegramNowPlayingView extends View {
         boolean animate = drawCover(canvas, tint, alpha, style);
 
         final float textLeft = cover.right + dp(style == STYLE_COMPACT ? 12 : 14);
-        final float textRight = card.right - dp(14);
+        // the profile's music has a play button at the end
+        final float buttonSize = pinned && track != null ? dp(style == STYLE_COMPACT ? 36 : 42) : 0;
+        if (buttonSize > 0) {
+            final float cy = style == STYLE_COMPACT ? card.centerY() : cover.centerY();
+            button.set(card.right - dp(14) - buttonSize, cy - buttonSize / 2f, card.right - dp(14), cy + buttonSize / 2f);
+        } else {
+            button.setEmpty();
+        }
+        final float textRight = card.right - dp(14) - (buttonSize > 0 ? buttonSize + dp(10) : 0);
         final int textColor = glass && track != null ? Color.WHITE : color(Theme.key_windowBackgroundWhiteBlackText);
         final int grayColor = glass && track != null ? 0xB8FFFFFF : color(Theme.key_windowBackgroundWhiteGrayText);
         final int accent = accent(glass && track != null);
@@ -361,7 +401,8 @@ public class SolegramNowPlayingView extends View {
         if (style == STYLE_COMPACT) {
             // one slim line: the equalizer at the end of the title, the artist under it
             float eqWidth = 0;
-            if (SolegramConfig.nowPlayingEqualizer) {
+            final boolean eq = SolegramConfig.nowPlayingEqualizer && (!pinned || playing());
+            if (eq) {
                 eqWidth = dp(3 * 2.6f + 2 * 2.2f) + dp(8);
             }
             final float textWidth = Math.max(0, textRight - textLeft - eqWidth);
@@ -370,7 +411,7 @@ public class SolegramNowPlayingView extends View {
             final CharSequence title = ellipsizeTitle(track.title, textWidth);
             final float titleBaseline = card.centerY() - dp(2) + rise;
             canvas.drawText(title, 0, title.length(), textLeft, titleBaseline, titlePaint);
-            if (SolegramConfig.nowPlayingEqualizer) {
+            if (eq) {
                 animate |= drawEqualizer(canvas, textLeft + titlePaint.measureText(title, 0, title.length()) + dp(8), titleBaseline - dp(1), alpha, accent, dp(9));
             }
             artistPaint.setColor(grayColor);
@@ -399,13 +440,14 @@ public class SolegramNowPlayingView extends View {
             final float statusBaseline = cover.top + dp(15);
             drawMark(canvas, x + dp(7), statusBaseline - dp(4.5f), dp(7), alpha, glass);
             x += dp(14) + dp(6);
-            final String status = LocaleController.getString(!playing() ? R.string.SG_NowPlayingPaused
-                : self ? R.string.SG_NowPlayingListeningSelf : R.string.SG_NowPlayingListening);
+            final String status = LocaleController.getString(pinned
+                ? (playing() ? R.string.SG_ProfileMusicPlaying : track.position > 0 ? R.string.SG_NowPlayingPaused : R.string.SG_ProfileMusicTitle)
+                : !playing() ? R.string.SG_NowPlayingPaused : self ? R.string.SG_NowPlayingListeningSelf : R.string.SG_NowPlayingListening);
             statusPaint.setColor(glass ? 0xD9FFFFFF : ColorUtils.blendARGB(accent, textColor, dark ? 0.1f : 0.2f));
             statusPaint.setAlpha((int) (Color.alpha(statusPaint.getColor()) * contentAlpha));
             canvas.drawText(status, x, statusBaseline, statusPaint);
             x += statusPaint.measureText(status) + dp(7);
-            if (SolegramConfig.nowPlayingEqualizer) {
+            if (SolegramConfig.nowPlayingEqualizer && (!pinned || playing())) {
                 animate |= drawEqualizer(canvas, x, statusBaseline, alpha, glass ? Color.WHITE : accent, dp(11));
             }
 
@@ -424,9 +466,45 @@ public class SolegramNowPlayingView extends View {
             }
         }
 
+        if (!button.isEmpty()) {
+            drawPlayButton(canvas, glass, accent, alpha);
+        }
         selector.draw(canvas);
         if (animate) {
             postInvalidateOnAnimation();
+        }
+    }
+
+    /** A round button: play, or pause while the profile's music plays. */
+    private void drawPlayButton(Canvas canvas, boolean glass, int accent, int alpha) {
+        final float cx = button.centerX(), cy = button.centerY(), r = button.width() / 2f;
+        markPaint.setStyle(Paint.Style.FILL);
+        shadowPaint.setColor(0);
+        shadowPaint.setShadowLayer(dp(6), 0, dp(2), ColorUtils.setAlphaComponent(glass ? Color.BLACK : accent, (int) (0x40 * contentAlpha)));
+        canvas.drawCircle(cx, cy, r, shadowPaint);
+        markPaint.setColor(glass ? Color.WHITE : accent);
+        markPaint.setAlpha(alpha);
+        canvas.drawCircle(cx, cy, r, markPaint);
+        markPaint.setColor(glass ? (track != null ? ColorUtils.blendARGB(track.color, Color.BLACK, 0.45f) : Color.BLACK) : Color.WHITE);
+        markPaint.setAlpha(alpha);
+        final float s = r * 0.36f;
+        if (playing()) {
+            final float w = s * 0.62f, gap = s * 0.42f;
+            tmp.set(cx - gap - w, cy - s, cx - gap, cy + s);
+            canvas.drawRoundRect(tmp, w / 2.4f, w / 2.4f, markPaint);
+            tmp.set(cx + gap, cy - s, cx + gap + w, cy + s);
+            canvas.drawRoundRect(tmp, w / 2.4f, w / 2.4f, markPaint);
+        } else {
+            // a triangle with soft corners, nudged right so it looks centred
+            buttonPath.rewind();
+            final float ox = cx + s * 0.18f;
+            buttonPath.moveTo(ox - s * 0.8f, cy - s);
+            buttonPath.lineTo(ox + s, cy);
+            buttonPath.lineTo(ox - s * 0.8f, cy + s);
+            buttonPath.close();
+            markPaint.setPathEffect(new android.graphics.CornerPathEffect(s * 0.3f));
+            canvas.drawPath(buttonPath, markPaint);
+            markPaint.setPathEffect(null);
         }
     }
 
@@ -762,6 +840,8 @@ public class SolegramNowPlayingView extends View {
             }
         }
         selector.setHotspot(event.getX(), event.getY());
+        lastTouchX = event.getX();
+        lastTouchY = event.getY();
         return super.onTouchEvent(event);
     }
 

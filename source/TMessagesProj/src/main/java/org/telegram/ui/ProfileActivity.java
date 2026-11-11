@@ -2508,6 +2508,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         getNotificationCenter().removeObserver(this, NotificationCenter.updatedChatRanks);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramNowPlayingChanged);
+        AndroidUtilities.cancelRunOnUIThread(sgMusicChanged);
+        if (sgMusic != null) {
+            sgMusic.detach();
+        }
         if (avatarsViewPager != null) {
             avatarsViewPager.onDestroy();
         }
@@ -10697,7 +10701,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (userInfo == null) {
             return null;
         }
-        final String about = com.solegram.messenger.SolegramNameEmojiShare.strip(com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : com.solegram.messenger.SolegramNowPlaying.stripHidden(userInfo.about));
+        // a music block left in the bio by an older Solegram is invisible: it goes, nothing else does
+        final String about = com.solegram.messenger.SolegramNameEmojiShare.strip(com.solegram.messenger.SolegramNowPlaying.stripHidden(userInfo.about));
         if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || TextUtils.isEmpty(about)) {
             return about;
         }
@@ -10719,7 +10724,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (!com.solegram.messenger.SolegramConfig.profileLinks || userId == 0 || userInfo == null || TextUtils.isEmpty(userInfo.about)) {
             return null;
         }
-        final String about = com.solegram.messenger.SolegramConfig.nowPlaying ? com.solegram.messenger.SolegramNowPlaying.stripBio(userInfo.about) : com.solegram.messenger.SolegramNowPlaying.stripHidden(userInfo.about);
+        final String about = com.solegram.messenger.SolegramNowPlaying.stripHidden(userInfo.about);
         final java.util.List<com.solegram.messenger.SolegramProfileLinks.Link> links = com.solegram.messenger.SolegramProfileLinks.parse(about).links;
         return links.isEmpty() ? null : links;
     }
@@ -10744,81 +10749,126 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
     };
 
-    /** What this profile listens to: the player on this phone for the own profile, else the music line of the bio. */
-    private com.solegram.messenger.SolegramNowPlaying.Track sgNowPlayingTrack() {
-        if (!com.solegram.messenger.SolegramConfig.nowPlaying || userId == 0) {
-            return null;
+    /** The profile's music (Telegram's music on the profile) for Solegram's card. */
+    private com.solegram.messenger.ui.SolegramProfileMusic sgMusic;
+    private final Runnable sgMusicChanged = this::sgMusicChanged;
+
+    private com.solegram.messenger.ui.SolegramProfileMusic sgMusic() {
+        if (sgMusic == null) {
+            // the changes come in from the player and the image loader: handled after the current frame's work
+            sgMusic = new com.solegram.messenger.ui.SolegramProfileMusic(currentAccount, () -> {
+                AndroidUtilities.cancelRunOnUIThread(sgMusicChanged);
+                AndroidUtilities.runOnUIThread(sgMusicChanged);
+            });
+            sgMusic.attach();
         }
-        if (sgIsSelf()) {
-            final com.solegram.messenger.SolegramNowPlaying.Track own = com.solegram.messenger.SolegramNowPlaying.get();
-            if (own != null) {
-                return own;
-            }
-        }
-        return userInfo != null ? com.solegram.messenger.SolegramNowPlaying.fromBio(userInfo.about) : null;
+        return sgMusic;
     }
 
-    /** The own profile invites to show the music, while a player is installed and not connected yet. */
-    private boolean sgOfferMusic() {
-        if (!sgIsSelf() || !com.solegram.messenger.SolegramConfig.nowPlaying
-            || com.solegram.messenger.SolegramConfig.prefs().getBoolean("nowPlayingOfferHidden", false)
-            || com.solegram.messenger.SolegramNowPlaying.hasAccess()) {
-            return false;
+    /** The card's track: the music on this profile, in Solegram's look (none in Telegram's look: its line shows it). */
+    private com.solegram.messenger.SolegramNowPlaying.Track sgNowPlayingTrack() {
+        if (userId == 0 || userInfo == null || userInfo.saved_music == null || !com.solegram.messenger.ui.SolegramProfileMusic.cardOn()) {
+            return null;
         }
-        return com.solegram.messenger.SolegramNowPlaying.isInstalled(com.solegram.messenger.SolegramNowPlaying.SPOTIFY)
-            || com.solegram.messenger.SolegramNowPlaying.isInstalled(com.solegram.messenger.SolegramNowPlaying.SOUNDCLOUD);
+        final com.solegram.messenger.ui.SolegramProfileMusic music = sgMusic();
+        music.setDocument(userInfo.saved_music);
+        return music.track();
+    }
+
+    private void sgMusicChanged() {
+        if (listView == null || listAdapter == null) {
+            return;
+        }
+        final com.solegram.messenger.SolegramNowPlaying.Track track = sgNowPlayingTrack();
+        if (track != null && sgNowPlayingRow >= 0) {
+            // the card follows the player: redrawn in place
+            final RecyclerView.ViewHolder holder = listView.findViewHolderForAdapterPosition(sgNowPlayingRow);
+            if (holder != null && holder.itemView instanceof com.solegram.messenger.ui.SolegramNowPlayingView) {
+                ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(track, false);
+                return;
+            }
+        }
+        sgUpdateMusicRows();
+    }
+
+    /** Solegram no longer reads players on the phone: nothing to connect. */
+    private boolean sgOfferMusic() {
+        return false;
     }
 
     private void sgNowPlayingClick(View view) {
-        final com.solegram.messenger.SolegramNowPlaying.Track track = sgNowPlayingTrack();
-        if (track == null) {
+        if (userInfo == null || userInfo.saved_music == null) {
             return;
         }
-        if (!track.remote && getParentActivity() != null && com.solegram.messenger.SolegramNowPlaying.openPlayer(getParentActivity(), track.source)) {
+        final boolean button = view instanceof com.solegram.messenger.ui.SolegramNowPlayingView && ((com.solegram.messenger.ui.SolegramNowPlayingView) view).tappedButton();
+        final MessageObject now = MediaController.getInstance().getPlayingMessageObject();
+        final boolean thisOne = now != null && now.getDocument() != null && now.getDocument().id == userInfo.saved_music.id;
+        if (button && thisOne) {
+            // the button plays and pauses in place
+            if (MediaController.getInstance().isMessagePaused()) {
+                MediaController.getInstance().playMessage(now);
+            } else {
+                MediaController.getInstance().pauseMessage(now);
+            }
             return;
         }
-        sgNowPlayingOptions(view, false);
+        sgPlayProfileMusic(!button);
+    }
+
+    /** Plays the profile's music (its whole list, as Telegram's line under the photo does) and opens the player. */
+    private void sgPlayProfileMusic(boolean openPlayer) {
+        if (savedMusicList == null) {
+            if (MediaController.getInstance().currentSavedMusicList != null &&
+                MediaController.getInstance().currentSavedMusicList.currentAccount == currentAccount &&
+                MediaController.getInstance().currentSavedMusicList.dialogId == getDialogId()) {
+                savedMusicList = MediaController.getInstance().currentSavedMusicList;
+            } else {
+                savedMusicList = new MessagesController.SavedMusicList(currentAccount, getDialogId());
+                if (userInfo != null && userInfo.saved_music != null) {
+                    savedMusicList.setup(userInfo.saved_music);
+                }
+            }
+        }
+        if (savedMusicList.list.isEmpty()) {
+            return;
+        }
+        boolean sameList = false;
+        if (MediaController.getInstance().currentSavedMusicList != savedMusicList ||
+            !MediaController.getInstance().isPlayingMessage(savedMusicList.list.get(0))) {
+            MediaController.getInstance().cleanup();
+        } else {
+            sameList = true;
+        }
+        MediaController.getInstance().currentSavedMusicList = savedMusicList;
+        MediaController.getInstance().getPlaylist().clear();
+        MediaController.getInstance().getPlaylist().addAll(savedMusicList.list);
+        if (!sameList) {
+            MediaController.getInstance().playMessage(savedMusicList.list.get(0));
+        }
+        if (!openPlayer || getParentActivity() == null) {
+            return;
+        }
+        if (com.solegram.messenger.SolegramConfig.newPlayer) {
+            com.solegram.messenger.ui.SolegramPlayer.open(getParentActivity(), getResourceProvider());
+        } else {
+            showDialog(new AudioPlayerAlert(getContext(), getResourceProvider()));
+        }
     }
 
     private void sgNowPlayingOptions(View view, boolean connectRow) {
-        if (connectRow) {
-            ItemOptions.makeOptions(this, view)
-                .add(R.drawable.msg_settings, getString(R.string.SG_NowPlaying), () ->
-                    presentFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_MUSIC)))
-                .add(R.drawable.msg_cancel, getString(R.string.SG_NowPlayingHide), () -> {
-                    com.solegram.messenger.SolegramConfig.prefs().edit().putBoolean("nowPlayingOfferHidden", true).apply();
-                    updateListAnimated(false);
-                })
-                .show();
-            return;
-        }
         final com.solegram.messenger.SolegramNowPlaying.Track track = sgNowPlayingTrack();
         if (track == null) {
             return;
         }
-        final String query = (TextUtils.isEmpty(track.artist) ? "" : track.artist + " ") + track.title;
-        final String encoded = android.net.Uri.encode(query);
+        final String query = (TextUtils.isEmpty(track.artist) ? "" : track.artist + " — ") + track.title;
         final ItemOptions o = ItemOptions.makeOptions(this, view);
-        if (!track.remote) {
-            o.add(R.drawable.files_music, formatString(R.string.SG_NowPlayingOpenIn, com.solegram.messenger.SolegramNowPlaying.sourceName(track.source)), () -> {
-                if (getParentActivity() != null) {
-                    com.solegram.messenger.SolegramNowPlaying.openPlayer(getParentActivity(), track.source);
-                }
-            });
-        } else {
-            o.add(R.drawable.msg_search, formatString(R.string.SG_NowPlayingOpenIn, "Spotify"), () ->
-                Browser.openUrl(getParentActivity(), "https://open.spotify.com/search/" + encoded));
-            o.add(R.drawable.msg_search, formatString(R.string.SG_NowPlayingOpenIn, "SoundCloud"), () ->
-                Browser.openUrl(getParentActivity(), "https://soundcloud.com/search?q=" + encoded));
-        }
+        o.add(R.drawable.msg_played, getString(track.playing ? R.string.SG_ProfileMusicOpenPlayer : R.string.SG_ProfileMusicListen), () -> sgPlayProfileMusic(true));
         o.add(R.drawable.msg_copy, getString(R.string.Copy), () -> {
             AndroidUtilities.addToClipboard(query);
             BulletinFactory.of(this).createCopyBulletin(getString(R.string.TextCopied)).show();
         });
-        if (sgIsSelf()) {
-            o.add(R.drawable.msg_settings, getString(R.string.SG_NowPlaying), () ->
-                presentFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_MUSIC)));
-        }
+        o.add(R.drawable.msg_customize, getString(R.string.SG_ProfileMusicLook), () ->
+            presentFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_MUSIC)));
         o.show();
     }
     // endregion
@@ -11000,7 +11050,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         if (userId != 0) {
             TLRPC.User user = getMessagesController().getUser(userId);
-            if (userInfo != null && userInfo.saved_music != null && (imageUpdater == null || myProfile)) {
+            // Solegram: in its own look the music is a card of its own in the list, not the line under the photo
+            if (userInfo != null && userInfo.saved_music != null && (imageUpdater == null || myProfile) && !com.solegram.messenger.ui.SolegramProfileMusic.cardOn()) {
                 hasMusic = true;
             }
 
@@ -13608,6 +13659,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 case VIEW_TYPE_SG_NOW_PLAYING: {
                     // the card draws its own press highlight, so it takes its taps itself
                     view = new com.solegram.messenger.ui.SolegramNowPlayingView(mContext, resourcesProvider);
+                    ((com.solegram.messenger.ui.SolegramNowPlayingView) view).setPinned(true);
                     view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
                     view.setOnClickListener(ProfileActivity.this::sgNowPlayingClick);
                     view.setOnLongClickListener(v -> {
@@ -13943,7 +13995,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             switch (holder.getItemViewType()) {
                 case VIEW_TYPE_SG_NOW_PLAYING:
-                    ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(sgNowPlayingTrack(), sgIsSelf());
+                    ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(sgNowPlayingTrack(), false);
                     break;
                 case VIEW_TYPE_SG_POSTS:
                     ((com.solegram.messenger.ui.SolegramProfilePostsView) holder.itemView).setPosts(sgCard != null ? sgCard.featured : null);

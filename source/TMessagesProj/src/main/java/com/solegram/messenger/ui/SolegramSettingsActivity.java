@@ -124,11 +124,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_SOLEDROP_SHARE_NAME = 1108;
 
     // music in the profile
-    private static final int ID_NOW_PLAYING = 701;
-    private static final int ID_NOW_PLAYING_ACCESS = 702;
-    private static final int ID_NOW_PLAYING_SPOTIFY = 703;
-    private static final int ID_NOW_PLAYING_SOUNDCLOUD = 704;
-    private static final int ID_NOW_PLAYING_SHARE = 705;
     private static final int ID_NP_STYLE_COVER = 706;
     private static final int ID_NP_STYLE_GLASS = 707;
     private static final int ID_NP_STYLE_COMPACT = 708;
@@ -138,6 +133,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_NP_ACCENT_COVER = 713;
     private static final int ID_NP_ACCENT_PLAYER = 714;
     private static final int ID_NP_ACCENT_THEME = 715;
+    private static final int ID_NP_STYLE_TELEGRAM = 716;
 
     // camera
     private static final int ID_CAMERA_FPS_AUTO = 801;
@@ -342,6 +338,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.solegramPluginsChanged);
         if (page == PAGE_MUSIC) {
             NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.solegramNowPlayingChanged);
+            // the own profile's music for the preview comes with the full user
+            getNotificationCenter().addObserver(this, NotificationCenter.userInfoDidLoad);
         }
         if (page == PAGE_PROXY) {
             NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.solegramProxyChanged);
@@ -356,9 +354,13 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
     @Override
     public void onFragmentDestroy() {
+        if (previewMusic != null) {
+            previewMusic.detach();
+        }
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramUpdateAvailable);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramPluginsChanged);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramNowPlayingChanged);
+        getNotificationCenter().removeObserver(this, NotificationCenter.userInfoDidLoad);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramProxyChanged);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramGeminiNanoChanged);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.proxySettingsChanged);
@@ -911,8 +913,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return ID_AI_SUMMARY;
             case ID_MEANING_RERANK:
                 return ID_MEANING;
-            case ID_NOW_PLAYING_SHARE:
-                return ID_NOW_PLAYING;
             case ID_ADBLOCK_YOUTUBE:
             case ID_ADBLOCK_POPUPS:
                 return ID_ADBLOCK;
@@ -1007,8 +1007,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_CHATS, ID_LOCAL_REPEATS, R.string.SG_LocalRepeats, -1},
         {PAGE_CHATS, ID_SAVE_STORIES, R.string.SG_SaveStories, -1},
         {PAGE_CHATS, ID_SKIP_SILENCE, R.string.SG_SkipSilence, -1},
-        {PAGE_MUSIC, ID_NOW_PLAYING_SHARE, R.string.SG_NowPlayingShare, 4},
-        {PAGE_MUSIC, ID_NP_STYLE_COVER, R.string.SG_NowPlayingLook, 4},
+        {PAGE_MUSIC, ID_NP_STYLE_COVER, R.string.SG_ProfileMusicSection, 4},
         {PAGE_MUSIC, ID_NP_VINYL, R.string.SG_NowPlayingVinyl, 4},
         {PAGE_MAIN_SCREEN, 0, R.string.SG_MainScreen, -1},
         {PAGE_MAIN_SCREEN, ID_REMEMBER_FOLDER, R.string.SG_RememberFolder, -1},
@@ -1409,41 +1408,53 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asButtonCheck(ID_NEW_PLAYER, getString(R.string.SG_NewPlayer), getString(R.string.SG_NewPlayerInfo)).setChecked(SolegramConfig.newPlayer));
         items.add(tile(UItem.asButton(ID_MUSIC_TAB, R.drawable.files_music, getString(R.string.SG_MusicTab), getString(com.solegram.messenger.SolegramTabs.current().contains(com.solegram.messenger.SolegramTabs.MUSIC) ? R.string.SG_TabInBar : R.string.SG_TabNotInBar)), TILE_PINK));
         items.add(UItem.asShadow(null));
-        // the card as the profile shows it, with what plays now
-        if (nowPlayingPreview == null) {
-            nowPlayingPreview = new SolegramNowPlayingView(getContext(), getResourceProvider());
-            nowPlayingPreview.setEmptyText(getString(R.string.SG_NowPlayingNothing));
-            nowPlayingPreview.setOnClickListener(v -> {
-                final com.solegram.messenger.SolegramNowPlaying.Track t = nowPlayingPreview.getTrack();
-                if (t != null && getParentActivity() != null) {
-                    com.solegram.messenger.SolegramNowPlaying.openPlayer(getParentActivity(), t.source);
-                }
-            });
+        // music on the profile (Telegram's own): Solegram's card, as a profile shows it
+        final int look = SolegramConfig.profileMusicStyle;
+        final boolean card = look != SolegramProfileMusic.STYLE_TELEGRAM;
+        if (card) {
+            if (nowPlayingPreview == null) {
+                nowPlayingPreview = new SolegramNowPlayingView(getContext(), getResourceProvider());
+                nowPlayingPreview.setPinned(true);
+                nowPlayingPreview.setOnClickListener(v -> {
+                    // the own music plays here; the sample only shows the look
+                    final org.telegram.tgnet.TLRPC.Document own = previewMusic != null ? previewMusic.getDocument() : null;
+                    if (own == null) {
+                        return;
+                    }
+                    final org.telegram.messenger.MessageObject now = org.telegram.messenger.MediaController.getInstance().getPlayingMessageObject();
+                    if (now != null && now.getDocument() != null && now.getDocument().id == own.id) {
+                        if (org.telegram.messenger.MediaController.getInstance().isMessagePaused()) {
+                            org.telegram.messenger.MediaController.getInstance().playMessage(now);
+                        } else {
+                            org.telegram.messenger.MediaController.getInstance().pauseMessage(now);
+                        }
+                        return;
+                    }
+                    final org.telegram.messenger.MessagesController.SavedMusicList list = new org.telegram.messenger.MessagesController.SavedMusicList(currentAccount, getUserConfig().getClientUserId());
+                    list.setup(own);
+                    org.telegram.messenger.MediaController.getInstance().cleanup();
+                    org.telegram.messenger.MediaController.getInstance().currentSavedMusicList = list;
+                    org.telegram.messenger.MediaController.getInstance().getPlaylist().clear();
+                    org.telegram.messenger.MediaController.getInstance().getPlaylist().addAll(list.list);
+                    org.telegram.messenger.MediaController.getInstance().playMessage(list.list.get(0));
+                });
+            }
+            nowPlayingPreview.styleChanged();
+            updateMusicPreview();
+            items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPreview)));
+            items.add(UItem.asCustom(nowPlayingPreview));
+            items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicPreviewInfo)));
         }
-        nowPlayingPreview.styleChanged();
-        nowPlayingPreview.setTrack(com.solegram.messenger.SolegramNowPlaying.get(), true);
-        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPreview)));
-        items.add(UItem.asCustom(nowPlayingPreview));
-        items.add(UItem.asShadow(null));
 
-        items.add(UItem.asRippleCheck(ID_NOW_PLAYING, getString(R.string.SG_NowPlayingSwitch)).setChecked(SolegramConfig.nowPlaying));
-        items.add(UItem.asShadow(getString(R.string.SG_NowPlayingSwitchInfo)));
-        if (!SolegramConfig.nowPlaying) {
+        items.add(UItem.asHeader(getString(R.string.SG_ProfileMusicSection)));
+        items.add(UItem.asRadio2(ID_NP_STYLE_COVER, getString(R.string.SG_NowPlayingStyleCover), getString(R.string.SG_NowPlayingStyleCoverInfo)).setChecked(look == SolegramNowPlayingView.STYLE_COVER));
+        items.add(UItem.asRadio2(ID_NP_STYLE_GLASS, getString(R.string.SG_NowPlayingStyleGlass), getString(R.string.SG_NowPlayingStyleGlassInfo)).setChecked(look == SolegramNowPlayingView.STYLE_GLASS));
+        items.add(UItem.asRadio2(ID_NP_STYLE_COMPACT, getString(R.string.SG_NowPlayingStyleCompact), getString(R.string.SG_NowPlayingStyleCompactInfo)).setChecked(look == SolegramNowPlayingView.STYLE_COMPACT));
+        items.add(UItem.asRadio2(ID_NP_STYLE_TELEGRAM, getString(R.string.SG_ProfileMusicStyleTelegram), getString(R.string.SG_ProfileMusicStyleTelegramInfo)).setChecked(!card));
+        items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicInfo)));
+        if (!card) {
             return;
         }
-        final boolean access = com.solegram.messenger.SolegramNowPlaying.hasAccess();
-        final UItem accessItem = tile(UItem.asButton(ID_NOW_PLAYING_ACCESS, R.drawable.msg2_permissions, getString(R.string.SG_NowPlayingAccess),
-            getString(access ? R.string.SG_NowPlayingAccessOn : R.string.SG_NowPlayingAccessOff)), access ? TILE_GREEN : TILE_ORANGE);
-        items.add(access ? accessItem : accessItem.accent());
-        items.add(UItem.asShadow(getString(R.string.SG_NowPlayingAccessInfo)));
-
-        // how the card looks: the preview above changes with every choice
-        final int style = SolegramConfig.nowPlayingStyle;
-        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingLook)));
-        items.add(UItem.asRadio2(ID_NP_STYLE_COVER, getString(R.string.SG_NowPlayingStyleCover), getString(R.string.SG_NowPlayingStyleCoverInfo)).setChecked(style == SolegramNowPlayingView.STYLE_COVER));
-        items.add(UItem.asRadio2(ID_NP_STYLE_GLASS, getString(R.string.SG_NowPlayingStyleGlass), getString(R.string.SG_NowPlayingStyleGlassInfo)).setChecked(style == SolegramNowPlayingView.STYLE_GLASS));
-        items.add(UItem.asRadio2(ID_NP_STYLE_COMPACT, getString(R.string.SG_NowPlayingStyleCompact), getString(R.string.SG_NowPlayingStyleCompactInfo)).setChecked(style == SolegramNowPlayingView.STYLE_COMPACT));
-        items.add(UItem.asShadow(null));
         items.add(UItem.asButtonCheck(ID_NP_VINYL, getString(R.string.SG_NowPlayingVinyl), getString(R.string.SG_NowPlayingVinylInfo)).setChecked(SolegramConfig.nowPlayingVinyl));
         items.add(UItem.asCheck(ID_NP_PROGRESS, getString(R.string.SG_NowPlayingProgress)).setChecked(SolegramConfig.nowPlayingProgress));
         items.add(UItem.asCheck(ID_NP_EQUALIZER, getString(R.string.SG_NowPlayingEqualizer)).setChecked(SolegramConfig.nowPlayingEqualizer));
@@ -1451,20 +1462,34 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         final int accent = SolegramConfig.nowPlayingAccent;
         items.add(UItem.asHeader(getString(R.string.SG_NowPlayingAccent)));
         items.add(UItem.asRadio(ID_NP_ACCENT_COVER, getString(R.string.SG_NowPlayingAccentCover)).setChecked(accent == 0));
-        items.add(UItem.asRadio(ID_NP_ACCENT_PLAYER, getString(R.string.SG_NowPlayingAccentPlayer)).setChecked(accent == 1));
-        items.add(UItem.asRadio(ID_NP_ACCENT_THEME, getString(R.string.SG_NowPlayingAccentTheme)).setChecked(accent == 2));
-        items.add(UItem.asShadow(getString(R.string.SG_NowPlayingLookInfo)));
-
-        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingSources)));
-        items.add(UItem.asButtonCheck(ID_NOW_PLAYING_SPOTIFY, "Spotify", getString(com.solegram.messenger.SolegramNowPlaying.isInstalled(com.solegram.messenger.SolegramNowPlaying.SPOTIFY)
-            ? R.string.SG_NowPlayingInstalled : R.string.SG_NowPlayingNotInstalled)).setChecked(SolegramConfig.nowPlayingSpotify));
-        items.add(UItem.asButtonCheck(ID_NOW_PLAYING_SOUNDCLOUD, "SoundCloud", getString(com.solegram.messenger.SolegramNowPlaying.isInstalled(com.solegram.messenger.SolegramNowPlaying.SOUNDCLOUD)
-            ? R.string.SG_NowPlayingInstalled : R.string.SG_NowPlayingNotInstalled)).setChecked(SolegramConfig.nowPlayingSoundCloud));
+        items.add(UItem.asRadio(ID_NP_ACCENT_THEME, getString(R.string.SG_NowPlayingAccentTheme)).setChecked(accent != 0));
         items.add(UItem.asShadow(null));
+    }
 
-        items.add(UItem.asButtonCheck(ID_NOW_PLAYING_SHARE, getString(R.string.SG_NowPlayingShare), getString(R.string.SG_NowPlayingShareInfo))
-            .setChecked(SolegramConfig.nowPlayingShareBio));
-        items.add(UItem.asShadow(null));
+    /** The music on the own profile for the preview (its cover is loaded, it plays here), else a sample. */
+    private SolegramProfileMusic previewMusic;
+
+    private void updateMusicPreview() {
+        if (nowPlayingPreview == null) {
+            return;
+        }
+        final long self = getUserConfig().getClientUserId();
+        final org.telegram.tgnet.TLRPC.UserFull full = getMessagesController().getUserFull(self);
+        if (full == null) {
+            getMessagesController().loadFullUser(getUserConfig().getCurrentUser(), getClassGuid(), true);
+        }
+        if (full != null && full.saved_music != null) {
+            if (previewMusic == null) {
+                previewMusic = new SolegramProfileMusic(currentAccount, () -> AndroidUtilities.runOnUIThread(this::updateMusicPreview));
+                previewMusic.attach();
+            }
+            previewMusic.setDocument(full.saved_music);
+            nowPlayingPreview.setTrack(previewMusic.track(), false);
+        } else {
+            // no music on the own profile yet: a sample that plays, so the look shows in full
+            nowPlayingPreview.setTrack(com.solegram.messenger.SolegramNowPlaying.pinned(getString(R.string.SG_ProfileMusicSampleTitle), Solegram.NAME,
+                214_000, true, 63_000, null), false);
+        }
     }
 
     private void fillCamera(ArrayList<UItem> items) {
@@ -1738,35 +1763,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         listView.adapter.update(true);
     }
 
-    private void askMusicAccess() {
-        if (getParentActivity() == null) {
-            return;
-        }
-        final org.telegram.ui.ActionBar.AlertDialog.Builder builder = new org.telegram.ui.ActionBar.AlertDialog.Builder(getParentActivity(), getResourceProvider());
-        builder.setTitle(getString(R.string.SG_NowPlayingAccessTitle));
-        builder.setMessage(getString(R.string.SG_NowPlayingAccessText));
-        builder.setPositiveButton(getString(R.string.SG_NowPlayingAccessOpen), (d, w) -> {
-            try {
-                getParentActivity().startActivity(com.solegram.messenger.SolegramNowPlaying.accessSettingsIntent());
-            } catch (Throwable e) {
-                FileLog.e(e);
-            }
-        });
-        builder.setNegativeButton(getString(R.string.Cancel), null);
-        showDialog(builder.create());
-    }
-
     /** The card's look changed: the preview and every open profile draw it anew. */
     private void musicLookChanged() {
         listView.adapter.update(true);
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramNowPlayingChanged);
     }
 
-    private void musicSettingChanged(View view, String key) {
-        toggleCheck(view, key);
-        com.solegram.messenger.SolegramNowPlaying.onSettingsChanged();
-        listView.adapter.update(true);
-    }
     // endregion
 
     private static String aiHost() {
@@ -2326,35 +2328,19 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 });
                 return;
 
-            // music in the profile
-            case ID_NOW_PLAYING:
-                musicSettingChanged(view, "nowPlaying");
-                if (SolegramConfig.nowPlaying && !com.solegram.messenger.SolegramNowPlaying.hasAccess()) {
-                    askMusicAccess();
-                }
-                return;
-            case ID_NOW_PLAYING_ACCESS:
-                if (com.solegram.messenger.SolegramNowPlaying.hasAccess()) {
-                    try {
-                        getParentActivity().startActivity(com.solegram.messenger.SolegramNowPlaying.accessSettingsIntent());
-                    } catch (Throwable e) {
-                        FileLog.e(e);
-                    }
-                } else {
-                    askMusicAccess();
-                }
-                return;
-            case ID_NOW_PLAYING_SPOTIFY:
-                musicSettingChanged(view, "nowPlayingSpotify");
-                return;
+            // music on the profile
             case ID_NP_STYLE_COVER:
             case ID_NP_STYLE_GLASS:
             case ID_NP_STYLE_COMPACT:
-                SolegramConfig.putInt("nowPlayingStyle", item.id - ID_NP_STYLE_COVER);
+                SolegramConfig.prefs().edit().putInt("nowPlayingStyle", item.id - ID_NP_STYLE_COVER).putInt("profileMusicStyle", item.id - ID_NP_STYLE_COVER).apply();
+                SolegramConfig.reload();
+                musicLookChanged();
+                return;
+            case ID_NP_STYLE_TELEGRAM:
+                SolegramConfig.putInt("profileMusicStyle", SolegramProfileMusic.STYLE_TELEGRAM);
                 musicLookChanged();
                 return;
             case ID_NP_ACCENT_COVER:
-            case ID_NP_ACCENT_PLAYER:
             case ID_NP_ACCENT_THEME:
                 SolegramConfig.putInt("nowPlayingAccent", item.id - ID_NP_ACCENT_COVER);
                 musicLookChanged();
@@ -2371,17 +2357,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 toggleCheck(view, "nowPlayingEqualizer");
                 musicLookChanged();
                 return;
-            case ID_NOW_PLAYING_SOUNDCLOUD:
-                musicSettingChanged(view, "nowPlayingSoundCloud");
-                return;
-            case ID_NOW_PLAYING_SHARE:
-                if (!SolegramConfig.nowPlayingShareBio) {
-                    // the bio of the account open now gets the music
-                    com.solegram.messenger.SolegramNowPlayingBio.setSharingAccount(currentAccount);
-                }
-                musicSettingChanged(view, "nowPlayingShareBio");
-                return;
-
             // camera
             case ID_CAMERA_FPS_AUTO:
                 setCameraFps(0);
@@ -2490,7 +2465,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_RESET:
                 confirm(getString(R.string.SG_ResetSettings), getString(R.string.SG_ResetSettingsConfirm), getString(R.string.SG_Reset), () -> {
                     SolegramConfig.resetAll();
-                    com.solegram.messenger.SolegramNowPlaying.onSettingsChanged();
                     listView.adapter.update(true);
                     restartBulletin();
                 });
@@ -3249,7 +3223,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             if (count < 0) {
                 BulletinFactory.of(this).createErrorBulletin(getString(R.string.SG_ImportFailed)).show();
             } else {
-                com.solegram.messenger.SolegramNowPlaying.onSettingsChanged();
                 listView.adapter.update(true);
                 BulletinFactory.of(this).createSimpleBulletin(R.raw.done, LocaleController.formatString(R.string.SG_Imported, count), getString(R.string.SG_Restart), () -> Solegram.restartApp(getParentActivity())).show();
             }

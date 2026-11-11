@@ -435,7 +435,7 @@
     <string name="SG_HideAndDeclutter">Скрыть</string>
     <string name="SG_SettingsSearchPath">Solegram</string>
     <string name="SG_NowPlaying">Музыка</string>
-    <string name="SG_NowPlayingSub">Spotify и SoundCloud: что вы слушаете</string>
+    <string name="SG_NowPlayingSub">Плеер и музыка в профиле</string>
     <string name="SG_NowPlayingSwitch">Показывать, что я слушаю</string>
     <string name="SG_NowPlayingSwitchInfo">Карточка с текущим треком в вашем профиле</string>
     <string name="SG_NowPlayingSources">Плееры</string>
@@ -1455,7 +1455,7 @@
     <string name="SG_TilePhone">Телефон</string>
     <string name="SG_TileBio">О себе</string>
     <string name="SG_TileLinks">Ссылки</string>
-    <string name="SG_TileMusic">Сейчас играет</string>
+    <string name="SG_TileMusic">Музыка профиля</string>
     <string name="SG_TileUsername">Имя пользователя</string>
     <string name="SG_TileId">ID</string>
     <string name="SG_TileBirthday">День рождения</string>
@@ -1839,4 +1839,15 @@
     <string name="SG_Intro5Message">Расширяйте Solegram **плагинами**: каждый проверяется перед установкой и работает под защитой.</string>
     <string name="SG_Intro6Title">Под защитой</string>
     <string name="SG_Intro6Message">**Скрытые чаты** под паролем, предупреждения о мошенниках и открытый исходный код.</string>
+    <string name="SG_ProfileMusicSection">Музыка в профиле</string>
+    <string name="SG_ProfileMusicTitle">Музыка профиля</string>
+    <string name="SG_ProfileMusicPlaying">Играет</string>
+    <string name="SG_ProfileMusicListen">Слушать</string>
+    <string name="SG_ProfileMusicOpenPlayer">Открыть плеер</string>
+    <string name="SG_ProfileMusicLook">Вид музыки в профиле</string>
+    <string name="SG_ProfileMusicStyleTelegram">Как в Telegram</string>
+    <string name="SG_ProfileMusicStyleTelegramInfo">Тонкая полоса под фото профиля</string>
+    <string name="SG_ProfileMusicInfo">Песня, закреплённая в профиле Telegram, показывается отдельной карточкой с обложкой. Нажмите на карточку, чтобы слушать, или на кнопку, чтобы поставить на паузу. Добавить песню в свой профиль можно в плеере: «⋮» → «Добавить в профиль».</string>
+    <string name="SG_ProfileMusicPreviewInfo">Так музыка выглядит в профилях. Если в вашем профиле есть песня, здесь показана она — нажмите, чтобы послушать.</string>
+    <string name="SG_ProfileMusicSampleTitle">Рассвет</string>
 </resources>
