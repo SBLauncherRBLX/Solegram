@@ -14318,7 +14318,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         ItemOptions io = ItemOptions.makeOptions(this, optionsItem);
         io.solegramCascade(); // the same opening as the ⋮ menus of the other screens
         io.setColors(getThemedColor(Theme.key_actionBarDefaultTitle), getThemedColor(Theme.key_actionBarDefaultTitle));
-        io.setDimAlpha(0x08);
+        io.setDimAlpha(0); // the header menus do not dim the screen either
 
         final Activity activity = getParentActivity();
         final LaunchActivity launchActivity;

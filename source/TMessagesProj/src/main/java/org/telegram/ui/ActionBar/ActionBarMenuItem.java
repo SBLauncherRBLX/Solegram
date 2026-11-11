@@ -901,6 +901,14 @@ public class ActionBarMenuItem extends FrameLayout {
      * when the bar draws one round its buttons - and back into it.
      */
     private void solegramSetLiquidOrigin(View button) {
+        solegramSetLiquidOrigin(popupWindow, button);
+    }
+
+    /** The same drop for a menu this button opens through another window (ItemOptions: the chat list's ⋮). */
+    public void solegramSetLiquidOrigin(ActionBarPopupWindow popupWindow, View button) {
+        if (popupWindow == null) {
+            return;
+        }
         if (button == null || !button.isAttachedToWindow() || button.getWidth() <= 0 || button.getHeight() <= 0) {
             popupWindow.solegramSetLiquidOrigin(null, null, -1);
             return;

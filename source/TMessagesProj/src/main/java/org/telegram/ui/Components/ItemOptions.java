@@ -1552,6 +1552,10 @@ public class ItemOptions {
             origin.offset(loc[0], loc[1]);
             actionBarPopupWindow.solegramSetLiquidOrigin(scrimView, origin, scrimViewRoundRadius > 0 ? scrimViewRoundRadius : -1);
         }
+        if (solegramCascade && scrimView instanceof org.telegram.ui.ActionBar.ActionBarMenuItem) {
+            // as a header's own menu: a round drop where the ⋮ button (or its glass bubble) is
+            ((org.telegram.ui.ActionBar.ActionBarMenuItem) scrimView).solegramSetLiquidOrigin(actionBarPopupWindow, scrimView);
+        }
         actionBarPopupWindow.showAtLocation(
             container,
             0,
