@@ -117,7 +117,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private String[] messages;
     private int currentViewPagerPage;
     private EGLThread eglThread;
-    private com.solegram.messenger.ui.SolegramIntroView solegramIntroView;
+    private com.solegram.messenger.ui.SolegramIntroStage solegramIntroView;
     private long currentDate;
     private boolean justEndDragging;
     private boolean dragging;
@@ -248,9 +248,9 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         frameContainerView.addView(frameLayout2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 78, 0, 0));
 
         TextureView textureView = new TextureView(context);
-        // Solegram: its own animated mark in place of Telegram's 3D pictures (the texture view is never attached,
+        // Solegram: its own pictures (its animated avatar, then a sticker for each page) in place of Telegram's 3D ones (the texture view is never attached,
         // so its surface, and the thread drawing Telegram's intro, never start)
-        solegramIntroView = new com.solegram.messenger.ui.SolegramIntroView(context);
+        solegramIntroView = new com.solegram.messenger.ui.SolegramIntroStage(context);
         frameLayout2.addView(solegramIntroView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         // its glow reaches past the picture's own bounds
         frameLayout2.setClipChildren(false);
