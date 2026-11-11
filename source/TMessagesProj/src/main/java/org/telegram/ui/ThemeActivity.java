@@ -244,6 +244,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     // Solegram: themed icons and the seasonal switch
     private int appIconThemedHeaderRow;
     private int appIconThemedSelectorRow;
+    private int appIconMaterialHeaderRow;
+    private int appIconMaterialSelectorRow;
     private int appIconSeasonalRow;
 
     private int rowCount;
@@ -724,6 +726,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         appIconShadowRow = -1;
         appIconThemedHeaderRow = -1;
         appIconThemedSelectorRow = -1;
+        appIconMaterialHeaderRow = -1;
+        appIconMaterialSelectorRow = -1;
         appIconSeasonalRow = -1;
         lastShadowRow = -1;
 
@@ -792,6 +796,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             appIconSelectorRow = rowCount++;
             appIconThemedHeaderRow = rowCount++;
             appIconThemedSelectorRow = rowCount++;
+            appIconMaterialHeaderRow = rowCount++;
+            appIconMaterialSelectorRow = rowCount++;
             appIconSeasonalRow = rowCount++;
             appIconShadowRow = rowCount++;
 
@@ -2194,6 +2200,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
         private final static int TYPE_APP_ICON = 20;
         private final static int TYPE_CHOOSE_COLOR = 21;
         private final static int TYPE_APP_ICON_THEMED = 22;
+        private final static int TYPE_APP_ICON_MATERIAL = 120;
 
         private Context mContext;
         private boolean first = true;
@@ -2215,7 +2222,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             int type = holder.getItemViewType();
             return type == 0 || type == TYPE_TEXT_SETTING || type == TYPE_THEME_TYPE || type == TYPE_TEXT_CHECK ||
                     type == TYPE_NIGHT_THEME || type == TYPE_THEME_LIST || type == TYPE_THEME_ACCENT_LIST ||
-                    type == TYPE_TEXT_PREFERENCE || type == 18 || type == TYPE_APP_ICON || type == TYPE_APP_ICON_THEMED || type == TYPE_CHOOSE_COLOR;
+                    type == TYPE_TEXT_PREFERENCE || type == 18 || type == TYPE_APP_ICON || type == TYPE_APP_ICON_THEMED || type == TYPE_APP_ICON_MATERIAL || type == TYPE_CHOOSE_COLOR;
         }
 
         private void showOptionsForTheme(Theme.ThemeInfo themeInfo) {
@@ -2601,6 +2608,9 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 case TYPE_APP_ICON_THEMED:
                     view = new AppIconsSelectorCell(mContext, ThemeActivity.this, currentAccount, true);
                     break;
+                case TYPE_APP_ICON_MATERIAL:
+                    view = new AppIconsSelectorCell(mContext, ThemeActivity.this, currentAccount, false, true);
+                    break;
                 case TYPE_CHOOSE_COLOR:
                     view = new PeerColorActivity.ChangeNameColorCell(currentAccount, 0, mContext, getResourceProvider());
                     break;
@@ -2728,6 +2738,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         headerCell.setText(getString(R.string.AppIcon));
                     } else if (position == appIconThemedHeaderRow) {
                         headerCell.setText(getString(R.string.SG_IconsThemed));
+                    } else if (position == appIconMaterialHeaderRow) {
+                        headerCell.setText(getString(R.string.SG_IconsMaterial));
                     } else if (position == otherHeaderRow) {
                         headerCell.setText(getString("OtherSettings", R.string.OtherSettings));
                     } else if (position == mediaSoundHeaderRow) {
@@ -2900,7 +2912,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             } else if (position == scheduleHeaderRow || position == automaticHeaderRow || position == preferedHeaderRow ||
                     position == settingsRow || position == themeHeaderRow || position == textSizeHeaderRow ||
                     position == chatListHeaderRow || position == bubbleRadiusHeaderRow || position == swipeGestureHeaderRow ||
-                    position == selectThemeHeaderRow || position == appIconHeaderRow || position == appIconThemedHeaderRow || position == mediaSoundHeaderRow ||
+                    position == selectThemeHeaderRow || position == appIconHeaderRow || position == appIconThemedHeaderRow || position == appIconMaterialHeaderRow || position == mediaSoundHeaderRow ||
                     position == otherHeaderRow) {
                 return TYPE_HEADER;
             } else if (position == automaticBrightnessRow) {
@@ -2937,6 +2949,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 return TYPE_APP_ICON;
             } else if (position == appIconThemedSelectorRow) {
                 return TYPE_APP_ICON_THEMED;
+            } else if (position == appIconMaterialSelectorRow) {
+                return TYPE_APP_ICON_MATERIAL;
             } else if (position == changeUserColor) {
                 return TYPE_CHOOSE_COLOR;
             }

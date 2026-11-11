@@ -231,7 +231,25 @@ public class LauncherIconController {
         DOOR("DoorIcon", R.mipmap.sg_icon_bg_door, R.mipmap.sg_icon_fg_door, R.string.SG_IconDoor, false, true),
         // homages to famous game styles (no names, characters or textures of any particular game)
         PIXEL("PixelIcon", R.mipmap.sg_icon_bg_pixel, R.mipmap.sg_icon_fg_pixel, R.string.SG_IconPixel, false, true),
-        CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true);
+        CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true),
+        // Solegram 3.3: an early 2000s desktop, a nebula, black and white manga, a frozen New Year, a deep sea
+        // jellyfish, a golden spin of the old West, a green robot - homages to styles, no names or characters
+        RETRO("RetroIcon", R.mipmap.sg_icon_bg_xp, R.mipmap.sg_icon_fg_xp, R.string.SG_IconRetro, false, true),
+        NEBULA("NebulaIcon", R.mipmap.sg_icon_bg_cosmos, R.mipmap.sg_icon_fg_cosmos, R.string.SG_IconNebula, false, true),
+        MANGA("MangaIcon", R.mipmap.sg_icon_bg_manga, R.mipmap.sg_icon_fg_manga, R.string.SG_IconManga, false, true),
+        FROST("FrostIcon", R.mipmap.sg_icon_bg_frost, R.mipmap.sg_icon_fg_frost, R.string.SG_IconFrost, false, true),
+        JELLYFISH("JellyfishIcon", R.mipmap.sg_icon_bg_jelly, R.mipmap.sg_icon_fg_jelly, R.string.SG_IconJellyfish, false, true),
+        SPIN("SpinIcon", R.mipmap.sg_icon_bg_spin, R.mipmap.sg_icon_fg_spin, R.string.SG_IconSpin, false, true),
+        DROID("DroidIcon", R.mipmap.sg_icon_bg_droid, R.mipmap.sg_icon_fg_droid, R.string.SG_IconDroid, false, true),
+        // Solegram 3.3: Material You - the mark in two tones of one hue on its tonal container (their own row)
+        MATERIAL_SKY("MaterialSkyIcon", R.drawable.sg_icon_bg_m3sky, R.drawable.sg_icon_fg_m3sky, R.string.SG_IconM3Sky, false, false, true),
+        MATERIAL_SAGE("MaterialSageIcon", R.drawable.sg_icon_bg_m3sage, R.drawable.sg_icon_fg_m3sage, R.string.SG_IconM3Sage, false, false, true),
+        MATERIAL_ROSE("MaterialRoseIcon", R.drawable.sg_icon_bg_m3rose, R.drawable.sg_icon_fg_m3rose, R.string.SG_IconM3Rose, false, false, true),
+        MATERIAL_APRICOT("MaterialApricotIcon", R.drawable.sg_icon_bg_m3apricot, R.drawable.sg_icon_fg_m3apricot, R.string.SG_IconM3Apricot, false, false, true),
+        MATERIAL_LILAC("MaterialLilacIcon", R.drawable.sg_icon_bg_m3lilac, R.drawable.sg_icon_fg_m3lilac, R.string.SG_IconM3Lilac, false, false, true),
+        MATERIAL_TEAL("MaterialTealIcon", R.drawable.sg_icon_bg_m3teal, R.drawable.sg_icon_fg_m3teal, R.string.SG_IconM3Teal, false, false, true),
+        MATERIAL_NIGHT("MaterialNightIcon", R.drawable.sg_icon_bg_m3night, R.drawable.sg_icon_fg_m3night, R.string.SG_IconM3Night, false, false, true),
+        MATERIAL_PAPER("MaterialPaperIcon", R.drawable.sg_icon_bg_m3paper, R.drawable.sg_icon_fg_m3paper, R.string.SG_IconM3Paper, false, false, true);
 
         public final String key;
         public final int background;
@@ -239,6 +257,8 @@ public class LauncherIconController {
         public final int title;
         public final boolean premium;
         public final boolean themed;
+        /** Solegram: the Material You set, in a row of its own in the picker. */
+        public final boolean material;
 
         private ComponentName componentName;
 
@@ -258,6 +278,11 @@ public class LauncherIconController {
         }
 
         LauncherIcon(String key, int background, int foreground, int title, boolean premium, boolean themed) {
+            this(key, background, foreground, title, premium, themed, false);
+        }
+
+        LauncherIcon(String key, int background, int foreground, int title, boolean premium, boolean themed, boolean material) {
+            this.material = material;
             this.themed = themed;
             this.key = key;
             this.background = background;

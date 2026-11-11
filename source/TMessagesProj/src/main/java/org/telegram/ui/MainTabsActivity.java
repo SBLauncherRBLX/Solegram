@@ -1684,6 +1684,28 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private final RectF tabsCapturePosition = new RectF();
     private final Runnable onFragmentGlassCaptured = this::blur3_onFragmentGlassCaptured;
 
+    private final java.util.Set<View> solegramGlassWatched = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+
+    /**
+     * Solegram: the tab bar's glass is given the page's capture once the page is laid out. At the app's start the pages
+     * are laid out after the tabs' container: they were skipped then (no width yet) and the bar stayed without glass
+     * until something else moved; now each page's first layout (and its size changes) brings the glass in.
+     */
+    @Override
+    protected void onFragmentViewBound(BaseFragment fragment, View fragmentView) {
+        if (fragmentView == null || !solegramGlassWatched.add(fragmentView)) {
+            return;
+        }
+        fragmentView.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (r - l != or - ol || b - t != ob - ot) {
+                blur3_updateFragmentsGlass();
+                blur3_onFragmentGlassCaptured();
+                // and once more after its first frame: its own capture is there by then
+                v.post(this::blur3_onFragmentGlassCaptured);
+            }
+        });
+    }
+
     private void blur3_onFragmentGlassCaptured() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && iBlur3SourceTabGlass != null) {
             iBlur3SourceTabGlass.invalidateRenderer();

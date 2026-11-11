@@ -1715,6 +1715,16 @@ public class ItemOptions {
         return true;
     }
 
+    /**
+     * Solegram: closes the menu at once, without its animation - for an item whose action has an animation of its own
+     * at once (the theme switch): the overlay holds the app's notifications back while it animates.
+     */
+    public void solegramCloseNow() {
+        if (solegramOverlay != null) {
+            solegramOverlay.close(false);
+        }
+    }
+
     /** Solegram: the menu opens as a header's own menu does (it grows out of the button, its items one by one). */
     public ItemOptions solegramCascade() {
         solegramCascade = true;

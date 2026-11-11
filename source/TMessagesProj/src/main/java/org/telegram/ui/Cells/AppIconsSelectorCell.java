@@ -56,17 +56,23 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
     private List<LauncherIconController.LauncherIcon> availableIcons = new ArrayList<>();
     private LinearLayoutManager linearLayoutManager;
     private int currentAccount;
-    /** Solegram: the picker has two rows, the colour icons and the themed ones. */
+    /** Solegram: the picker has three rows, the colour icons, the themed ones and the Material You ones. */
     private final boolean themed;
+    private final boolean material;
 
     public AppIconsSelectorCell(Context context, BaseFragment fragment, int currentAccount) {
         this(context, fragment, currentAccount, false);
     }
 
     public AppIconsSelectorCell(Context context, BaseFragment fragment, int currentAccount, boolean themed) {
+        this(context, fragment, currentAccount, themed, false);
+    }
+
+    public AppIconsSelectorCell(Context context, BaseFragment fragment, int currentAccount, boolean themed, boolean material) {
         super(context);
         this.currentAccount = currentAccount;
         this.themed = themed;
+        this.material = material;
         setPadding(0, AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12));
 
         setFocusable(false);
@@ -171,7 +177,7 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
     private void updateIconsVisibility() {
         availableIcons.clear();
         for (LauncherIconController.LauncherIcon icon : LauncherIconController.LauncherIcon.values()) {
-            if (icon.themed == themed) {
+            if (icon.themed == themed && icon.material == material) {
                 availableIcons.add(icon);
             }
         }

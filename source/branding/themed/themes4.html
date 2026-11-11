@@ -1,0 +1,379 @@
+<!doctype html><html><body style="margin:0;background:transparent"><canvas id="c" width="432" height="432"></canvas>
+<script>
+// Solegram themed launcher icons, set 4: mission, comic, money, tv. Each theme draws a background (opaque) and a
+// foreground (the mark, transparent around it) in the 108-unit adaptive icon box, at 4 px per unit.
+const M = __MARK__;
+const S = 4, W = 432;
+const sun = new Path2D(M.sun), lines = new Path2D(M.lines);
+const both = new Path2D(); both.addPath(sun); both.addPath(lines);
+const [L, T, R, B] = M.box, cx = M.cx, sunTop = M.sunTop, sunBot = M.sunBot;
+const sunR = (R - L) / 2, sunCy = M.sunBot - 1.24;   // centre of the half disc (its flat base)
+
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+// value noise and fbm, seeded
+function noise2(seed) {
+  const r = rng(seed), P = new Uint8Array(512), G = new Float32Array(256);
+  for (let i = 0; i < 256; i++) { P[i] = i; G[i] = r(); }
+  for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
+  for (let i = 0; i < 256; i++) P[i + 256] = P[i];
+  const v = (x, y) => G[P[P[x & 255] + (y & 255)]];
+  const sm = t => t * t * (3 - 2 * t);
+  return (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = sm(xf), w = sm(yf);
+    const a = v(xi, yi), b = v(xi + 1, yi), c = v(xi, yi + 1), d = v(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * w + (a - b - c + d) * u * w; };
+}
+function fbm(n, x, y, oct = 5) { let s = 0, a = 0.5, f = 1, t = 0; for (let i = 0; i < oct; i++) { s += a * n(x * f, y * f); t += a; a *= 0.5; f *= 2; } return s / t; }
+// per-pixel painter in device pixels; fn(x, y) in units returns [r,g,b,a] (0..255)
+function pixels(g, fn) {
+  const c = document.createElement('canvas'); c.width = W; c.height = W; const cg = c.getContext('2d');
+  const img = cg.createImageData(W, W), d = img.data;
+  for (let py = 0; py < W; py++) for (let px = 0; px < W; px++) {
+    const o = fn((px + 0.5) / S, (py + 0.5) / S); const k = (py * W + px) * 4;
+    d[k] = o[0]; d[k + 1] = o[1]; d[k + 2] = o[2]; d[k + 3] = o[3] === undefined ? 255 : o[3];
+  }
+  cg.putImageData(img, 0, 0);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(c, 0, 0); g.restore();
+}
+function within(g, p, fn) { g.save(); g.clip(p); fn(); g.restore(); }
+function glow(g, path, color, blur, alpha) { g.save(); g.filter = `blur(${blur * S}px)`; g.globalAlpha = alpha; g.fillStyle = color; g.fill(path); g.restore(); }
+function bevel(g, light, shade, k = 1, w = 1.6) {
+  for (const p of [sun, lines]) {
+    g.save(); g.clip(p);
+    g.save(); g.translate(0, 0.9); g.lineWidth = w; g.strokeStyle = light; g.filter = `blur(${0.5 * S}px)`; g.globalAlpha = 0.9 * k; g.stroke(p); g.restore();
+    g.save(); g.translate(0, -1.0); g.lineWidth = w * 1.1; g.strokeStyle = shade; g.filter = `blur(${0.6 * S}px)`; g.globalAlpha = 0.8 * k; g.stroke(p); g.restore();
+    g.restore();
+  }
+}
+function star4(g, x, y, s, color, alpha) { // a four point glint
+  g.save(); g.translate(x, y); g.globalAlpha = alpha; g.fillStyle = color;
+  g.beginPath(); g.moveTo(0, -s); g.quadraticCurveTo(s * 0.12, -s * 0.12, s, 0); g.quadraticCurveTo(s * 0.12, s * 0.12, 0, s);
+  g.quadraticCurveTo(-s * 0.12, s * 0.12, -s, 0); g.quadraticCurveTo(-s * 0.12, -s * 0.12, 0, -s); g.fill(); g.restore();
+}
+
+const THEMES = {};
+
+// ------------------------------------------------------------------------------------------------ mission
+// A space mission: deep sky with nebula and stars, the Earth's limb with clouds and air glow; the mark in
+// spacecraft white with ripstop and panel seams, the lines in crinkled gold foil, an orbit with a satellite.
+THEMES.mission = {
+  bg(g) {
+    const n1 = noise2(11), n2 = noise2(23), n3 = noise2(37);
+    const ex = 54, ey = 54 + 104, er = 76; // the Earth below the icon
+    pixels(g, (x, y) => {
+      // sky
+      let dx = x - 30, dy = y - 26; const rad = Math.sqrt(dx * dx + dy * dy) / 90;
+      let r = 4 + 10 * (1 - rad), gg = 7 + 18 * (1 - rad), b = 22 + 50 * (1 - rad);
+      // nebula: two colours of folded noise
+      const neb = Math.pow(Math.max(0, fbm(n1, x / 26, y / 26, 6) - 0.42) * 2.4, 1.6) * Math.max(0, 1 - Math.hypot(x - 26, y - 30) / 70);
+      const neb2 = Math.pow(Math.max(0, fbm(n2, x / 18 + 3, y / 18, 6) - 0.47) * 2.6, 1.8) * Math.max(0, 1 - Math.hypot(x - 80, y - 22) / 60);
+      r += neb * 90 + neb2 * 30; gg += neb * 40 + neb2 * 70; b += neb * 150 + neb2 * 110;
+      // the Earth
+      const de = Math.hypot(x - ex, y - ey);
+      if (de < er) {
+        const nx = (x - ex) / er, ny = (y - ey) / er; const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+        const light = Math.max(0, nx * 0.55 - ny * 0.75 + nz * 0.35);      // sun from the upper right
+        const land = fbm(n3, x / 7, y / 4, 6) > 0.56;
+        const cloud = Math.max(0, fbm(n2, x / 5 + 40, y / 2.4, 6) - 0.48) * 3;
+        let er_ = land ? 70 : 18, eg = land ? 95 : 70, eb = land ? 55 : 150;
+        er_ += (255 - er_) * Math.min(1, cloud); eg += (255 - eg) * Math.min(1, cloud); eb += (255 - eb) * Math.min(1, cloud);
+        const sh = 0.12 + light * 1.05;
+        r = er_ * sh; gg = eg * sh; b = eb * sh;
+        // city lights on the night side
+        if (light < 0.08 && land && n1(x * 9, y * 9) > 0.86) { r += 120; gg += 90; b += 30; }
+        // limb darkening towards the edge
+        const limb = Math.pow(nz, 0.35); r *= limb; gg *= limb; b *= limb;
+      }
+      // air glow: a thin band around the limb, brightest on the lit side
+      const air = Math.exp(-Math.pow((de - er) / 1.1, 2)) + 0.45 * Math.exp(-Math.pow((de - er - 1.6) / 2.6, 2));
+      const lit = Math.max(0.15, Math.min(1, 0.6 + (x - ex) / 60));
+      r += air * 90 * lit; gg += air * 170 * lit; b += air * 255 * lit;
+      return [Math.min(255, r), Math.min(255, gg), Math.min(255, b)];
+    });
+    // stars, three layers
+    const r = rng(5);
+    for (let i = 0; i < 1100; i++) {
+      const x = r() * 108, y = r() * 108; if (Math.hypot(x - ex, y - ey) < er + 1) continue;
+      const s = 0.07 + r() * r() * 0.22, t = r(); g.fillStyle = t < 0.2 ? '#ffd9b0' : t < 0.45 ? '#cfe0ff' : '#ffffff';
+      g.globalAlpha = 0.35 + r() * 0.6; g.beginPath(); g.arc(x, y, s, 0, 7); g.fill();
+    }
+    g.globalAlpha = 1;
+    for (const [x, y, s] of [[17, 18, 2.2], [88, 14, 1.6], [92, 47, 1.2], [12, 58, 1.4], [70, 9, 1.0], [30, 80, 0.9]]) {
+      g.save(); g.filter = `blur(${0.8 * S}px)`; g.fillStyle = '#bcd4ff'; g.globalAlpha = 0.8; g.beginPath(); g.arc(x, y, s * 0.6, 0, 7); g.fill(); g.restore();
+      star4(g, x, y, s, '#ffffff', 0.95); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, s * 0.16, 0, 7); g.fill();
+    }
+    // the sun rising behind the limb, with a soft flare
+    const fx = ex + er * 0.62, fy = ey - er * 0.79;
+    const fl = g.createRadialGradient(fx, fy, 0, fx, fy, 22); fl.addColorStop(0, 'rgba(255,255,240,1)'); fl.addColorStop(0.08, 'rgba(255,245,210,0.9)');
+    fl.addColorStop(0.3, 'rgba(160,200,255,0.25)'); fl.addColorStop(1, 'rgba(120,160,255,0)'); g.fillStyle = fl; g.fillRect(0, 0, 108, 108);
+    star4(g, fx, fy, 9, '#ffffff', 0.9);
+    g.save(); g.strokeStyle = 'rgba(180,210,255,0.18)'; g.lineWidth = 0.5; g.beginPath(); g.arc(fx - 14, fy - 12, 5, 0, 7); g.stroke();
+    g.fillStyle = 'rgba(150,200,255,0.10)'; g.beginPath(); g.arc(fx - 22, fy - 19, 2.4, 0, 7); g.fill(); g.restore();
+  },
+  fg(g) {
+    const n = noise2(91);
+    const orbit = (front) => { // an inclined orbit; front: the half nearer to us
+      g.save(); g.translate(54, 55); g.rotate(-0.32);
+      g.lineWidth = 0.55; g.setLineDash([2.2, 1.3]);
+      const grad = g.createLinearGradient(-30, 0, 30, 0); grad.addColorStop(0, 'rgba(190,220,255,0.15)'); grad.addColorStop(0.5, 'rgba(230,245,255,0.95)'); grad.addColorStop(1, 'rgba(190,220,255,0.35)');
+      g.strokeStyle = grad; g.beginPath(); g.ellipse(0, 0, 30.5, 9.2, 0, front ? 0 : Math.PI, front ? Math.PI : 2 * Math.PI); g.stroke();
+      if (front) { // a satellite on the near side
+        const a = 0.35 * Math.PI, sx = 30.5 * Math.cos(a), sy = 9.2 * Math.sin(a);
+        g.setLineDash([]); g.translate(sx, sy); g.rotate(0.32);
+        g.fillStyle = '#26324a'; g.fillRect(-4.1, -0.9, 2.9, 1.8); g.fillRect(1.2, -0.9, 2.9, 1.8);
+        g.strokeStyle = 'rgba(140,180,255,0.9)'; g.lineWidth = 0.12;
+        for (const x0 of [-4.1, 1.2]) { for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(x0 + k * 0.725, -0.9); g.lineTo(x0 + k * 0.725, 0.9); g.stroke(); } g.strokeRect(x0, -0.9, 2.9, 1.8); }
+        const bd = g.createLinearGradient(0, -1.2, 0, 1.2); bd.addColorStop(0, '#fff3c4'); bd.addColorStop(1, '#c79a2e'); g.fillStyle = bd;
+        g.beginPath(); g.roundRect(-1.2, -1.2, 2.4, 2.4, 0.4); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(0.3, -1.6, 0.35, 0, 7); g.fill();
+        g.strokeStyle = '#fff'; g.lineWidth = 0.15; g.beginPath(); g.moveTo(0.3, -1.2); g.lineTo(0.3, -1.6); g.stroke();
+      }
+      g.restore();
+    };
+    orbit(false);
+    glow(g, both, '#7fb2ff', 3.2, 0.55);
+    // the sun: spacecraft white, ripstop weave, panel seams and rivets
+    within(g, sun, () => {
+      pixels(g, (x, y) => {
+        const t = (y - sunTop) / (sunBot - sunTop); let v = 252 - t * 26;
+        const rip = (Math.abs(((x * 2.2) % 2) - 1) < 0.07 || Math.abs(((y * 2.2) % 2) - 1) < 0.07) ? -10 : 0;
+        const weave = (n(x * 14, y * 14) - 0.5) * 9;
+        v += rip + weave; return [v - 4, v - 1, v + 3, 255];
+      });
+      g.strokeStyle = 'rgba(70,90,120,0.45)'; g.lineWidth = 0.22;
+      for (const a of [-0.55, -0.25, 0.05, 0.35]) { g.beginPath(); g.moveTo(cx, sunCy); g.lineTo(cx + Math.cos(Math.PI + (a + 0.5) * Math.PI) * 30, sunCy + Math.sin(Math.PI + (a + 0.5) * Math.PI) * 30); g.stroke(); }
+      g.beginPath(); g.arc(cx, sunCy, sunR * 0.55, Math.PI, 2 * Math.PI); g.stroke();
+      g.fillStyle = 'rgba(80,95,120,0.55)';
+      for (let k = 0; k <= 10; k++) { const a = Math.PI + k / 10 * Math.PI; g.beginPath(); g.arc(cx + Math.cos(a) * (sunR - 1.6), sunCy + Math.sin(a) * (sunR - 1.6), 0.28, 0, 7); g.fill(); }
+      const sh = g.createRadialGradient(cx - 7, sunTop + 4, 1, cx, sunCy, sunR + 2); sh.addColorStop(0, 'rgba(255,255,255,0.6)'); sh.addColorStop(0.55, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(40,60,110,0.35)');
+      g.fillStyle = sh; g.fillRect(0, 0, 108, 108);
+    });
+    // the lines: crinkled gold insulation foil
+    within(g, lines, () => {
+      const n2 = noise2(57);
+      pixels(g, (x, y) => {
+        const e = 0.2, h = fbm(n2, x * 1.6, y * 1.6, 4), hx = fbm(n2, x * 1.6 + e, y * 1.6, 4) - h, hy = fbm(n2, x * 1.6, y * 1.6 + e, 4) - h;
+        const sh = Math.max(0, Math.min(1, 0.55 + (-hx * 0.7 - hy * 1.0) * 9));
+        const spec = Math.pow(sh, 6);
+        return [Math.min(255, 150 + sh * 105 + spec * 60), Math.min(255, 95 + sh * 95 + spec * 70), Math.min(255, 18 + sh * 40 + spec * 80), 255];
+      });
+    });
+    bevel(g, 'rgba(255,255,255,0.95)', 'rgba(30,45,80,0.55)');
+    orbit(true);
+  },
+};
+
+// ------------------------------------------------------------------------------------------------ comic
+// A comic page: a burst of rays in two yellows, Ben-Day dots, paper grain, speed lines; the mark inked with a
+// heavy outline, flat colours with halftone shading, an off-register print shadow and a white shine.
+THEMES.comic = {
+  bg(g) {
+    const n = noise2(4);
+    const ox = 56, oy = 50;
+    pixels(g, (x, y) => {
+      const a = Math.atan2(y - oy, x - ox), d = Math.hypot(x - ox, y - oy);
+      const ray = (Math.floor((a + Math.PI) / (Math.PI * 2) * 22) % 2) === 0;
+      let r = ray ? 255 : 255, gg = ray ? 214 : 186, b = ray ? 40 : 20;
+      // outward warmer
+      const k = Math.min(1, d / 75); r -= 10 * k; gg -= 70 * k; b -= 10 * k;
+      // Ben-Day dots: magenta dots that grow towards the edge, on a 45 degree grid
+      const p = 2.1, u = (x + y) / Math.SQRT2 / p, v = (x - y) / Math.SQRT2 / p;
+      const du = u - Math.round(u), dv = v - Math.round(v), dd = Math.sqrt(du * du + dv * dv);
+      const rad = 0.08 + 0.32 * Math.min(1, d / 70);
+      if (dd < rad) { r = r * 0.92; gg = gg * 0.55; b = b * 0.75 + 30; }
+      // paper grain and fibres
+      const gr = (n(x * 30, y * 30) - 0.5) * 22 + (fbm(n, x / 4, y / 4, 3) - 0.5) * 14;
+      return [Math.max(0, Math.min(255, r + gr)), Math.max(0, Math.min(255, gg + gr)), Math.max(0, Math.min(255, b + gr * 0.6))];
+    });
+    // speed lines towards the centre
+    const r = rng(9); g.strokeStyle = '#1b1210';
+    for (let i = 0; i < 46; i++) {
+      const a = r() * Math.PI * 2, d0 = 44 + r() * 20, d1 = d0 + 6 + r() * 26;
+      g.globalAlpha = 0.55 + r() * 0.4; g.lineWidth = 0.25 + r() * 0.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(ox + Math.cos(a) * d0, oy + Math.sin(a) * d0); g.lineTo(ox + Math.cos(a) * d1, oy + Math.sin(a) * d1); g.stroke();
+    }
+    g.globalAlpha = 1;
+    // a frame line, as a panel border (inside the safe area of most masks)
+    g.strokeStyle = 'rgba(27,18,16,0.85)'; g.lineWidth = 1.1; g.strokeRect(6.5, 6.5, 95, 95);
+  },
+  fg(g) {
+    // the burst behind: a white jagged balloon with a black outline
+    const r = rng(17), pts = [], N = 22;
+    for (let i = 0; i < N * 2; i++) { const a = i / (N * 2) * Math.PI * 2 - Math.PI / 2; const rr = i % 2 ? 23 + r() * 3 : 31 + r() * 5; pts.push([54 + Math.cos(a) * rr * 1.08, 54 + Math.sin(a) * rr * 0.92]); }
+    const burst = new Path2D(); burst.moveTo(...pts[0]); for (const p of pts) burst.lineTo(...p); burst.closePath();
+    g.save(); g.translate(1.6, 1.8); g.fillStyle = 'rgba(0,160,220,0.9)'; g.fill(burst); g.restore();      // off-register cyan
+    g.fillStyle = '#fffaf0'; g.fill(burst);
+    within(g, burst, () => { // halftone shadow in the burst's lower right
+      for (let y = 20; y < 92; y += 1.6) for (let x = 20; x < 92; x += 1.6) {
+        const k = Math.max(0, ((x - 54) * 0.6 + (y - 54) * 0.8) / 34); if (k <= 0.05) continue;
+        g.fillStyle = 'rgba(230,80,60,0.55)'; g.beginPath(); g.arc(x + ((y / 1.6) % 2) * 0.8, y, Math.min(0.75, k * 0.6), 0, 7); g.fill();
+      }
+    });
+    g.lineJoin = 'round'; g.strokeStyle = '#141010'; g.lineWidth = 1.5; g.stroke(burst);
+    // the mark: offset print, ink outline, flat colour, halftone shade, shine
+    g.save(); g.translate(1.1, 1.3); g.fillStyle = '#e8337a'; g.globalAlpha = 0.85; g.fill(both); g.restore();
+    within(g, sun, () => {
+      const base = g.createLinearGradient(0, sunTop, 0, sunBot); base.addColorStop(0, '#ff6b2c'); base.addColorStop(1, '#ff3d1f'); g.fillStyle = base; g.fillRect(0, 0, 108, 108);
+      for (let y = sunTop; y < sunBot + 2; y += 1.25) for (let x = L; x < R; x += 1.25) {
+        const k = Math.max(0, (y - (sunTop + 7)) / 11 + (x - cx) / 40); if (k <= 0.02) continue;
+        g.fillStyle = '#b3160c'; g.beginPath(); g.arc(x + ((y / 1.25) % 2) * 0.62, y, Math.min(0.6, k * 0.5), 0, 7); g.fill();
+      }
+    });
+    within(g, lines, () => {
+      g.fillStyle = '#2ec4ff'; g.fillRect(0, 0, 108, 108);
+      for (let y = sunBot; y < B + 2; y += 1.2) for (let x = L; x < R; x += 1.2) {
+        const k = Math.max(0, (y - (sunBot + 4)) / 12); if (k <= 0.05) continue;
+        g.fillStyle = '#0a6fb8'; g.beginPath(); g.arc(x + ((y / 1.2) % 2) * 0.6, y, Math.min(0.55, k * 0.6), 0, 7); g.fill();
+      }
+    });
+    g.strokeStyle = '#141010'; g.lineWidth = 1.35; g.stroke(sun); g.stroke(lines);
+    // shine strokes
+    g.save(); g.clip(sun); g.strokeStyle = '#fff6e6'; g.lineCap = 'round'; g.lineWidth = 1.1;
+    g.beginPath(); g.arc(cx, sunCy, sunR - 3.6, Math.PI * 1.17, Math.PI * 1.42); g.stroke();
+    g.lineWidth = 0.9; g.beginPath(); g.arc(cx, sunCy, sunR - 3.6, Math.PI * 1.47, Math.PI * 1.53); g.stroke(); g.restore();
+    g.save(); g.clip(lines); g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineCap = 'round'; g.lineWidth = 0.7;
+    g.beginPath(); g.moveTo(L + 5, M.box[3] - 10.9); g.lineTo(L + 11, M.box[3] - 10.9); g.stroke(); g.restore();
+    // ink sparkles
+    for (const [x, y, s] of [[76, 33, 3.2], [31, 37, 2.2], [79, 70, 2]]) { star4(g, x + 0.5, y + 0.6, s * 1.25, '#141010', 1); star4(g, x, y, s, '#ffffff', 1); }
+  },
+};
+
+// ------------------------------------------------------------------------------------------------ money
+// Money: banknote green with engraved guilloche rosettes, fine line work and security fibres; the mark in
+// polished gold, the sun a coin with a reeded rim and engraved rings, the lines two stamped ingots.
+THEMES.money = {
+  bg(g) {
+    const n = noise2(71);
+    pixels(g, (x, y) => {
+      const d = Math.hypot(x - 54, y - 50) / 76;
+      let r = 12 + 30 * (1 - d), gg = 58 + 60 * (1 - d), b = 40 + 36 * (1 - d);
+      // fine diagonal engraving and paper
+      const lnA = Math.abs(Math.sin((x + y) * 3.1)) < 0.12 ? 14 : 0;
+      const lnB = Math.abs(Math.sin((x - y) * 2.3)) < 0.08 ? 8 : 0;
+      const paper = (n(x * 22, y * 22) - 0.5) * 12 + (fbm(n, x / 6, y / 6, 3) - 0.5) * 16;
+      return [r + lnA + lnB * 0.6 + paper, gg + lnA * 1.4 + lnB + paper, b + lnA + lnB * 0.8 + paper];
+    });
+    // guilloche rosettes: hypotrochoids in thin light lines
+    const rosette = (ox, oy, R1, r1, d1, turns, color, w, alpha) => {
+      g.save(); g.strokeStyle = color; g.lineWidth = w; g.globalAlpha = alpha; g.beginPath();
+      const steps = 3600;
+      for (let i = 0; i <= steps; i++) { const t = i / steps * Math.PI * 2 * turns;
+        const x = (R1 - r1) * Math.cos(t) + d1 * Math.cos((R1 - r1) / r1 * t), y = (R1 - r1) * Math.sin(t) - d1 * Math.sin((R1 - r1) / r1 * t);
+        i ? g.lineTo(ox + x, oy + y) : g.moveTo(ox + x, oy + y); }
+      g.stroke(); g.restore();
+    };
+    rosette(54, 52, 40, 6.2, 11, 31, '#9fe3b8', 0.09, 0.55);
+    rosette(54, 52, 34, 4.7, 9.5, 47, '#d9f5df', 0.07, 0.45);
+    rosette(54, 52, 22, 3.1, 6.8, 31, '#c9f0d2', 0.07, 0.5);
+    rosette(10, 98, 22, 3.3, 7, 33, '#8fd8a8', 0.08, 0.45);
+    rosette(98, 10, 22, 3.3, 7, 33, '#8fd8a8', 0.08, 0.45);
+    // concentric microline rings around the centre
+    g.save(); g.strokeStyle = 'rgba(220,255,230,0.18)'; g.lineWidth = 0.08; for (let k = 0; k < 40; k++) { g.beginPath(); g.arc(54, 52, 41 + k * 0.45, 0, 7); g.stroke(); } g.restore();
+    // security fibres
+    const r = rng(13);
+    for (let i = 0; i < 70; i++) { const x = r() * 108, y = r() * 108, a = r() * 6.28, l = 1 + r() * 2.2;
+      g.strokeStyle = r() < 0.5 ? 'rgba(220,60,70,0.55)' : 'rgba(70,120,230,0.5)'; g.lineWidth = 0.12;
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a + 1) * l * 0.6, y + Math.sin(a + 1) * l * 0.6, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }
+    // vignette
+    const v = g.createRadialGradient(54, 52, 30, 54, 54, 80); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,25,12,0.55)'); g.fillStyle = v; g.fillRect(0, 0, 108, 108);
+  },
+  fg(g) {
+    const gold = (x, y, a, b) => { // brushed polished gold by a shade factor
+      return null;
+    };
+    g.save(); g.filter = `blur(${1.6 * S}px)`; g.globalAlpha = 0.7; g.fillStyle = '#021a0c'; g.translate(0.6, 2.2); g.fill(both); g.restore(); // drop shadow
+    glow(g, both, '#ffd76a', 3, 0.35);
+    const n = noise2(5);
+    within(g, sun, () => { // the coin
+      pixels(g, (x, y) => {
+        const dx = x - cx, dy = y - sunCy, d = Math.hypot(dx, dy) / sunR, ang = Math.atan2(dy, dx);
+        // a conical sheen: polished metal catches light at angles
+        let s = 0.55 + 0.35 * Math.cos(ang * 2 + 0.9) + 0.12 * Math.cos(ang * 6);
+        s -= d * 0.15; const brush = (n(d * 260, ang * 4) - 0.5) * 0.12; s += brush;
+        if (d > 0.88) { // reeded rim
+          const reed = Math.abs(Math.sin(ang * 70)) * 0.25; s = 0.5 + (d > 0.96 ? -0.15 : 0.2) + reed - 0.12;
+        } else if (Math.abs(d - 0.8) < 0.015 || Math.abs(d - 0.5) < 0.012) s -= 0.35; // engraved rings
+        else if (d < 0.5 && d > 0.2 && Math.abs(Math.sin(ang * 12)) < 0.06) s -= 0.18; // rays in the field
+        s = Math.max(0, Math.min(1.15, s));
+        return [Math.min(255, 120 + s * 135 + Math.max(0, s - 0.85) * 300), Math.min(255, 78 + s * 125 + Math.max(0, s - 0.85) * 300), Math.min(255, 12 + s * 55 + Math.max(0, s - 0.9) * 400), 255];
+      });
+    });
+    within(g, lines, () => { // two ingots
+      pixels(g, (x, y) => {
+        const top1 = 59.115, top2 = 66.555, h = 4.65; const yy = y < 65 ? (y - top1) / h : (y - top2) / h;
+        let s = yy < 0.3 ? 0.95 - yy : yy > 0.78 ? 0.35 : 0.75 - (yy - 0.3) * 0.5;   // top facet bright, bottom darker
+        s += (n(x * 30, y * 3) - 0.5) * 0.12 + 0.12 * Math.cos(x * 0.25);
+        s = Math.max(0, Math.min(1.1, s));
+        return [Math.min(255, 125 + s * 130 + Math.max(0, s - 0.85) * 260), Math.min(255, 80 + s * 120 + Math.max(0, s - 0.85) * 260), Math.min(255, 15 + s * 50 + Math.max(0, s - 0.9) * 300), 255];
+      });
+      g.strokeStyle = 'rgba(120,70,0,0.55)'; g.lineWidth = 0.18; // stamped marks
+      for (const [x0, y0] of [[48, 61.4], [51, 68.9]]) { g.strokeRect(x0, y0 - 0.9, 3.4, 1.8); g.beginPath(); g.moveTo(x0 + 0.6, y0); g.lineTo(x0 + 2.8, y0); g.stroke(); }
+    });
+    bevel(g, 'rgba(255,250,215,1)', 'rgba(90,50,0,0.75)', 1, 1.4);
+    // glints
+    for (const [x, y, s] of [[44, 42.5, 3], [66.5, 61, 2.2], [59, 47, 1.4]]) star4(g, x, y, s, '#fffbe8', 0.95);
+  },
+};
+
+// ------------------------------------------------------------------------------------------------ tv
+// On air: a glass CRT screen in the dark (phosphor triads, scanlines, static, a curved reflection); the mark
+// as a glowing picture on it with colour fringes, bloom, a rolling bar and one glitched slice.
+THEMES.tv = {
+  bg(g) {
+    const n = noise2(3), r = rng(41);
+    pixels(g, (x, y) => {
+      // screen glow, barrel vignette
+      const ux = (x - 54) / 54, uy = (y - 54) / 54; const v = Math.max(0, 1 - Math.pow(ux * ux * 0.7 + uy * uy * 0.7, 1.4));
+      let rr = 8 + 22 * v, gg = 16 + 52 * v, bb = 30 + 70 * v;
+      // faint colour bars of a test signal, very low, at the top
+      const bar = Math.floor(x / (108 / 7)); const bars = [[1, 1, 1], [1, 1, 0], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [0, 0, 1]][bar] || [0, 0, 0];
+      const barK = y < 22 ? 0.13 * Math.max(0, 1 - y / 22) : 0; rr += bars[0] * 255 * barK; gg += bars[1] * 255 * barK; bb += bars[2] * 255 * barK;
+      // static
+      const st = (n(x * 40, y * 40) - 0.5) * 26 * (0.4 + v);
+      rr += st; gg += st; bb += st;
+      // scanlines
+      const sl = 0.72 + 0.28 * Math.cos((y * 4 / 3) * Math.PI * 2);
+      // aperture grille: R, G, B stripes
+      const ph = Math.floor(x * 4 / 1.0) % 3; const m = [ph === 0 ? 1.15 : 0.85, ph === 1 ? 1.15 : 0.85, ph === 2 ? 1.15 : 0.85];
+      return [Math.max(0, Math.min(255, rr * sl * m[0])), Math.max(0, Math.min(255, gg * sl * m[1])), Math.max(0, Math.min(255, bb * sl * m[2]))];
+    });
+    // a soft glass reflection from the upper left and a bright rolling band
+    const rf = g.createLinearGradient(0, 0, 60, 60); rf.addColorStop(0, 'rgba(255,255,255,0.13)'); rf.addColorStop(0.5, 'rgba(255,255,255,0.02)'); rf.addColorStop(1, 'rgba(255,255,255,0)');
+    g.save(); g.beginPath(); g.ellipse(26, 18, 46, 20, -0.5, 0, 7); g.fillStyle = rf; g.fill(); g.restore();
+    const band = g.createLinearGradient(0, 76, 0, 90); band.addColorStop(0, 'rgba(160,220,255,0)'); band.addColorStop(0.5, 'rgba(160,220,255,0.10)'); band.addColorStop(1, 'rgba(160,220,255,0)'); g.fillStyle = band; g.fillRect(0, 76, 108, 14);
+    // an "on air" lamp, red with a halo
+    g.save(); g.filter = `blur(${1.6 * S}px)`; g.fillStyle = '#ff2a2a'; g.globalAlpha = 0.9; g.beginPath(); g.arc(79, 28, 2.6, 0, 7); g.fill(); g.restore();
+    const lamp = g.createRadialGradient(78.4, 27.4, 0.2, 79, 28, 1.7); lamp.addColorStop(0, '#ffd2c8'); lamp.addColorStop(0.4, '#ff4a3a'); lamp.addColorStop(1, '#a50f12');
+    g.fillStyle = lamp; g.beginPath(); g.arc(79, 28, 1.6, 0, 7); g.fill();
+  },
+  fg(g) {
+    // bloom
+    glow(g, both, '#5fd4ff', 4.2, 0.65); glow(g, both, '#bff0ff', 1.6, 0.55);
+    // colour fringes: red to the left, cyan to the right
+    g.save(); g.globalCompositeOperation = 'lighter';
+    g.save(); g.translate(-0.75, 0); g.fillStyle = 'rgba(255,40,80,0.75)'; g.fill(both); g.restore();
+    g.save(); g.translate(0.75, 0); g.fillStyle = 'rgba(40,220,255,0.75)'; g.fill(both); g.restore();
+    g.restore();
+    within(g, both, () => {
+      const base = g.createLinearGradient(0, T, 0, B); base.addColorStop(0, '#ffffff'); base.addColorStop(1, '#d6f4ff'); g.fillStyle = base; g.fillRect(0, 0, 108, 108);
+      // scanlines and phosphor through the picture
+      for (let y = T; y < B + 1; y += 0.75) { g.fillStyle = 'rgba(30,90,140,0.22)'; g.fillRect(0, y + 0.42, 108, 0.3); }
+      for (let x = L; x < R + 1; x += 0.75) { g.fillStyle = 'rgba(255,120,160,0.06)'; g.fillRect(x, 0, 0.25, 108); }
+      const hot = g.createRadialGradient(cx - 4, sunTop + 6, 0.5, cx, sunCy, sunR + 6); hot.addColorStop(0, 'rgba(255,255,255,0.0)'); hot.addColorStop(1, 'rgba(90,170,230,0.35)'); g.fillStyle = hot; g.fillRect(0, 0, 108, 108);
+    });
+    // one glitched slice across the sun
+    const y0 = sunTop + 9.2, h = 1.7;
+    g.save(); g.beginPath(); g.rect(0, y0, 108, h); g.clip();
+    g.clearRect(0, y0, 108, h);
+    g.save(); g.translate(2.4, 0); glow(g, sun, '#5fd4ff', 1.2, 0.6); g.fillStyle = '#eafaff'; g.fill(sun);
+    g.globalCompositeOperation = 'lighter'; g.translate(-0.9, 0); g.fillStyle = 'rgba(255,40,80,0.6)'; g.fill(sun); g.restore();
+    g.restore();
+  },
+};
+
+__MORE__
+window.render = (name, layer) => {
+  const c = document.getElementById('c'), g = c.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W); g.filter = 'none'; g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  g.setTransform(S, 0, 0, S, 0, 0); THEMES[name][layer](g);
+  return c.toDataURL('image/png');
+};
+</script></body></html>

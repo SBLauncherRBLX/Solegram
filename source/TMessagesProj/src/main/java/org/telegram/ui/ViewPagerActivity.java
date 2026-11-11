@@ -130,6 +130,7 @@ public abstract class ViewPagerActivity extends BaseFragment {
                 ViewCompat.requestApplyInsets(container);
                 checkSystemBarColors();
                 checkFragmentsVisibility();
+                onFragmentViewBound(fragment, fragmentView);
             }
         });
 
@@ -138,6 +139,11 @@ public abstract class ViewPagerActivity extends BaseFragment {
         fragmentView = contentView;
         ViewCompat.setOnApplyWindowInsetsListener(fragmentView, this::onApplyWindowInsets);
         return fragmentView;
+    }
+
+    /** Solegram: a page's view was put into the pager (it is laid out after this). */
+    protected void onFragmentViewBound(BaseFragment fragment, View fragmentView) {
+
     }
 
     protected void putFragmentAtPosition(int position, BaseFragment fragment) {

@@ -52,10 +52,21 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
 
     private float glassColorsFactor = 1f;
     private PopupSwipeBackLayout swipeBackListening;
+    private BlurredBackgroundColorProvider solegramMenuColors;
+    private Theme.ResourcesProvider solegramMenuColorsFor;
     private final BlurredBackgroundColorProvider glassColors = new BlurredBackgroundColorProvider() {
         @Nullable
         private BlurredBackgroundColorProvider base() {
-            return bar != null ? bar.getMenuGlassColorProvider() : null;
+            if (bar == null) {
+                return null;
+            }
+            // Solegram: the open menu is coloured and outlined as every other Solegram menu (the popup ones)
+            final Theme.ResourcesProvider resourcesProvider = bar.getMenuResourcesProvider();
+            if (solegramMenuColors == null || solegramMenuColorsFor != resourcesProvider) {
+                solegramMenuColors = org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl.solegramMenu(resourcesProvider, true);
+                solegramMenuColorsFor = resourcesProvider;
+            }
+            return solegramMenuColors;
         }
 
         @Override
@@ -78,7 +89,7 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
         @Override
         public int getStrokeColorTop() {
             final BlurredBackgroundColorProvider base = base();
-            final int menu = base != null && bar.hasMenuGlassStroke() ? base.getStrokeColorTop() : 0;
+            final int menu = base != null ? base.getStrokeColorTop() : 0;
             final BlurredBackgroundColorProvider buttons = buttons();
             return buttons != null ? blend(buttons.getStrokeColorTop(), menu) : menu;
         }
@@ -86,7 +97,7 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
         @Override
         public int getStrokeColorBottom() {
             final BlurredBackgroundColorProvider base = base();
-            final int menu = base != null && bar.hasMenuGlassStroke() ? base.getStrokeColorBottom() : 0;
+            final int menu = base != null ? base.getStrokeColorBottom() : 0;
             final BlurredBackgroundColorProvider buttons = buttons();
             return buttons != null ? blend(buttons.getStrokeColorBottom(), menu) : menu;
         }
@@ -615,8 +626,9 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
         if (glass != null) {
             // from the color of the button's glass (a tinted header) to the menu's
             glassColorsFactor = startFromPill ? Utilities.clamp01(m) : 1f;
-            // and from the button's glass to the frosted glass of the open menu
-            bar.setMenuGlassFrostedProgress(glassColorsFactor);
+            // Solegram: the open menu stays on the glass of the button, with its refraction, as all the popup menus
+            // (Telegram 13.2 turned it into frosted glass, a plain blur); its colour keeps the items readable
+            bar.setMenuGlassFrostedProgress(0f);
             glass.updateColors();
             // the stroke's width goes over too: the buttons' glass may have thinner or thicker lines than the menu's
             glass.setStrokeWidth(

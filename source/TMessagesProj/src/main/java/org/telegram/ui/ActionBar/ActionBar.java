@@ -923,6 +923,11 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         openMenuOverlay = overlay;
         openMenuItem = item;
         invalidate();
+        if (menu != null) {
+            // Solegram: the menu draws the bubble itself; while the overlay drew the menu it was left out of the menu's
+            // drawing, which the bar then kept showing (only the icons, no pill) until something redrew the menu
+            menu.invalidate();
+        }
     }
 
     @Override
