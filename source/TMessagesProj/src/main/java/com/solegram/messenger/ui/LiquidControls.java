@@ -131,11 +131,20 @@ public final class LiquidControls {
             }
             shader.setFloatUniform("center", cx, cy);
             shader.setFloatUniform("halfSize", w / 2f, h / 2f);
-            shader.setFloatUniform("magnify", 1f + 0.2f * a);
-            shader.setFloatUniform("bend", h * 0.42f * a);
-            shader.setFloatUniform("dispersion", 0.4f * a);
-            shader.setFloatUniform("light", 0.85f * a);
-            final float body = 0.06f * a; // a faint white glass body, premultiplied
+            if (sliderLens) {
+                // a slider's thumb is a thicker drop over a thin track: the middle magnifies it well, towards the
+                // rim the glass curves it hard and splits its colours, so the distortion shows on a plain line too
+                shader.setFloatUniform("magnify", 1f + 0.42f * a);
+                shader.setFloatUniform("bend", h * 0.62f * a);
+                shader.setFloatUniform("dispersion", 0.75f * a);
+                shader.setFloatUniform("light", 0.95f * a);
+            } else {
+                shader.setFloatUniform("magnify", 1f + 0.2f * a);
+                shader.setFloatUniform("bend", h * 0.42f * a);
+                shader.setFloatUniform("dispersion", 0.4f * a);
+                shader.setFloatUniform("light", 0.85f * a);
+            }
+            final float body = (sliderLens ? 0.04f : 0.06f) * a; // a faint white glass body, premultiplied
             shader.setFloatUniform("tint", body, body, body, body);
             node.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "img"));
             canvas.drawRenderNode(node);
@@ -162,19 +171,20 @@ public final class LiquidControls {
         drawThumb(canvas, cx, cy, width, height, active, lens, null, 0, 0);
     }
 
-    private static boolean plainLens;
+    private static boolean sliderLens;
 
     /**
-     * A slider's thumb: clear glass only. The track runs straight on under it (no magnified blob of the fill's
-     * colour inside the glass), the light on its rim stays.
+     * A slider's thumb: a real glass lens over the track (Android 13+): the track is magnified in the middle,
+     * bent along the curved rim and split into colours at the bend, with light on the rim facing the top left.
+     * Without the shader it is magnified a little and lit the same way.
      */
     public static void drawSliderThumb(Canvas canvas, float cx, float cy, float width, float height, float active, LensContent lens,
                                        Lens glass, int viewWidth, int viewHeight) {
-        plainLens = true;
+        sliderLens = true;
         try {
-            drawThumb(canvas, cx, cy, width, height, active, lens, null, viewWidth, viewHeight);
+            drawThumb(canvas, cx, cy, width, height, active, lens, glass, viewWidth, viewHeight);
         } finally {
-            plainLens = false;
+            sliderLens = false;
         }
     }
 
@@ -221,7 +231,7 @@ public final class LiquidControls {
                 path.rewind();
                 path.addRoundRect(rect, r, r, Path.Direction.CW);
                 canvas.clipPath(path);
-                final float magnify = plainLens ? 1f : 1f + 0.24f * a;
+                final float magnify = 1f + (sliderLens ? 0.3f : 0.24f) * a;
                 canvas.scale(magnify, magnify, cx, cy);
                 lens.draw(canvas);
                 canvas.restore();
@@ -230,7 +240,7 @@ public final class LiquidControls {
         }
 
         // white body fades to a faint tint (demo: background opacity 1 -> 0.1)
-        fillPaint.setColor(((int) (255 * (1f - (plainLens ? 0.84f : 0.9f) * a)) << 24) | 0xFFFFFF);
+        fillPaint.setColor(((int) (255 * (1f - (sliderLens ? 0.94f : 0.9f) * a)) << 24) | 0xFFFFFF);
         canvas.drawRoundRect(rect, r, r, fillPaint);
 
         if (Build.VERSION.SDK_INT < 28) {

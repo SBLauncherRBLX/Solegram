@@ -1536,6 +1536,59 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
     }
 
     /** Just shown: the menu scales up from the point nearest to what opened it, with a soft overshoot. */
+    /**
+     * Solegram: while the menu springs out of its button (a menu the liquid can't draw: one split by a gap), its
+     * items come in one after another as it grows - Telegram's own reveal follows its background's growth, which
+     * the spring does not use, and left the menu empty until it had grown.
+     */
+    private boolean solegramStaggerItems() {
+        final View root = getContentView();
+        ActionBarPopupWindowLayout content = null;
+        if (root instanceof ActionBarPopupWindowLayout) {
+            content = (ActionBarPopupWindowLayout) root;
+        } else if (root instanceof ViewGroup) {
+            final ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (group.getChildAt(i) instanceof ActionBarPopupWindowLayout) {
+                    content = (ActionBarPopupWindowLayout) group.getChildAt(i);
+                }
+            }
+        }
+        if (content == null) {
+            return false;
+        }
+        final int count = content.getItemsCount();
+        final java.util.ArrayList<View> shown = new java.util.ArrayList<>();
+        for (int a = 0; a < count; a++) {
+            final View child = content.getItemAt(a);
+            if (child != null && child.getVisibility() == View.VISIBLE && !(child instanceof GapView)) {
+                shown.add(child);
+            }
+        }
+        final boolean fromBottom = content.shownFromBottom;
+        final int n = shown.size();
+        for (int i = 0; i < n; i++) {
+            final View child = shown.get(i);
+            final int order = fromBottom ? n - 1 - i : i;
+            child.animate().cancel();
+            child.setAlpha(0f);
+            child.setTranslationY(dp(fromBottom ? 6 : -6));
+            child.animate()
+                .alpha(child.isEnabled() ? 1f : 0.5f)
+                .translationY(0)
+                .setStartDelay(40 + order * 18L)
+                .setDuration(200)
+                .setInterpolator(decelerateInterpolator)
+                .withEndAction(() -> {
+                    if (child instanceof ActionBarMenuSubItem) {
+                        ((ActionBarMenuSubItem) child).onItemShown();
+                    }
+                })
+                .start();
+        }
+        return true;
+    }
+
     private void solegramSpringIn(@Nullable View opener) {
         final View content = getContentView();
         solegramSprung = true;
@@ -2003,6 +2056,9 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             // Solegram: a menu with no window animation of its own (a header's menu) grows out of its button too,
             // together with Telegram's reveal of its items below
             solegramSpringIn(null);
+        }
+        if (animationEnabled && solegramSprung && windowAnimatorSet == null && solegramStaggerItems()) {
+            return; // Solegram: the items come with the spring, not after it
         }
         if (animationEnabled) {
             if (windowAnimatorSet != null) {

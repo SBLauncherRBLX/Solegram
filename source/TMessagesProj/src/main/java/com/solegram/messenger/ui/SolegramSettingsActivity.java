@@ -1740,20 +1740,20 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     ? LocaleController.formatString(R.string.SG_ProxyFound, r.host, (int) r.ping, r.working)
                     : LocaleController.formatString(R.string.SG_ProxyFoundNoPing, r.host);
                 if (r.fromCache) {
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.done, text, getString(R.string.SG_ProxyFromCache)).show();
+                    BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.done, text, getString(R.string.SG_ProxyFromCache)).show();
                 } else {
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.done, text).show();
+                    BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.done, text).show();
                 }
                 break;
             }
             case SolegramProxy.RESULT_NO_LIST:
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_ProxyNoList), 5).show();
+                BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.error, getString(R.string.SG_ProxyNoList), 5).show();
                 break;
             case SolegramProxy.RESULT_NONE_WORKING:
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.error, LocaleController.formatString(R.string.SG_ProxyNoneWorking, r.checked), 5).show();
+                BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.error, LocaleController.formatString(R.string.SG_ProxyNoneWorking, r.checked), 5).show();
                 break;
             case SolegramProxy.RESULT_CANCELLED:
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.info, getString(R.string.SG_ProxyStopped)).show();
+                BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.info, getString(R.string.SG_ProxyStopped)).show();
                 break;
         }
     }
@@ -1866,7 +1866,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
     private void startNanoDownload() {
         if (com.solegram.messenger.SolegramGeminiNano.download()) {
-            BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_download, getString(R.string.SG_NanoDownloadStarted)).show();
+            BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.ic_download, getString(R.string.SG_NanoDownloadStarted)).show();
         }
         listView.adapter.update(true);
     }
@@ -2137,12 +2137,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 }
                 if (result == com.solegram.messenger.updater.BetaChannel.STATUS_OK) {
                     com.solegram.messenger.updater.BetaChannel.setCode(code);
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.done, getString(R.string.SG_BetaWelcome)).show();
+                    BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.done, getString(R.string.SG_BetaWelcome)).show();
                     UpdateController.getInstance().checkNow(null, false);
                 } else {
                     final int text = result == com.solegram.messenger.updater.BetaChannel.STATUS_WRONG_CODE ? R.string.SG_BetaWrongCode
                         : result == com.solegram.messenger.updater.BetaChannel.STATUS_NONE ? R.string.SG_BetaNoChannel : R.string.SG_BetaCheckFailed;
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(text)).show();
+                    BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.error, getString(text)).show();
                 }
                 if (listView != null) {
                     listView.adapter.update(true);
@@ -2232,7 +2232,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 if (SolegramConfig.nameEmojiShare && com.solegram.messenger.SolegramNameEmoji.get() != 0) {
                     final org.telegram.tgnet.TLRPC.UserFull full = getMessagesController().getUserFull(getUserConfig().getClientUserId());
                     if (full != null && com.solegram.messenger.SolegramNameEmojiShare.tooLong(currentAccount, full.about)) {
-                        org.telegram.ui.Components.BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_NameEmojiShareTooLong)).show();
+                        org.telegram.ui.Components.BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.error, getString(R.string.SG_NameEmojiShareTooLong)).show();
                     }
                 }
                 return;
@@ -2427,7 +2427,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     getString(R.string.Delete), () -> {
                         SolegramProxy.removeAdded();
                         listView.adapter.update(true);
-                        BulletinFactory.of(this).createSimpleBulletin(R.raw.done, getString(R.string.SG_ProxyCleared)).show();
+                        BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.done, getString(R.string.SG_ProxyCleared)).show();
                     });
                 return;
 
@@ -2885,7 +2885,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 if (slot >= 0) {
                     presentFragment(new org.telegram.ui.LoginActivity(slot));
                 } else {
-                    BulletinFactory.of(this).createSimpleBulletin(R.raw.info, getString(R.string.SG_AccountsInfo)).show();
+                    BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.info, getString(R.string.SG_AccountsInfo)).show();
                 }
                 return;
             }
@@ -3056,8 +3056,32 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
     }
 
+    /** The screen this page is shown inside of (Customization shows Appearance in its own list), or null. */
+    private org.telegram.ui.ActionBar.BaseFragment embeddedHost;
+
+    private org.telegram.ui.ActionBar.BaseFragment bulletinHost() {
+        return embeddedHost != null ? embeddedHost : this;
+    }
+
+    /**
+     * This page as a list inside another screen (the page is not opened itself): its rows, their switches and
+     * what they open work as on the page, through the host's navigation.
+     */
+    public View createEmbeddedList(org.telegram.ui.ActionBar.BaseFragment host) {
+        embeddedHost = host;
+        setParentLayout(host.getParentLayout());
+        listView = new org.telegram.ui.Components.UniversalRecyclerView(this, this::fillItems, this::onClick, this::onLongClick);
+        listView.setSections();
+        // the host's list scrolls; this one shows all its rows
+        listView.setNestedScrollingEnabled(false);
+        listView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        listView.setVerticalScrollBarEnabled(false);
+        listView.setLayoutParams(new androidx.recyclerview.widget.RecyclerView.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        return listView;
+    }
+
     private void restartBulletin() {
-        BulletinFactory.of(this).createSimpleBulletin(R.raw.info, getString(R.string.SG_RestartRequired), getString(R.string.SG_Restart), () -> Solegram.restartApp(getParentActivity())).show();
+        BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.info, getString(R.string.SG_RestartRequired), getString(R.string.SG_Restart), () -> Solegram.restartApp(getParentActivity())).show();
     }
 
     private void confirm(String title, String message, String action, Runnable onConfirm) {
@@ -3186,7 +3210,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             activity.startActivity(Intent.createChooser(intent, getString(R.string.SG_ExportSettings)));
         } catch (Throwable e) {
             FileLog.e(e);
-            BulletinFactory.of(this).createErrorBulletin(e.getMessage()).show();
+            BulletinFactory.of(bulletinHost()).createErrorBulletin(e.getMessage()).show();
         }
     }
 
@@ -3221,14 +3245,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             }
             int count = SolegramConfig.importFromJson(out.toString("UTF-8"));
             if (count < 0) {
-                BulletinFactory.of(this).createErrorBulletin(getString(R.string.SG_ImportFailed)).show();
+                BulletinFactory.of(bulletinHost()).createErrorBulletin(getString(R.string.SG_ImportFailed)).show();
             } else {
                 listView.adapter.update(true);
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.done, LocaleController.formatString(R.string.SG_Imported, count), getString(R.string.SG_Restart), () -> Solegram.restartApp(getParentActivity())).show();
+                BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.done, LocaleController.formatString(R.string.SG_Imported, count), getString(R.string.SG_Restart), () -> Solegram.restartApp(getParentActivity())).show();
             }
         } catch (Throwable e) {
             FileLog.e(e);
-            BulletinFactory.of(this).createErrorBulletin(getString(R.string.SG_ImportFailed)).show();
+            BulletinFactory.of(bulletinHost()).createErrorBulletin(getString(R.string.SG_ImportFailed)).show();
         }
     }
 
