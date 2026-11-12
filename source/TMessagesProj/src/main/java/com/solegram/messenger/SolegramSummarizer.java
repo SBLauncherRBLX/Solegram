@@ -333,7 +333,35 @@ public final class SolegramSummarizer {
             body.put("private", true);
             body.put("referrer", "solegram");
         }
+        return send(body, url, own);
+    }
 
+    /**
+     * One chat completion with a picture (Solegram AI's photo questions), from the user's own service: the picture
+     * goes as an image part (JPEG, base64) beside the text, as OpenAI-compatible services take it (Gemini, OpenAI,
+     * OpenRouter...). The free service has no model that sees pictures.
+     */
+    static String chatWithImage(String instruction, String input, String jpegBase64) throws Exception {
+        final String url = chatCompletionsUrl(SolegramConfig.aiBaseUrl);
+        final String model = TextUtils.isEmpty(SolegramConfig.aiModel) ? DEFAULT_OWN_MODEL : SolegramConfig.aiModel.trim();
+        final JSONObject body = new JSONObject();
+        body.put("model", model);
+        final JSONArray messages = new JSONArray();
+        messages.put(new JSONObject().put("role", "system").put("content", instruction));
+        final JSONArray parts = new JSONArray();
+        parts.put(new JSONObject().put("type", "text").put("text", input));
+        parts.put(new JSONObject().put("type", "image_url").put("image_url", new JSONObject().put("url", "data:image/jpeg;base64," + jpegBase64)));
+        messages.put(new JSONObject().put("role", "user").put("content", parts));
+        body.put("messages", messages);
+        try {
+            return send(body, url, true);
+        } catch (BusyException busy) {
+            Thread.sleep(4000);
+            return send(body, url, true);
+        }
+    }
+
+    private static String send(JSONObject body, String url, boolean own) throws Exception {
         if (own) {
             // the key and the message go to the user's service: https, or plain http only inside the local network
             SolegramNet.checkPrivateEndpoint(url);
@@ -700,7 +728,7 @@ public final class SolegramSummarizer {
         return TextUtils.isEmpty(code) || "und".equals(code) ? null : normalizeLanguage(code);
     }
 
-    private static String languageName(@Nullable String language) {
+    static String languageName(@Nullable String language) {
         if (TextUtils.isEmpty(language)) {
             return "the same language as the message";
         }

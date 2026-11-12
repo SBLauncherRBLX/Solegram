@@ -65,7 +65,12 @@ public class SolegramAiSheet extends BottomSheet {
         final float[] hsl = new float[3];
         ColorUtils.colorToHSL(accent, hsl);
         final float h = hsl[0], s = Math.max(0.55f, Math.min(0.92f, hsl[1])), l = Math.max(0.5f, Math.min(0.64f, hsl[2]));
-        return new int[]{hsl(h - 28, s, l), hsl(h, s, l), hsl(h + 34, s * 0.95f, l + 0.02f), hsl(h + 68, s * 0.9f, l + 0.04f)};
+        return new int[]{hsl(h - 28, s, l), accent, hsl(h + 34, s * 0.95f, l + 0.02f), hsl(h + 68, s * 0.9f, l + 0.04f)};
+    }
+
+    /** The theme's accent itself (icons, the send button). */
+    public static int accent() {
+        return Theme.getColor(Theme.key_featuredStickers_addButton) | 0xFF000000;
     }
 
     private static int hsl(float h, float s, float l) {

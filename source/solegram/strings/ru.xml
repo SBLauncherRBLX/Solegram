@@ -1898,7 +1898,7 @@
     <string name="SG_AiImprove">Улучшить с ИИ</string>
     <string name="SG_AiNewChat">Новый разговор</string>
     <string name="SG_AiChatHello">Чем помочь?</string>
-    <string name="SG_AiChatAbout">Спросите что угодно: идеи, ответы, тексты, переводы или как устроен Solegram.</string>
+    <string name="SG_AiChatAbout">Спросите что угодно или пришлите фото: идеи, ответы, тексты, переводы, что на снимке.</string>
     <string name="SG_AiChatHint">Сообщение для Solegram AI</string>
     <string name="SG_AiIdea1">Что умеет Solegram?</string>
     <string name="SG_AiIdea2">Помоги вежливо отказаться от встречи</string>
@@ -1924,4 +1924,8 @@
     <string name="SG_AiPresetCustom">Другой сервис</string>
     <string name="SG_AiPresetFreeKey">бесплатный ключ</string>
     <string name="SG_AiPresetKeyInfo">Вставьте свой API-ключ %1$s. Получить его можно здесь: %2$s</string>
+    <string name="SG_AiPhotoOwnFailed">Ваш ИИ-сервис не смог посмотреть фото. Проверьте, что его модель понимает картинки (например, gemini-2.5-flash или gpt-4o-mini).</string>
+    <string name="SG_AiPhotoNanoNo">Gemini Nano на этом телефоне не видит фото. Выберите в настройках ИИ режим Solegram AI (авто) или свой сервис.</string>
+    <string name="SG_AiAttachPhoto">Прикрепить фото</string>
+    <string name="SG_AiPhotoLoadFailed">Не удалось открыть это фото.</string>
 </resources>

@@ -321,12 +321,20 @@ public final class SolegramAI {
 
     /** The assistant: an answer to the last question of a conversation (lines "User: ..." / "Solegram AI: ..."). */
     public static void ask(List<String[]> turns, Result result) {
+        final String last = turns.isEmpty() ? "" : turns.get(turns.size() - 1)[1];
+        run(assistantInstruction(), conversationOf(turns), last, appLanguage(), 700, true, result);
+    }
+
+    private static String conversationOf(List<String[]> turns) {
         final StringBuilder conversation = new StringBuilder();
         for (String[] t : turns.subList(Math.max(0, turns.size() - 12), turns.size())) {
-            conversation.append(t[0].equals("user") ? "User: " : "Solegram AI: ").append(t[1]).append("\n\n");
+            conversation.append(t[0].equals("user") ? "User: " : "Solegram AI: ").append(TextUtils.isEmpty(t[1]) ? "(a photo)" : t[1]).append("\n\n");
         }
-        final String last = turns.isEmpty() ? "" : turns.get(turns.size() - 1)[1];
-        final String task = "You are Solegram AI, the assistant built into Solegram, an unofficial Telegram app for Android. You are smart, "
+        return conversation.toString().trim();
+    }
+
+    private static String assistantInstruction() {
+        return "You are Solegram AI, the assistant built into Solegram, an unofficial Telegram app for Android. You are smart, "
             + "friendly and to the point, and you write in " + SolegramSummarizer.LANGUAGE + ".\n"
             + "Answer the user's last message in the conversation below. Be accurate: if you are not sure, say so; do not make up facts, "
             + "links or numbers. Keep answers short unless the user asks for more; use \"• \" for lists and plain text otherwise.\n"
@@ -335,7 +343,102 @@ public final class SolegramAI {
             + "messages in place, AI summaries, catch-up of chats and smart replies (Solegram AI), search by meaning, reminders, message "
             + "filters, anti-scam warnings, SoleDrop file sharing nearby, SoleWallet, plugins and a proxy page. Its settings are under "
             + "Settings → Solegram. Do not claim features you are not sure of.";
-        run(task, conversation.toString().trim(), last, appLanguage(), 700, true, result);
+    }
+
+    // region Photos
+
+    private static final java.util.concurrent.ExecutorService photoPool = java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    private static final String PHOTO = "The user attached a photo to their last message. Look at it carefully: answer their question "
+        + "about it, or, without a question, say what is in it and what matters - read out any text it has (translate it if it is in "
+        + "another language), name places, things, dishes, plants, animals, problems or mistakes you see, and help with what the user "
+        + "probably wants. Be concrete and do not guess what you cannot see.";
+
+    /**
+     * The assistant with a photo: the user's own service looks at it when it is set up, else Gemini Nano on the phone
+     * when its model sees pictures, else the phone recognises what is in it and the cloud answers from that (and says
+     * it saw the photo only in part).
+     */
+    public static void askWithImage(List<String[]> turns, android.graphics.Bitmap image, Result result) {
+        final String conversation = conversationOf(turns);
+        final String question = turns.isEmpty() ? "" : turns.get(turns.size() - 1)[1];
+        final String instruction = assistantInstruction() + "\n" + PHOTO;
+        photoPool.execute(() -> {
+            final android.graphics.Bitmap scaled = scaleDown(image, 1024);
+            final int provider = SolegramConfig.aiProvider;
+            if (provider == SolegramSummarizer.PROVIDER_OWN && !TextUtils.isEmpty(SolegramConfig.aiBaseUrl)) {
+                try {
+                    final String answer = SolegramSummarizer.chatWithImage(withLanguage(instruction, question), conversation, jpegBase64(scaled));
+                    org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> result.done(TextUtils.isEmpty(answer) ? null : clean(answer),
+                        TextUtils.isEmpty(answer) ? LocaleController.getString(R.string.SG_AiFailed) : null, SolegramSummarizer.SOURCE_OWN));
+                } catch (Throwable e) {
+                    org.telegram.messenger.FileLog.e(e);
+                    org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> result.done(null, LocaleController.getString(R.string.SG_AiPhotoOwnFailed), 0));
+                }
+                return;
+            }
+            if (provider != SolegramSummarizer.PROVIDER_FREE && SolegramGeminiNano.isAvailable()) {
+                try {
+                    final String answer = SolegramGeminiNano.generateWithImage(withLanguage(instruction, question), conversation, scaled, 600);
+                    org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> result.done(clean(answer), null, SolegramSummarizer.SOURCE_NANO));
+                    return;
+                } catch (Throwable ignore) {
+                    // this phone's model does not see pictures (or is busy): what it shows, recognised on the phone
+                }
+            }
+            if (provider == SolegramSummarizer.PROVIDER_NANO) {
+                org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> result.done(null, LocaleController.getString(R.string.SG_AiPhotoNanoNo), 0));
+                return;
+            }
+            final String seen = labels(scaled);
+            final String task = assistantInstruction() + "\nThe user attached a photo. You cannot see it yourself: the phone recognised these things on it: "
+                + (seen.isEmpty() ? "nothing it could name" : seen) + ". Answer from that as well as you can, and say in one short sentence that "
+                + "for a full look at photos the user can connect their own AI key (for example a free Google Gemini key) in Solegram AI settings.";
+            org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> run(task, conversation, question, appLanguage(), 600, true, result));
+        });
+    }
+
+    /** The language to answer a photo question in: the one of the question, or the app's when there is none. */
+    private static String withLanguage(String instruction, String question) {
+        return instruction.replace(SolegramSummarizer.LANGUAGE, TextUtils.isEmpty(question)
+            ? SolegramSummarizer.languageName(appLanguage()) : "the language of the user's last message");
+    }
+
+    /** What ML Kit recognises on a picture, on the phone: "cat (93%), sofa (71%)". */
+    private static String labels(android.graphics.Bitmap bitmap) {
+        try {
+            final List<com.google.mlkit.vision.label.ImageLabel> found = com.google.android.gms.tasks.Tasks.await(
+                com.google.mlkit.vision.label.ImageLabeling.getClient(com.google.mlkit.vision.label.defaults.ImageLabelerOptions.DEFAULT_OPTIONS)
+                    .process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)), 15, java.util.concurrent.TimeUnit.SECONDS);
+            final StringBuilder b = new StringBuilder();
+            for (com.google.mlkit.vision.label.ImageLabel l : found) {
+                if (l.getConfidence() < 0.55f) {
+                    continue;
+                }
+                if (b.length() > 0) {
+                    b.append(", ");
+                }
+                b.append(l.getText().toLowerCase(Locale.ROOT)).append(" (").append(Math.round(l.getConfidence() * 100)).append("%)");
+            }
+            return b.toString();
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    private static android.graphics.Bitmap scaleDown(android.graphics.Bitmap b, int max) {
+        final int w = b.getWidth(), h = b.getHeight();
+        if (Math.max(w, h) <= max) {
+            return b;
+        }
+        final float k = max / (float) Math.max(w, h);
+        return android.graphics.Bitmap.createScaledBitmap(b, Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)), true);
+    }
+
+    private static String jpegBase64(android.graphics.Bitmap b) {
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out);
+        return android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP);
     }
 
     // endregion

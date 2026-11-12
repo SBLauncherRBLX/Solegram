@@ -4070,8 +4070,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         ContentView contentView = new ContentView(context);
         fragmentView = contentView;
 
-        solegramFloatingHeader = com.solegram.messenger.SolegramConfig.floatingHeader && !inPreviewMode && !onlySelect
-            && initialDialogsType == DIALOGS_TYPE_DEFAULT && communityId == 0;
+        // the chat list, and the same list picking a chat (forwarding, sharing): blur and glass buttons, no panel
+        solegramFloatingHeader = com.solegram.messenger.SolegramConfig.floatingHeader && !inPreviewMode
+            && (initialDialogsType == DIALOGS_TYPE_DEFAULT || onlySelect && initialDialogsType == DIALOGS_TYPE_FORWARD) && communityId == 0;
         if (solegramFloatingHeader) {
             // the buttons in a glass bubble, as in a chat; the title stays plain text over the list
             actionBar.solegramSetupButtonsGlass(iBlur3FactoryLiquidGlass, BlurredBackgroundProviderImpl.topPanel(resourceProvider));

@@ -2165,7 +2165,7 @@
     <string name="SG_AiImprove">Improve with AI</string>
     <string name="SG_AiNewChat">New conversation</string>
     <string name="SG_AiChatHello">How can I help?</string>
-    <string name="SG_AiChatAbout">Ask anything: ideas, answers, writing, translations, or how Solegram works.</string>
+    <string name="SG_AiChatAbout">Ask anything or send a photo: ideas, answers, writing, translations, what is in a picture.</string>
     <string name="SG_AiChatHint">Message Solegram AI</string>
     <string name="SG_AiIdea1">What can Solegram do?</string>
     <string name="SG_AiIdea2">Help me write a polite refusal</string>
@@ -2191,5 +2191,9 @@
     <string name="SG_AiPresetCustom">Another service</string>
     <string name="SG_AiPresetFreeKey">free key</string>
     <string name="SG_AiPresetKeyInfo">Paste your %1$s API key. You can create one at %2$s</string>
+    <string name="SG_AiPhotoOwnFailed">Your AI service could not look at the photo. Check that its model sees pictures (for example gemini-2.5-flash or gpt-4o-mini).</string>
+    <string name="SG_AiPhotoNanoNo">Gemini Nano on this phone does not see photos. Choose Solegram AI (auto) or your own service in AI settings.</string>
+    <string name="SG_AiAttachPhoto">Attach a photo</string>
+    <string name="SG_AiPhotoLoadFailed">Could not open this photo.</string>
     <!-- SOLEGRAM END -->
 </resources>

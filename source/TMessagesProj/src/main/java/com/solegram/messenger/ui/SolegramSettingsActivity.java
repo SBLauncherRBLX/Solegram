@@ -1376,6 +1376,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         super.createView(context);
         // rounded section cards, as in Telegram's own settings
         listView.setSections();
+        if (page == PAGE_AI) {
+            // the AI page's glow goes on up under the header from the first frame: the list clips neither its items
+            // nor its padding (set here: the first fill of the page runs before the list exists)
+            listView.setClipChildren(false);
+            listView.setClipToPadding(false);
+        }
         return fragmentView;
     }
 

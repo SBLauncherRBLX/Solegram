@@ -269,24 +269,26 @@ public final class SolegramAiPageViews {
                 spark.draw(canvas);
                 return;
             }
+            // filled, as the Solegram AI mark: a speech bubble with two lines cut out of it, and a spark well clear of it
             paint.setShader(new LinearGradient(0, h, w, 0, SolegramAiSheet.brand(), null, Shader.TileMode.CLAMP));
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(s * 0.11f);
-            paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setStrokeJoin(Paint.Join.ROUND);
-            rect.set(w * 0.08f, h * 0.16f, w * 0.78f, h * 0.72f);
-            canvas.drawRoundRect(rect, s * 0.24f, s * 0.24f, paint);
-            path.rewind();
-            path.moveTo(w * 0.25f, h * 0.72f);
-            path.lineTo(w * 0.18f, h * 0.9f);
-            path.lineTo(w * 0.42f, h * 0.72f);
-            canvas.drawPath(path, paint);
-            // two lines of text inside
-            canvas.drawLine(w * 0.24f, h * 0.38f, w * 0.6f, h * 0.38f, paint);
-            canvas.drawLine(w * 0.24f, h * 0.52f, w * 0.48f, h * 0.52f, paint);
             paint.setStyle(Paint.Style.FILL);
-            final float cx = w * 0.84f, cy = h * 0.16f, r = s * 0.16f;
             path.rewind();
+            path.setFillType(Path.FillType.EVEN_ODD);
+            rect.set(w * 0.04f, h * 0.24f, w * 0.72f, h * 0.76f);
+            path.addRoundRect(rect, s * 0.2f, s * 0.2f, Path.Direction.CW);
+            path.moveTo(w * 0.16f, h * 0.7f);
+            path.lineTo(w * 0.1f, h * 0.94f);
+            path.lineTo(w * 0.38f, h * 0.74f);
+            path.close();
+            final float lh = s * 0.045f;
+            rect.set(w * 0.17f, h * 0.42f - lh, w * 0.58f, h * 0.42f + lh);
+            path.addRoundRect(rect, lh, lh, Path.Direction.CCW);
+            rect.set(w * 0.17f, h * 0.58f - lh, w * 0.44f, h * 0.58f + lh);
+            path.addRoundRect(rect, lh, lh, Path.Direction.CCW);
+            canvas.drawPath(path, paint);
+            path.rewind();
+            path.setFillType(Path.FillType.WINDING);
+            final float cx = w * 0.86f, cy = h * 0.14f, r = s * 0.14f;
             path.moveTo(cx, cy - r);
             path.quadTo(cx + r * 0.16f, cy - r * 0.16f, cx + r, cy);
             path.quadTo(cx + r * 0.16f, cy + r * 0.16f, cx, cy + r);
@@ -307,19 +309,13 @@ public final class SolegramAiPageViews {
 
         public FeatureRow(Context context, int icon, int colorIndex, CharSequence title, CharSequence text, Theme.ResourcesProvider resourcesProvider) {
             super(context);
-            final int[] c = SolegramAiSheet.brand();
-            final int color = c[Math.max(0, Math.min(c.length - 1, colorIndex))];
-            // the icon on a soft round of its colour, every icon scaled to the same box
+            // the icon alone (no backdrop), in the theme's accent, every icon fitted to the same 30 dp box
+            final int color = SolegramAiSheet.accent();
             final ImageView iconView = new ImageView(context);
             iconView.setImageResource(icon);
             iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            iconView.setPadding(dp(8), dp(8), dp(8), dp(8));
             iconView.setColorFilter(new android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN));
-            final GradientDrawable round = new GradientDrawable();
-            round.setShape(GradientDrawable.OVAL);
-            round.setColor(ColorUtils.setAlphaComponent(color, 0x24));
-            iconView.setBackground(round);
-            addView(iconView, LayoutHelper.createFrame(42, 42, Gravity.LEFT | Gravity.CENTER_VERTICAL, 16, 0, 0, 0));
+            addView(iconView, LayoutHelper.createFrame(30, 30, Gravity.LEFT | Gravity.CENTER_VERTICAL, 22, 0, 0, 0));
             final LinearLayout texts = new LinearLayout(context);
             texts.setOrientation(LinearLayout.VERTICAL);
             final TextView t = new TextView(context);
@@ -334,13 +330,13 @@ public final class SolegramAiPageViews {
             d.setLineSpacing(dp(1.5f), 1f);
             d.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
             texts.addView(d, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 3, 0, 0));
-            addView(texts, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 74, 14, 76, 14));
+            addView(texts, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 72, 14, 76, 14));
             toggle = new Switch(context, resourcesProvider);
             toggle.setColors(Theme.key_switchTrack, Theme.key_switchTrackChecked, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
             addView(toggle, LayoutHelper.createFrame(37, 40, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 20, 0));
             divider = new View(context);
             divider.setBackgroundColor(Theme.getColor(Theme.key_divider, resourcesProvider));
-            addView(divider, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1f / AndroidUtilities.density, Gravity.BOTTOM, 74, 0, 0, 0));
+            addView(divider, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1f / AndroidUtilities.density, Gravity.BOTTOM, 72, 0, 0, 0));
             setBackground(Theme.getSelectorDrawable(false));
         }
 
