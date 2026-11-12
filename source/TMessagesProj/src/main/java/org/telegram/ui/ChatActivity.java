@@ -999,6 +999,11 @@ public class ChatActivity extends BaseFragment implements
     private int first_unread_id;
     private boolean loadingForward;
     private MessageObject unreadMessageObject;
+
+    /** Solegram AI: the "Unread messages" divider of this visit (it stays while the chat is open), or null. */
+    public MessageObject solegramUnreadDivider() {
+        return unreadMessageObject;
+    }
     private MessageObject scrollToMessage;
     public int highlightMessageId = Integer.MAX_VALUE;
     public boolean showNoQuoteAlert;

@@ -357,28 +357,6 @@ public final class SolegramGeminiNano {
         }
     }
 
-    /**
-     * A prompt with a picture, on the device (Gemini Nano models that see images). Background threads only; a phone
-     * whose model does not take pictures answers with a {@link NanoException}.
-     */
-    public static String generateWithImage(String instruction, String input, android.graphics.Bitmap image, int maxOutputTokens) throws NanoException {
-        if (!sdkSupported()) {
-            throw new NanoException(NanoException.UNAVAILABLE, null);
-        }
-        if (quotaExhausted()) {
-            throw new NanoException(NanoException.QUOTA, null);
-        }
-        if (statusBlocking() != STATUS_AVAILABLE) {
-            throw new NanoException(NanoException.UNAVAILABLE, null);
-        }
-        Impl.inFlight(true);
-        try {
-            return Impl.generateWithImage(instruction, input, image, maxOutputTokens);
-        } finally {
-            Impl.inFlight(false);
-        }
-    }
-
     /** Tokens the request would take (instruction included), or -1 when the device does not say. Background threads only. */
     public static int countTokens(String instruction, String input) {
         if (!sdkSupported()) {
@@ -553,42 +531,6 @@ public final class SolegramGeminiNano {
                 builder.setMaxOutputTokens(maxOutputTokens);
             }
             return builder.build();
-        }
-
-        static String generateWithImage(String instruction, String input, android.graphics.Bitmap image, int maxOutputTokens) throws NanoException {
-            final com.google.mlkit.genai.prompt.java.GenerativeModelFutures model = client();
-            try {
-                final com.google.mlkit.genai.prompt.GenerateContentRequest.Builder builder = new com.google.mlkit.genai.prompt.GenerateContentRequest.Builder(
-                    new com.google.mlkit.genai.prompt.ImagePart(image),
-                    new com.google.mlkit.genai.prompt.TextPart(systemPromptAvailable(model) ? input : instruction + "\n\n" + input));
-                if (systemPromptAvailable(model)) {
-                    builder.setSystemInstruction(new com.google.mlkit.genai.prompt.SystemInstruction(instruction));
-                }
-                builder.setTemperature(0.3f);
-                builder.setCandidateCount(1);
-                if (maxOutputTokens > 0) {
-                    builder.setMaxOutputTokens(maxOutputTokens);
-                }
-                final com.google.mlkit.genai.prompt.GenerateContentResponse response = model.generateContent(builder.build())
-                    .get(GENERATE_TIMEOUT_SEC, TimeUnit.SECONDS);
-                final List<com.google.mlkit.genai.prompt.Candidate> candidates = response.getCandidates();
-                final String text = candidates == null || candidates.isEmpty() ? null : candidates.get(0).getText();
-                if (TextUtils.isEmpty(text)) {
-                    throw new NanoException(NanoException.FAILED, null);
-                }
-                return text;
-            } catch (ExecutionException e) {
-                throw map(e.getCause() != null ? e.getCause() : e);
-            } catch (TimeoutException e) {
-                throw new NanoException(NanoException.FAILED, e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new NanoException(NanoException.FAILED, e);
-            } catch (NanoException e) {
-                throw e;
-            } catch (Throwable e) {
-                throw map(e);
-            }
         }
 
         static String generate(String instruction, String input, int maxOutputTokens) throws NanoException {

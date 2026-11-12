@@ -106,7 +106,9 @@ public final class SolegramMessageMenu {
             icons.add(R.drawable.msg_translate);
         }
         // Solegram AI: reply ideas, what it means, its gist
-        if ((SolegramConfig.aiReplies || SolegramConfig.aiExplain) && SolegramAI.canUseMessage(chat, translateTarget != null ? translateTarget : message)) {
+        final MessageObject aiTarget = translateTarget != null ? translateTarget : message;
+        // only when one of its tasks is on for this message (replies are for others' messages)
+        if ((SolegramConfig.aiExplain || SolegramConfig.aiReplies && aiTarget != null && !aiTarget.isOutOwner()) && SolegramAI.canUseMessage(chat, aiTarget)) {
             items.add(LocaleController.getString(R.string.SG_AiTitle));
             options.add(OPTION_AI);
             icons.add(R.drawable.sg_ai_spark);

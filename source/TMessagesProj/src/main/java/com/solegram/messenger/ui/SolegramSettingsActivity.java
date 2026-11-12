@@ -847,15 +847,11 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             listView.setClipChildren(false);
             listView.setClipToPadding(false);
         }
-        // Solegram AI: its header, the assistant and the catch-up, then all of its features
+        // Solegram AI: its header, the catch-up card, then all of its features
         if (aiHero == null) {
             aiHero = new SolegramAiPageViews.Hero(context, getString(R.string.SG_AiTagline), getResourceProvider());
             aiCards = new SolegramAiPageViews.Cards(context);
             SolegramAiPageViews.riseOnce(aiCards, 90);
-            final SolegramAiPageViews.Card assistant = aiCards.add(new SolegramAiPageViews.Card(context,
-                new SolegramAiPageViews.CardMark(context, SolegramAiPageViews.CardMark.ASSISTANT),
-                getString(R.string.SG_AiAssistant), getString(R.string.SG_AiAssistantInfo), getResourceProvider()));
-            assistant.setOnClickListener(v -> presentFragment(new SolegramAiChatActivity()));
             aiCatchUpCard = aiCards.add(new SolegramAiPageViews.Card(context,
                 new SolegramAiPageViews.CardMark(context, SolegramAiPageViews.CardMark.CATCH_UP),
                 getString(R.string.SG_AiCatchUpMenu), getString(R.string.SG_AiCatchUpInfo), getResourceProvider()));

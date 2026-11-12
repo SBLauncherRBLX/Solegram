@@ -2163,18 +2163,8 @@
     <string name="SG_AiRepliesHint">Tap a reply to put it into the message field.</string>
     <string name="SG_AiCatchUpMenu">What I missed</string>
     <string name="SG_AiImprove">Improve with AI</string>
-    <string name="SG_AiNewChat">New conversation</string>
-    <string name="SG_AiChatHello">How can I help?</string>
-    <string name="SG_AiChatAbout">Ask anything or send a photo: ideas, answers, writing, translations, what is in a picture.</string>
-    <string name="SG_AiSmarterHint">Smarter with your own free Gemini key — set up</string>
     <string name="SG_AiChatHint">Message Solegram AI</string>
-    <string name="SG_AiIdea1">What can Solegram do?</string>
-    <string name="SG_AiIdea2">Help me write a polite refusal</string>
-    <string name="SG_AiIdea3">Plan a weekend in Saint Petersburg</string>
-    <string name="SG_AiIdea4">Explain what an API is in simple words</string>
     <string name="SG_AiTagline">Smart, right in your chats</string>
-    <string name="SG_AiAssistant">Assistant</string>
-    <string name="SG_AiAssistantInfo">Ask anything: ideas, texts, translations.</string>
     <string name="SG_AiCatchUpInfo">Catch up on any chat in seconds.</string>
     <string name="SG_AiOnInChats">On · in the ⋮ menu of chats</string>
     <string name="SG_AiOff">Off</string>
@@ -2192,9 +2182,5 @@
     <string name="SG_AiPresetCustom">Another service</string>
     <string name="SG_AiPresetFreeKey">free key</string>
     <string name="SG_AiPresetKeyInfo">Paste your %1$s API key. You can create one at %2$s</string>
-    <string name="SG_AiPhotoOwnFailed">Your AI service could not look at the photo. Check that its model sees pictures (for example gemini-2.5-flash or gpt-4o-mini).</string>
-    <string name="SG_AiPhotoNanoNo">Gemini Nano on this phone does not see photos. Choose Solegram AI (auto) or your own service in AI settings.</string>
-    <string name="SG_AiAttachPhoto">Attach a photo</string>
-    <string name="SG_AiPhotoLoadFailed">Could not open this photo.</string>
     <!-- SOLEGRAM END -->
 </resources>

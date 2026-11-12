@@ -59,10 +59,17 @@ public final class SolegramAiPageViews {
         view.setTag(R.id.sg_ai_rise, Boolean.TRUE);
         view.setAlpha(0f);
         view.setTranslationY(dp(18));
+        final long made = SystemClock.uptimeMillis();
         view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
                 v.removeOnAttachStateChangeListener(this);
+                if (SystemClock.uptimeMillis() - made > 900) {
+                    // a row below the screen, first scrolled to later: just there, no late entrance
+                    v.setAlpha(1f);
+                    v.setTranslationY(0);
+                    return;
+                }
                 v.animate().alpha(1f).translationY(0).setStartDelay(delay).setDuration(460).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
             }
 
@@ -304,6 +311,10 @@ public final class SolegramAiPageViews {
             path.setFillType(Path.FillType.WINDING);
             rect.set(w * 0.04f, h * 0.24f, w * 0.72f, h * 0.76f);
             path.addRoundRect(rect, s * 0.2f, s * 0.2f, Path.Direction.CW);
+            canvas.drawPath(path, paint);
+            // the tail is a shape of its own: in one path with the body its other winding cut the overlap out (a dark
+            // wedge where the tail meets the bubble)
+            path.rewind();
             path.moveTo(w * 0.16f, h * 0.7f);
             path.lineTo(w * 0.1f, h * 0.94f);
             path.lineTo(w * 0.38f, h * 0.74f);
