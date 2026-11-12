@@ -796,8 +796,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             appIconSelectorRow = rowCount++;
             appIconThemedHeaderRow = rowCount++;
             appIconThemedSelectorRow = rowCount++;
-            appIconMaterialHeaderRow = rowCount++;
-            appIconMaterialSelectorRow = rowCount++;
             appIconSeasonalRow = rowCount++;
             appIconShadowRow = rowCount++;
 

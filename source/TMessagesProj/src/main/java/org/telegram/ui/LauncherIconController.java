@@ -15,7 +15,7 @@ import java.util.Calendar;
 
 public class LauncherIconController {
     /** Icons taken out of the picker; their launcher entries stay in the manifest so an install that has one on keeps an icon until the switch below. */
-    private static final String[] RETIRED = {"NeonIcon", "SpinIcon"};
+    private static final String[] RETIRED = {"NeonIcon", "SpinIcon", "NebulaIcon", "FrostIcon"};
 
     public static void tryFixLauncherIconIfNeeded() {
         // Solegram: a retired icon that is still on gives way to the default one
@@ -232,23 +232,21 @@ public class LauncherIconController {
         // homages to famous game styles (no names, characters or textures of any particular game)
         PIXEL("PixelIcon", R.mipmap.sg_icon_bg_pixel, R.mipmap.sg_icon_fg_pixel, R.string.SG_IconPixel, false, true),
         CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true),
-        // Solegram 3.3: an early 2000s desktop, a nebula, black and white manga, a frozen New Year, a deep sea
+        // Solegram 3.3: an early 2000s desktop, black and white manga, a deep sea
         // jellyfish, a green robot - homages to styles, no names or characters
         RETRO("RetroIcon", R.mipmap.sg_icon_bg_xp, R.mipmap.sg_icon_fg_xp, R.string.SG_IconRetro, false, true),
-        NEBULA("NebulaIcon", R.mipmap.sg_icon_bg_cosmos, R.mipmap.sg_icon_fg_cosmos, R.string.SG_IconNebula, false, true),
         MANGA("MangaIcon", R.mipmap.sg_icon_bg_manga, R.mipmap.sg_icon_fg_manga, R.string.SG_IconManga, false, true),
-        FROST("FrostIcon", R.mipmap.sg_icon_bg_frost, R.mipmap.sg_icon_fg_frost, R.string.SG_IconFrost, false, true),
         JELLYFISH("JellyfishIcon", R.mipmap.sg_icon_bg_jelly, R.mipmap.sg_icon_fg_jelly, R.string.SG_IconJellyfish, false, true),
         DROID("DroidIcon", R.mipmap.sg_icon_bg_droid, R.mipmap.sg_icon_fg_droid, R.string.SG_IconDroid, false, true),
-        // Solegram 3.3: Material You - the mark in two tones of one hue on its tonal container (their own row)
-        MATERIAL_SKY("MaterialSkyIcon", R.drawable.sg_icon_bg_m3sky, R.drawable.sg_icon_fg_m3sky, R.string.SG_IconM3Sky, false, false, true),
-        MATERIAL_SAGE("MaterialSageIcon", R.drawable.sg_icon_bg_m3sage, R.drawable.sg_icon_fg_m3sage, R.string.SG_IconM3Sage, false, false, true),
-        MATERIAL_ROSE("MaterialRoseIcon", R.drawable.sg_icon_bg_m3rose, R.drawable.sg_icon_fg_m3rose, R.string.SG_IconM3Rose, false, false, true),
-        MATERIAL_APRICOT("MaterialApricotIcon", R.drawable.sg_icon_bg_m3apricot, R.drawable.sg_icon_fg_m3apricot, R.string.SG_IconM3Apricot, false, false, true),
-        MATERIAL_LILAC("MaterialLilacIcon", R.drawable.sg_icon_bg_m3lilac, R.drawable.sg_icon_fg_m3lilac, R.string.SG_IconM3Lilac, false, false, true),
-        MATERIAL_TEAL("MaterialTealIcon", R.drawable.sg_icon_bg_m3teal, R.drawable.sg_icon_fg_m3teal, R.string.SG_IconM3Teal, false, false, true),
-        MATERIAL_NIGHT("MaterialNightIcon", R.drawable.sg_icon_bg_m3night, R.drawable.sg_icon_fg_m3night, R.string.SG_IconM3Night, false, false, true),
-        MATERIAL_PAPER("MaterialPaperIcon", R.drawable.sg_icon_bg_m3paper, R.drawable.sg_icon_fg_m3paper, R.string.SG_IconM3Paper, false, false, true);
+        // Solegram 3.3: Material You - the mark in two tones of one hue on its tonal container (with the colour icons)
+        MATERIAL_SKY("MaterialSkyIcon", R.drawable.sg_icon_bg_m3sky, R.drawable.sg_icon_fg_m3sky, R.string.SG_IconM3Sky, false, false, false),
+        MATERIAL_SAGE("MaterialSageIcon", R.drawable.sg_icon_bg_m3sage, R.drawable.sg_icon_fg_m3sage, R.string.SG_IconM3Sage, false, false, false),
+        MATERIAL_ROSE("MaterialRoseIcon", R.drawable.sg_icon_bg_m3rose, R.drawable.sg_icon_fg_m3rose, R.string.SG_IconM3Rose, false, false, false),
+        MATERIAL_APRICOT("MaterialApricotIcon", R.drawable.sg_icon_bg_m3apricot, R.drawable.sg_icon_fg_m3apricot, R.string.SG_IconM3Apricot, false, false, false),
+        MATERIAL_LILAC("MaterialLilacIcon", R.drawable.sg_icon_bg_m3lilac, R.drawable.sg_icon_fg_m3lilac, R.string.SG_IconM3Lilac, false, false, false),
+        MATERIAL_TEAL("MaterialTealIcon", R.drawable.sg_icon_bg_m3teal, R.drawable.sg_icon_fg_m3teal, R.string.SG_IconM3Teal, false, false, false),
+        MATERIAL_NIGHT("MaterialNightIcon", R.drawable.sg_icon_bg_m3night, R.drawable.sg_icon_fg_m3night, R.string.SG_IconM3Night, false, false, false),
+        MATERIAL_PAPER("MaterialPaperIcon", R.drawable.sg_icon_bg_m3paper, R.drawable.sg_icon_fg_m3paper, R.string.SG_IconM3Paper, false, false, false);
 
         public final String key;
         public final int background;

@@ -540,3 +540,113 @@ THEMES.spin = {
     g.restore();
   },
 };
+
+// ------------------------------------------------------------------------------------------------ manga (v3)
+// A softer manga page, in the manner of romance manga: warm off-white paper, a gentle dot tone fading in from
+// the corners, fine light rays behind the mark, sparkles, bubbles and little flowers in clean line; the mark in
+// ink with a soft gradient tone and a big highlight. Black and white, calm on the eye.
+function flower(g, x, y, r, rot, ink) {
+  g.save(); g.translate(x, y); g.rotate(rot); g.lineWidth = 0.35; g.strokeStyle = ink; g.fillStyle = '#fffdf8';
+  for (let i = 0; i < 5; i++) { g.save(); g.rotate(i * Math.PI * 2 / 5); g.beginPath(); g.ellipse(0, -r * 0.62, r * 0.36, r * 0.58, 0, 0, 7); g.fill(); g.stroke(); g.restore(); }
+  g.beginPath(); g.arc(0, 0, r * 0.22, 0, 7); g.fillStyle = '#fffdf8'; g.fill(); g.stroke();
+  g.restore();
+}
+function bubble(g, x, y, r, ink) {
+  g.lineWidth = 0.3; g.strokeStyle = ink; g.fillStyle = 'rgba(255,253,248,0.9)';
+  g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke();
+  g.beginPath(); g.arc(x, y, r * 0.7, Math.PI * 1.1, Math.PI * 1.45); g.stroke();
+}
+THEMES.manga = {
+  bg(g) {
+    const n = noise2(321);
+    pixels(g, (x, y) => {
+      let v = 252 - (fbm(n, x / 3, y / 3, 3) - 0.5) * 7;
+      // a gentle tone only towards the corners, fine and grey rather than black
+      const corner = Math.min(Math.hypot(x - 18, y - 18), Math.hypot(x - 90, y - 90), Math.hypot(x - 90, y - 18) * 1.3, Math.hypot(x - 18, y - 90) * 1.3);
+      const p = 1.25, u = (x + y) / Math.SQRT2 / p, w = (x - y) / Math.SQRT2 / p;
+      const du = u - Math.round(u), dw = w - Math.round(w), dd = Math.sqrt(du * du + dw * dw);
+      if (dd < 0.05 + 0.3 * (1 - smooth(6, 30, corner))) v = 150;
+      return [v, v - 2, v - 6];
+    });
+    // fine light rays behind the mark
+    const r = rng(331);
+    g.lineCap = 'round';
+    for (let i = 0; i < 90; i++) {
+      const a = (i / 90) * Math.PI * 2 + r() * 0.03, r0 = 26 + r() * 4, r1 = 40 + r() * 16;
+      g.strokeStyle = `rgba(40,36,34,${0.18 + r() * 0.16})`; g.lineWidth = 0.18 + r() * 0.2;
+      g.beginPath(); g.moveTo(54 + Math.cos(a) * r0, 54 + Math.sin(a) * r0); g.lineTo(54 + Math.cos(a) * r1, 54 + Math.sin(a) * r1); g.stroke();
+    }
+    const ink = '#2b2624';
+    flower(g, 26, 76, 4.6, 0.3, ink); flower(g, 82, 30, 3.6, 1.1, ink); flower(g, 84, 78, 2.8, 0.7, ink);
+    bubble(g, 30, 30, 3.2, ink); bubble(g, 36, 24, 1.6, ink); bubble(g, 78, 86, 2.2, ink); bubble(g, 72, 22, 1.2, ink);
+  },
+  fg(g) {
+    const ink = '#2b2624';
+    // a soft white glow so the mark sits on clean paper
+    const halo = new Path2D(); halo.ellipse(54, 54, 25, 23, 0, 0, Math.PI * 2);
+    g.save(); g.filter = `blur(${3 * S}px)`; g.fillStyle = 'rgba(255,253,248,0.95)'; g.fill(halo); g.restore();
+    g.fillStyle = '#fffdf8'; g.fill(both);
+    // the sun: a gentle dot tone growing towards its base, a big clean highlight
+    toneDots(g, sun, 30, sunTop - 2, 78, sunBot + 2, 0.95, (x, y) => 0.08 + 0.36 * smooth(sunTop + 4, sunBot + 2, y + (x - cx) * 0.25), '#3a3431');
+    within(g, sun, () => {
+      g.fillStyle = '#fffdf8'; g.beginPath(); g.ellipse(cx - 6, sunTop + 7, 8.5, 4.4, -0.3, 0, Math.PI * 2); g.fill();
+    });
+    toneDots(g, lines, 30, 58, 78, 72, 0.95, () => 0.16, '#3a3431');
+    g.lineJoin = 'round'; g.strokeStyle = ink; g.lineWidth = 1.15; g.stroke(sun); g.lineWidth = 0.95; g.stroke(lines);
+    // sparkles in line and fill
+    const spark = (x, y, s) => { star4(g, x + 0.25, y + 0.3, s * 1.18, ink, 1); star4(g, x, y, s, '#fffdf8', 1); };
+    spark(cx - 9, sunTop + 5, 2.4); spark(76, 40, 2.8); spark(33, 46, 1.8); spark(70, 74, 1.6);
+  },
+};
+
+// ------------------------------------------------------------------------------------------------ manga (v4)
+// A slice-of-life manga panel: a big sky in gradation tone, a cumulus cloud in clean line, power lines and a pole
+// across it, birds, rooftops in solid ink at the bottom; the mark is the sun over the town, inked and softly toned.
+THEMES.manga = {
+  bg(g) {
+    const n = noise2(341), ink = '#262220';
+    pixels(g, (x, y) => {
+      let v = 251 - (fbm(n, x / 3, y / 3, 3) - 0.5) * 7;
+      // gradation tone: the sky darkens upwards in fine dots
+      const p = 1.2, u = (x + y) / Math.SQRT2 / p, w = (x - y) / Math.SQRT2 / p;
+      const du = u - Math.round(u), dw = w - Math.round(w), dd = Math.sqrt(du * du + dw * dw);
+      if (dd < 0.04 + 0.34 * (1 - smooth(14, 62, y))) v = 70;
+      return [v, v - 1, v - 4];
+    });
+    // power lines and a pole on the right
+    g.strokeStyle = ink; g.lineWidth = 1.4; g.beginPath(); g.moveTo(84, 18); g.lineTo(82, 92); g.stroke();
+    g.lineWidth = 0.9; for (const y of [27, 31]) { g.beginPath(); g.moveTo(77, y); g.lineTo(90, y - 0.6); g.stroke(); }
+    g.lineWidth = 0.35;
+    for (const [y0, sag] of [[27.4, 9], [30.6, 11], [34, 13]]) { g.beginPath(); g.moveTo(83, y0); g.quadraticCurveTo(50, y0 + sag, 0, y0 + sag * 0.4); g.stroke(); }
+    // the cloud: a bumpy outline filled white, a few hatch strokes in its shade
+    const cl = new Path2D(); const bumps = [[24, 34, 6], [31, 28, 7.5], [40, 25, 8], [49, 27, 6.5], [54, 32, 5], [20, 40, 4.5], [28, 40, 5.5], [38, 39, 6], [47, 37, 5.5]];
+    for (const [x, y, r] of bumps) { cl.moveTo(x + r, y); cl.arc(x, y, r, 0, Math.PI * 2); }
+    // a clean outer outline: the whole shape stroked, then filled over, so only the outside half of the line shows
+    g.lineWidth = 1.25; g.strokeStyle = ink; g.lineJoin = 'round'; g.stroke(cl);
+    g.fillStyle = '#fbfaf6'; g.fill(cl);
+    // birds
+    g.lineWidth = 0.45; g.lineCap = 'round';
+    for (const [x, y, s] of [[66, 21, 2.2], [72, 25, 1.6], [61, 26, 1.3]]) { g.beginPath(); g.moveTo(x - s, y - s * 0.4); g.quadraticCurveTo(x - s * 0.4, y - s * 0.7, x, y); g.quadraticCurveTo(x + s * 0.4, y - s * 0.7, x + s, y - s * 0.4); g.stroke(); }
+    // rooftops in solid ink, a few lit windows
+    const roofs = new Path2D(); roofs.moveTo(0, 80);
+    const r = rng(347); let x = 0;
+    while (x < 108) { const w = 7 + r() * 9, h = 74 + r() * 8; roofs.lineTo(x, h); if (r() < 0.5) roofs.lineTo(x + w / 2, h - 3 - r() * 2); roofs.lineTo(x + w, h); x += w; }
+    roofs.lineTo(108, 108); roofs.lineTo(0, 108); roofs.closePath();
+    g.fillStyle = ink; g.fill(roofs);
+    g.fillStyle = '#fbfaf6'; const rw = rng(353);
+    for (let i = 0; i < 16; i++) { const wx = 4 + rw() * 100, wy = 84 + rw() * 10; g.fillRect(wx, wy, 1.1, 1.4); }
+  },
+  fg(g) {
+    const ink = '#262220';
+    const halo = new Path2D(); halo.arc(cx, sunCy - 4, sunR + 7, 0, Math.PI * 2);
+    g.save(); g.beginPath(); g.rect(0, 0, 108, sunBot + 0.5); g.clip(); g.filter = `blur(${2.6 * S}px)`; g.fillStyle = 'rgba(251,250,246,0.95)'; g.fill(halo); g.restore();
+    g.fillStyle = '#fbfaf6'; g.fill(both);
+    toneDots(g, sun, 30, sunTop - 2, 78, sunBot + 2, 0.95, (x, y) => 0.06 + 0.3 * smooth(sunTop + 6, sunBot + 2, y), '#3a3431');
+    within(g, sun, () => { g.fillStyle = '#fbfaf6'; g.beginPath(); g.ellipse(cx - 6, sunTop + 7, 8, 4, -0.3, 0, Math.PI * 2); g.fill(); });
+    toneDots(g, lines, 30, 58, 78, 72, 0.95, () => 0.15, '#3a3431');
+    g.lineJoin = 'round'; g.strokeStyle = ink; g.lineWidth = 1.15; g.stroke(sun); g.lineWidth = 0.95; g.stroke(lines);
+    // short rays round the sun, drawn by hand
+    g.lineCap = 'round'; g.lineWidth = 0.5;
+    for (let i = 0; i < 9; i++) { const a = Math.PI + (i + 0.5) / 9 * Math.PI; g.beginPath(); g.moveTo(cx + Math.cos(a) * (sunR + 2.4), sunCy + Math.sin(a) * (sunR + 2.4)); g.lineTo(cx + Math.cos(a) * (sunR + 5), sunCy + Math.sin(a) * (sunR + 5)); g.stroke(); }
+  },
+};

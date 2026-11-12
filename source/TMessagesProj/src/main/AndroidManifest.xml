@@ -557,8 +557,8 @@
             android:enabled="false"
             android:name="org.telegram.messenger.NebulaIcon"
             android:targetActivity="org.telegram.ui.LaunchActivity"
-            android:icon="@mipmap/icon_38_launcher"
-            android:roundIcon="@mipmap/icon_38_launcher_round"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
             android:exported="true">
 
             <intent-filter>
@@ -587,8 +587,8 @@
             android:enabled="false"
             android:name="org.telegram.messenger.FrostIcon"
             android:targetActivity="org.telegram.ui.LaunchActivity"
-            android:icon="@mipmap/icon_40_launcher"
-            android:roundIcon="@mipmap/icon_40_launcher_round"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
             android:exported="true">
 
             <intent-filter>
