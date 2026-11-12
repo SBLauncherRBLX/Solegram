@@ -181,7 +181,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_APP_ICON = 108;
     private static final int ID_TEXTURED_GLASS = 109;
     private static final int ID_GLASS_SETTINGS = 111;
-    private static final int ID_AVATAR_IN_CHATS = 112;
     private static final int ID_MAIN_TITLE = 113;
     private static final int ID_SMOOTH_TRANSITIONS = 114;
     private static final int ID_PRESS_SCALE = 115;
@@ -498,7 +497,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 SolegramConfig.putInt("avatarCorners", v);
                 AndroidUtilities.runOnUIThread(SolegramSettingsActivity::redrawEverything);
             }));
-        items.add(UItem.asCheck(ID_AVATAR_IN_CHATS, getString(R.string.SG_AvatarShapeInChats)).setChecked(SolegramConfig.avatarShapeInChats));
         items.add(UItem.asShadow(getString(R.string.SG_AvatarCornersInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_Interface)));
@@ -1065,7 +1063,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int[][] SEARCH = {
         {PAGE_MAIN, 0, R.string.SG_SettingsTitle, 0},
         {PAGE_APPEARANCE, 0, R.string.SG_Appearance, -1},
-        {PAGE_APPEARANCE, ID_AVATAR_IN_CHATS, R.string.SG_AvatarShapeInChats, -1},
         {PAGE_APPEARANCE, 0, R.string.SG_IconPack, 18},
         {PAGE_APPEARANCE, ID_ICONS_LINES, R.string.SG_SettingsIcons, 18},
         {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_SystemFont, -1},
@@ -2766,10 +2763,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     return;
                 }
                 toggleCheck(view, item.id == ID_GLASS_MENUS ? "glassMenus" : item.id == ID_GLASS_DIALOGS ? "glassDialogs" : "glassSheets");
-                return;
-            case ID_AVATAR_IN_CHATS:
-                toggleCheck(view, "avatarShapeInChats");
-                redrawEverything();
                 return;
             case ID_TITLE_EMOJI:
                 // Telegram's emoji status picker; the emoji shows next to the title on the chats screen

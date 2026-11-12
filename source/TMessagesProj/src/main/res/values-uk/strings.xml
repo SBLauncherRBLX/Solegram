@@ -316,7 +316,7 @@
     <string name="SG_ResetSettingsConfirm">All Solegram options will return to their defaults. Your chats and Telegram settings are not affected.</string>
     <string name="SG_BackupInfo">The backup is a small JSON file you can keep or move to another device.</string>
     <string name="SG_AvatarCorners">Avatar corners</string>
-    <string name="SG_AvatarCornersInfo">Avatar shape in the chat list, profiles and menus, from circle to square. Inside chats avatars stay round so they never stick out of message bubbles, unless the option above is on.</string>
+    <string name="SG_AvatarCornersInfo">Avatar shape everywhere: the chat list, profiles, menus and chats, from circle to square. In a chat\'s header the glass pill takes the avatar\'s shape on its left end, so the avatar always sits neatly inside it.</string>
     <string name="SG_AvatarCircle">Circle</string>
     <string name="SG_AvatarSquare">Square</string>
     <string name="SG_Interface">Interface</string>
@@ -461,7 +461,6 @@
     <string name="SG_DisableVibrationInfo">No haptic feedback or vibration inside the app</string>
     <string name="SG_Glass">Glass</string>
     <string name="SG_GlassInfo">Glass floats above your chats like a separate layer, so content stays readable while the interface stays light. Turn it off to save battery on older phones.</string>
-    <string name="SG_AvatarShapeInChats">Avatar shape inside chats too</string>
     <string name="SG_MainTitle">Chats screen title</string>
     <string name="SG_TitleAccount">Account name</string>
     <string name="SG_TitleCustom">Custom text</string>

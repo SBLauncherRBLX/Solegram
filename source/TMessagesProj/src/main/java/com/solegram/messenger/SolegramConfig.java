@@ -400,7 +400,7 @@ public class SolegramConfig {
         monetAccent = p.getBoolean("monetAccent", false);
         showSeconds = p.getBoolean("showSeconds", false);
         disableVibration = p.getBoolean("disableVibration", false);
-        avatarShapeInChats = p.getBoolean("avatarShapeInChats", false);
+        avatarShapeInChats = true; // the avatar shape is everywhere, chats included (the switch is gone)
         mainTitle = clamp(p.getInt("mainTitle", 0), 0, 3);
         mainTitleText = p.getString("mainTitleText", "");
         // the old two packs (1 thin, 2 filled) both were Phosphor: they become the Phosphor pack

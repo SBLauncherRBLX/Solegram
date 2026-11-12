@@ -303,7 +303,7 @@
     <string name="SG_ResetSettingsConfirm">Все параметры Solegram вернутся к значениям по умолчанию. Чаты и настройки Telegram не изменятся.</string>
     <string name="SG_BackupInfo">Резервная копия — небольшой JSON-файл, который можно сохранить или перенести на другое устройство.</string>
     <string name="SG_AvatarCorners">Скругление аватарок</string>
-    <string name="SG_AvatarCornersInfo">Форма аватарок в списке чатов, профилях и меню: от круга до квадрата. Внутри переписки аватарки остаются круглыми, чтобы не вылезать за рамки сообщений, если не включить опцию выше.</string>
+    <string name="SG_AvatarCornersInfo">Форма аватарок везде: в списке чатов, профилях, меню и переписке — от круга до квадрата. В шапке чата левый край стеклянной пилюли повторяет форму аватарки, поэтому она всегда аккуратно вписана внутрь.</string>
     <string name="SG_AvatarCircle">Круг</string>
     <string name="SG_AvatarSquare">Квадрат</string>
     <string name="SG_Interface">Интерфейс</string>
@@ -448,7 +448,6 @@
     <string name="SG_DisableVibrationInfo">Без тактильного отклика и вибрации в приложении</string>
     <string name="SG_Glass">Стекло</string>
     <string name="SG_GlassInfo">Стекло лежит над чатами отдельным слоем: содержимое остаётся читаемым, а интерфейс — лёгким. На старых телефонах можно выключить ради батареи.</string>
-    <string name="SG_AvatarShapeInChats">Форма аватарок и в переписке</string>
     <string name="SG_MainTitle">Заголовок главного экрана</string>
     <string name="SG_TitleAccount">Имя аккаунта</string>
     <string name="SG_TitleCustom">Свой текст</string>

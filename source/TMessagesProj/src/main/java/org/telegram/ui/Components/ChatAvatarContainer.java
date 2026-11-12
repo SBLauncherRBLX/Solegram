@@ -264,7 +264,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         }
         avatarImageView.setContentDescription(getString(R.string.AccDescrProfilePicture));
         avatarImageView.setRoundRadius(dp(21));
-        // Solegram: the chat header belongs to the chat, so it keeps round avatars like the messages.
+        // Solegram: the chat header belongs to the chat (avatar corners apply there too; its glass pill fits the shape).
         if (parentFragment != null) {
             avatarImageView.getImageReceiver().solegramShape = com.solegram.messenger.SolegramUi.SHAPE_CHAT;
             avatarDrawable.solegramShape = com.solegram.messenger.SolegramUi.SHAPE_CHAT;

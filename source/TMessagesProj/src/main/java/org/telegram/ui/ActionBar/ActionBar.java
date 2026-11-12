@@ -237,6 +237,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         glassDrawable = factory.create(this)
                 .setColorProvider(colorProvider)
                 .setPadding(dp(6));
+        solegramTitleLeftRadius = -1; // a new pill: its ends are fitted again
         if (isForum) {
             glassDrawable.setRadius(dp(18.33f), dp(23), dp(23), dp(18.33f));
         } else {
@@ -2963,6 +2964,33 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
     }
 
+    private float solegramTitleLeftRadius = -1;
+
+    /**
+     * Solegram: the left end of the chat's title pill follows the avatar in it - its corners are the avatar's corners
+     * grown by the gap round it, so an avatar of any shape (avatar corners) sits in the pill evenly and never sticks out
+     * of it; a round avatar keeps the pill round. The right end stays round. Without the avatar, and while the search or
+     * the selection takes the pill, it is round on both ends.
+     */
+    private void solegramFitTitlePill(float takenOver) {
+        final float round = dp(23);
+        float target = round;
+        if (chatAvatarContainer != null && chatAvatarContainer.getAvatarImageView() != null) {
+            final org.telegram.messenger.ImageReceiver receiver = chatAvatarContainer.getAvatarImageView().getImageReceiver();
+            final int[] radii = receiver.getRoundRadius();
+            final int base = radii != null && radii.length > 0 ? radii[0] : dp(21);
+            final int percent = com.solegram.messenger.SolegramUi.avatarPercent(receiver.solegramShape);
+            final float avatar = percent >= 100 ? base : base * percent / 100f;
+            // the avatar (42 dp less a pixel) in the 46 dp pill: about 2.33 dp all round
+            final float fitted = Math.min(round, avatar + dp(2.33f));
+            target = lerp(round, fitted, animatorAvatarContainerHasAvatar.getFloatValue() * (1f - Math.min(1f, takenOver)));
+        }
+        if (Math.abs(target - solegramTitleLeftRadius) > 0.25f) {
+            solegramTitleLeftRadius = target;
+            glassDrawable.setRadius(target, round, round, target);
+        }
+    }
+
     public void checkAvatarContainerWidth(boolean animated) {
         if (chatAvatarContainer == null) {
             return;
@@ -3141,6 +3169,7 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
                     right = rightDefault;
                 }
 
+                solegramFitTitlePill(Math.max(Math.max(searchFactor, actionModeFactor), searchFieldVisibleAlpha));
                 glassDrawable.setBounds(left, t, right, b);
                 if (!doNotDrawCenterGlass) {
                     glassDrawable.draw(canvas);

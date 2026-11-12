@@ -198,7 +198,7 @@ public final class SolegramUi {
 
     /** Avatar outside chats: dialogs list, profiles, menus. Follows the "avatar corners" option. */
     public static final int SHAPE_DEFAULT = 0;
-    /** Avatar inside a chat (messages, service messages, chat header): round unless "shape in chats" is on. */
+    /** Avatar inside a chat (messages, service messages, chat header): follows the "avatar corners" option too. */
     public static final int SHAPE_CHAT = 1;
     /** Avatar drawn inside a circular frame (stacked avatars, map pins): always round. */
     public static final int SHAPE_CIRCLE = 2;
