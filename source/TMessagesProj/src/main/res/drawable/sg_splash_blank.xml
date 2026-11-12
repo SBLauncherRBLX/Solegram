@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: the system splash screen shows no icon, only a background: the app then plays its launch animation in
+     the theme's colours (SolegramLaunchSplash) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="320dp"
+    android:viewportWidth="320"
+    android:viewportHeight="320">
+    <path android:pathData="M0,0h1v1h-1z" android:fillColor="#00000000"/>
+</vector>

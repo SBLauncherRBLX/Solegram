@@ -40,7 +40,10 @@ public class GlassCaptureSourceCanvas {
         FROSTED_FILTERED;
 
         private boolean isFrosted() {
-            return this == FROSTED_GLASS || this == FROSTED_FILTERED;
+            // Solegram: the filtered capture (the profile's buttons over the photo) is the clear glass, filtered - at
+            // full resolution with the glass's light blur, so the liquid lens refracts the photo; Telegram 13.2 blurred
+            // it as the frosted glass, and the profile's buttons and menus read as a plain blur
+            return this == FROSTED_GLASS;
         }
     }
 
@@ -430,14 +433,14 @@ public class GlassCaptureSourceCanvas {
                 glassRadius = Math.max(0.5f, blurRadiusForDownsample(dpf2(7) * com.solegram.messenger.SolegramGlass.blurScale(), glassDownsample));
                 renderNode.setRenderEffect(RenderEffect.createBlurEffect(
                         glassRadius, glassRadius, Shader.TileMode.CLAMP));
+                // the filtered capture draws the capture node, already blurred as the clear glass: no blur of its own
+                renderNodeFrostedFiltered.setRenderEffect(null);
             }
             if (this.frostedGlassDownsample != frostedGlassDownsample) {
                 this.frostedGlassDownsample = frostedGlassDownsample;
                 frostedGlassRadius = Math.max(0.5f, blurRadiusForDownsample(
                         dpf2(36) * com.solegram.messenger.SolegramGlass.blurScale(), frostedGlassDownsample));
                 renderNodeGlassFrosted.setRenderEffect(RenderEffect.createBlurEffect(
-                        frostedGlassRadius, frostedGlassRadius, Shader.TileMode.CLAMP));
-                renderNodeFrostedFiltered.setRenderEffect(RenderEffect.createBlurEffect(
                         frostedGlassRadius, frostedGlassRadius, Shader.TileMode.CLAMP));
             }
             this.normalizationDownsample = normalizationDownsample;
@@ -529,20 +532,9 @@ public class GlassCaptureSourceCanvas {
                 recordingCanvas.drawRenderNode(renderNode);
                 renderNodeFiltered.endRecording();
 
-                renderNodeFrostedFiltered.setPosition(
-                        0, 0, frostedGlassWidth, frostedGlassHeight);
+                // on the clear glass's grid (see SourceIndex#isFrosted)
+                renderNodeFrostedFiltered.setPosition(0, 0, glassWidth, glassHeight);
                 recordingCanvas = renderNodeFrostedFiltered.beginRecording();
-                recordingCanvas.translate(
-                        (normalizedPositionGlassWithOffset.left
-                                - normalizedPositionFrostedGlassWithOffset.left)
-                                / frostedGlassDownsample,
-                        (normalizedPositionGlassWithOffset.top
-                                - normalizedPositionFrostedGlassWithOffset.top)
-                                / frostedGlassDownsample);
-                if (glassDownsample != frostedGlassDownsample) {
-                    final float scale = glassDownsample / (float) frostedGlassDownsample;
-                    recordingCanvas.scale(scale, scale);
-                }
                 recordingCanvas.drawRenderNode(renderNodeFiltered);
                 renderNodeFrostedFiltered.endRecording();
             }

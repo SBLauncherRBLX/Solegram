@@ -5717,6 +5717,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         checkUi_searchFieldStyle();
 
         glassEngine.setGlassInvalidationListener(this::invalidateBlurCaptures);
+        if (actionBar != null) {
+            // Solegram: a menu growing out of the header's buttons reaches far below the header: its glass needs the
+            // capture of the whole screen while it is open (else it showed grey below the header's part)
+            actionBar.solegramOnMenuOverlayChanged = () -> {
+                if (fragmentView != null && fragmentView.getMeasuredHeight() > 0) {
+                    invalidateBlurCaptures(GlassEngine.FLAG_INVALIDATED_POSITIONS);
+                }
+            };
+        }
         glassEngine.setPositionsMerger(new GlassPositionsMerger(Float.POSITIVE_INFINITY, dp(48)));
 
         ViewCompat.setOnApplyWindowInsetsListener(fragmentView, this::onApplyWindowInsets);
@@ -14529,6 +14538,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 + dp(30);
 
             iBlur3PositionActionBar.set(0, -additionalList, fragmentView.getMeasuredWidth(), lerp(actionBarHeight, actionBarHeightSearch, animatorSearchVisible.getFloatValue()) + additionalList );
+            if (actionBar != null && actionBar.getOpenMenuOverlay() != null) {
+                // Solegram: a header menu is open: its glass reaches down the screen (see solegramOnMenuOverlayChanged)
+                iBlur3PositionActionBar.bottom = fragmentView.getMeasuredHeight();
+            }
 
             boolean hasBottomBlur = false;
             if (hasMainTabs) {

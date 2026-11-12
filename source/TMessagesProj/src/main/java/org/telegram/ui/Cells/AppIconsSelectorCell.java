@@ -262,6 +262,8 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
             setWillNotDraw(false);
             iconView = new AdaptiveIconImageView(context);
             iconView.setPadding(AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8));
+            // Solegram: the whole icon in the tile, inside the selection ring
+            iconView.setSolegramWholeIcon(AndroidUtilities.dp(4), AndroidUtilities.dp(ICONS_ROUND_RADIUS) - AndroidUtilities.dp(3));
             addView(iconView, LayoutHelper.createLinear(58, 58, Gravity.CENTER_HORIZONTAL));
 
             titleView = new TextView(context);
@@ -381,8 +383,47 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
             this.backgroundOuterPadding = backgroundOuterPadding;
         }
 
+        /**
+         * Solegram: the whole icon as a launcher shows it (the middle 72 of the adaptive icon's 108 units) in a rounded
+         * square that fills the view, with {@code inset} room around it and corners of {@code radius}, instead of the
+         * background cut to a circle.
+         */
+        public void setSolegramWholeIcon(float inset, float radius) {
+            solegramWhole = true;
+            solegramInset = inset;
+            solegramRadius = radius;
+            invalidate();
+        }
+
+        private boolean solegramWhole;
+        private float solegramInset, solegramRadius;
+        private final android.graphics.RectF solegramRect = new android.graphics.RectF();
+
         @Override
         public void draw(Canvas canvas) {
+            if (solegramWhole) {
+                solegramRect.set(solegramInset, solegramInset, getWidth() - solegramInset, getHeight() - solegramInset);
+                final float r = Math.min(solegramRadius, solegramRect.width() / 2f);
+                path.rewind();
+                path.addRoundRect(solegramRect, r, r, Path.Direction.CW);
+                canvas.save();
+                canvas.clipPath(path);
+                // the layers are 108 units, the launcher shows their middle 72
+                final float size = solegramRect.width() * 108f / 72f;
+                final int l = Math.round(solegramRect.centerX() - size / 2f), t = Math.round(solegramRect.centerY() - size / 2f);
+                final int sz = Math.round(size);
+                final Drawable background = getDrawable();
+                if (background != null) {
+                    background.setBounds(l, t, l + sz, t + sz);
+                    background.draw(canvas);
+                }
+                if (foreground != null) {
+                    foreground.setBounds(l, t, l + sz, t + sz);
+                    foreground.draw(canvas);
+                }
+                canvas.restore();
+                return;
+            }
             canvas.save();
             canvas.clipPath(path);
             canvas.scale(1f + backgroundOuterPadding / (float) getWidth(), 1f + backgroundOuterPadding / (float) getHeight(), getWidth() / 2f, getHeight() / 2f);
@@ -396,6 +437,9 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
         }
 
         private void updatePath() {
+            if (solegramWhole) {
+                return; // drawn in draw()
+            }
             path.rewind();
             path.addCircle(getWidth() / 2f, getHeight() / 2f, Math.min(getWidth() - getPaddingLeft() - getPaddingRight(), getHeight() - getPaddingTop() - getPaddingBottom()) / 2f, Path.Direction.CW);
         }

@@ -918,11 +918,17 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         return menu;
     }
 
+    /** Solegram: told when a menu of this bar opens in the screen's overlay and when it has closed. */
+    public Runnable solegramOnMenuOverlayChanged;
+
     @Override
     public void setMenuOverlay(SimpleActionBarMenuOverlay overlay, ActionBarMenuItem item) {
         openMenuOverlay = overlay;
         openMenuItem = item;
         invalidate();
+        if (solegramOnMenuOverlayChanged != null) {
+            solegramOnMenuOverlayChanged.run();
+        }
         if (menu != null) {
             // Solegram: the menu draws the bubble itself; while the overlay drew the menu it was left out of the menu's
             // drawing, which the bar then kept showing (only the icons, no pill) until something redrew the menu

@@ -617,8 +617,8 @@
             android:enabled="false"
             android:name="org.telegram.messenger.SpinIcon"
             android:targetActivity="org.telegram.ui.LaunchActivity"
-            android:icon="@mipmap/icon_42_launcher"
-            android:roundIcon="@mipmap/icon_42_launcher_round"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
             android:exported="true">
 
             <intent-filter>

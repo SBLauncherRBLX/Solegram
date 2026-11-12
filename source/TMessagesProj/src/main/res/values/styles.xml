@@ -250,4 +250,7 @@
         <item name="android:textColor">@color/widget_badge</item>
     </style>
 
+    <style name="SolegramSplash.Light" parent="Theme.TMessages.Start"/>
+    <style name="SolegramSplash.Dark" parent="Theme.TMessages.Start"/>
+    <style name="SolegramSplash.Black" parent="Theme.TMessages.Start"/>
 </resources>

@@ -247,6 +247,12 @@ public class BlurredBackgroundProviderImpl {
     }
 
     public static BlurredBackgroundProvider simpleActionBar(Theme.ResourcesProvider resourcesProvider) {
+        // Solegram: the glass of the simple headers (settings, profile and the other new screens of Telegram 13.2)
+        // is Solegram's glass, as everywhere else: a light veil of the glass settings' density, so the refraction
+        // shows. Telegram filled it 85% with the background colour: milky, it read as a plain blur.
+        if (true) {
+            return topPanel(resourcesProvider);
+        }
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
             .setBackgroundColor((r, isDark) -> {
                 final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.80f;

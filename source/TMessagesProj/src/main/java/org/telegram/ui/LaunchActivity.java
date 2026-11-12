@@ -470,6 +470,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         frameLayout.setClipToPadding(false);
         frameLayout.setClipChildren(false);
         setContentView(frameLayout);
+        // Solegram: the launch animation in the theme's colours, over the app while it loads
+        com.solegram.messenger.ui.SolegramLaunchSplash.maybeShow(this, savedInstanceState);
         rootAnimatedInsetsListener = new WindowAnimatedInsetsProvider(frameLayout);
         PipCoordinator.getInstance().onActivityCreate(this, createActivityVisibilityController(false));
 

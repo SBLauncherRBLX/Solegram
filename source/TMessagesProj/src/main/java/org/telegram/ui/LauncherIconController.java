@@ -15,7 +15,7 @@ import java.util.Calendar;
 
 public class LauncherIconController {
     /** Icons taken out of the picker; their launcher entries stay in the manifest so an install that has one on keeps an icon until the switch below. */
-    private static final String[] RETIRED = {"NeonIcon"};
+    private static final String[] RETIRED = {"NeonIcon", "SpinIcon"};
 
     public static void tryFixLauncherIconIfNeeded() {
         // Solegram: a retired icon that is still on gives way to the default one
@@ -233,13 +233,12 @@ public class LauncherIconController {
         PIXEL("PixelIcon", R.mipmap.sg_icon_bg_pixel, R.mipmap.sg_icon_fg_pixel, R.string.SG_IconPixel, false, true),
         CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true),
         // Solegram 3.3: an early 2000s desktop, a nebula, black and white manga, a frozen New Year, a deep sea
-        // jellyfish, a golden spin of the old West, a green robot - homages to styles, no names or characters
+        // jellyfish, a green robot - homages to styles, no names or characters
         RETRO("RetroIcon", R.mipmap.sg_icon_bg_xp, R.mipmap.sg_icon_fg_xp, R.string.SG_IconRetro, false, true),
         NEBULA("NebulaIcon", R.mipmap.sg_icon_bg_cosmos, R.mipmap.sg_icon_fg_cosmos, R.string.SG_IconNebula, false, true),
         MANGA("MangaIcon", R.mipmap.sg_icon_bg_manga, R.mipmap.sg_icon_fg_manga, R.string.SG_IconManga, false, true),
         FROST("FrostIcon", R.mipmap.sg_icon_bg_frost, R.mipmap.sg_icon_fg_frost, R.string.SG_IconFrost, false, true),
         JELLYFISH("JellyfishIcon", R.mipmap.sg_icon_bg_jelly, R.mipmap.sg_icon_fg_jelly, R.string.SG_IconJellyfish, false, true),
-        SPIN("SpinIcon", R.mipmap.sg_icon_bg_spin, R.mipmap.sg_icon_fg_spin, R.string.SG_IconSpin, false, true),
         DROID("DroidIcon", R.mipmap.sg_icon_bg_droid, R.mipmap.sg_icon_fg_droid, R.string.SG_IconDroid, false, true),
         // Solegram 3.3: Material You - the mark in two tones of one hue on its tonal container (their own row)
         MATERIAL_SKY("MaterialSkyIcon", R.drawable.sg_icon_bg_m3sky, R.drawable.sg_icon_fg_m3sky, R.string.SG_IconM3Sky, false, false, true),
