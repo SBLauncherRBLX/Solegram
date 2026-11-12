@@ -170,7 +170,7 @@ public class SolegramAiSheet extends BottomSheet {
         final LinearLayout head = new LinearLayout(context);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(new Spark(context), LayoutHelper.createLinear(40, 40));
+        head.addView(new Spark(context).setPlain(true), LayoutHelper.createLinear(36, 36)); // the mark alone, no tile behind it
         final LinearLayout titles = new LinearLayout(context);
         titles.setOrientation(LinearLayout.VERTICAL);
         final TextView name = text(context, getString(R.string.SG_AiTitle), 20, textColor);
@@ -578,28 +578,23 @@ public class SolegramAiSheet extends BottomSheet {
     }
 
     /**
-     * The Solegram AI mark: the Solegram mark (a half sun rising over two message lines) with a spark beside the sun,
-     * in the theme's Solegram AI colours, on a soft tile of them (or plain).
+     * The Solegram AI mark: a tall spark with a tilted ring round it - in front of it below, behind it above, with a
+     * gap where they cross - and a small spark beside it; in the theme's Solegram AI colours, on a soft tile of them
+     * (or plain). The same shape as the sg_ai_spark icon.
      */
     public static class Spark extends View {
-        private static final String SUN = "M35.4,55.395 A18.6,18.6 0 0 1 72.6,55.395 A1.24,1.24 0 0 1 71.36,56.635 L36.64,56.635 A1.24,1.24 0 0 1 35.4,55.395 Z";
-        private static final String LINES = "M38.345,59.115 L69.655,59.115 A2.325,2.325 0 0 1 69.655,63.765 L38.345,63.765 A2.325,2.325 0 0 1 38.345,59.115 Z M45.165,66.555 L62.835,66.555 A2.325,2.325 0 0 1 62.835,71.205 L45.165,71.205 A2.325,2.325 0 0 1 45.165,66.555 Z";
-        // the mark with its spark spans x 35.4..83, y 25.5..71.2 of the icon's 108 units
-        private static final float BOX_L = 35.4f, BOX_T = 25.5f, BOX_W = 47.6f, BOX_H = 45.7f;
+        /** The mark in a 24 x 24 box (generated: the spark, the ring's two halves and the small spark as one outline). */
+        private static final String MARK = "M20.40,1.60 L20.22,2.17 L20.06,2.46 L19.72,2.87 L19.46,3.06 L19.17,3.22 L18.60,3.40 L18.95,3.50 L19.27,3.63 L19.55,3.80 L19.80,4.00 L20.00,4.25 L20.17,4.53 L20.30,4.85 L20.40,5.20 L20.50,4.85 L20.63,4.53 L20.80,4.25 L21.01,4.00 L21.25,3.80 L21.53,3.63 L21.85,3.50 L22.20,3.40 L21.63,3.22 L21.16,2.94 L20.86,2.64 L20.68,2.37 L20.54,2.06 Z M14.93,7.17 L16.37,7.08 L17.49,7.10 L18.51,7.21 L19.59,7.44 L20.06,7.60 L20.49,7.79 L21.07,8.16 L21.35,8.41 L21.57,8.69 L21.68,8.88 L21.80,9.19 L23.34,8.75 L23.11,8.18 L22.76,7.66 L22.42,7.30 L21.87,6.86 L21.21,6.48 L20.64,6.24 L19.81,5.96 L18.89,5.76 L17.64,5.60 L16.29,5.55 L14.86,5.60 L13.63,5.74 L13.79,6.33 L14.12,7.26 Z M14.86,13.62 L15.41,13.04 L16.01,12.55 L16.33,12.34 L17.00,12.00 L16.66,11.84 L16.01,11.45 L15.71,11.22 L15.13,10.69 L14.60,10.06 L14.35,9.71 L13.89,8.94 L13.68,8.52 L13.10,7.11 L12.63,5.49 L12.26,3.65 L12.00,1.60 L11.74,3.65 L11.37,5.49 L10.90,7.11 L10.32,8.52 L10.11,8.94 L9.65,9.71 L9.40,10.06 L8.87,10.69 L8.29,11.22 L7.99,11.45 L7.34,11.84 L7.00,12.00 L7.67,12.34 L7.99,12.55 L8.59,13.04 L8.87,13.31 L9.14,13.62 L9.65,14.29 L10.11,15.06 L10.44,15.74 L12.16,15.37 L14.03,14.82 L14.35,14.29 Z M9.52,6.70 L8.08,7.22 L6.97,7.70 L5.93,8.23 L4.71,8.95 L3.62,9.71 L2.85,10.36 L2.18,11.02 L1.49,11.86 L1.07,12.54 L0.91,12.87 L0.72,13.37 L0.60,13.86 L0.56,14.18 L0.57,14.81 L0.70,15.40 L0.82,15.68 L1.05,16.08 L1.46,16.58 L1.98,17.03 L2.45,17.34 L2.98,17.60 L3.56,17.84 L4.19,18.04 L4.87,18.20 L5.60,18.32 L6.89,18.44 L8.56,18.43 L10.31,18.27 L12.10,17.95 L13.90,17.49 L15.64,16.89 L17.29,16.17 L18.82,15.35 L19.52,14.90 L20.17,14.44 L20.78,13.97 L21.33,13.48 L21.82,12.98 L22.25,12.48 L22.62,11.97 L22.93,11.46 L23.16,10.96 L23.33,10.46 L23.43,9.98 L23.45,9.66 L23.43,9.19 L23.34,8.75 L21.80,9.19 L21.87,9.63 L21.83,10.09 L21.68,10.57 L21.43,11.07 L21.07,11.58 L20.61,12.10 L20.21,12.48 L19.59,12.99 L18.89,13.49 L18.11,13.97 L17.27,14.43 L16.36,14.87 L14.68,15.55 L13.67,15.88 L12.64,16.18 L11.09,16.53 L9.82,16.74 L8.34,16.89 L6.95,16.91 L5.89,16.84 L4.75,16.65 L4.24,16.51 L3.79,16.34 L3.38,16.14 L3.03,15.92 L2.74,15.68 L2.43,15.31 L2.23,14.92 L2.13,14.49 L2.15,14.03 L2.27,13.55 L2.43,13.18 L2.74,12.67 L3.26,12.03 L3.79,11.52 L4.58,10.88 L5.30,10.39 L6.09,9.91 L7.18,9.35 L8.34,8.83 L9.35,8.44 L9.70,7.71 L10.15,6.50 Z M11.84,21.01 L12.00,22.40 L12.26,20.35 L12.57,18.77 L11.48,18.99 Z";
 
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint tile = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Path sun = androidx.core.graphics.PathParser.createPathFromPathData(SUN);
-        private final android.graphics.Path lines = androidx.core.graphics.PathParser.createPathFromPathData(LINES);
-        private final android.graphics.Path spark = new android.graphics.Path();
+        private final android.graphics.Path mark = androidx.core.graphics.PathParser.createPathFromPathData(MARK);
         private final RectF rect = new RectF();
         private boolean plain;
         private float breathe = 1f;
 
         public Spark(Context context) {
             super(context);
-            star(spark, 75.5f, 33f, 7.5f);
-            star(spark, 81.5f, 44.5f, 2.6f);
         }
 
         /** Only the mark, no tile (in rows and cards). */
@@ -609,19 +604,10 @@ public class SolegramAiSheet extends BottomSheet {
             return this;
         }
 
-        /** The spark's size, for a gentle pulse. */
+        /** The mark's size, for a gentle pulse. */
         public void setBreathe(float breathe) {
             this.breathe = breathe;
             invalidate();
-        }
-
-        private static void star(android.graphics.Path path, float cx, float cy, float r) {
-            path.moveTo(cx, cy - r);
-            path.quadTo(cx + r * 0.16f, cy - r * 0.16f, cx + r, cy);
-            path.quadTo(cx + r * 0.16f, cy + r * 0.16f, cx, cy + r);
-            path.quadTo(cx - r * 0.16f, cy + r * 0.16f, cx - r, cy);
-            path.quadTo(cx - r * 0.16f, cy - r * 0.16f, cx, cy - r);
-            path.close();
         }
 
         @Override
@@ -633,19 +619,12 @@ public class SolegramAiSheet extends BottomSheet {
                 rect.set(0, 0, w, h);
                 canvas.drawRoundRect(rect, s * 0.3f, s * 0.3f, tile);
             }
-            final float inner = s * (plain ? 0.96f : 0.6f);
-            final float k = inner / Math.max(BOX_W, BOX_H);
+            final float k = s * (plain ? 1f : 0.64f) / 24f * breathe;
             canvas.save();
-            canvas.translate((w - BOX_W * k) / 2f, (h - BOX_H * k) / 2f);
+            canvas.translate((w - 24 * k) / 2f, (h - 24 * k) / 2f);
             canvas.scale(k, k);
-            canvas.translate(-BOX_L, -BOX_T);
-            paint.setShader(new LinearGradient(BOX_L, BOX_T + BOX_H, BOX_L + BOX_W, BOX_T, c, null, Shader.TileMode.CLAMP));
-            canvas.drawPath(sun, paint);
-            canvas.drawPath(lines, paint);
-            canvas.save();
-            canvas.scale(breathe, breathe, 75.5f, 33f);
-            canvas.drawPath(spark, paint);
-            canvas.restore();
+            paint.setShader(new LinearGradient(0, 24, 24, 0, c, null, Shader.TileMode.CLAMP));
+            canvas.drawPath(mark, paint);
             canvas.restore();
         }
     }
