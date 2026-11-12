@@ -243,6 +243,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_AI_REPLIES = 2901;
     private static final int ID_AI_EXPLAIN = 2902;
     private static final int ID_AI_WRITER = 2903;
+    private static final int ID_AI_CATCH_UP = 2905;
     private static final int ID_AI_PRESET = 2904;
     private static final int ID_MEANING = 236;
     private static final int ID_MEANING_RERANK = 237;
@@ -623,8 +624,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(UItem.asButtonCheck(ID_HEADER_BUTTONS, getString(R.string.SG_HeaderButtons), getString(R.string.SG_HeaderButtonsInfo)).setChecked(SolegramConfig.glassHeaderButtons));
             items.add(UItem.asButtonCheck(ID_FROSTED_HEADERS, getString(R.string.SG_FrostedHeaders), getString(R.string.SG_FrostedHeadersInfo)).setChecked(SolegramConfig.frostedHeaders));
             items.add(UItem.asButtonCheck(ID_GLASS_MENUS, getString(R.string.SG_GlassMenus), getString(R.string.SG_GlassMenusInfo)).setChecked(SolegramConfig.glassMenus));
-            items.add(UItem.asButtonCheck(ID_GLASS_DIALOGS, getString(R.string.SG_GlassDialogs), getString(R.string.SG_GlassDialogsInfo)).setChecked(SolegramConfig.glassDialogs));
-            items.add(UItem.asButtonCheck(ID_GLASS_SHEETS, getString(R.string.SG_GlassSheets), getString(R.string.SG_GlassSheetsInfo)).setChecked(SolegramConfig.glassSheets));
             items.add(UItem.asButtonCheck(ID_GLASS_CALL, getString(R.string.SG_GlassCallScreen), getString(R.string.SG_GlassCallScreenInfo)).setChecked(SolegramConfig.glassCallScreen));
             items.add(UItem.asShadow(getString(windowBlur ? R.string.SG_GlassElsewhereInfo : R.string.SG_GlassElsewhereUnavailable)));
 
@@ -833,61 +832,24 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     // the AI page's own views, made once: the list keeps them over its updates (no rebuilding, no flashes)
-    private SolegramAiPageViews.Hero aiHero;
-    private SolegramAiPageViews.Cards aiCards;
-    private SolegramAiPageViews.Card aiCatchUpCard;
-    private final java.util.HashMap<String, SolegramAiPageViews.FeatureRow> aiRows = new java.util.HashMap<>();
-
     private void fillAi(ArrayList<UItem> items) {
-        final Context context = getContext();
-        if (listView != null) {
-            // the header's glow goes on up under the header: the list clips neither its items nor its padding
-            listView.setClipChildren(false);
-            listView.setClipToPadding(false);
-        }
-        // Solegram AI: its header, the catch-up card, then all of its features
-        if (aiHero == null) {
-            aiHero = new SolegramAiPageViews.Hero(context, getString(R.string.SG_AiTagline), getResourceProvider());
-            aiCards = new SolegramAiPageViews.Cards(context);
-            SolegramAiPageViews.riseOnce(aiCards, 90);
-            aiCatchUpCard = aiCards.add(new SolegramAiPageViews.Card(context,
-                new SolegramAiPageViews.CardMark(context, SolegramAiPageViews.CardMark.CATCH_UP),
-                getString(R.string.SG_AiCatchUpMenu), getString(R.string.SG_AiCatchUpInfo), getResourceProvider()));
-            aiCatchUpCard.setState(getString(SolegramConfig.aiCatchUp ? R.string.SG_AiOnInChats : R.string.SG_AiOff), SolegramConfig.aiCatchUp, false);
-            aiCatchUpCard.setOnClickListener(v -> {
-                // only the card changes: nothing else on the page depends on it
-                final boolean on = SolegramConfig.toggle("aiCatchUp");
-                aiCatchUpCard.setState(getString(on ? R.string.SG_AiOnInChats : R.string.SG_AiOff), on, true);
-                try {
-                    v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
-                } catch (Exception ignore) {
-                }
-            });
-        }
-        items.add(UItem.asCustomShadow(aiHero, true));
-        items.add(UItem.asCustomShadow(aiCards));
-
-        items.add(UItem.asHeader(getString(R.string.SG_AiMoreFeatures)));
-        items.add(UItem.asCustom(ID_AI_REPLIES, feature(R.drawable.menu_reply, 0, R.string.SG_AiRepliesFeature, R.string.SG_AiRepliesInfo, "aiReplies", SolegramConfig.aiReplies, true, false)));
-        items.add(UItem.asCustom(ID_AI_EXPLAIN, feature(R.drawable.msg_info, 3, R.string.SG_AiExplainFeature, R.string.SG_AiExplainInfo, "aiExplain", SolegramConfig.aiExplain, true, false)));
-        items.add(UItem.asCustom(ID_AI_WRITER, feature(R.drawable.msg_edit, 2, R.string.SG_AiWriterFeature, R.string.SG_AiWriterInfo, "aiWriter", SolegramConfig.aiWriter, true, false)));
-        items.add(UItem.asCustom(ID_AI_SUMMARY, feature(R.drawable.sg_ai_summary, 1, R.string.SG_AiSummary, R.string.SG_AiSummaryInfo, "aiSummary", SolegramConfig.aiSummary, true, true)));
-        items.add(UItem.asCustom(ID_MEANING, feature(R.drawable.msg_search, 0, R.string.SG_MeaningSearch, R.string.SG_MeaningSearchInfo, "meaningSearch", SolegramConfig.meaningSearch, false, true)));
+        // Solegram AI in chats: each of its tasks with its switch
+        items.add(UItem.asHeader(getString(R.string.SG_AiTitle)));
+        items.add(UItem.asButtonCheck(ID_AI_CATCH_UP, getString(R.string.SG_AiCatchUpMenu), getString(R.string.SG_AiCatchUpInfo)).setChecked(SolegramConfig.aiCatchUp));
+        items.add(UItem.asButtonCheck(ID_AI_REPLIES, getString(R.string.SG_AiRepliesFeature), getString(R.string.SG_AiRepliesInfo)).setChecked(SolegramConfig.aiReplies));
+        items.add(UItem.asButtonCheck(ID_AI_EXPLAIN, getString(R.string.SG_AiExplainFeature), getString(R.string.SG_AiExplainInfo)).setChecked(SolegramConfig.aiExplain));
+        items.add(UItem.asButtonCheck(ID_AI_WRITER, getString(R.string.SG_AiWriterFeature), getString(R.string.SG_AiWriterInfo)).setChecked(SolegramConfig.aiWriter));
         items.add(UItem.asShadow(getString(R.string.SG_AiFeaturesInfo)));
 
-        // the long messages' summary and the search by meaning: their details
-        if (SolegramConfig.aiSummary || SolegramConfig.meaningSearch && com.solegram.messenger.SolegramMeaningSearch.rerankAvailable()) {
-            items.add(UItem.asHeader(getString(R.string.SG_AiDetails)));
-            if (SolegramConfig.aiSummary) {
-                items.add(UItem.asButtonCheck(ID_AI_SUMMARY_BUTTON, getString(R.string.SG_AiSummaryButton), getString(R.string.SG_AiSummaryButtonInfo)).setChecked(SolegramConfig.aiSummaryButton));
-                items.add(tile(UItem.asButton(ID_AI_LANGUAGE, R.drawable.msg_language, getString(R.string.SG_AiLanguage),
-                    SolegramConfig.aiSummaryLanguage == 1 ? translateTargetName() : getString(R.string.SG_AiLanguageMessage)), TILE_TEAL));
-            }
-            if (SolegramConfig.meaningSearch && com.solegram.messenger.SolegramMeaningSearch.rerankAvailable()) {
-                items.add(UItem.asButtonCheck(ID_MEANING_RERANK, getString(R.string.SG_MeaningRerank), getString(R.string.SG_MeaningRerankInfo)).setChecked(SolegramConfig.meaningRerank));
-            }
-            items.add(UItem.asShadow(SolegramConfig.meaningSearch ? getString(R.string.SG_MeaningPrivacy) : null));
+        // the summary of long messages
+        items.add(UItem.asHeader(getString(R.string.SG_AiSummaryHeader)));
+        items.add(UItem.asButtonCheck(ID_AI_SUMMARY, getString(R.string.SG_AiSummary), getString(R.string.SG_AiSummaryInfo)).setChecked(SolegramConfig.aiSummary));
+        if (SolegramConfig.aiSummary) {
+            items.add(UItem.asButtonCheck(ID_AI_SUMMARY_BUTTON, getString(R.string.SG_AiSummaryButton), getString(R.string.SG_AiSummaryButtonInfo)).setChecked(SolegramConfig.aiSummaryButton));
+            items.add(tile(UItem.asButton(ID_AI_LANGUAGE, R.drawable.msg_language, getString(R.string.SG_AiLanguage),
+                SolegramConfig.aiSummaryLanguage == 1 ? translateTargetName() : getString(R.string.SG_AiLanguageMessage)), TILE_TEAL));
         }
+        items.add(UItem.asShadow(null));
 
         // the model: where Solegram AI thinks
         items.add(UItem.asHeader(getString(R.string.SG_AiModelHeader)));
@@ -907,6 +869,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
         items.add(UItem.asShadow(getString(aiPrivacyText(SolegramConfig.aiProvider))));
 
+        fillMeaningSearch(items);
+
         // translation
         items.add(UItem.asHeader(getString(R.string.SG_Translation)));
         items.add(UItem.asButtonCheck(ID_TRANSLATE_HERE, getString(R.string.SG_TranslateHereItem), getString(R.string.SG_TranslateHereItemInfo)).setChecked(SolegramConfig.translateHere));
@@ -917,36 +881,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(tile(UItem.asButton(ID_DONT_TRANSLATE, R.drawable.msg_block2, getString(R.string.DoNotTranslate)), TILE_RED));
         }
         items.add(UItem.asShadow(getString(R.string.SG_TranslationInfo)));
-    }
-
-    /** The feature row in a list item (the list wraps custom views in a frame of its own). */
-    private static SolegramAiPageViews.FeatureRow featureRow(View view) {
-        if (view instanceof SolegramAiPageViews.FeatureRow) {
-            return (SolegramAiPageViews.FeatureRow) view;
-        }
-        if (view instanceof android.view.ViewGroup && ((android.view.ViewGroup) view).getChildCount() > 0 && ((android.view.ViewGroup) view).getChildAt(0) instanceof SolegramAiPageViews.FeatureRow) {
-            return (SolegramAiPageViews.FeatureRow) ((android.view.ViewGroup) view).getChildAt(0);
-        }
-        return null;
-    }
-
-    /** A Solegram AI feature row with its switch (the setting {@code key}). */
-    private View feature(int icon, int colorIndex, int title, int text, String key, boolean on, boolean divider, boolean shapesPage) {
-        SolegramAiPageViews.FeatureRow row = aiRows.get(key);
-        if (row == null) {
-            row = new SolegramAiPageViews.FeatureRow(getContext(), icon, colorIndex, getString(title), getString(text), getResourceProvider())
-                .setDivider(divider)
-                .onToggle(() -> {
-                    SolegramConfig.toggle(key);
-                    if (shapesPage) {
-                        // the details below show or hide with it: the same rows, only the list changes
-                        AndroidUtilities.runOnUIThread(() -> listView.adapter.update(true), 200);
-                    }
-                });
-            aiRows.put(key, row);
-            SolegramAiPageViews.riseOnce(row, 150 + 45L * aiRows.size());
-        }
-        return row.setChecked(on, false);
     }
 
     /** Services one's own key works with: base address and a good model for Solegram AI. */
@@ -1085,8 +1019,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_GLASS, ID_HEADER_BUTTONS, R.string.SG_HeaderButtons, -1},
         {PAGE_GLASS, ID_FROSTED_HEADERS, R.string.SG_FrostedHeaders, -1},
         {PAGE_GLASS, ID_GLASS_MENUS, R.string.SG_GlassMenus, -1},
-        {PAGE_GLASS, ID_GLASS_DIALOGS, R.string.SG_GlassDialogs, -1},
-        {PAGE_GLASS, ID_GLASS_SHEETS, R.string.SG_GlassSheets, -1},
         {PAGE_GLASS, ID_GLASS_CALL, R.string.SG_GlassCallScreen, -1},
         {PAGE_GLASS, ID_GLASS_TINT, R.string.SG_GlassTintColor, -1},
         {PAGE_GLASS, ID_GLASS_SHADOW, R.string.SG_GlassShadow, -1},
@@ -1371,22 +1303,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         super.createView(context);
         // rounded section cards, as in Telegram's own settings
         listView.setSections();
-        if (page == PAGE_AI) {
-            // the AI page's glow goes on up under the header from the first frame: the list clips neither its items
-            // nor its padding (set here: the first fill of the page runs before the list exists)
-            listView.setClipChildren(false);
-            listView.setClipToPadding(false);
-            // and without the list's appear animation: it faded every row in a layer of the row's own size, which
-            // cut the glow off at the hero's top - a plain band under the header until it was over. The page's
-            // parts rise in by themselves instead
-            listView.setLayoutAnimation(null);
-            // the glow itself is drawn behind the list, not by the hero row (see Glow); centred, so that the floating
-            // header does not take it for a view of its own at the top of the screen
-            if (aiHero != null && fragmentView instanceof android.widget.FrameLayout) {
-                ((android.widget.FrameLayout) fragmentView).addView(new SolegramAiPageViews.Glow(context, listView, aiHero, getResourceProvider()), 0,
-                    LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, android.view.Gravity.CENTER));
-            }
-        }
         return fragmentView;
     }
 
@@ -2675,10 +2591,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 toggleCheck(view, "translateHere");
                 return;
             case ID_AI_SUMMARY:
-                if (featureRow(view) != null) {
-                    featureRow(view).toggleOnce(); // once, whether the row or the list saw the tap
-                    return;
-                }
                 toggleCheck(view, "aiSummary");
                 listView.adapter.update(true);
                 return;
@@ -2698,11 +2610,19 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     restartBulletin();
                 });
                 return;
+            case ID_AI_CATCH_UP:
+                toggleCheck(view, "aiCatchUp");
+                return;
+            case ID_AI_REPLIES:
+                toggleCheck(view, "aiReplies");
+                return;
+            case ID_AI_EXPLAIN:
+                toggleCheck(view, "aiExplain");
+                return;
+            case ID_AI_WRITER:
+                toggleCheck(view, "aiWriter");
+                return;
             case ID_MEANING:
-                if (featureRow(view) != null) {
-                    featureRow(view).toggleOnce(); // once, whether the row or the list saw the tap
-                    return;
-                }
                 toggleCheck(view, "meaningSearch");
                 listView.adapter.update(true);
                 return;
@@ -2714,13 +2634,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_AI_PRESET:
                 showAiPresetPicker();
-                return;
-            case ID_AI_REPLIES:
-            case ID_AI_EXPLAIN:
-            case ID_AI_WRITER:
-                if (featureRow(view) != null) {
-                    featureRow(view).toggleOnce();
-                }
                 return;
             case ID_AI_NANO:
                 onNanoClick();

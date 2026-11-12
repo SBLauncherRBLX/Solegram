@@ -477,6 +477,10 @@ public final class SolegramLiveGlass implements GlassSource, org.telegram.ui.Com
         if (!available() || host != null && !host.part) {
             return null;
         }
+        if (recipe == FROSTED) {
+            // the frosted recipe (a plain blur, no real liquid glass) is gone: those panels are Telegram's plain fill
+            return null;
+        }
         try {
             final SolegramLiveGlass glass = new SolegramLiveGlass(owner, recipe, host);
             glass.drawable.setColorProvider(provider);
@@ -997,6 +1001,13 @@ public final class SolegramLiveGlass implements GlassSource, org.telegram.ui.Com
 
         @Override
         public BlurredBackgroundDrawable create(View view, BlurredBackgroundColorProvider provider, boolean multiwindow) {
+            if (recipe == FROSTED) {
+                // menus over Telegram's blurred backdrop: a plain fill of the theme's menu colour, as Telegram had them,
+                // not a blur of the screen
+                final org.telegram.utils.glass.source.GlassSourceColor plain = new org.telegram.utils.glass.source.GlassSourceColor();
+                plain.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground) | 0xFF000000);
+                return new BlurredBackgroundDrawableViewFactory(plain).create(view, provider, multiwindow);
+            }
             if (view != null && menusOn()) {
                 final SolegramLiveGlass glass = SolegramLiveGlass.create(view, provider, recipe);
                 if (glass != null) {

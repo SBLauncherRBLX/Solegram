@@ -2904,6 +2904,12 @@ public class ChatActivityEnterView extends FrameLayout implements
         ScaleStateListAnimator.apply(aiButton);
         aiButton.setOnClickListener(v -> {
             MessagesController.getGlobalMainSettings().edit().putInt("aihintshown", 3).apply();
+            // Solegram: the AI button opens Solegram AI's writer (a better wording, a translation), not Telegram's editor
+            if (com.solegram.messenger.SolegramConfig.aiWriter && !richDraftActive && messageEditText != null && parentFragment != null
+                    && parentFragment.getCurrentEncryptedChat() == null && messageEditText.length() > 0) {
+                com.solegram.messenger.ui.SolegramAiSheet.showWriter(parentFragment, messageEditText.getText().toString());
+                return;
+            }
             final long dialogId = parentFragment != null ? parentFragment.getDialogId() : dialog_id;
             if (richDraftActive) {
                 if (richDraftMessage == null) return;

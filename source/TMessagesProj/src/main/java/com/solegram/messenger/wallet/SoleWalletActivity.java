@@ -208,7 +208,10 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             bioItem = other.addSubItem(MENU_BIO, R.drawable.fingerprint, biometricLabel());
         }
         // one wallet (Telegram's wallet inside SoleWallet, behind its code) is about the wallet: it is set here
-        unifiedItem = other.addSubItem(MENU_UNIFIED, R.drawable.msg_payment_card, getString(R.string.SG_WalletUnifiedMenu), true);
+        // the check on the right: on the left (where Telegram puts it) it sat over the card icon
+        unifiedItem = other.addSubItem(MENU_UNIFIED, R.drawable.msg_payment_card, getString(R.string.SG_WalletUnifiedMenu));
+        unifiedItem.makeCheckView(2);
+        unifiedItem.setTextAndIcon(getString(R.string.SG_WalletUnifiedMenu), R.drawable.msg_payment_card);
         unifiedItem.setChecked(com.solegram.messenger.SolegramConfig.unifiedWallet);
         other.addSubItem(MENU_TOUR, R.drawable.msg_help, getString(R.string.SG_WalletTour));
         other.addSubItem(MENU_REMOVE_CODE, R.drawable.msg_delete, getString(R.string.SG_WalletRemoveCode));
@@ -1805,7 +1808,18 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                 glass = source;
                 root.getViewTreeObserver().addOnPreDrawListener(() -> {
                     if (root.getWidth() > 0) {
-                        source.setSize(root.getWidth(), Math.min(root.getHeight(), ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(48)));
+                        // the buttons look only at the top of the page; an open menu (made of this glass) goes far down
+                        // the page: the whole page then, or the menu's glass was cut off below the top band
+                        boolean menuOpen = false;
+                        for (int i = 0, n = root.getChildCount(); i < n; i++) {
+                            final View child = root.getChildAt(i);
+                            if (child instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay && child.getVisibility() == View.VISIBLE) {
+                                menuOpen = true;
+                                break;
+                            }
+                        }
+                        source.setSize(root.getWidth(), menuOpen ? root.getHeight()
+                            : Math.min(root.getHeight(), ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight + dp(48)));
                         source.updateDisplayListIfNeeded();
                     }
                     return true;

@@ -553,8 +553,8 @@
     <string name="SG_GlassDialogsInfo">Окна подтверждений и предупреждений из того же живого жидкого стекла, что и кнопки в чате (Android 13+)</string>
     <string name="SG_GlassSheets">Нижние панели</string>
     <string name="SG_GlassSheetsInfo">Выезжающие снизу панели из живого жидкого стекла: преломление по краю, внутри матовое, чтобы текст хорошо читался (Android 13+)</string>
-    <string name="SG_GlassElsewhereInfo">Меню и диалоги работают на любом Android. Нижним панелям нужно системное размытие окон (Android 12+), энергосбережение может его отключать.</string>
-    <string name="SG_GlassElsewhereUnavailable">Нижним панелям нужно системное размытие окон (Android 12+), сейчас оно выключено. Меню и диалоги работают и так.</string>
+    <string name="SG_GlassElsewhereInfo">Жидкое стекло в меню, кнопках и шапках работает на любом Android. Нижние панели и диалоги — обычные, как в Telegram.</string>
+    <string name="SG_GlassElsewhereUnavailable">Жидкое стекло в меню, кнопках и шапках работает на любом Android. Нижние панели и диалоги — обычные, как в Telegram.</string>
     <string name="SG_LiquidControls">Жидкие переключатели и ползунки</string>
     <string name="SG_LiquidControlsInfo">Белая «пилюля», которая при нажатии раздувается в стеклянную линзу над дорожкой</string>
     <string name="SG_QuickGhost">Призрак</string>

@@ -357,6 +357,11 @@ public class SolegramFloatingScreen {
     }
 
     private int glassHeight() {
+        if (openMenuIn(fragmentView) && fragmentView.getParent() instanceof View) {
+            // an open menu of the header is made of this glass and goes far down the screen: the whole screen then,
+            // or its glass was cut off below the band under the header
+            return Math.max(1, ((View) fragmentView.getParent()).getHeight());
+        }
         return (int) Math.ceil(Math.max(0, actionBar.getY()) + actionBar.getMeasuredHeight() + dp(48));
     }
 

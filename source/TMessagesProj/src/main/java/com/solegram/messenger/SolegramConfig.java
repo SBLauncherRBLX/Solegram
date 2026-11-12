@@ -440,8 +440,10 @@ public class SolegramConfig {
         newPlayer = p.getBoolean("newPlayer", true);
         musicTab = p.getBoolean("musicTab", false);
         tabsLayout = p.getString("tabsLayout", "");
-        glassDialogs = p.getBoolean("glassDialogs", true);
-        glassSheets = p.getBoolean("glassSheets", true);
+        // dialogs and the sheets that slide up are Telegram's plain panels again: their glass was a frosted blur,
+        // not the liquid glass (the switches are gone)
+        glassDialogs = false;
+        glassSheets = false;
         liquidControls = p.getBoolean("liquidControls", true);
         glassPreviewLook = p.getBoolean("glassPreviewLook", true);
         typingAnimation = p.getBoolean("typingAnimation", true);
