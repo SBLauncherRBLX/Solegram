@@ -3929,9 +3929,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             musicView = new ProfileMusicView(context, resourcesProvider);
             balanceView = new ProfileBalanceView(context, resourcesProvider);
             musicView.setTrailingView(balanceView);
-            if (buttonsGlass != null) {
-                musicView.setGlassFactory(buttonsGlass.actionsFactory);
-            }
+            // Solegram: the music pill is flat, as the action buttons (no glass)
             balanceView.setOnClickListener(v -> {
                 if (userInfo != null && userInfo.wallet_card != null && getParentActivity() != null) {
                     showDialog(new ProfileWalletCardDialog(this, balanceView,
@@ -8212,12 +8210,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             buttonsGlass.setButtonColor(topView.btnColor, topView.hasColorById);
         }
         buttonsGlass.setPhotoProgress(buttonsPhotoProgress);
-        if (actionsView != null) {
-            actionsView.setGlassFactory(buttonsGlass.actionsFactory);
-        }
-        if (musicView != null) {
-            musicView.setGlassFactory(buttonsGlass.actionsFactory);
-        }
+        // Solegram: the action buttons (call, video, mute, message...) and the music pill are flat, without glass
         simpleActionBar.setButtonsGlass(buttonsGlass.headerFactory);
         simpleActionBar.setMenuGlassStroke(false);
         glass.setViews(contentView, simpleActionBar, resourcesProvider);

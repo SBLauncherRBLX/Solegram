@@ -307,21 +307,27 @@ public class ProfileActionsView extends View {
                 drawGlass(canvas, AndroidUtilities.rectTmp, r, action.getAlpha() * alphaFraction1);
                 continue;
             }
+            // Solegram: flat buttons (no glass); over the expanded photo they go a soft dark, so white icons read
+            final int wasColor = paint.getColor();
+            final float overPhoto = Utilities.clamp01(parentExpanded);
+            if (overPhoto > 0f) {
+                paint.setColor(ColorUtils.blendARGB(wasColor, 0x48000000, overPhoto));
+            }
             int wasAlpha = paint.getAlpha();
             int newAlpha = (int) (action.getAlpha() * alphaFraction1 * wasAlpha);
-            paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f : 1f)));
+            paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f + 0.9f * overPhoto : 1f)));
             paint.setShadowLayer(0, 0, 0, 0);
 
             canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, paint);
-            if (radialGradient != null) {
+            if (radialGradient != null && overPhoto < 1f) {
                 int wasAlpha2 = shaderPaint.getAlpha();
-                shaderPaint.setAlpha((int) (action.getAlpha() * alphaFraction1 * wasAlpha2));
+                shaderPaint.setAlpha((int) (action.getAlpha() * alphaFraction1 * wasAlpha2 * (1f - overPhoto)));
                 matrix.setTranslate(AndroidUtilities.rectTmp.left, AndroidUtilities.rectTmp.top);
                 radialGradient.setLocalMatrix(matrix);
                 canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, shaderPaint);
                 shaderPaint.setAlpha(wasAlpha2);
             }
-            paint.setAlpha(wasAlpha);
+            paint.setColor(wasColor); // its own colour and alpha back
         }
         hideUnusedGlass();
 

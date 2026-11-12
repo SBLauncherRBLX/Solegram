@@ -788,9 +788,12 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 }
                 canvas.restore();
             } else {
+                // Solegram: each half down to its own corner (at least to the middle, for the straight side of a small
+                // corner): with one height for both, a round end beside a small corner lost most of its outline
                 final float cx = (left + right) / 2f;
+                final float half = (bottom - top) / 2f;
                 canvas.save();
-                if (canvas.clipRect(left, top, cx, MathUtils.clamp(top + radii[0] * 2, top, bottom))) {
+                if (canvas.clipRect(left, top, cx, MathUtils.clamp(top + Math.max(radii[1] * 2, half), top, bottom))) {
                     canvas.drawRoundRect(
                             left - strokeHalf,
                             top + strokeHalf,
@@ -802,7 +805,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 }
                 canvas.restore();
                 canvas.save();
-                if (canvas.clipRect(cx, top, right, MathUtils.clamp(top + radii[0] * 2, top, bottom))) {
+                if (canvas.clipRect(cx, top, right, MathUtils.clamp(top + Math.max(radii[3] * 2, half), top, bottom))) {
                     canvas.drawRoundRect(
                             left - strokeHalf,
                             top + strokeHalf,
@@ -830,8 +833,9 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 canvas.restore();
             } else {
                 final float cx = (left + right) / 2f;
+                final float half = (bottom - top) / 2f;
                 canvas.save();
-                if (canvas.clipRect(left, MathUtils.clamp(bottom - radii[4] * 2, top, bottom), cx, bottom)) {
+                if (canvas.clipRect(left, MathUtils.clamp(bottom - Math.max(radii[7] * 2, half), top, bottom), cx, bottom)) {
                     canvas.drawRoundRect(
                             left - strokeHalf,
                             top - strokeHalf,
@@ -843,7 +847,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 }
                 canvas.restore();
                 canvas.save();
-                if (canvas.clipRect(cx, MathUtils.clamp(bottom - radii[4] * 2, top, bottom), right, bottom)) {
+                if (canvas.clipRect(cx, MathUtils.clamp(bottom - Math.max(radii[5] * 2, half), top, bottom), right, bottom)) {
                     canvas.drawRoundRect(
                             left - strokeHalf,
                             top - strokeHalf,

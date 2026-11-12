@@ -2999,7 +2999,8 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
         if (Math.abs(target - solegramTitleLeftRadius) > 0.25f) {
             solegramTitleLeftRadius = target;
-            glassDrawable.setRadius(target, round, round, target);
+            // the outline and the glass itself (its lens and rim take their own radii) both get the corners
+            glassDrawable.setRadius(target, round, round, target, false);
         }
     }
 
