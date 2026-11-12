@@ -114,9 +114,8 @@ public final class ProfileButtonsGlass {
         actionsSource = new Source(null);
         headerSource = new Source(new SettingsSource(simpleGlass.factory));
 
+        // the action buttons (call, video, mute, message...) and the music pills are flat, as Telegram has them: no lens
         actionsFactory = createFactory(engine, actionsSource);
-        // Solegram: the action buttons and the music pills are liquid glass too, as before Telegram 13.2 made them flat
-        actionsFactory.setLiquidGlassEffectAllowed(true);
         headerFactory = createFactory(engine, headerSource);
         headerFactory.setLiquidGlassEffectAllowed(true);
 

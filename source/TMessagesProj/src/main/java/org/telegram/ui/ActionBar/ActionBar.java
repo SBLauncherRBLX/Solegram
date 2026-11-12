@@ -2975,15 +2975,27 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     private void solegramFitTitlePill(float takenOver) {
         final float round = dp(23);
         float target = round;
-        if (chatAvatarContainer != null && chatAvatarContainer.getAvatarImageView() != null) {
-            final org.telegram.messenger.ImageReceiver receiver = chatAvatarContainer.getAvatarImageView().getImageReceiver();
+        // the chat's avatar: given to the bar in some modes (pinned, comments), in an ordinary chat only a child of it
+        ChatAvatarContainer container = chatAvatarContainer;
+        if (container == null) {
+            for (int i = 0, n = getChildCount(); i < n; i++) {
+                if (getChildAt(i) instanceof ChatAvatarContainer) {
+                    container = (ChatAvatarContainer) getChildAt(i);
+                    break;
+                }
+            }
+        }
+        if (container != null && container.getAvatarImageView() != null) {
+            final float shown = chatAvatarContainer != null ? animatorAvatarContainerHasAvatar.getFloatValue()
+                : container.getVisibility() == View.VISIBLE && container.hasVisibleAvatar() ? container.getAlpha() : 0f;
+            final org.telegram.messenger.ImageReceiver receiver = container.getAvatarImageView().getImageReceiver();
             final int[] radii = receiver.getRoundRadius();
             final int base = radii != null && radii.length > 0 ? radii[0] : dp(21);
             final int percent = com.solegram.messenger.SolegramUi.avatarPercent(receiver.solegramShape);
             final float avatar = percent >= 100 ? base : base * percent / 100f;
             // the avatar (42 dp less a pixel) in the 46 dp pill: about 2.33 dp all round
             final float fitted = Math.min(round, avatar + dp(2.33f));
-            target = lerp(round, fitted, animatorAvatarContainerHasAvatar.getFloatValue() * (1f - Math.min(1f, takenOver)));
+            target = lerp(round, fitted, shown * (1f - Math.min(1f, takenOver)));
         }
         if (Math.abs(target - solegramTitleLeftRadius) > 0.25f) {
             solegramTitleLeftRadius = target;
