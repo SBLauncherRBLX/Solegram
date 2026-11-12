@@ -2153,6 +2153,7 @@
     <string name="SG_AiNewChat">Новый разговор</string>
     <string name="SG_AiChatHello">Чем помочь?</string>
     <string name="SG_AiChatAbout">Спросите что угодно или пришлите фото: идеи, ответы, тексты, переводы, что на снимке.</string>
+    <string name="SG_AiSmarterHint">Умнее со своим бесплатным ключом Gemini — настроить</string>
     <string name="SG_AiChatHint">Сообщение для Solegram AI</string>
     <string name="SG_AiIdea1">Что умеет Solegram?</string>
     <string name="SG_AiIdea2">Помоги вежливо отказаться от встречи</string>

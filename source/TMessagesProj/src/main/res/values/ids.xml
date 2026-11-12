@@ -71,4 +71,5 @@
     <item name="theme_generation" type="id" />
     <item name="sg_ai_task" type="id" />
     <item name="sg_ai_mode" type="id" />
+    <item name="sg_ai_rise" type="id" />
 </resources>

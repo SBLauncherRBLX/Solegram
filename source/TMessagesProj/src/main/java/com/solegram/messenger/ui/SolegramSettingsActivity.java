@@ -851,6 +851,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         if (aiHero == null) {
             aiHero = new SolegramAiPageViews.Hero(context, getString(R.string.SG_AiTagline), getResourceProvider());
             aiCards = new SolegramAiPageViews.Cards(context);
+            SolegramAiPageViews.riseOnce(aiCards, 90);
             final SolegramAiPageViews.Card assistant = aiCards.add(new SolegramAiPageViews.Card(context,
                 new SolegramAiPageViews.CardMark(context, SolegramAiPageViews.CardMark.ASSISTANT),
                 getString(R.string.SG_AiAssistant), getString(R.string.SG_AiAssistantInfo), getResourceProvider()));
@@ -949,6 +950,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     }
                 });
             aiRows.put(key, row);
+            SolegramAiPageViews.riseOnce(row, 150 + 45L * aiRows.size());
         }
         return row.setChecked(on, false);
     }
@@ -1381,6 +1383,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             // nor its padding (set here: the first fill of the page runs before the list exists)
             listView.setClipChildren(false);
             listView.setClipToPadding(false);
+            // and without the list's appear animation: it faded every row in a layer of the row's own size, which
+            // cut the glow off at the hero's top - a plain band under the header until it was over. The page's
+            // parts rise in by themselves instead
+            listView.setLayoutAnimation(null);
         }
         return fragmentView;
     }

@@ -13568,6 +13568,7 @@
     <string name="SG_AiNewChat">New conversation</string>
     <string name="SG_AiChatHello">How can I help?</string>
     <string name="SG_AiChatAbout">Ask anything or send a photo: ideas, answers, writing, translations, what is in a picture.</string>
+    <string name="SG_AiSmarterHint">Smarter with your own free Gemini key — set up</string>
     <string name="SG_AiChatHint">Message Solegram AI</string>
     <string name="SG_AiIdea1">What can Solegram do?</string>
     <string name="SG_AiIdea2">Help me write a polite refusal</string>

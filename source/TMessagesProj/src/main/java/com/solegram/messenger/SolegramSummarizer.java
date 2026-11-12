@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -320,6 +321,13 @@ public final class SolegramSummarizer {
 
     /** One chat completion from the free service or the user's own one: the raw answer. */
     private static String chat(String instruction, String input, boolean own) throws Exception {
+        return chat(instruction, input, own, null);
+    }
+
+    /** The most of a conversation sent: its latest turns, up to this many characters. */
+    private static final int CHAT_TURNS_BUDGET = 14000;
+
+    private static String chat(String instruction, String input, boolean own, @Nullable ChatOptions options) throws Exception {
         final String url = own ? chatCompletionsUrl(SolegramConfig.aiBaseUrl) : FREE_URL;
         final String model = own ? (TextUtils.isEmpty(SolegramConfig.aiModel) ? DEFAULT_OWN_MODEL : SolegramConfig.aiModel.trim()) : FREE_MODEL;
 
@@ -327,11 +335,33 @@ public final class SolegramSummarizer {
         body.put("model", model);
         final JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content", instruction));
-        messages.put(new JSONObject().put("role", "user").put("content", input));
+        if (options != null && options.turns != null && !options.turns.isEmpty()) {
+            // the conversation as it was: the model follows who said what far better than in one block of text
+            final List<String[]> turns = options.turns;
+            int from = turns.size(), used = 0;
+            while (from > 0 && (from == turns.size() || used + turns.get(from - 1)[1].length() <= CHAT_TURNS_BUDGET)) {
+                used += turns.get(--from)[1].length();
+            }
+            if (from < turns.size() && "ai".equals(turns.get(from)[0])) {
+                from++; // a conversation starts with the user
+            }
+            for (int i = from; i < turns.size(); i++) {
+                final String[] t = turns.get(i);
+                final String text = TextUtils.isEmpty(t[1]) ? "(a photo)" : t[1];
+                messages.put(new JSONObject().put("role", "ai".equals(t[0]) ? "assistant" : "user")
+                    .put("content", text.length() > MAX_INPUT ? text.substring(0, MAX_INPUT) : text));
+            }
+        } else {
+            messages.put(new JSONObject().put("role", "user").put("content", input));
+        }
         body.put("messages", messages);
         if (!own) {
             body.put("private", true);
             body.put("referrer", "solegram");
+            if (options != null && options.effort != null) {
+                // the free model reasons before it answers: more for open questions, less for quick replies
+                body.put("reasoning_effort", options.effort);
+            }
         }
         return send(body, url, own);
     }
@@ -430,12 +460,37 @@ public final class SolegramSummarizer {
     }
 
     /**
+     * How a cloud model is asked (Solegram AI): the conversation as real turns rather than one block of text, and how
+     * much the free service's reasoning model thinks before it answers.
+     */
+    public static final class ChatOptions {
+        /** {"user"|"ai", text}: sent as user and assistant messages; null: the input is one user message. */
+        @Nullable
+        public List<String[]> turns;
+        /** "low", "medium" or "high" for the free service's reasoning model; null: its default. */
+        @Nullable
+        public String effort;
+
+        public ChatOptions(@Nullable List<String[]> turns, @Nullable String effort) {
+            this.turns = turns;
+            this.effort = effort;
+        }
+    }
+
+    /**
      * @param cloudFirst in the auto mode, the free service first and Gemini Nano only when it fails or the user does not
      *                   agree to it: for the tasks a small model on the phone does poorly (long chats, open questions)
      */
     public static void compose(String instruction, String input, String sample, String fallbackLanguage, int maxTokens,
                                boolean mayAskConsent, int consentTitle, int consentMessage, boolean cloudFirst,
                                Utilities.Callback2<String, Integer> done) {
+        compose(instruction, input, sample, fallbackLanguage, maxTokens, mayAskConsent, consentTitle, consentMessage, cloudFirst, null, done);
+    }
+
+    /** @param options how the cloud model is asked; null: one instruction and one block of input */
+    public static void compose(String instruction, String input, String sample, String fallbackLanguage, int maxTokens,
+                               boolean mayAskConsent, int consentTitle, int consentMessage, boolean cloudFirst,
+                               @Nullable ChatOptions options, Utilities.Callback2<String, Integer> done) {
         if (cloudFirst && SolegramConfig.aiProvider == PROVIDER_AUTO) {
             final String clipped = input.length() > MAX_INPUT ? input.substring(0, MAX_INPUT) : input;
             final Runnable onDevice = () -> pool.execute(() -> {
@@ -457,9 +512,9 @@ public final class SolegramSummarizer {
             };
             AndroidUtilities.runOnUIThread(() -> {
                 if (SolegramConfig.aiConsent) {
-                    composeRemote(instruction, clipped, sample, fallbackLanguage, false, orDevice);
+                    composeRemote(instruction, clipped, sample, fallbackLanguage, false, options, orDevice);
                 } else if (mayAskConsent) {
-                    askConsent(consentTitle, consentMessage, () -> composeRemote(instruction, clipped, sample, fallbackLanguage, false, orDevice),
+                    askConsent(consentTitle, consentMessage, () -> composeRemote(instruction, clipped, sample, fallbackLanguage, false, options, orDevice),
                         () -> orDevice.run(null, COMPOSE_NEEDS_CONSENT));
                 } else {
                     orDevice.run(null, COMPOSE_NEEDS_CONSENT);
@@ -474,15 +529,15 @@ public final class SolegramSummarizer {
                 AndroidUtilities.runOnUIThread(() -> done.run(null, COMPOSE_NO_SERVICE));
                 return;
             }
-            composeRemote(instruction, clipped, sample, fallbackLanguage, true, done);
+            composeRemote(instruction, clipped, sample, fallbackLanguage, true, options, done);
             return;
         }
         // UI thread: the free service, once the user agreed to it
         final Runnable remote = () -> {
             if (SolegramConfig.aiConsent) {
-                composeRemote(instruction, clipped, sample, fallbackLanguage, false, done);
+                composeRemote(instruction, clipped, sample, fallbackLanguage, false, options, done);
             } else if (mayAskConsent) {
-                askConsent(consentTitle, consentMessage, () -> composeRemote(instruction, clipped, sample, fallbackLanguage, false, done),
+                askConsent(consentTitle, consentMessage, () -> composeRemote(instruction, clipped, sample, fallbackLanguage, false, options, done),
                     () -> done.run(null, COMPOSE_NEEDS_CONSENT));
             } else {
                 done.run(null, COMPOSE_NEEDS_CONSENT);
@@ -542,16 +597,17 @@ public final class SolegramSummarizer {
         return result;
     }
 
-    private static void composeRemote(String instruction, String input, String sample, String fallbackLanguage, boolean own, Utilities.Callback2<String, Integer> done) {
+    private static void composeRemote(String instruction, String input, String sample, String fallbackLanguage, boolean own,
+                                      @Nullable ChatOptions options, Utilities.Callback2<String, Integer> done) {
         pool.execute(() -> {
             String result = null;
             try {
                 final String system = instruction.replace(LANGUAGE, languageName(composeLanguage(sample, fallbackLanguage)));
                 try {
-                    result = chat(system, input, own);
+                    result = chat(system, input, own, options);
                 } catch (BusyException busy) {
                     Thread.sleep(6000);
-                    result = chat(system, input, own);
+                    result = chat(system, input, own, options);
                 }
                 if (result != null) {
                     result = result.replaceAll("(?s)<think>.*?</think>", "").trim();

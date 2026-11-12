@@ -11,12 +11,20 @@ import static org.telegram.messenger.LocaleController.getString;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.ColorFilter;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.RadialGradient;
+import android.graphics.Path;
+import android.graphics.PixelFormat;
+import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.os.SystemClock;
+import android.os.Build;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ReplacementSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -27,12 +35,16 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 
 import com.solegram.messenger.SolegramAI;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -41,16 +53,20 @@ import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
 
 /**
- * Solegram AI as an assistant: a conversation about anything - questions, ideas, writing, translations, Solegram
- * itself. Kept for as long as the app runs, nothing of it is stored.
- * <p>
- * The conversation fills the screen and scrolls under the floating header (only its blur and the glass of its
- * buttons, see SolegramFloatingScreen) and under the input, which floats on glass over a blur of its own, with a soft
- * glow of the theme's Solegram AI colours behind it all.
+ * Solegram AI as an assistant, in a chat that looks as any Telegram chat: the chat's wallpaper, a date pill, message
+ * bubbles in the chat colours with their tails and times, "bot" and "typing..." under the name in the header, a
+ * description card while it is empty. The header floats (only its blur and its glass buttons), the input is a capsule
+ * of Solegram's glass - exactly its own shape - holding the photo button, the field and the send button.
+ * The conversation is kept while the app runs; nothing of it is stored.
  */
 public class SolegramAiChatActivity extends BaseFragment {
 
@@ -58,8 +74,9 @@ public class SolegramAiChatActivity extends BaseFragment {
     private static final ArrayList<String[]> TURNS = new ArrayList<>();
     /** The photo of each turn (null for none), in step with TURNS. */
     private static final ArrayList<android.graphics.Bitmap> PHOTOS = new ArrayList<>();
+    /** When each turn was written, in step with TURNS. */
+    private static final ArrayList<Long> TIMES = new ArrayList<>();
     private static final int PICK_PHOTO = 4021;
-
     private static final int MENU_NEW = 1;
 
     private LinearLayout list;
@@ -69,7 +86,6 @@ public class SolegramAiChatActivity extends BaseFragment {
     private LinearLayout input;
     private EditTextBoldCursor field;
     private ImageView send;
-    private ImageView attach;
     private FrameLayout preview;
     private ImageView previewImage;
     private android.graphics.Bitmap pendingPhoto;
@@ -82,6 +98,7 @@ public class SolegramAiChatActivity extends BaseFragment {
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setTitle(getString(R.string.SG_AiTitle));
+        actionBar.setSubtitle(getString(R.string.Bot));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -90,9 +107,9 @@ public class SolegramAiChatActivity extends BaseFragment {
                 } else if (id == MENU_NEW) {
                     TURNS.clear();
                     PHOTOS.clear();
+                    TIMES.clear();
                     token++;
-                    waiting = false;
-                    send.setAlpha(1f);
+                    setWaiting(false);
                     rebuild(true);
                 }
             }
@@ -100,60 +117,80 @@ public class SolegramAiChatActivity extends BaseFragment {
         final ActionBarMenu menu = actionBar.createMenu();
         menu.addItem(MENU_NEW, R.drawable.msg_clear).setContentDescription(getString(R.string.SG_AiNewChat));
 
-        final int textColor = getThemedColor(Theme.key_windowBackgroundWhiteBlackText);
-        final int grayColor = getThemedColor(Theme.key_windowBackgroundWhiteGrayText);
-        final int background = getThemedColor(Theme.key_windowBackgroundWhite);
         final int[] c = SolegramAiSheet.brand();
+        final Root root = new Root(context);
 
-        final Root root = new Root(context, background);
-
-        // the conversation, full screen: the header floats over it
+        // the conversation, full screen: the header floats over it, the input over its bottom
         scroll = new ScrollView(context);
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
         scroll.setVerticalScrollBarEnabled(false);
         list = new LinearLayout(context);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(dp(12), dp(12), dp(12), dp(96)); // room for the floating input
+        list.setPadding(dp(8), dp(8), dp(8), dp(96));
         scroll.addView(list);
         root.addView(scroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        root.scroll = scroll;
 
-        // the empty state: the mark, a question, a few ideas to start with
+        // the empty chat: a bot's description card, in the chat's service colours
         empty = new LinearLayout(context);
         empty.setOrientation(LinearLayout.VERTICAL);
         empty.setGravity(Gravity.CENTER_HORIZONTAL);
+        empty.setPadding(dp(20), dp(20), dp(20), dp(16));
+        final GradientDrawable card = new GradientDrawable();
+        card.setColor(getThemedColor(Theme.key_chat_serviceBackground));
+        card.setCornerRadius(dp(20));
+        empty.setBackground(card);
+        final int serviceText = getThemedColor(Theme.key_chat_serviceText);
         emptyMark = new SolegramAiSheet.Spark(context).setPlain(true);
-        empty.addView(emptyMark, LayoutHelper.createLinear(84, 84, Gravity.CENTER_HORIZONTAL));
+        empty.addView(emptyMark, LayoutHelper.createLinear(64, 64, Gravity.CENTER_HORIZONTAL));
         final TextView hello = new TextView(context);
         hello.setText(getString(R.string.SG_AiChatHello));
-        hello.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 26);
+        hello.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
         hello.setTypeface(AndroidUtilities.bold());
-        hello.setTextColor(textColor);
+        hello.setTextColor(serviceText);
         hello.setGravity(Gravity.CENTER);
-        empty.addView(hello, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 18, 0, 0));
+        empty.addView(hello, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 12, 0, 0));
         final TextView about = new TextView(context);
         about.setText(getString(R.string.SG_AiChatAbout));
-        about.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        about.setTextColor(grayColor);
+        about.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        about.setTextColor(serviceText);
+        about.setAlpha(0.85f);
         about.setGravity(Gravity.CENTER);
-        empty.addView(about, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 32, 6, 32, 20));
+        empty.addView(about, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 4, 0, 14));
         for (int s : new int[]{R.string.SG_AiIdea1, R.string.SG_AiIdea2, R.string.SG_AiIdea3, R.string.SG_AiIdea4}) {
+            // the ideas as a bot's keyboard buttons
             final TextView idea = new TextView(context);
             idea.setText(getString(s));
-            idea.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-            idea.setTextColor(textColor);
-            idea.setPadding(dp(16), dp(12), dp(16), dp(12));
-            idea.setBackground(glassPill(dp(18), background, textColor, 0.62f));
+            idea.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            idea.setTypeface(AndroidUtilities.bold());
+            idea.setTextColor(serviceText);
+            idea.setGravity(Gravity.CENTER);
+            idea.setPadding(dp(12), dp(10), dp(12), dp(10));
+            idea.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(12), ColorUtils.setAlphaComponent(serviceText, 0x1E), ColorUtils.setAlphaComponent(serviceText, 0x34)));
             idea.setOnClickListener(v -> sendText(getString(s)));
             SolegramAiPageViews.pressSpring(idea);
-            empty.addView(idea, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 0, 24, 8));
+            empty.addView(idea, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6));
         }
-        root.addView(empty, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 0, 0, 0, 40));
+        if (com.solegram.messenger.SolegramConfig.aiProvider != com.solegram.messenger.SolegramSummarizer.PROVIDER_OWN
+            || android.text.TextUtils.isEmpty(com.solegram.messenger.SolegramConfig.aiBaseUrl)) {
+            // the free model is a small one: the way to a far smarter assistant, right where it is used
+            final TextView smarter = new TextView(context);
+            smarter.setText(getString(R.string.SG_AiSmarterHint));
+            smarter.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            smarter.setTextColor(serviceText);
+            smarter.setAlpha(0.8f);
+            smarter.setGravity(Gravity.CENTER);
+            smarter.setPadding(dp(8), dp(8), dp(8), dp(2));
+            smarter.setOnClickListener(v -> presentFragment(new SolegramSettingsActivity(SolegramSettingsActivity.PAGE_AI)));
+            empty.addView(smarter, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
+        }
+        root.addView(empty, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 40, 0, 40, 40));
 
-        // the input floats at the bottom: one capsule of glass holding the photo button, the field and the send button
+        // the input: a capsule of Solegram's glass with the photo button, the field and the send button inside
         input = new LinearLayout(context);
         input.setOrientation(LinearLayout.VERTICAL);
-        input.setPadding(dp(12), dp(6), dp(12), dp(12));
+        input.setPadding(dp(8), dp(4), dp(8), dp(8));
         preview = new FrameLayout(context);
         previewImage = new ImageView(context);
         previewImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -164,7 +201,7 @@ public class SolegramAiChatActivity extends BaseFragment {
             }
         });
         previewImage.setClipToOutline(true);
-        preview.addView(previewImage, LayoutHelper.createFrame(72, 72, Gravity.LEFT | Gravity.BOTTOM, 4, 6, 0, 0));
+        preview.addView(previewImage, LayoutHelper.createFrame(72, 72, Gravity.LEFT | Gravity.BOTTOM, 6, 6, 0, 0));
         final ImageView remove = new ImageView(context);
         remove.setImageResource(R.drawable.ic_close_white);
         remove.setScaleType(ImageView.ScaleType.CENTER);
@@ -173,45 +210,49 @@ public class SolegramAiChatActivity extends BaseFragment {
         removeBg.setColor(0xB0000000);
         remove.setBackground(removeBg);
         remove.setOnClickListener(v -> setPendingPhoto(null));
-        preview.addView(remove, LayoutHelper.createFrame(24, 24, Gravity.LEFT | Gravity.TOP, 60, 0, 0, 0));
+        preview.addView(remove, LayoutHelper.createFrame(24, 24, Gravity.LEFT | Gravity.TOP, 62, 0, 0, 0));
         preview.setVisibility(View.GONE);
         input.addView(preview, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6));
 
+        final int textColor = getThemedColor(Theme.key_chat_messagePanelText);
+        final int hintColor = getThemedColor(Theme.key_chat_messagePanelHint);
+        final int iconColor = getThemedColor(Theme.key_chat_messagePanelIcons);
         final LinearLayout capsule = new LinearLayout(context);
         capsule.setOrientation(LinearLayout.HORIZONTAL);
         capsule.setGravity(Gravity.BOTTOM);
         capsule.setPadding(dp(4), dp(4), dp(4), dp(4));
-        capsule.setBackground(glassPill(dp(26), background, textColor, 0.74f));
-        attach = new ImageView(context);
+        final ImageView attach = new ImageView(context);
         attach.setImageResource(R.drawable.input_attach);
         attach.setScaleType(ImageView.ScaleType.CENTER);
-        attach.setColorFilter(new android.graphics.PorterDuffColorFilter(grayColor, android.graphics.PorterDuff.Mode.SRC_IN));
+        attach.setColorFilter(new android.graphics.PorterDuffColorFilter(iconColor, android.graphics.PorterDuff.Mode.SRC_IN));
         attach.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
         attach.setContentDescription(getString(R.string.SG_AiAttachPhoto));
         attach.setOnClickListener(v -> pickPhoto());
         capsule.addView(attach, LayoutHelper.createLinear(42, 42));
         field = new EditTextBoldCursor(context);
-        field.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        field.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
         field.setTextColor(textColor);
-        field.setHintTextColor(grayColor);
-        field.setHint(getString(R.string.SG_AiChatHint));
-        field.setCursorColor(c[1]);
+        field.setHintTextColor(hintColor);
+        field.setHint(getString(R.string.TypeMessage));
+        field.setCursorColor(getThemedColor(Theme.key_chat_messagePanelCursor));
         field.setCursorSize(dp(20));
         field.setMaxLines(6);
         field.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        field.setPadding(dp(4), dp(10), dp(8), dp(10));
+        field.setPadding(dp(4), dp(9), dp(8), dp(9));
         field.setBackground(null);
         capsule.addView(field, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
         send = new ImageView(context);
         send.setImageResource(R.drawable.ic_send);
         send.setScaleType(ImageView.ScaleType.CENTER);
         send.setColorFilter(new android.graphics.PorterDuffColorFilter(0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN));
-        final GradientDrawable sendBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{c[0], c[1]});
+        final GradientDrawable sendBg = new GradientDrawable();
         sendBg.setShape(GradientDrawable.OVAL);
+        sendBg.setColor(getThemedColor(Theme.key_chat_messagePanelSend));
         send.setBackground(sendBg);
         send.setOnClickListener(v -> sendText(field.getText().toString()));
         SolegramAiPageViews.pressSpring(send);
         capsule.addView(send, LayoutHelper.createLinear(42, 42));
+        root.glassFor(capsule, getResourceProvider());
         input.addView(capsule, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         root.addView(input, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
         // the conversation ends above the input, whatever its height (a photo waiting to go, several lines)
@@ -221,8 +262,6 @@ public class SolegramAiChatActivity extends BaseFragment {
                 list.setPadding(list.getPaddingLeft(), list.getPaddingTop(), list.getPaddingRight(), room);
             }
         });
-        root.input = input;
-        root.scroll = scroll;
 
         fragmentView = root;
         rebuild(false);
@@ -232,13 +271,29 @@ public class SolegramAiChatActivity extends BaseFragment {
         return fragmentView;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid);
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        if (breathe != null) {
+            breathe.cancel();
+        }
+        super.onFragmentDestroy();
+    }
+
+    // region Photos
+
     private void pickPhoto() {
         if (getParentActivity() == null) {
             return;
         }
         try {
             final android.content.Intent intent;
-            if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (Build.VERSION.SDK_INT >= 33) {
                 intent = new android.content.Intent(android.provider.MediaStore.ACTION_PICK_IMAGES);
             } else {
                 intent = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
@@ -271,7 +326,7 @@ public class SolegramAiChatActivity extends BaseFragment {
     /** The picked photo at most 1280 px on its long side, turned upright. */
     private android.graphics.Bitmap loadPhoto(android.net.Uri uri) {
         try {
-            if (android.os.Build.VERSION.SDK_INT >= 28) {
+            if (Build.VERSION.SDK_INT >= 28) {
                 return android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(getParentActivity().getContentResolver(), uri), (decoder, info, src) -> {
                     final int w = info.getSize().getWidth(), h = info.getSize().getHeight();
                     final float k = Math.min(1f, 1280f / Math.max(w, h));
@@ -319,37 +374,15 @@ public class SolegramAiChatActivity extends BaseFragment {
         }
     }
 
-    /** A pill of glass: the page's colour, see-through, with a light rim. */
-    private static GradientDrawable glassPill(int radius, int background, int ink, float alpha) {
-        final GradientDrawable d = new GradientDrawable();
-        d.setColor(ColorUtils.setAlphaComponent(ColorUtils.blendARGB(background, ink, 0.05f), (int) (255 * alpha)));
-        d.setCornerRadius(radius);
-        d.setStroke(Math.max(1, dp(0.6f)), ColorUtils.setAlphaComponent(ink, 0x18));
-        return d;
-    }
+    // endregion
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid);
-    }
+    // region The conversation
 
-    @Override
-    public void onFragmentDestroy() {
-        if (breathe != null) {
-            breathe.cancel();
-        }
-        super.onFragmentDestroy();
-    }
-
-    /** The empty state comes in: the mark breathes, the ideas rise one after another. */
+    /** The empty chat comes in: the card rises, the mark breathes. */
     private void enterEmpty() {
-        for (int i = 0; i < empty.getChildCount(); i++) {
-            final View v = empty.getChildAt(i);
-            v.setAlpha(0f);
-            v.setTranslationY(dp(16));
-            v.animate().alpha(1f).translationY(0).setStartDelay(40L + 55L * i).setDuration(460).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
-        }
+        empty.setAlpha(0f);
+        empty.setTranslationY(dp(16));
+        empty.animate().alpha(1f).translationY(0).setStartDelay(60).setDuration(460).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
         if (breathe == null) {
             breathe = ValueAnimator.ofFloat(0, 1);
             breathe.setDuration(2200);
@@ -364,14 +397,18 @@ public class SolegramAiChatActivity extends BaseFragment {
     private void rebuild(boolean animateEmpty) {
         list.removeAllViews();
         thinking = null;
+        if (!TURNS.isEmpty()) {
+            list.addView(datePill(TIMES.isEmpty() ? System.currentTimeMillis() : TIMES.get(0)));
+        }
         for (int i = 0; i < TURNS.size(); i++) {
             final String[] t = TURNS.get(i);
             final android.graphics.Bitmap photo = i < PHOTOS.size() ? PHOTOS.get(i) : null;
+            final long time = i < TIMES.size() ? TIMES.get(i) : System.currentTimeMillis();
             if (photo != null) {
-                list.addView(photoBubble(photo, false));
+                list.addView(photoBubble(photo, time, false));
             }
             if (!t[1].isEmpty()) {
-                list.addView(bubble(t[0].equals("user"), t[1], false));
+                list.addView(bubble(t[0].equals("user"), t[1], time, false));
             }
         }
         final boolean none = TURNS.isEmpty();
@@ -382,6 +419,13 @@ public class SolegramAiChatActivity extends BaseFragment {
         scrollToEnd();
     }
 
+    private void setWaiting(boolean waiting) {
+        this.waiting = waiting;
+        send.animate().alpha(waiting ? 0.5f : 1f).setDuration(160).start();
+        // as a bot in Telegram: "typing..." under its name while it answers
+        actionBar.setSubtitle(getString(waiting ? R.string.Typing : R.string.Bot));
+    }
+
     private void sendText(String text) {
         text = text == null ? "" : text.trim();
         final android.graphics.Bitmap photo = pendingPhoto;
@@ -389,8 +433,13 @@ public class SolegramAiChatActivity extends BaseFragment {
             return;
         }
         field.setText("");
+        final long now = System.currentTimeMillis();
+        if (TURNS.isEmpty()) {
+            list.addView(datePill(now));
+        }
         TURNS.add(new String[]{"user", text});
         PHOTOS.add(photo);
+        TIMES.add(now);
         if (photo != null) {
             pendingPhoto = null;
             preview.setVisibility(View.GONE);
@@ -404,25 +453,23 @@ public class SolegramAiChatActivity extends BaseFragment {
             }).start();
         }
         if (photo != null) {
-            list.addView(photoBubble(photo, true));
+            list.addView(photoBubble(photo, now, true));
         }
         if (!text.isEmpty()) {
-            list.addView(bubble(true, text, true));
+            list.addView(bubble(true, text, now, true));
         }
         thinking = new Dots(getParentActivity());
-        list.addView(thinking, LayoutHelper.createLinear(68, 38, Gravity.LEFT, 4, 8, 0, 0));
+        list.addView(thinking, LayoutHelper.createLinear(64, 36, Gravity.LEFT, 6, 6, 0, 0));
         thinking.setAlpha(0f);
         thinking.animate().alpha(1f).setStartDelay(150).setDuration(200).start();
         scrollToEnd();
-        waiting = true;
-        send.animate().alpha(0.5f).setDuration(160).start();
+        setWaiting(true);
         final int t = ++token;
         final SolegramAI.Result done = (answer, error, source) -> {
             if (t != token || fragmentView == null) {
                 return;
             }
-            waiting = false;
-            send.animate().alpha(1f).setDuration(160).start();
+            setWaiting(false);
             if (thinking != null) {
                 list.removeView(thinking);
                 thinking = null;
@@ -431,6 +478,7 @@ public class SolegramAiChatActivity extends BaseFragment {
                 // not answered: the question (and its photo) go back into the field
                 final String[] last = TURNS.remove(TURNS.size() - 1);
                 final android.graphics.Bitmap lastPhoto = PHOTOS.remove(PHOTOS.size() - 1);
+                TIMES.remove(TIMES.size() - 1);
                 rebuild(true);
                 field.setText(last[1]);
                 field.setSelection(field.length());
@@ -442,9 +490,11 @@ public class SolegramAiChatActivity extends BaseFragment {
                 }
                 return;
             }
+            final long at = System.currentTimeMillis();
             TURNS.add(new String[]{"ai", answer});
             PHOTOS.add(null);
-            list.addView(bubble(false, answer, true));
+            TIMES.add(at);
+            list.addView(bubble(false, answer, at, true));
             scrollToEnd();
         };
         if (photo != null) {
@@ -454,133 +504,304 @@ public class SolegramAiChatActivity extends BaseFragment {
         }
     }
 
-    /** A photo the user sent: rounded, at most 220 dp wide, on the right. */
-    private View photoBubble(android.graphics.Bitmap photo, boolean animate) {
-        final ImageView v = new ImageView(getParentActivity());
-        v.setImageBitmap(photo);
-        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        v.setOutlineProvider(new android.view.ViewOutlineProvider() {
-            @Override
-            public void getOutline(View view, android.graphics.Outline outline) {
-                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(20));
-            }
-        });
-        v.setClipToOutline(true);
-        final int w = 220;
-        final int h = Math.max(90, Math.min(300, Math.round(w * photo.getHeight() / (float) Math.max(1, photo.getWidth()))));
-        v.setLayoutParams(LayoutHelper.createLinear(w, h, Gravity.RIGHT, 48, 8, 0, 0));
-        if (animate) {
-            v.setAlpha(0f);
-            v.setScaleX(0.9f);
-            v.setScaleY(0.9f);
-            v.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(360).setInterpolator(CubicBezierInterpolator.EASE_OUT_BACK).start();
-        }
+    private static String timeOf(long ms) {
+        return LocaleController.getInstance().getFormatterDay().format(new Date(ms));
+    }
+
+    /** The date over the conversation, as Telegram's date pills. */
+    private View datePill(long ms) {
+        final TextView v = new TextView(getParentActivity());
+        v.setText(LocaleController.formatDateChat(ms / 1000));
+        v.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        v.setTypeface(AndroidUtilities.bold());
+        v.setTextColor(getThemedColor(Theme.key_chat_serviceText));
+        v.setPadding(dp(10), dp(4), dp(10), dp(5));
+        final GradientDrawable bg = new GradientDrawable();
+        bg.setColor(getThemedColor(Theme.key_chat_serviceBackground));
+        bg.setCornerRadius(dp(14));
+        v.setBackground(bg);
+        v.setLayoutParams(LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 4, 0, 6));
         return v;
     }
 
-    private View bubble(boolean mine, String text, boolean animate) {
-        final int textColor = getThemedColor(Theme.key_windowBackgroundWhiteBlackText);
-        final int background = getThemedColor(Theme.key_windowBackgroundWhite);
-        final int[] c = SolegramAiSheet.brand();
-        final TextView v = new TextView(getParentActivity());
-        v.setText(text);
-        v.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-        v.setLineSpacing(dp(2), 1f);
-        v.setPadding(dp(15), dp(10), dp(15), dp(11));
-        v.setTextIsSelectable(!mine);
-        if (mine) {
-            final GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{c[0], c[1]});
-            bg.setCornerRadii(new float[]{dp(22), dp(22), dp(22), dp(22), dp(6), dp(6), dp(22), dp(22)});
-            v.setBackground(bg);
-            v.setTextColor(0xFFFFFFFF);
-        } else {
-            // glass: the page shows through, with a hint of the theme's colour and a light rim
-            final GradientDrawable bg = new GradientDrawable();
-            bg.setColor(ColorUtils.setAlphaComponent(ColorUtils.blendARGB(background, c[1], 0.1f), 0xD8));
-            bg.setStroke(Math.max(1, dp(0.6f)), ColorUtils.setAlphaComponent(c[1], 0x30));
-            bg.setCornerRadii(new float[]{dp(22), dp(22), dp(22), dp(22), dp(22), dp(22), dp(6), dp(6)});
-            v.setBackground(bg);
-            v.setTextColor(textColor);
-            v.setOnLongClickListener(view -> {
+    /** A message bubble in the chat's colours, with its tail and its time at the end of the text. */
+    private View bubble(boolean mine, String text, long time, boolean animate) {
+        final Context context = getParentActivity();
+        final FrameLayout box = new FrameLayout(context);
+        final int textColor = getThemedColor(mine ? Theme.key_chat_messageTextOut : Theme.key_chat_messageTextIn);
+        final int timeColor = getThemedColor(mine ? Theme.key_chat_outTimeText : Theme.key_chat_inTimeText);
+        box.setBackground(new Bubble(mine, getThemedColor(mine ? Theme.key_chat_outBubble : Theme.key_chat_inBubble),
+            getThemedColor(mine ? Theme.key_chat_outBubbleShadow : Theme.key_chat_inBubbleShadow)));
+        final TextView body = new TextView(context);
+        body.setTextSize(TypedValue.COMPLEX_UNIT_DIP, SharedConfig.fontSize);
+        body.setTextColor(textColor);
+        body.setLinkTextColor(getThemedColor(mine ? Theme.key_chat_messageLinkOut : Theme.key_chat_messageLinkIn));
+        body.setLineSpacing(dp(1), 1f);
+        final String clock = timeOf(time);
+        final Paint timePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        timePaint.setTextSize(dp(12));
+        final int reserve = (int) Math.ceil(timePaint.measureText(clock)) + dp(10);
+        // room for the time on the last line, as Telegram keeps it
+        final SpannableStringBuilder sb = new SpannableStringBuilder(text).append(" ").append(" ");
+        sb.setSpan(new Space(reserve), sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        body.setText(sb);
+        body.setTextIsSelectable(!mine);
+        if (!mine) {
+            body.setOnLongClickListener(v -> {
                 if (AndroidUtilities.addToClipboard(text)) {
                     BulletinFactory.of(this).createCopyBulletin(getString(R.string.TextCopied)).show();
                 }
                 return true;
             });
         }
-        v.setLayoutParams(LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, mine ? Gravity.RIGHT : Gravity.LEFT,
-            mine ? 48 : 0, 8, mine ? 0 : 48, 0));
+        box.addView(body, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
+        final TextView when = new TextView(context);
+        when.setText(clock);
+        when.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        when.setTextColor(timeColor);
+        box.addView(when, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 0, -2));
+        // the tail side has the room for the tail
+        box.setPadding(dp(mine ? 11 : 17), dp(7), dp(mine ? 17 : 11), dp(7));
+        box.setLayoutParams(LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, mine ? Gravity.RIGHT : Gravity.LEFT,
+            mine ? 56 : 0, 4, mine ? 0 : 56, 0));
         if (animate) {
-            v.setAlpha(0f);
-            v.setTranslationY(dp(14));
-            v.setScaleX(0.94f);
-            v.setScaleY(0.94f);
-            v.setPivotX(mine ? dp(220) : 0);
-            v.animate().alpha(1f).translationY(0).scaleX(1f).scaleY(1f).setDuration(380).setInterpolator(CubicBezierInterpolator.EASE_OUT_BACK).start();
+            appear(box, mine);
         }
-        return v;
+        return box;
+    }
+
+    /** A photo the user sent: rounded, in a bubble's corner shape, with its time over it. */
+    private View photoBubble(android.graphics.Bitmap photo, long time, boolean animate) {
+        final Context context = getParentActivity();
+        final FrameLayout box = new FrameLayout(context);
+        final ImageView v = new ImageView(context);
+        v.setImageBitmap(photo);
+        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        final float r = dp(SharedConfig.bubbleRadius), small = dp(Math.min(6, SharedConfig.bubbleRadius));
+        v.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
+            }
+        });
+        v.setClipToOutline(true);
+        final int w = 240;
+        final int h = Math.max(100, Math.min(320, Math.round(w * photo.getHeight() / (float) Math.max(1, photo.getWidth()))));
+        box.addView(v, LayoutHelper.createFrame(w, h));
+        final TextView when = new TextView(context);
+        when.setText(timeOf(time));
+        when.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        when.setTextColor(0xFFFFFFFF);
+        when.setPadding(dp(6), dp(1), dp(6), dp(2));
+        final GradientDrawable pill = new GradientDrawable();
+        pill.setColor(0x66000000);
+        pill.setCornerRadius(dp(10));
+        when.setBackground(pill);
+        box.addView(when, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 6, 6));
+        box.setLayoutParams(LayoutHelper.createLinear(w, h, Gravity.RIGHT, 56, 4, 6, 0));
+        if (animate) {
+            appear(box, true);
+        }
+        return box;
+    }
+
+    private static void appear(View v, boolean mine) {
+        v.setAlpha(0f);
+        v.setTranslationY(dp(14));
+        v.setScaleX(0.94f);
+        v.setScaleY(0.94f);
+        v.setPivotX(mine ? dp(240) : 0);
+        v.animate().alpha(1f).translationY(0).scaleX(1f).scaleY(1f).setDuration(380).setInterpolator(CubicBezierInterpolator.EASE_OUT_BACK).start();
     }
 
     private void scrollToEnd() {
         scroll.post(() -> scroll.smoothScrollTo(0, list.getHeight()));
     }
 
+    // endregion
+
+    // region Views
+
+    /** Room for the time on the last line of a message. */
+    private static class Space extends ReplacementSpan {
+        private final int width;
+
+        Space(int width) {
+            this.width = width;
+        }
+
+        @Override
+        public int getSize(@NonNull Paint paint, CharSequence text, int start, int end, @Nullable Paint.FontMetricsInt fm) {
+            return width;
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint) {
+        }
+    }
+
+    /** A Telegram message bubble: the chat's bubble radius, a small corner and a tail at the bottom of its side. */
+    private static class Bubble extends Drawable {
+        private final boolean out;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private final RectF rect = new RectF();
+
+        Bubble(boolean out, int color, int shadowColor) {
+            this.out = out;
+            paint.setColor(color);
+            shadow.setColor(shadowColor);
+        }
+
+        private void build() {
+            path.rewind();
+            final float l = getBounds().left, t = getBounds().top, r = getBounds().right, b = getBounds().bottom;
+            final float tail = dp(6);
+            final float big = dp(Math.max(6, SharedConfig.bubbleRadius)), small = dp(Math.min(6, SharedConfig.bubbleRadius));
+            if (out) {
+                rect.set(l, t, r - tail, b);
+                final float[] radii = {big, big, big, big, small, small, big, big};
+                path.addRoundRect(rect, radii, Path.Direction.CW);
+                // the tail at the bottom right
+                path.moveTo(r - tail - small, b);
+                path.lineTo(r, b);
+                path.quadTo(r - tail * 0.9f, b - dp(2), r - tail, b - dp(9));
+                path.close();
+            } else {
+                rect.set(l + tail, t, r, b);
+                final float[] radii = {big, big, big, big, big, big, small, small};
+                path.addRoundRect(rect, radii, Path.Direction.CW);
+                path.moveTo(l + tail + small, b);
+                path.lineTo(l, b);
+                path.quadTo(l + tail * 0.9f, b - dp(2), l + tail, b - dp(9));
+                path.close();
+            }
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            build();
+            canvas.save();
+            canvas.translate(0, dp(1));
+            canvas.drawPath(path, shadow);
+            canvas.restore();
+            canvas.drawPath(path, paint);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            paint.setAlpha(alpha);
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
     /**
-     * The screen: a soft glow of the theme's colours at the top, and under the floating input a blur of the
-     * conversation going out of focus towards the bottom edge (as under the header).
+     * The screen: the chat's wallpaper, the conversation, and the input's capsule of Solegram's glass, which sees the
+     * wallpaper and the messages under it (and only within its own shape).
      */
     private static class Root extends FrameLayout {
-        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final int background;
-        private final long born = SystemClock.uptimeMillis() - 4000;
-        private final View[] blurred = new View[1];
-        private SolegramEdgeBlur edgeBlur;
-        View input, scroll;
+        private final Paint fill = new Paint();
+        private org.telegram.utils.glass.source.GlassSourceRenderNode source;
+        View scroll;
 
-        Root(Context context, int background) {
+        Root(Context context) {
             super(context);
-            this.background = background;
             setWillNotDraw(false);
-            setBackgroundColor(background);
+        }
+
+        /** The chat's wallpaper, as the chat shows it: scaled to cover, or tiled, or a colour or gradient. */
+        void drawWallpaper(Canvas canvas, int w, int h) {
+            final Drawable wallpaper = Theme.getCachedWallpaper();
+            if (wallpaper == null) {
+                fill.setColor(Theme.getColor(Theme.key_chat_wallpaper));
+                canvas.drawRect(0, 0, w, h, fill);
+                return;
+            }
+            if (wallpaper instanceof BitmapDrawable && ((BitmapDrawable) wallpaper).getTileModeX() == null && ((BitmapDrawable) wallpaper).getBitmap() != null) {
+                final android.graphics.Bitmap b = ((BitmapDrawable) wallpaper).getBitmap();
+                final float k = Math.max(w / (float) b.getWidth(), h / (float) b.getHeight());
+                final int dw = Math.round(b.getWidth() * k), dh = Math.round(b.getHeight() * k);
+                wallpaper.setBounds((w - dw) / 2, (h - dh) / 2, (w - dw) / 2 + dw, (h - dh) / 2 + dh);
+            } else {
+                wallpaper.setBounds(0, 0, w, h);
+            }
+            wallpaper.draw(canvas);
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            final float w = getWidth();
-            final int[] c = SolegramAiSheet.brand();
-            final boolean dark = ColorUtils.calculateLuminance(background) < 0.4;
-            final float k = dark ? 0.75f : 0.4f;
-            final float t = (SystemClock.uptimeMillis() - born) / 1000f;
-            final float d = dp(16);
-            blob(canvas, w * 0.1f + d * (float) Math.sin(t * 0.3), dp(40), w * 0.7f, c[0], 0.3f * k);
-            blob(canvas, w * 0.62f + d * (float) Math.cos(t * 0.25), -dp(20), w * 0.7f, c[1], 0.26f * k);
-            blob(canvas, w * 0.95f + d * (float) Math.sin(t * 0.21 + 1), dp(80), w * 0.55f, c[3], 0.24f * k);
-            // still: a moving glow would make the blurs under the header and the input redraw all the time
+            drawWallpaper(canvas, getWidth(), getHeight());
         }
 
-        private void blob(Canvas canvas, float x, float y, float r, int color, float alpha) {
-            glow.setShader(new RadialGradient(x, y, r, new int[]{ColorUtils.setAlphaComponent(color, (int) (255 * alpha)), ColorUtils.setAlphaComponent(color, 0)}, null, Shader.TileMode.CLAMP));
-            canvas.drawCircle(x, y, r, glow);
+        /** The capsule's background: Solegram's glass over what is under it. */
+        void glassFor(View capsule, Theme.ResourcesProvider resourcesProvider) {
+            if (Build.VERSION.SDK_INT >= 31) {
+                // a plain panel where the picture cannot be drawn (a software canvas)
+                final org.telegram.utils.glass.source.GlassSourceColor plain = new org.telegram.utils.glass.source.GlassSourceColor();
+                plain.setColor(Theme.getColor(Theme.key_chat_messagePanelBackground, resourcesProvider));
+                source = new org.telegram.utils.glass.source.GlassSourceRenderNode(plain);
+                source.setupRenderer(new org.telegram.ui.Components.blur3.RenderNodeWithHash.Renderer() {
+                    @Override
+                    public void renderNodeUpdateDisplayList(Canvas canvas) {
+                        drawWallpaper(canvas, getWidth(), getHeight());
+                        if (scroll != null) {
+                            canvas.save();
+                            canvas.translate(scroll.getX(), scroll.getY());
+                            scroll.draw(canvas);
+                            canvas.restore();
+                        }
+                    }
+
+                    @Override
+                    public void renderNodeCalculateHash(org.telegram.ui.Components.blur3.capture.IBlur3Hash hash) {
+                        hash.unsupported(); // the conversation moves and grows: recorded with every frame of the screen
+                    }
+                });
+                final boolean liquid = org.telegram.messenger.LiteMode.isEnabled(org.telegram.messenger.LiteMode.FLAG_LIQUID_GLASS);
+                source.setBlur(AndroidUtilities.dpf2(liquid ? 9f : 40f) * com.solegram.messenger.SolegramGlass.blurScale());
+            }
+            final org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory factory = SolegramFloatingHeader.factory(source,
+                Theme.getColor(Theme.key_chat_messagePanelBackground, resourcesProvider), this);
+            final BlurredBackgroundDrawable glass = factory.create(capsule, BlurredBackgroundProviderImpl.topPanel(resourcesProvider));
+            glass.setRadius(dp(25));
+            capsule.setBackground(glass);
+        }
+
+        /**
+         * Before every frame (a scroll or a growing bubble redraws only itself, not this view): the picture under
+         * the capsule is taken again.
+         */
+        private final android.view.ViewTreeObserver.OnPreDrawListener updateGlass = () -> {
+            if (source != null && getWidth() > 0 && getHeight() > 0) {
+                source.setSize(getWidth(), getHeight());
+                source.updateDisplayListIfNeeded();
+            }
+            return true;
+        };
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            getViewTreeObserver().addOnPreDrawListener(updateGlass);
         }
 
         @Override
-        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-            if (child == input && scroll != null && input.getVisibility() == VISIBLE) {
-                // the conversation blurs out under the input, towards the bottom edge
-                if (edgeBlur == null) {
-                    edgeBlur = new SolegramEdgeBlur();
-                }
-                final int top = (int) (input.getY() - dp(24));
-                blurred[0] = scroll;
-                edgeBlur.draw(canvas, blurred, getWidth(), top, getHeight() - top, false, background, 0, 1f);
-                blurred[0] = null;
-            }
-            return super.drawChild(canvas, child, drawingTime);
+        protected void onDetachedFromWindow() {
+            getViewTreeObserver().removeOnPreDrawListener(updateGlass);
+            super.onDetachedFromWindow();
         }
     }
 
-    /** Three dots that breathe while Solegram AI thinks. */
+    /** Three dots that breathe while Solegram AI thinks, in an incoming bubble. */
     private class Dots extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final ValueAnimator animator = ValueAnimator.ofFloat(0, 1);
@@ -588,12 +809,7 @@ public class SolegramAiChatActivity extends BaseFragment {
 
         Dots(Context context) {
             super(context);
-            final int[] c = SolegramAiSheet.brand();
-            final GradientDrawable bg = new GradientDrawable();
-            bg.setColor(ColorUtils.setAlphaComponent(ColorUtils.blendARGB(getThemedColor(Theme.key_windowBackgroundWhite), c[1], 0.1f), 0xD8));
-            bg.setStroke(Math.max(1, dp(0.6f)), ColorUtils.setAlphaComponent(c[1], 0x30));
-            bg.setCornerRadius(dp(19));
-            setBackground(bg);
+            setBackground(new Bubble(false, getThemedColor(Theme.key_chat_inBubble), getThemedColor(Theme.key_chat_inBubbleShadow)));
             animator.setDuration(1100);
             animator.setRepeatCount(ValueAnimator.INFINITE);
             animator.addUpdateListener(a -> {
@@ -616,13 +832,15 @@ public class SolegramAiChatActivity extends BaseFragment {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            final int[] c = SolegramAiSheet.brand();
+            final int color = getThemedColor(Theme.key_chat_inTimeText);
             for (int i = 0; i < 3; i++) {
                 final float p = (float) (0.5 + 0.5 * Math.sin((phase - i * 0.18f) * Math.PI * 2));
-                paint.setShader(new LinearGradient(0, 0, getWidth(), 0, c[0], c[2], Shader.TileMode.CLAMP));
-                paint.setAlpha((int) (110 + 145 * p));
-                canvas.drawCircle(getWidth() / 2f + (i - 1) * dp(12), getHeight() / 2f - dp(2.5f) * p, dp(4), paint);
+                paint.setColor(color);
+                paint.setAlpha((int) (90 + 165 * p));
+                canvas.drawCircle(getWidth() / 2f + dp(3) + (i - 1) * dp(11), getHeight() / 2f - dp(2) * p, dp(3.5f), paint);
             }
         }
     }
+
+    // endregion
 }

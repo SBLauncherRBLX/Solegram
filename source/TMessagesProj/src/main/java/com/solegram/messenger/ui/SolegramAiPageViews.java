@@ -32,6 +32,7 @@ import android.widget.TextView;
 import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
@@ -44,6 +45,31 @@ import org.telegram.ui.Components.Switch;
 public final class SolegramAiPageViews {
 
     private SolegramAiPageViews() {
+    }
+
+    /**
+     * The page's parts rise in once, one after another, when the page opens. The page does not use the list's own
+     * appear animation: it fades each row in a layer of the row's size, and that cut the header's glow off at the
+     * top of the header for as long as it ran (a plain band under the header for a second).
+     */
+    public static void riseOnce(View view, long delay) {
+        if (view.getTag(R.id.sg_ai_rise) != null) {
+            return;
+        }
+        view.setTag(R.id.sg_ai_rise, Boolean.TRUE);
+        view.setAlpha(0f);
+        view.setTranslationY(dp(18));
+        view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+                v.removeOnAttachStateChangeListener(this);
+                v.animate().alpha(1f).translationY(0).setStartDelay(delay).setDuration(460).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+            }
+        });
     }
 
     /** A view springs down a little while pressed, and back with a soft overshoot. */
@@ -244,6 +270,7 @@ public final class SolegramAiPageViews {
         public static final int ASSISTANT = 0, CATCH_UP = 1;
         private final int kind;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint lines = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
         private final RectF rect = new RectF();
         private final SolegramAiSheet.Spark spark;
@@ -269,25 +296,27 @@ public final class SolegramAiPageViews {
                 spark.draw(canvas);
                 return;
             }
-            // filled, as the Solegram AI mark: a speech bubble with two lines cut out of it, and a spark well clear of it
+            // filled, as the Solegram AI mark: a speech bubble (its body and its tail one shape, no seam where they
+            // meet), two lines of text on it, and a spark well clear of it
             paint.setShader(new LinearGradient(0, h, w, 0, SolegramAiSheet.brand(), null, Shader.TileMode.CLAMP));
             paint.setStyle(Paint.Style.FILL);
             path.rewind();
-            path.setFillType(Path.FillType.EVEN_ODD);
+            path.setFillType(Path.FillType.WINDING);
             rect.set(w * 0.04f, h * 0.24f, w * 0.72f, h * 0.76f);
             path.addRoundRect(rect, s * 0.2f, s * 0.2f, Path.Direction.CW);
             path.moveTo(w * 0.16f, h * 0.7f);
             path.lineTo(w * 0.1f, h * 0.94f);
             path.lineTo(w * 0.38f, h * 0.74f);
             path.close();
-            final float lh = s * 0.045f;
-            rect.set(w * 0.17f, h * 0.42f - lh, w * 0.58f, h * 0.42f + lh);
-            path.addRoundRect(rect, lh, lh, Path.Direction.CCW);
-            rect.set(w * 0.17f, h * 0.58f - lh, w * 0.44f, h * 0.58f + lh);
-            path.addRoundRect(rect, lh, lh, Path.Direction.CCW);
             canvas.drawPath(path, paint);
+            // the lines are drawn on the bubble, not cut out of it: cut out, the card's dark colour showed through
+            final float lh = s * 0.045f;
+            lines.setColor(0xF2FFFFFF);
+            rect.set(w * 0.17f, h * 0.42f - lh, w * 0.58f, h * 0.42f + lh);
+            canvas.drawRoundRect(rect, lh, lh, lines);
+            rect.set(w * 0.17f, h * 0.58f - lh, w * 0.44f, h * 0.58f + lh);
+            canvas.drawRoundRect(rect, lh, lh, lines);
             path.rewind();
-            path.setFillType(Path.FillType.WINDING);
             final float cx = w * 0.86f, cy = h * 0.14f, r = s * 0.14f;
             path.moveTo(cx, cy - r);
             path.quadTo(cx + r * 0.16f, cy - r * 0.16f, cx + r, cy);
@@ -315,6 +344,11 @@ public final class SolegramAiPageViews {
             iconView.setImageResource(icon);
             iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
             iconView.setColorFilter(new android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN));
+            // the same optical size for all: the reply arrow and the summary's thin lines fill less of their box
+            // than the others' glyphs do, so they are drawn larger
+            final float k = opticalScale(icon);
+            iconView.setScaleX(k);
+            iconView.setScaleY(k);
             addView(iconView, LayoutHelper.createFrame(30, 30, Gravity.LEFT | Gravity.CENTER_VERTICAL, 22, 0, 0, 0));
             final LinearLayout texts = new LinearLayout(context);
             texts.setOrientation(LinearLayout.VERTICAL);
@@ -338,6 +372,16 @@ public final class SolegramAiPageViews {
             divider.setBackgroundColor(Theme.getColor(Theme.key_divider, resourcesProvider));
             addView(divider, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1f / AndroidUtilities.density, Gravity.BOTTOM, 72, 0, 0, 0));
             setBackground(Theme.getSelectorDrawable(false));
+        }
+
+        private static float opticalScale(int icon) {
+            if (icon == R.drawable.menu_reply) {
+                return 1.26f;
+            }
+            if (icon == R.drawable.sg_ai_summary) {
+                return 1.2f;
+            }
+            return 1f;
         }
 
         public FeatureRow setChecked(boolean checked, boolean animated) {

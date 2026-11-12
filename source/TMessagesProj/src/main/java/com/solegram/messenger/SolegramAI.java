@@ -242,7 +242,7 @@ public final class SolegramAI {
             + "addressed to the user and what is expected of them.\n"
             + "Each point one or two short sentences. Skip greetings, stickers, emoji, reactions and small talk; mention a date only "
             + "when it matters (a plan, a deadline).";
-        run(task, transcript(messages, null), "", appLanguage(), 600, true, result);
+        run(task, transcript(messages, null), "", appLanguage(), 600, true, new SolegramSummarizer.ChatOptions(null, "medium"), result);
     }
 
     /** An answer to a question about a chat, from its messages. */
@@ -251,7 +251,7 @@ public final class SolegramAI {
         final String task = BASE + "\nBelow are the latest messages from " + chatTitle(chat) + " (oldest first; \"You\" is the user). "
             + "Answer the user's question about this chat using only these messages; quote the key words, and say who wrote it and when. "
             + "If the messages do not answer it, say so in one sentence.";
-        run(task, transcript(messages, null) + "\n\nQuestion: " + question, question, appLanguage(), 500, true, result);
+        run(task, transcript(messages, null) + "\n\nQuestion: " + question, question, appLanguage(), 500, true, new SolegramSummarizer.ChatOptions(null, "medium"), result);
     }
 
     /** Three replies to a message, in the user's voice and the chat's tone (one per line in the answer). */
@@ -263,7 +263,7 @@ public final class SolegramAI {
             + "for example agree, ask or decline, and a warmer or funny one. They must fit the facts of the chat (who, what, when). "
             + "Each reply on its own line, no numbering, no quotes, "
             + "at most 15 words and at most one emoji. Output only the 3 lines.";
-        run(task, transcript(context, message), textOf(message), appLanguage(), 160, false, result);
+        run(task, transcript(context, message), textOf(message), appLanguage(), 160, true, new SolegramSummarizer.ChatOptions(null, "low"), result);
     }
 
     /** What a message means, with slang, references and terms explained, from the chat around it. */
@@ -273,14 +273,14 @@ public final class SolegramAI {
             + "message marked >>>: what it means and implies, in plain words, using the lines around it. Explain any slang, abbreviations, "
             + "memes, references, jargon or foreign words in it. 2 to 5 short sentences or points. If it is plain and clear, say that in one "
             + "sentence and add only what really helps.";
-        run(task, transcript(context, message), "", appLanguage(), 350, false, result);
+        run(task, transcript(context, message), "", appLanguage(), 350, true, new SolegramSummarizer.ChatOptions(null, "medium"), result);
     }
 
     /** A short summary of one message (long posts). */
     public static void summarizeMessage(MessageObject message, Result result) {
         final String task = BASE + "\nSum up this message from a Telegram chat or channel for the user: its main points in 2 to 5 short "
             + "bullet points, the most important first, with any dates, prices, places and links that matter.";
-        run(task, textOf(message), textOf(message), appLanguage(), 350, false, result);
+        run(task, textOf(message), textOf(message), appLanguage(), 350, true, new SolegramSummarizer.ChatOptions(null, "low"), result);
     }
 
     public static final int WRITE_FIX = 0, WRITE_SHORTER = 1, WRITE_POLITE = 2, WRITE_FRIENDLY = 3, WRITE_FORMAL = 4, WRITE_TRANSLATE = 5, WRITE_LONGER = 6;
@@ -316,13 +316,13 @@ public final class SolegramAI {
         }
         final String task = "You are Solegram AI, the writing assistant in Solegram, a Telegram app. " + how;
         final boolean translate = mode == WRITE_TRANSLATE;
-        run(task, text, translate ? "" : text, translate ? (targetLanguage != null ? targetLanguage : "en") : appLanguage(), 500, false, result);
+        run(task, text, translate ? "" : text, translate ? (targetLanguage != null ? targetLanguage : "en") : appLanguage(), 500, true, new SolegramSummarizer.ChatOptions(null, "low"), result);
     }
 
     /** The assistant: an answer to the last question of a conversation (lines "User: ..." / "Solegram AI: ..."). */
     public static void ask(List<String[]> turns, Result result) {
         final String last = turns.isEmpty() ? "" : turns.get(turns.size() - 1)[1];
-        run(assistantInstruction(), conversationOf(turns), last, appLanguage(), 700, true, result);
+        run(assistantInstruction(), conversationOf(turns), last, appLanguage(), 700, true, new SolegramSummarizer.ChatOptions(new ArrayList<>(turns), "medium"), result);
     }
 
     private static String conversationOf(List<String[]> turns) {
@@ -334,11 +334,24 @@ public final class SolegramAI {
     }
 
     private static String assistantInstruction() {
-        return "You are Solegram AI, the assistant built into Solegram, an unofficial Telegram app for Android. You are smart, "
-            + "friendly and to the point, and you write in " + SolegramSummarizer.LANGUAGE + ".\n"
-            + "Answer the user's last message in the conversation below. Be accurate: if you are not sure, say so; do not make up facts, "
-            + "links or numbers. Keep answers short unless the user asks for more; use \"• \" for lists and plain text otherwise.\n"
-            + "You can help with anything: questions, ideas, writing and editing messages, translations, explanations, plans, advice.\n"
+        final java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", Locale.ENGLISH);
+        return "You are Solegram AI, the assistant built into Solegram, an unofficial Telegram app for Android. You write in "
+            + SolegramSummarizer.LANGUAGE + " (or the language the user writes in), naturally, as a smart and friendly person would.\n"
+            + "Now it is " + day.format(new java.util.Date()) + " (the user's time).\n"
+            + "How you answer:\n"
+            + "• First understand what the user really wants, using the whole conversation (\"it\", \"this\", \"again\" refer to earlier "
+            + "messages). If a request is truly ambiguous, ask one short question instead of guessing.\n"
+            + "• Think it through before answering: for maths, logic, code, plans and comparisons work step by step and check the result; "
+            + "give the answer first, then the short reasoning.\n"
+            + "• Fit the length to the question: a fact or a yes/no in a sentence or two; an explanation, a text to write, a plan or a "
+            + "how-to as complete as it needs to be. Do not pad, do not repeat the question, no filler like \"great question\".\n"
+            + "• Be concrete and useful: real steps, examples, numbers, names. When asked to write something (a message, a post, a "
+            + "letter), write the finished text, ready to send.\n"
+            + "• Be honest: you have no internet access and do not know events after your training; for news, prices, weather or "
+            + "schedules say so and tell how to check. If you are not sure, say so; never make up facts, links, quotes or numbers.\n"
+            + "• Formatting: plain text; \"• \" for lists, numbered lines for steps; no markdown headings, tables or bold marks.\n"
+            + "You can help with anything: questions, ideas, writing and editing messages, translations, explanations, studies, code, "
+            + "plans, advice.\n"
             + "About Solegram, if asked: it adds to Telegram liquid glass design, themes and app icons, a music player, translation of "
             + "messages in place, AI summaries, catch-up of chats and smart replies (Solegram AI), search by meaning, reminders, message "
             + "filters, anti-scam warnings, SoleDrop file sharing nearby, SoleWallet, plugins and a proxy page. Its settings are under "
@@ -394,7 +407,7 @@ public final class SolegramAI {
             final String task = assistantInstruction() + "\nThe user attached a photo. You cannot see it yourself: the phone recognised these things on it: "
                 + (seen.isEmpty() ? "nothing it could name" : seen) + ". Answer from that as well as you can, and say in one short sentence that "
                 + "for a full look at photos the user can connect their own AI key (for example a free Google Gemini key) in Solegram AI settings.";
-            org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> run(task, conversation, question, appLanguage(), 600, true, result));
+            org.telegram.messenger.AndroidUtilities.runOnUIThread(() -> run(task, conversation, question, appLanguage(), 600, true, new SolegramSummarizer.ChatOptions(new ArrayList<>(turns), "medium"), result));
         });
     }
 
@@ -468,9 +481,14 @@ public final class SolegramAI {
         return list;
     }
 
-    private static void run(String instruction, String input, String sample, String fallbackLanguage, int maxTokens, boolean cloudFirst, Result result) {
+    /**
+     * In the auto mode every task goes to the cloud model first (it is far smarter than the small model on the phone);
+     * Gemini Nano answers when the cloud cannot (no network, busy) or the user did not agree to it.
+     */
+    private static void run(String instruction, String input, String sample, String fallbackLanguage, int maxTokens, boolean cloudFirst,
+                            SolegramSummarizer.ChatOptions options, Result result) {
         SolegramSummarizer.compose(instruction, input, sample, fallbackLanguage, maxTokens, true,
-            R.string.SG_AiTitle, R.string.SG_AiConsentAssistant, cloudFirst, (answer, code) -> {
+            R.string.SG_AiTitle, R.string.SG_AiConsentAssistant, cloudFirst, options, (answer, code) -> {
                 if (answer != null) {
                     result.done(clean(answer), null, code);
                     return;
