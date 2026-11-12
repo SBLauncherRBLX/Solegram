@@ -51,16 +51,16 @@ public class SolegramConfig {
     // endregion
 
     // region Glass (100 = Telegram's value unless noted; the defaults are Solegram's tuned look, see writeGlassDefaults())
-    public static int glassThickness = 70;
-    public static int glassRefraction = 100;
+    public static int glassThickness = 75;
+    public static int glassRefraction = 35;
     /** Refraction index x100: 150 = Telegram's 1.5. */
     public static int glassIndex = 130;
     public static int glassDispersion = 40;
-    public static int glassRim = 10;
+    public static int glassRim = 35;
     /** Tint layer opacity in percent: 85 = Telegram's liquid glass. */
-    public static int glassOpacity = 70;
-    public static int glassBlur = 30;
-    public static int glassHighlight = 150;
+    public static int glassOpacity = 35;
+    public static int glassBlur = 40;
+    public static int glassHighlight = 0;
     /** Faster transfers: 0 as Telegram, 1 fast (larger parts, more at once), 2 the most the servers take. */
     public static volatile int transferBoost = 1;
     /** The glass switch of the Glass page; off takes the glass of menus, sheets, controls and the rest with it. */
@@ -68,7 +68,7 @@ public class SolegramConfig {
     public static int glassTint;
     public static int glassTintAmount = 25;
     public static boolean glassShadow = true;
-    public static boolean glassVibrancy = true;
+    public static boolean glassVibrancy = false;
     /** Window blur (Android 12+) behind popup menus, dialogs and bottom sheets. */
     public static boolean glassMenus = true;
     public static boolean streaks = true;
@@ -421,20 +421,20 @@ public class SolegramConfig {
         settingsIconStyle = clamp(p.getInt("settingsIconStyle", 1), 0, 1);
         SolegramIcons.setPack(iconPack);
 
-        glassThickness = clamp(p.getInt("glassThickness", 70), 25, 300);
-        glassRefraction = clamp(p.getInt("glassRefraction", 100), 0, 300);
+        glassThickness = clamp(p.getInt("glassThickness", 75), 25, 300);
+        glassRefraction = clamp(p.getInt("glassRefraction", 35), 0, 300);
         glassIndex = clamp(p.getInt("glassIndex", 130), 100, 250);
         glassDispersion = clamp(p.getInt("glassDispersion", 40), 0, 100);
-        glassRim = clamp(p.getInt("glassRim", 10), 0, 100);
-        glassOpacity = clamp(p.getInt("glassOpacity", 70), 10, 100);
-        glassBlur = clamp(p.getInt("glassBlur", 30), 0, 300);
+        glassRim = clamp(p.getInt("glassRim", 35), 0, 100);
+        glassOpacity = clamp(p.getInt("glassOpacity", 35), 10, 100);
+        glassBlur = clamp(p.getInt("glassBlur", 40), 0, 300);
         transferBoost = clamp(p.getInt("transferBoost", 1), 0, 2);
-        glassHighlight = clamp(p.getInt("glassHighlight", 150), 0, 300);
+        glassHighlight = clamp(p.getInt("glassHighlight", 0), 0, 300);
         glassOn = p.getBoolean("glassOn", true);
         glassTint = clamp(p.getInt("glassTint", 0), 0, SolegramGlass.TINT_COLORS.length - 1);
         glassTintAmount = clamp(p.getInt("glassTintAmount", 25), 0, 60);
         glassShadow = p.getBoolean("glassShadow", true);
-        glassVibrancy = p.getBoolean("glassVibrancy", true);
+        glassVibrancy = p.getBoolean("glassVibrancy", false);
         glassMenus = p.getBoolean("glassMenus", true);
         streaks = p.getBoolean("streaks", true);
         newPlayer = p.getBoolean("newPlayer", true);
@@ -742,7 +742,6 @@ public class SolegramConfig {
             case "updateWifiOnly":
             case "showUserId":
             case "glassShadow":
-            case "glassVibrancy":
             case "glassMenus":
             case "streaks":
             case "newPlayer":
@@ -908,20 +907,20 @@ public class SolegramConfig {
     }
 
     /** Raised when Solegram's glass look changes: everyone gets the new look once, then their own changes stay. */
-    private static final int GLASS_DEFAULTS_VERSION = 1;
+    private static final int GLASS_DEFAULTS_VERSION = 2; // 3.3: thinner, clearer glass without the edge highlight
 
     /** Everything on the Glass page, written out with Solegram's look (the same values as the defaults above). */
     private static void writeGlassDefaults(SharedPreferences.Editor editor) {
-        editor.putInt("glassThickness", 70)
-            .putInt("glassRefraction", 100)
+        editor.putInt("glassThickness", 75)
+            .putInt("glassRefraction", 35)
             .putInt("glassIndex", 130)
             .putInt("glassDispersion", 40)
-            .putInt("glassRim", 10)
-            .putInt("glassOpacity", 70)
-            .putInt("glassBlur", 30)
-            .putInt("glassHighlight", 150)
+            .putInt("glassRim", 35)
+            .putInt("glassOpacity", 35)
+            .putInt("glassBlur", 40)
+            .putInt("glassHighlight", 0)
             .putBoolean("glassPreviewLook", true)
-            .putBoolean("glassVibrancy", true)
+            .putBoolean("glassVibrancy", false)
             .putBoolean("glassOn", true)
             .putInt("glassTint", 0)
             .putInt("glassTintAmount", 25)

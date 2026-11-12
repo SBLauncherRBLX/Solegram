@@ -166,15 +166,14 @@ public class SolegramAiSheet extends BottomSheet {
         scroll.addView(content);
         root.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        // header: the Solegram AI mark, its name in its colours, what it does here
+        // header: the Solegram AI mark, its name (plain, in the sheet's text colour), what it does here
         final LinearLayout head = new LinearLayout(context);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(new Spark(context), LayoutHelper.createLinear(40, 40));
         final LinearLayout titles = new LinearLayout(context);
         titles.setOrientation(LinearLayout.VERTICAL);
-        final GradientText name = new GradientText(context);
-        name.setText(getString(R.string.SG_AiTitle));
+        final TextView name = text(context, getString(R.string.SG_AiTitle), 20, textColor);
         name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         name.setTypeface(AndroidUtilities.bold());
         titles.addView(name);
@@ -271,7 +270,8 @@ public class SolegramAiSheet extends BottomSheet {
             send.setImageResource(R.drawable.ic_send);
             send.setScaleType(ImageView.ScaleType.CENTER);
             send.setColorFilter(new android.graphics.PorterDuffColorFilter(0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN));
-            final GradientDrawable sendBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{brand()[0], brand()[1]});
+            final GradientDrawable sendBg = new GradientDrawable();
+            sendBg.setColor(accent());
             sendBg.setShape(GradientDrawable.OVAL);
             send.setBackground(sendBg);
             send.setOnClickListener(v -> ask());
@@ -356,9 +356,8 @@ public class SolegramAiSheet extends BottomSheet {
         for (TextView chip : chipViews) {
             final boolean on = (Integer) chip.getTag(R.id.sg_ai_task) == task && (task != TASK_WRITE || (Integer) chip.getTag(R.id.sg_ai_mode) == writeMode);
             if (on) {
-                final GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{brand()[0], brand()[1]});
-                bg.setCornerRadius(dp(17));
-                chip.setBackground(bg);
+                // the chosen one in the theme's colour, plain
+                chip.setBackground(Theme.createRoundRectDrawable(dp(17), accent()));
                 chip.setTextColor(0xFFFFFFFF);
             } else {
                 chip.setBackground(Theme.createRoundRectDrawable(dp(17), ColorUtils.setAlphaComponent(text, 0x12)));

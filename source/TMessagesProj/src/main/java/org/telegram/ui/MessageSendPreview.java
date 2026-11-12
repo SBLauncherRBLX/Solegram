@@ -217,7 +217,9 @@ public class MessageSendPreview extends Dialog implements NotificationCenter.Not
         });
 
         iBlur3SourceBitmap = new GlassSourceBitmap();
-        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.FROSTED); // Solegram: live glass, frosted like the backdrop
+        // Solegram: the send menu (Improve with AI, schedule / remind, send silently) and the effects over it are the
+        // clear liquid glass of the message menu, not a frosted blur
+        iBlur3Factory = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(iBlur3SourceBitmap, com.solegram.messenger.ui.SolegramLiveGlass.CLEAR);
         iBlur3Factory.setSourceRootView(new ViewPositionWatcher(windowView), windowView);
 
         containerView = new SizeNotifierFrameLayout(context) {
