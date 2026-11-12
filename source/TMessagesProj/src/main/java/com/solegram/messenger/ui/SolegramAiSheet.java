@@ -56,8 +56,21 @@ import java.util.List;
  */
 public class SolegramAiSheet extends BottomSheet {
 
-    /** The Solegram AI colours: blue, violet, pink, amber. */
-    public static final int[] BRAND = {0xFF4F8BFF, 0xFF9B6BFF, 0xFFFF6FA8, 0xFFFFB25B};
+    /**
+     * The Solegram AI colours, from the theme: its accent and its neighbours on the colour wheel (a cooler one before
+     * it, two warmer ones after), kept bright enough to glow.
+     */
+    public static int[] brand() {
+        final int accent = Theme.getColor(Theme.key_featuredStickers_addButton) | 0xFF000000;
+        final float[] hsl = new float[3];
+        ColorUtils.colorToHSL(accent, hsl);
+        final float h = hsl[0], s = Math.max(0.55f, Math.min(0.92f, hsl[1])), l = Math.max(0.5f, Math.min(0.64f, hsl[2]));
+        return new int[]{hsl(h - 28, s, l), hsl(h, s, l), hsl(h + 34, s * 0.95f, l + 0.02f), hsl(h + 68, s * 0.9f, l + 0.04f)};
+    }
+
+    private static int hsl(float h, float s, float l) {
+        return ColorUtils.HSLToColor(new float[]{(h % 360 + 360) % 360, Math.max(0, Math.min(1, s)), Math.max(0, Math.min(1, l))});
+    }
 
     private static final int TASK_REPLIES = 0, TASK_EXPLAIN = 1, TASK_GIST = 2, TASK_CATCH_UP = 3, TASK_ASK = 4, TASK_WRITE = 5;
 
@@ -253,7 +266,7 @@ public class SolegramAiSheet extends BottomSheet {
             send.setImageResource(R.drawable.ic_send);
             send.setScaleType(ImageView.ScaleType.CENTER);
             send.setColorFilter(new android.graphics.PorterDuffColorFilter(0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN));
-            final GradientDrawable sendBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BRAND[0], BRAND[1]});
+            final GradientDrawable sendBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{brand()[0], brand()[1]});
             sendBg.setShape(GradientDrawable.OVAL);
             send.setBackground(sendBg);
             send.setOnClickListener(v -> ask());
@@ -338,7 +351,7 @@ public class SolegramAiSheet extends BottomSheet {
         for (TextView chip : chipViews) {
             final boolean on = (Integer) chip.getTag(R.id.sg_ai_task) == task && (task != TASK_WRITE || (Integer) chip.getTag(R.id.sg_ai_mode) == writeMode);
             if (on) {
-                final GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{BRAND[0], BRAND[1]});
+                final GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{brand()[0], brand()[1]});
                 bg.setCornerRadius(dp(17));
                 chip.setBackground(bg);
                 chip.setTextColor(0xFFFFFFFF);
@@ -556,30 +569,49 @@ public class SolegramAiSheet extends BottomSheet {
         protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             super.onSizeChanged(w, h, oldw, oldh);
             final float width = Math.max(1, getPaint().measureText(getText().toString()));
-            getPaint().setShader(new LinearGradient(0, 0, width, 0, new int[]{BRAND[0], BRAND[1], BRAND[2], BRAND[3]}, null, Shader.TileMode.CLAMP));
+            getPaint().setShader(new LinearGradient(0, 0, width, 0, brand(), null, Shader.TileMode.CLAMP));
         }
     }
 
-    /** The Solegram AI mark: a four point sparkle with a small one, in its colours, on a soft tile. */
+    /**
+     * The Solegram AI mark: the Solegram mark (a half sun rising over two message lines) with a spark beside the sun,
+     * in the theme's Solegram AI colours, on a soft tile of them (or plain).
+     */
     public static class Spark extends View {
+        private static final String SUN = "M35.4,55.395 A18.6,18.6 0 0 1 72.6,55.395 A1.24,1.24 0 0 1 71.36,56.635 L36.64,56.635 A1.24,1.24 0 0 1 35.4,55.395 Z";
+        private static final String LINES = "M38.345,59.115 L69.655,59.115 A2.325,2.325 0 0 1 69.655,63.765 L38.345,63.765 A2.325,2.325 0 0 1 38.345,59.115 Z M45.165,66.555 L62.835,66.555 A2.325,2.325 0 0 1 62.835,71.205 L45.165,71.205 A2.325,2.325 0 0 1 45.165,66.555 Z";
+        // the mark with its spark spans x 35.4..83, y 25.5..71.2 of the icon's 108 units
+        private static final float BOX_L = 35.4f, BOX_T = 25.5f, BOX_W = 47.6f, BOX_H = 45.7f;
+
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint tile = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Path path = new android.graphics.Path();
+        private final android.graphics.Path sun = androidx.core.graphics.PathParser.createPathFromPathData(SUN);
+        private final android.graphics.Path lines = androidx.core.graphics.PathParser.createPathFromPathData(LINES);
+        private final android.graphics.Path spark = new android.graphics.Path();
         private final RectF rect = new RectF();
         private boolean plain;
+        private float breathe = 1f;
 
         public Spark(Context context) {
             super(context);
+            star(spark, 75.5f, 33f, 7.5f);
+            star(spark, 81.5f, 44.5f, 2.6f);
         }
 
-        /** Only the sparkle, no tile (in rows and cards). */
+        /** Only the mark, no tile (in rows and cards). */
         public Spark setPlain(boolean plain) {
             this.plain = plain;
             invalidate();
             return this;
         }
 
-        private void star(float cx, float cy, float r) {
+        /** The spark's size, for a gentle pulse. */
+        public void setBreathe(float breathe) {
+            this.breathe = breathe;
+            invalidate();
+        }
+
+        private static void star(android.graphics.Path path, float cx, float cy, float r) {
             path.moveTo(cx, cy - r);
             path.quadTo(cx + r * 0.16f, cy - r * 0.16f, cx + r, cy);
             path.quadTo(cx + r * 0.16f, cy + r * 0.16f, cx, cy + r);
@@ -591,17 +623,26 @@ public class SolegramAiSheet extends BottomSheet {
         @Override
         protected void onDraw(Canvas canvas) {
             final float w = getWidth(), h = getHeight(), s = Math.min(w, h);
+            final int[] c = brand();
             if (!plain) {
-                tile.setShader(new LinearGradient(0, 0, w, h, new int[]{ColorUtils.setAlphaComponent(BRAND[0], 0x30), ColorUtils.setAlphaComponent(BRAND[2], 0x30)}, null, Shader.TileMode.CLAMP));
+                tile.setShader(new LinearGradient(0, 0, w, h, new int[]{ColorUtils.setAlphaComponent(c[0], 0x38), ColorUtils.setAlphaComponent(c[2], 0x30)}, null, Shader.TileMode.CLAMP));
                 rect.set(0, 0, w, h);
                 canvas.drawRoundRect(rect, s * 0.3f, s * 0.3f, tile);
             }
-            path.rewind();
-            final float k = plain ? 1f : 0.62f;
-            star(w * 0.45f, h * 0.55f, s * 0.36f * k);
-            star(w * 0.5f + s * 0.27f * k, h * 0.5f - s * 0.27f * k, s * 0.14f * k);
-            paint.setShader(new LinearGradient(0, h, w, 0, new int[]{BRAND[0], BRAND[1], BRAND[2], BRAND[3]}, null, Shader.TileMode.CLAMP));
-            canvas.drawPath(path, paint);
+            final float inner = s * (plain ? 0.96f : 0.6f);
+            final float k = inner / Math.max(BOX_W, BOX_H);
+            canvas.save();
+            canvas.translate((w - BOX_W * k) / 2f, (h - BOX_H * k) / 2f);
+            canvas.scale(k, k);
+            canvas.translate(-BOX_L, -BOX_T);
+            paint.setShader(new LinearGradient(BOX_L, BOX_T + BOX_H, BOX_L + BOX_W, BOX_T, c, null, Shader.TileMode.CLAMP));
+            canvas.drawPath(sun, paint);
+            canvas.drawPath(lines, paint);
+            canvas.save();
+            canvas.scale(breathe, breathe, 75.5f, 33f);
+            canvas.drawPath(spark, paint);
+            canvas.restore();
+            canvas.restore();
         }
     }
 
@@ -641,7 +682,7 @@ public class SolegramAiSheet extends BottomSheet {
             final float w = getWidth();
             final float x = -w + phase * w * 3;
             paint.setShader(new LinearGradient(x, 0, x + w, 0,
-                new int[]{ColorUtils.setAlphaComponent(color, 0x14), ColorUtils.setAlphaComponent(BRAND[1], 0x40), ColorUtils.setAlphaComponent(color, 0x14)},
+                new int[]{ColorUtils.setAlphaComponent(color, 0x14), ColorUtils.setAlphaComponent(brand()[1], 0x40), ColorUtils.setAlphaComponent(color, 0x14)},
                 null, Shader.TileMode.CLAMP));
             final float[] widths = {1f, 0.86f, 0.93f, 0.55f};
             for (int i = 0; i < widths.length; i++) {
