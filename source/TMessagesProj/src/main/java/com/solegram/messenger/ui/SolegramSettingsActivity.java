@@ -1383,6 +1383,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             // cut the glow off at the hero's top - a plain band under the header until it was over. The page's
             // parts rise in by themselves instead
             listView.setLayoutAnimation(null);
+            // the glow itself is drawn behind the list, not by the hero row (see Glow); centred, so that the floating
+            // header does not take it for a view of its own at the top of the screen
+            if (aiHero != null && fragmentView instanceof android.widget.FrameLayout) {
+                ((android.widget.FrameLayout) fragmentView).addView(new SolegramAiPageViews.Glow(context, listView, aiHero, getResourceProvider()), 0,
+                    LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, android.view.Gravity.CENTER));
+            }
         }
         return fragmentView;
     }

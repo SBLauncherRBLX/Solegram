@@ -99,23 +99,16 @@ public final class SolegramAiPageViews {
     // region Header
 
     /**
-     * "Solegram AI" over a soft, slowly drifting glow of the theme's colours. The glow has no top: it goes on up under
-     * the header and the status bar (the view draws past its own top), and melts into the page's colour towards the
-     * cards below.
+     * "Solegram AI" and its tagline, over the page's glow ({@link Glow}, drawn behind the list).
      */
     public static class Hero extends FrameLayout {
-        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint fade = new Paint();
         private final Theme.ResourcesProvider resourcesProvider;
         private final LinearLayout texts;
         private boolean entered;
-        private final long born = SystemClock.uptimeMillis();
 
         public Hero(Context context, CharSequence subtitle, Theme.ResourcesProvider resourcesProvider) {
             super(context);
             this.resourcesProvider = resourcesProvider;
-            setWillNotDraw(false);
-            setClipChildren(false);
             texts = new LinearLayout(context);
             texts.setOrientation(LinearLayout.VERTICAL);
             final TextView title = new TextView(context);
@@ -129,13 +122,9 @@ public final class SolegramAiPageViews {
             sub.setText(subtitle);
             sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
             final int accent = SolegramAiSheet.brand()[1];
-            sub.setTextColor(isDark() ? ColorUtils.blendARGB(accent, 0xFFFFFFFF, 0.35f) : ColorUtils.blendARGB(accent, 0xFF000000, 0.12f));
+            sub.setTextColor(isDark(resourcesProvider) ? ColorUtils.blendARGB(accent, 0xFFFFFFFF, 0.35f) : ColorUtils.blendARGB(accent, 0xFF000000, 0.12f));
             texts.addView(sub, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
             addView(texts, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 24, 0, 24, 34));
-        }
-
-        private boolean isDark() {
-            return ColorUtils.calculateLuminance(Theme.getColor(Theme.key_windowBackgroundGray, resourcesProvider)) < 0.4;
         }
 
         @Override
@@ -152,7 +141,61 @@ public final class SolegramAiPageViews {
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(206), MeasureSpec.EXACTLY));
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(HEIGHT_DP), MeasureSpec.EXACTLY));
+        }
+
+        static final int HEIGHT_DP = 206;
+    }
+
+    private static boolean isDark(Theme.ResourcesProvider resourcesProvider) {
+        return ColorUtils.calculateLuminance(Theme.getColor(Theme.key_windowBackgroundGray, resourcesProvider)) < 0.4;
+    }
+
+    /**
+     * The page's soft, slowly drifting glow in the theme's colours, behind the list: it has no top (it goes on up under
+     * the header and the status bar) and melts into the page's colour towards the cards. It follows the hero's place
+     * in the list as it scrolls.
+     * <p>
+     * It is not drawn by the hero row itself: the list fades and cross-fades its rows (when they appear, when the page
+     * updates - the Gemini Nano status comes right after it opens), each in a layer of the row's own size, and every
+     * such animation cut the glow off at the hero's top: a plain band under the header for a moment.
+     */
+    public static class Glow extends View {
+        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fade = new Paint();
+        private final Theme.ResourcesProvider resourcesProvider;
+        private final long born = SystemClock.uptimeMillis();
+        private final androidx.recyclerview.widget.RecyclerView list;
+        private final View hero;
+        private final float[] pos = new float[2];
+
+        public Glow(Context context, androidx.recyclerview.widget.RecyclerView list, View hero, Theme.ResourcesProvider resourcesProvider) {
+            super(context);
+            this.list = list;
+            this.hero = hero;
+            this.resourcesProvider = resourcesProvider;
+            list.addOnScrollListener(new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                @Override
+                public void onScrolled(@androidx.annotation.NonNull androidx.recyclerview.widget.RecyclerView recyclerView, int dx, int dy) {
+                    invalidate();
+                }
+            });
+        }
+
+        /** The hero's top in this view; NaN when it is scrolled away. */
+        private float heroTop() {
+            if (hero.getParent() == null || !hero.isAttachedToWindow()) {
+                // not laid out yet: where the list starts; laid out and gone: scrolled away above
+                return list.getChildCount() == 0 ? list.getTop() + list.getPaddingTop() : Float.NaN;
+            }
+            float y = hero.getTop() + hero.getTranslationY();
+            android.view.ViewParent p = hero.getParent();
+            while (p instanceof View && p != getParent()) {
+                final View v = (View) p;
+                y += v.getTop() + v.getTranslationY() - v.getScrollY();
+                p = v.getParent();
+            }
+            return y - getTop();
         }
 
         private void blob(Canvas canvas, float x, float y, float r, int color, float alpha) {
@@ -162,24 +205,28 @@ public final class SolegramAiPageViews {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            final float w = getWidth(), h = getHeight();
-            final int[] c = SolegramAiSheet.brand();
-            final float k = isDark() ? 1f : 0.6f;
-            final float t = (SystemClock.uptimeMillis() - born) / 1000f;
-            final float d = dp(18);
-            // the glow reaches well above the view (under the header and the status bar): the list does not clip it
-            final float top = -h * 1.4f;
-            final int layer = canvas.saveLayer(-w, top, w * 2, h, null);
-            blob(canvas, w * 0.16f + d * (float) Math.sin(t * 0.35), h * 0.5f + d * (float) Math.cos(t * 0.29), w * 0.62f, c[0], 0.42f * k);
-            blob(canvas, w * 0.5f + d * (float) Math.cos(t * 0.27), h * 0.3f + d * (float) Math.sin(t * 0.33), w * 0.6f, c[1], 0.34f * k);
-            blob(canvas, w * 0.86f + d * (float) Math.sin(t * 0.31 + 1), h * 0.5f + d * (float) Math.cos(t * 0.23), w * 0.52f, c[3], 0.34f * k);
-            blob(canvas, w * 0.74f + d * (float) Math.cos(t * 0.21), -h * 0.15f, w * 0.55f, c[2], 0.24f * k);
-            blob(canvas, w * 0.3f + d * (float) Math.sin(t * 0.19), -h * 0.45f, w * 0.6f, c[1], 0.18f * k);
-            // towards the cards it melts into the page's colour
-            final int page = Theme.getColor(Theme.key_windowBackgroundGray, resourcesProvider);
-            fade.setShader(new LinearGradient(0, h * 0.42f, 0, h, ColorUtils.setAlphaComponent(page, 0), page, Shader.TileMode.CLAMP));
-            canvas.drawRect(-w, h * 0.42f, w * 2, h, fade);
-            canvas.restoreToCount(layer);
+            final float top = heroTop();
+            final float w = getWidth(), h = dp(Hero.HEIGHT_DP);
+            if (!Float.isNaN(top) && top + h > 0) {
+                final int[] c = SolegramAiSheet.brand();
+                final float k = isDark(resourcesProvider) ? 1f : 0.6f;
+                final float t = (SystemClock.uptimeMillis() - born) / 1000f;
+                final float d = dp(18);
+                canvas.save();
+                canvas.translate(0, top);
+                final int layer = canvas.saveLayer(0, -top, w, h, null);
+                blob(canvas, w * 0.16f + d * (float) Math.sin(t * 0.35), h * 0.5f + d * (float) Math.cos(t * 0.29), w * 0.62f, c[0], 0.42f * k);
+                blob(canvas, w * 0.5f + d * (float) Math.cos(t * 0.27), h * 0.3f + d * (float) Math.sin(t * 0.33), w * 0.6f, c[1], 0.34f * k);
+                blob(canvas, w * 0.86f + d * (float) Math.sin(t * 0.31 + 1), h * 0.5f + d * (float) Math.cos(t * 0.23), w * 0.52f, c[3], 0.34f * k);
+                blob(canvas, w * 0.74f + d * (float) Math.cos(t * 0.21), -h * 0.15f, w * 0.55f, c[2], 0.24f * k);
+                blob(canvas, w * 0.3f + d * (float) Math.sin(t * 0.19), -h * 0.45f, w * 0.6f, c[1], 0.18f * k);
+                // towards the cards it melts into the page's colour
+                final int page = Theme.getColor(Theme.key_windowBackgroundGray, resourcesProvider);
+                fade.setShader(new LinearGradient(0, h * 0.42f, 0, h, ColorUtils.setAlphaComponent(page, 0), page, Shader.TileMode.CLAMP));
+                canvas.drawRect(0, h * 0.42f, w, h, fade);
+                canvas.restoreToCount(layer);
+                canvas.restore();
+            }
             if (isAttachedToWindow()) {
                 postInvalidateDelayed(48); // the slow drift: about 20 frames a second are plenty for it
             }
