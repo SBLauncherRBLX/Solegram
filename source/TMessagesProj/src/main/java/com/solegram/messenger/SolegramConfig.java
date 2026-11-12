@@ -96,6 +96,11 @@ public class SolegramConfig {
     public static boolean aiSummary = true;
     /** The summary button beside long messages in every chat (not only on long channel posts). */
     public static boolean aiSummaryButton = true;
+    /** Solegram AI (3.3): the assistant and its features in chats. */
+    public static boolean aiCatchUp = true;
+    public static boolean aiReplies = true;
+    public static boolean aiExplain = true;
+    public static boolean aiWriter = true;
     /** SolegramSummarizer.PROVIDER_*: 2 = auto (Gemini Nano on the phone, otherwise the free service), 3 = Gemini Nano only,
      * 0 = free service (no key), 1 = the user's own OpenAI-compatible service. */
     public static int aiProvider = SolegramSummarizer.PROVIDER_AUTO;
@@ -446,6 +451,10 @@ public class SolegramConfig {
         glassHeaderButtons = p.getBoolean("glassHeaderButtons", true);
         aiSummary = p.getBoolean("aiSummary", true);
         aiSummaryButton = p.getBoolean("aiSummaryButton", true);
+        aiCatchUp = p.getBoolean("aiCatchUp", true);
+        aiReplies = p.getBoolean("aiReplies", true);
+        aiExplain = p.getBoolean("aiExplain", true);
+        aiWriter = p.getBoolean("aiWriter", true);
         // "aiMode" replaced "aiProvider" (free/own) when Gemini Nano came: one's own service stays, the free one becomes auto
         aiProvider = p.contains("aiMode") ? clamp(p.getInt("aiMode", SolegramSummarizer.PROVIDER_AUTO), 0, 3)
             : p.getInt("aiProvider", 0) == SolegramSummarizer.PROVIDER_OWN ? SolegramSummarizer.PROVIDER_OWN : SolegramSummarizer.PROVIDER_AUTO;
@@ -756,6 +765,10 @@ public class SolegramConfig {
             case "glassHeaderButtons":
             case "aiSummary":
             case "aiSummaryButton":
+            case "aiCatchUp":
+            case "aiReplies":
+            case "aiExplain":
+            case "aiWriter":
             case "meaningSearch":
             case "meaningRerank":
             case "animatedAvatars":

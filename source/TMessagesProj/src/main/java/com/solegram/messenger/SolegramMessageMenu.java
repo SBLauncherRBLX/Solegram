@@ -41,6 +41,7 @@ public final class SolegramMessageMenu {
     public static final int OPTION_REMIND = 9006;
     public static final int OPTION_SOLEDROP = 9007;
     public static final int OPTION_SAVED_TAG = 9008;
+    public static final int OPTION_AI = 9009;
     public static final int OPTION_PLUGIN_BASE = 9100;
     public static final int HEADER_PLUGIN_BASE = 20000;
     public static final int PROFILE_PLUGIN_BASE = 21000;
@@ -103,6 +104,12 @@ public final class SolegramMessageMenu {
             items.add(LocaleController.getString(shownNow ? R.string.SG_ShowOriginal : R.string.SG_TranslateHere));
             options.add(OPTION_TRANSLATE_HERE);
             icons.add(R.drawable.msg_translate);
+        }
+        // Solegram AI: reply ideas, what it means, its gist
+        if ((SolegramConfig.aiReplies || SolegramConfig.aiExplain) && SolegramAI.canUseMessage(chat, translateTarget != null ? translateTarget : message)) {
+            items.add(LocaleController.getString(R.string.SG_AiTitle));
+            options.add(OPTION_AI);
+            icons.add(R.drawable.sg_ai_spark);
         }
         if (SolegramSummarizer.canSummarize(translateTarget)) {
             final boolean open = translateTarget.messageOwner.summarizedOpen;
@@ -173,6 +180,11 @@ public final class SolegramMessageMenu {
         }
         if (option == OPTION_MESSAGE_DETAILS) {
             showMessageDetails(chat, message);
+            return true;
+        }
+        if (option == OPTION_AI) {
+            final MessageObject target = SolegramInlineTranslate.target(message, group);
+            com.solegram.messenger.ui.SolegramAiSheet.showForMessage(chat, target != null ? target : message);
             return true;
         }
         if (option == OPTION_SUMMARY) {
@@ -352,6 +364,8 @@ public final class SolegramMessageMenu {
     public static final int ACTION_SOLEDROP = 19993;
     /** Saved Messages menu: the tags kept on this device. */
     public static final int HEADER_SAVED_TAGS = 19994;
+    /** Solegram AI: what one missed in this chat. */
+    public static final int HEADER_AI_CATCH_UP = 19995;
     /** Profile menu: the account, group or channel goes by SoleDrop. */
     public static final int PROFILE_SOLEDROP = 20990;
     /** Profile menu: the chat is hidden from the lists of this device (or shown again). */
@@ -365,6 +379,10 @@ public final class SolegramMessageMenu {
 
     public static void addHeaderItems(ChatActivity chat, ActionBarMenuItem headerItem) {
         headerItems.remove(chat);
+        if (headerItem != null && SolegramConfig.aiCatchUp && chat.getChatMode() == ChatActivity.MODE_DEFAULT && SolegramAI.allowedIn(chat)
+            && chat.getDialogId() != chat.getUserConfig().getClientUserId()) {
+            headerItem.lazilyAddSubItem(HEADER_AI_CATCH_UP, R.drawable.sg_ai_spark, LocaleController.getString(R.string.SG_AiCatchUpMenu));
+        }
         if (headerItem != null && SolegramConfig.jumpToFirstInMenu && chat.getCurrentEncryptedChat() == null) {
             headerItem.lazilyAddSubItem(HEADER_FIRST_MESSAGE, R.drawable.msg_go_up, LocaleController.getString(R.string.SG_JumpToFirst));
         }
@@ -403,6 +421,10 @@ public final class SolegramMessageMenu {
             final ArrayList<MessageObject> selected = chat.solegramSelectedMessages();
             chat.clearSelectionMode();
             com.solegram.messenger.ui.SolegramReminderSheet.show(chat, selected);
+            return true;
+        }
+        if (id == HEADER_AI_CATCH_UP) {
+            com.solegram.messenger.ui.SolegramAiSheet.showCatchUp(chat);
             return true;
         }
         if (id == HEADER_SAVED_TAGS) {

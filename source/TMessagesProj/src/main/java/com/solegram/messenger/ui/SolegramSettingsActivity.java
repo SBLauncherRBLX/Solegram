@@ -241,6 +241,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_AI_LANGUAGE = 229;
     private static final int ID_AI_SUMMARY_BUTTON = 230;
     private static final int ID_AI_NANO = 232;
+    private static final int ID_AI_REPLIES = 2901;
+    private static final int ID_AI_EXPLAIN = 2902;
+    private static final int ID_AI_WRITER = 2903;
+    private static final int ID_AI_PRESET = 2904;
     private static final int ID_MEANING = 236;
     private static final int ID_MEANING_RERANK = 237;
     private static final int ID_IOS_INPUT_BAR = 231;
@@ -831,6 +835,65 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillAi(ArrayList<UItem> items) {
+        final Context context = getContext();
+        // Solegram AI: its header, the assistant and the catch-up, then all of its features
+        items.add(UItem.asCustomShadow(new SolegramAiPageViews.Hero(context, getString(R.string.SG_AiTagline), getResourceProvider())));
+        final SolegramAiPageViews.Cards cards = new SolegramAiPageViews.Cards(context);
+        final SolegramAiPageViews.Card assistant = cards.add(new SolegramAiPageViews.Card(context,
+            new SolegramAiPageViews.CardMark(context, SolegramAiPageViews.CardMark.ASSISTANT),
+            getString(R.string.SG_AiAssistant), getString(R.string.SG_AiAssistantInfo), getResourceProvider()));
+        assistant.setOnClickListener(v -> presentFragment(new SolegramAiChatActivity()));
+        final SolegramAiPageViews.Card catchUp = cards.add(new SolegramAiPageViews.Card(context,
+            new SolegramAiPageViews.CardMark(context, SolegramAiPageViews.CardMark.CATCH_UP),
+            getString(R.string.SG_AiCatchUpMenu), getString(R.string.SG_AiCatchUpInfo), getResourceProvider()));
+        catchUp.setState(getString(SolegramConfig.aiCatchUp ? R.string.SG_AiOnInChats : R.string.SG_AiOff), SolegramConfig.aiCatchUp);
+        catchUp.setOnClickListener(v -> {
+            SolegramConfig.toggle("aiCatchUp");
+            listView.adapter.update(true);
+        });
+        items.add(UItem.asCustomShadow(cards));
+
+        items.add(UItem.asHeader(getString(R.string.SG_AiMoreFeatures)));
+        items.add(UItem.asCustom(ID_AI_REPLIES, feature(R.drawable.menu_reply, 0xFF34C759, R.string.SG_AiRepliesFeature, R.string.SG_AiRepliesInfo, "aiReplies", SolegramConfig.aiReplies, true)));
+        items.add(UItem.asCustom(ID_AI_EXPLAIN, feature(R.drawable.msg_info, 0xFFFF9F0A, R.string.SG_AiExplainFeature, R.string.SG_AiExplainInfo, "aiExplain", SolegramConfig.aiExplain, true)));
+        items.add(UItem.asCustom(ID_AI_WRITER, feature(R.drawable.msg_edit, 0xFFFF5FA2, R.string.SG_AiWriterFeature, R.string.SG_AiWriterInfo, "aiWriter", SolegramConfig.aiWriter, true)));
+        items.add(UItem.asCustom(ID_AI_SUMMARY, feature(R.drawable.sg_ai_summary, 0xFF9B6BFF, R.string.SG_AiSummary, R.string.SG_AiSummaryInfo, "aiSummary", SolegramConfig.aiSummary, true)));
+        items.add(UItem.asCustom(ID_MEANING, feature(R.drawable.msg_search, 0xFF4F8BFF, R.string.SG_MeaningSearch, R.string.SG_MeaningSearchInfo, "meaningSearch", SolegramConfig.meaningSearch, false)));
+        items.add(UItem.asShadow(getString(R.string.SG_AiFeaturesInfo)));
+
+        // the long messages' summary and the search by meaning: their details
+        if (SolegramConfig.aiSummary || SolegramConfig.meaningSearch && com.solegram.messenger.SolegramMeaningSearch.rerankAvailable()) {
+            items.add(UItem.asHeader(getString(R.string.SG_AiDetails)));
+            if (SolegramConfig.aiSummary) {
+                items.add(UItem.asButtonCheck(ID_AI_SUMMARY_BUTTON, getString(R.string.SG_AiSummaryButton), getString(R.string.SG_AiSummaryButtonInfo)).setChecked(SolegramConfig.aiSummaryButton));
+                items.add(tile(UItem.asButton(ID_AI_LANGUAGE, R.drawable.msg_language, getString(R.string.SG_AiLanguage),
+                    SolegramConfig.aiSummaryLanguage == 1 ? translateTargetName() : getString(R.string.SG_AiLanguageMessage)), TILE_TEAL));
+            }
+            if (SolegramConfig.meaningSearch && com.solegram.messenger.SolegramMeaningSearch.rerankAvailable()) {
+                items.add(UItem.asButtonCheck(ID_MEANING_RERANK, getString(R.string.SG_MeaningRerank), getString(R.string.SG_MeaningRerankInfo)).setChecked(SolegramConfig.meaningRerank));
+            }
+            items.add(UItem.asShadow(SolegramConfig.meaningSearch ? getString(R.string.SG_MeaningPrivacy) : null));
+        }
+
+        // the model: where Solegram AI thinks
+        items.add(UItem.asHeader(getString(R.string.SG_AiModelHeader)));
+        final boolean own = com.solegram.messenger.SolegramSummarizer.usesOwnService();
+        items.add(tile(UItem.asButton(ID_AI_PROVIDER, R.drawable.sg_ai_spark, getString(R.string.SG_AiProvider), aiProviderName(SolegramConfig.aiProvider)), TILE_PURPLE));
+        if (com.solegram.messenger.SolegramSummarizer.usesNano()) {
+            items.add(tile(UItem.asButton(ID_AI_NANO, R.drawable.msg_newphone, getString(R.string.SG_NanoTitle), nanoStatusText()), TILE_INDIGO));
+        }
+        if (own) {
+            items.add(tile(UItem.asButton(ID_AI_PRESET, R.drawable.msg_bots, getString(R.string.SG_AiPreset), aiPresetName()), TILE_ORANGE));
+            items.add(tile(UItem.asButton(ID_AI_URL, R.drawable.msg_link, getString(R.string.SG_AiUrl),
+                TextUtils.isEmpty(SolegramConfig.aiBaseUrl) ? getString(R.string.SG_AiNotSet) : aiHost()), TILE_BLUE));
+            items.add(tile(UItem.asButton(ID_AI_KEY, R.drawable.msg_permissions, getString(R.string.SG_AiKey),
+                getString(TextUtils.isEmpty(SolegramConfig.aiApiKey) ? R.string.SG_AiNotSet : R.string.SG_AiKeySet)), TILE_GRAY));
+            items.add(tile(UItem.asButton(ID_AI_MODEL, R.drawable.msg_bots, getString(R.string.SG_AiModel),
+                TextUtils.isEmpty(SolegramConfig.aiModel) ? "gpt-4o-mini" : SolegramConfig.aiModel), TILE_INDIGO));
+        }
+        items.add(UItem.asShadow(getString(aiPrivacyText(SolegramConfig.aiProvider))));
+
+        // translation
         items.add(UItem.asHeader(getString(R.string.SG_Translation)));
         items.add(UItem.asButtonCheck(ID_TRANSLATE_HERE, getString(R.string.SG_TranslateHereItem), getString(R.string.SG_TranslateHereItemInfo)).setChecked(SolegramConfig.translateHere));
         items.add(UItem.asButtonCheck(ID_FREE_TRANSLATE, getString(R.string.SG_FreeTranslate), getString(R.string.SG_FreeTranslateInfo)).setChecked(SolegramConfig.freeTranslate));
@@ -840,33 +903,77 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(tile(UItem.asButton(ID_DONT_TRANSLATE, R.drawable.msg_block2, getString(R.string.DoNotTranslate)), TILE_RED));
         }
         items.add(UItem.asShadow(getString(R.string.SG_TranslationInfo)));
+    }
 
-        items.add(UItem.asHeader(getString(R.string.SG_AiSummaryHeader)));
-        items.add(UItem.asButtonCheck(ID_AI_SUMMARY, getString(R.string.SG_AiSummary), getString(R.string.SG_AiSummaryInfo)).setChecked(SolegramConfig.aiSummary));
-        if (SolegramConfig.aiSummary) {
-            items.add(UItem.asButtonCheck(ID_AI_SUMMARY_BUTTON, getString(R.string.SG_AiSummaryButton), getString(R.string.SG_AiSummaryButtonInfo)).setChecked(SolegramConfig.aiSummaryButton));
-            final boolean own = com.solegram.messenger.SolegramSummarizer.usesOwnService();
-            items.add(tile(UItem.asButton(ID_AI_PROVIDER, R.drawable.sg_ai_summary, getString(R.string.SG_AiProvider),
-                aiProviderName(SolegramConfig.aiProvider)), TILE_PURPLE));
-            if (com.solegram.messenger.SolegramSummarizer.usesNano()) {
-                items.add(tile(UItem.asButton(ID_AI_NANO, R.drawable.msg_newphone, getString(R.string.SG_NanoTitle), nanoStatusText()), TILE_INDIGO));
-            }
-            if (own) {
-                items.add(tile(UItem.asButton(ID_AI_URL, R.drawable.msg_link, getString(R.string.SG_AiUrl),
-                    TextUtils.isEmpty(SolegramConfig.aiBaseUrl) ? getString(R.string.SG_AiNotSet) : aiHost()), TILE_BLUE));
-                items.add(tile(UItem.asButton(ID_AI_KEY, R.drawable.msg_permissions, getString(R.string.SG_AiKey),
-                    getString(TextUtils.isEmpty(SolegramConfig.aiApiKey) ? R.string.SG_AiNotSet : R.string.SG_AiKeySet)), TILE_GRAY));
-                items.add(tile(UItem.asButton(ID_AI_MODEL, R.drawable.msg_bots, getString(R.string.SG_AiModel),
-                    TextUtils.isEmpty(SolegramConfig.aiModel) ? "gpt-4o-mini" : SolegramConfig.aiModel), TILE_INDIGO));
-            }
-            items.add(tile(UItem.asButton(ID_AI_LANGUAGE, R.drawable.msg_language, getString(R.string.SG_AiLanguage),
-                SolegramConfig.aiSummaryLanguage == 1 ? translateTargetName() : getString(R.string.SG_AiLanguageMessage)), TILE_TEAL));
-            items.add(UItem.asShadow(getString(aiPrivacyText(SolegramConfig.aiProvider))));
-        } else {
-            items.add(UItem.asShadow(null));
+    /** The feature row in a list item (the list wraps custom views in a frame of its own). */
+    private static SolegramAiPageViews.FeatureRow featureRow(View view) {
+        if (view instanceof SolegramAiPageViews.FeatureRow) {
+            return (SolegramAiPageViews.FeatureRow) view;
         }
+        if (view instanceof android.view.ViewGroup && ((android.view.ViewGroup) view).getChildCount() > 0 && ((android.view.ViewGroup) view).getChildAt(0) instanceof SolegramAiPageViews.FeatureRow) {
+            return (SolegramAiPageViews.FeatureRow) ((android.view.ViewGroup) view).getChildAt(0);
+        }
+        return null;
+    }
 
-        fillMeaningSearch(items);
+    /** A Solegram AI feature row with its switch (the setting {@code key}). */
+    private View feature(int icon, int color, int title, int text, String key, boolean on, boolean divider) {
+        return new SolegramAiPageViews.FeatureRow(getContext(), icon, color, getString(title), getString(text), getResourceProvider())
+            .setChecked(on, false)
+            .setDivider(divider)
+            .onToggle(() -> {
+                SolegramConfig.toggle(key);
+                AndroidUtilities.runOnUIThread(() -> listView.adapter.update(true), 220);
+            });
+    }
+
+    /** Services one's own key works with: base address and a good model for Solegram AI. */
+    private static final String[][] AI_PRESETS = {
+        {"Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash", "https://aistudio.google.com/apikey"},
+        {"OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", "https://platform.openai.com/api-keys"},
+        {"OpenRouter", "https://openrouter.ai/api/v1", "google/gemini-2.5-flash", "https://openrouter.ai/keys"},
+        {"Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", "https://console.groq.com/keys"},
+        {"DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat", "https://platform.deepseek.com/api_keys"},
+    };
+
+    private String aiPresetName() {
+        for (String[] p : AI_PRESETS) {
+            if (p[1].equals(SolegramConfig.aiBaseUrl)) {
+                return p[0];
+            }
+        }
+        return getString(TextUtils.isEmpty(SolegramConfig.aiBaseUrl) ? R.string.SG_AiNotSet : R.string.SG_AiPresetCustom);
+    }
+
+    private void showAiPresetPicker() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        final String[] names = new String[AI_PRESETS.length + 1];
+        int selected = AI_PRESETS.length;
+        for (int i = 0; i < AI_PRESETS.length; i++) {
+            names[i] = i == 0 ? AI_PRESETS[i][0] + " · " + getString(R.string.SG_AiPresetFreeKey) : AI_PRESETS[i][0];
+            if (AI_PRESETS[i][1].equals(SolegramConfig.aiBaseUrl)) {
+                selected = i;
+            }
+        }
+        names[AI_PRESETS.length] = getString(R.string.SG_AiPresetCustom);
+        showDialog(org.telegram.ui.Components.AlertsCreator.createSingleChoiceDialog(getParentActivity(), names, getString(R.string.SG_AiPreset), selected, (d, which) -> {
+            if (which >= AI_PRESETS.length) {
+                askAiUrl();
+                return;
+            }
+            final String[] p = AI_PRESETS[which];
+            SolegramConfig.prefs().edit().putString("aiBaseUrl", p[1]).putString("aiModel", p[2]).apply();
+            SolegramConfig.reload();
+            listView.adapter.update(true);
+            // the key comes next: where to get one
+            askText(getString(R.string.SG_AiKey), LocaleController.formatString(R.string.SG_AiPresetKeyInfo, p[0], p[3]), SolegramConfig.aiApiKey, "", true, text -> {
+                SolegramConfig.setAiApiKey(text);
+                SolegramConfig.reload();
+                listView.adapter.update(true);
+            });
+        }));
     }
 
     /** "Search by meaning" in the chat list search; the on-device reranking only where Gemini Nano is. */
@@ -2531,6 +2638,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 toggleCheck(view, "translateHere");
                 return;
             case ID_AI_SUMMARY:
+                if (featureRow(view) != null) {
+                    featureRow(view).toggleOnce(); // once, whether the row or the list saw the tap
+                    return;
+                }
                 toggleCheck(view, "aiSummary");
                 listView.adapter.update(true);
                 return;
@@ -2551,6 +2662,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 });
                 return;
             case ID_MEANING:
+                if (featureRow(view) != null) {
+                    featureRow(view).toggleOnce(); // once, whether the row or the list saw the tap
+                    return;
+                }
                 toggleCheck(view, "meaningSearch");
                 listView.adapter.update(true);
                 return;
@@ -2559,6 +2674,16 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_AI_PROVIDER:
                 showAiProviderPicker();
+                return;
+            case ID_AI_PRESET:
+                showAiPresetPicker();
+                return;
+            case ID_AI_REPLIES:
+            case ID_AI_EXPLAIN:
+            case ID_AI_WRITER:
+                if (featureRow(view) != null) {
+                    featureRow(view).toggleOnce();
+                }
                 return;
             case ID_AI_NANO:
                 onNanoClick();

@@ -355,7 +355,8 @@ public final class SolegramSummarizer {
                 out.write(body.toString().getBytes(StandardCharsets.UTF_8));
             }
             final int code = c.getResponseCode();
-            if (code == 429 || code == 503) {
+            // the free service answers 402 to too many requests from one place in a row: a pause and one more try
+            if (code == 429 || code == 503 || code == 402 && !own) {
                 throw new BusyException();
             }
             if (code < 200 || code >= 300) {
@@ -397,6 +398,47 @@ public final class SolegramSummarizer {
      */
     public static void compose(String instruction, String input, String sample, String fallbackLanguage, int maxTokens,
                                boolean mayAskConsent, int consentTitle, int consentMessage, Utilities.Callback2<String, Integer> done) {
+        compose(instruction, input, sample, fallbackLanguage, maxTokens, mayAskConsent, consentTitle, consentMessage, false, done);
+    }
+
+    /**
+     * @param cloudFirst in the auto mode, the free service first and Gemini Nano only when it fails or the user does not
+     *                   agree to it: for the tasks a small model on the phone does poorly (long chats, open questions)
+     */
+    public static void compose(String instruction, String input, String sample, String fallbackLanguage, int maxTokens,
+                               boolean mayAskConsent, int consentTitle, int consentMessage, boolean cloudFirst,
+                               Utilities.Callback2<String, Integer> done) {
+        if (cloudFirst && SolegramConfig.aiProvider == PROVIDER_AUTO) {
+            final String clipped = input.length() > MAX_INPUT ? input.substring(0, MAX_INPUT) : input;
+            final Runnable onDevice = () -> pool.execute(() -> {
+                try {
+                    final String result = composeOnDevice(instruction, clipped, sample, fallbackLanguage, maxTokens);
+                    AndroidUtilities.runOnUIThread(() -> done.run(result, SOURCE_NANO));
+                } catch (Throwable e) {
+                    AndroidUtilities.runOnUIThread(() -> done.run(null, COMPOSE_FAILED));
+                }
+            });
+            final Utilities.Callback2<String, Integer> orDevice = (result, code) -> {
+                if (result != null) {
+                    done.run(result, code);
+                } else if (SolegramGeminiNano.isAvailable()) {
+                    onDevice.run();
+                } else {
+                    done.run(null, code);
+                }
+            };
+            AndroidUtilities.runOnUIThread(() -> {
+                if (SolegramConfig.aiConsent) {
+                    composeRemote(instruction, clipped, sample, fallbackLanguage, false, orDevice);
+                } else if (mayAskConsent) {
+                    askConsent(consentTitle, consentMessage, () -> composeRemote(instruction, clipped, sample, fallbackLanguage, false, orDevice),
+                        () -> orDevice.run(null, COMPOSE_NEEDS_CONSENT));
+                } else {
+                    orDevice.run(null, COMPOSE_NEEDS_CONSENT);
+                }
+            });
+            return;
+        }
         final String clipped = input.length() > MAX_INPUT ? input.substring(0, MAX_INPUT) : input;
         final int provider = SolegramConfig.aiProvider;
         if (provider == PROVIDER_OWN) {
@@ -480,7 +522,7 @@ public final class SolegramSummarizer {
                 try {
                     result = chat(system, input, own);
                 } catch (BusyException busy) {
-                    Thread.sleep(4000);
+                    Thread.sleep(6000);
                     result = chat(system, input, own);
                 }
                 if (result != null) {

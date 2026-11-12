@@ -5225,6 +5225,19 @@ public class ChatActivityEnterView extends FrameLayout implements
             ;*/
         }
 
+        // Solegram AI: a better wording (or a translation) of the text before it goes
+        if (com.solegram.messenger.SolegramConfig.aiWriter && parentFragment != null && parentFragment.getCurrentEncryptedChat() == null
+                && messageEditText != null && messageEditText.length() > 1 && !isInScheduleMode()) {
+            final String solegramText = messageEditText.getText().toString();
+            options.add(R.drawable.sg_ai_spark, getString(R.string.SG_AiImprove), () -> {
+                if (messageSendPreview != null) {
+                    messageSendPreview.dismiss(false);
+                    messageSendPreview = null;
+                }
+                AndroidUtilities.runOnUIThread(() -> com.solegram.messenger.ui.SolegramAiSheet.showWriter(parentFragment, solegramText), 250);
+            });
+        }
+
         if (sendWithoutSoundButtonValue) {
             // Solegram: with "send silently" on, this item sends with sound instead.
             final boolean solegramSilent = com.solegram.messenger.SolegramConfig.sendSilently;

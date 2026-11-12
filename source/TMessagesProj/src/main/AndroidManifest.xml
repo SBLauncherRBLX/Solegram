@@ -572,8 +572,8 @@
             android:enabled="false"
             android:name="org.telegram.messenger.MangaIcon"
             android:targetActivity="org.telegram.ui.LaunchActivity"
-            android:icon="@mipmap/icon_39_launcher"
-            android:roundIcon="@mipmap/icon_39_launcher_round"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
             android:exported="true">
 
             <intent-filter>
