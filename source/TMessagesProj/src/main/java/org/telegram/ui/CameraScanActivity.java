@@ -258,7 +258,7 @@ public class CameraScanActivity extends BaseFragment {
     public CameraScanActivity(int type) {
         super();
         currentType = type;
-        // Solegram: every scanner has the camera's glass buttons (the wallet's, SoleDrop's, Telegram's own)
+        // Solegram: every scanner has the camera's glass buttons (the wallet's, Telegram's own)
         solegramGlass = true;
         solegramGlassNext = false;
         if (isQr()) {

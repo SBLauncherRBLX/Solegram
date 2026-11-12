@@ -134,6 +134,8 @@ public class SendGiftSheet extends BottomSheetWithRecyclerListView implements No
     private final TextView leftTextView, leftTextView2;
 
     public boolean anonymous;
+    /** Solegram: the next sheet opens with "hide my name" on (set by the gift sheet right before it makes one). */
+    public static boolean solegramNextAnonymous;
     public boolean upgrade = false;
     public boolean useStars = false;
 
@@ -165,6 +167,11 @@ public class SendGiftSheet extends BottomSheetWithRecyclerListView implements No
         if (self) {
             anonymous = true;
         }
+        // Solegram: a gift by a SoleWallet card number goes with "hide my name" on (the person can still turn it off)
+        if (solegramNextAnonymous) {
+            anonymous = true;
+        }
+        solegramNextAnonymous = false;
 
         this.currentAccount = currentAccount;
         this.dialogId = dialogId;

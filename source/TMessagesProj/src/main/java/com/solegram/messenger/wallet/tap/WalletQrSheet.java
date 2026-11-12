@@ -3,7 +3,7 @@
  * It is licensed under GNU GPL v. 2 or later.
  */
 
-package com.solegram.messenger.soledrop;
+package com.solegram.messenger.wallet.tap;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
@@ -33,6 +33,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.solegram.messenger.ui.SolegramMotion;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.TelegramQRCodeWriter;
 import org.telegram.messenger.UserConfig;
@@ -48,11 +49,12 @@ import org.telegram.ui.Components.RadialProgressView;
 import java.util.HashMap;
 
 /**
- * The SoleDrop code: the way in for a phone without NFC. It is the account's Telegram contact link
- * (t.me/contact/...) as a QR code in SoleDrop's colours; the friend scans it in SoleDrop and sends just as
- * after a tap. The link runs out with its token and is renewed while the sheet is open.
+ * The SoleWallet code, for receiving a gift or Stars: the account's Telegram contact link (t.me/contact/...) as a
+ * QR code in the theme's colour; the sender scans it in SoleWallet and sends just as after a tap of the phones. The
+ * link runs out with its token and is renewed while the sheet is open. The card number is under it: a gift can be
+ * sent by it too.
  */
-public class SoleDropQrSheet extends BottomSheet {
+public class WalletQrSheet extends BottomSheet {
 
     private final int account;
     private final QrView qrView;
@@ -63,12 +65,11 @@ public class SoleDropQrSheet extends BottomSheet {
         if (fragment == null || fragment.getParentActivity() == null) {
             return;
         }
-        fragment.showDialog(new SoleDropQrSheet(fragment.getParentActivity(), account, fragment.getResourceProvider()));
+        fragment.showDialog(new WalletQrSheet(fragment.getParentActivity(), account, fragment.getResourceProvider()));
     }
 
-    private SoleDropQrSheet(Context context, int account, Theme.ResourcesProvider rp) {
+    private WalletQrSheet(Context context, int account, Theme.ResourcesProvider rp) {
         super(context, false, rp);
-        SoleDropPalette.refresh(rp);
         this.account = account;
         fixNavigationBar();
         SolegramMotion.springSheet(this);
@@ -83,23 +84,31 @@ public class SoleDropQrSheet extends BottomSheet {
         title.setTypeface(AndroidUtilities.bold());
         title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, rp));
         title.setGravity(Gravity.CENTER);
-        title.setText(getString(R.string.SG_SoleDropMyCode));
+        title.setText(getString(R.string.SG_WalletQrTitle));
         column.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 0, 24, 0));
 
         final TextView info = new TextView(context);
         info.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         info.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, rp));
         info.setGravity(Gravity.CENTER);
-        info.setText(getString(R.string.SG_SoleDropMyCodeInfo));
+        info.setText(getString(R.string.SG_WalletQrInfo));
         column.addView(info, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 32, 6, 32, 18));
 
         final FrameLayout frame = new FrameLayout(context);
         qrView = new QrView(context);
         frame.addView(qrView, LayoutHelper.createFrame(260, 300, Gravity.CENTER));
         progress = new RadialProgressView(context, rp);
-        progress.setProgressColor(SoleDropPalette.PINK);
+        progress.setProgressColor(Theme.getColor(Theme.key_featuredStickers_addButton, rp));
         frame.addView(progress, LayoutHelper.createFrame(44, 44, Gravity.CENTER));
         column.addView(frame, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 300));
+
+        final TextView cardView = new TextView(context);
+        cardView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        cardView.setTypeface(AndroidUtilities.bold());
+        cardView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, rp));
+        cardView.setGravity(Gravity.CENTER);
+        cardView.setText(LocaleController.formatString(R.string.SG_WalletQrCard, com.solegram.messenger.wallet.SoleWallet.cardNumberGrouped(account, false)));
+        column.addView(cardView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 14, 24, 0));
 
         expiresView = new TextView(context);
         expiresView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
@@ -112,18 +121,18 @@ public class SoleDropQrSheet extends BottomSheet {
     }
 
     private void load(boolean force) {
-        final String link = SoleDropIdentity.link(account);
+        final String link = WalletIdentity.link(account);
         // a code shown on the screen must still be valid when the friend scans it a while later: a fresh one when
         // the cached one has less than half an hour left
-        if (link != null && !force && SoleDropIdentity.expiresIn(account) > 30 * 60) {
+        if (link != null && !force && WalletIdentity.expiresIn(account) > 30 * 60) {
             render(link);
             return;
         }
         progress.setVisibility(View.VISIBLE);
         qrView.setAlpha(0.15f);
         expiresView.setOnClickListener(null);
-        SoleDropIdentity.refresh(account, () -> {
-            final String fresh = SoleDropIdentity.link(account);
+        WalletIdentity.refresh(account, () -> {
+            final String fresh = WalletIdentity.link(account);
             if (fresh != null) {
                 render(fresh);
             } else {
@@ -136,8 +145,8 @@ public class SoleDropQrSheet extends BottomSheet {
     private void failed() {
         progress.setVisibility(View.GONE);
         qrView.setAlpha(0.15f);
-        final String why = SoleDropIdentity.lastError;
-        expiresView.setText(getString(R.string.SG_SoleDropCodeFailed) + (TextUtils.isEmpty(why) ? "" : " (" + why + ")") + "\n" + getString(R.string.SG_SoleDropCodeRetry));
+        final String why = WalletIdentity.lastError;
+        expiresView.setText(getString(R.string.SG_WalletQrFailed) + (TextUtils.isEmpty(why) ? "" : " (" + why + ")") + "\n" + getString(R.string.SG_WalletQrRetry));
         expiresView.setOnClickListener(v -> load(true));
     }
 
@@ -148,31 +157,8 @@ public class SoleDropQrSheet extends BottomSheet {
         final String name = self != null ? UserObject.getUserName(self) : "";
         final String username = self != null ? UserObject.getPublicUsername(self) : null;
         final int size = dp(220);
-        // the drop goes into the hole the writer leaves in the middle of the code (in place of Telegram's logo),
-        // a little inside its edge: no module round it is covered
-        final Drawable logo = ContextCompat.getDrawable(getContext(), R.drawable.sg_soledrop_logo);
-        final Drawable center = logo == null ? null : new Drawable() {
-            @Override
-            public void draw(@androidx.annotation.NonNull Canvas canvas) {
-                final android.graphics.Rect b = getBounds();
-                final int inset = Math.round(b.width() * 0.12f);
-                logo.setBounds(b.left + inset, b.top + inset, b.right - inset, b.bottom - inset);
-                logo.draw(canvas);
-            }
-
-            @Override
-            public void setAlpha(int alpha) {
-            }
-
-            @Override
-            public void setColorFilter(android.graphics.ColorFilter colorFilter) {
-            }
-
-            @Override
-            public int getOpacity() {
-                return android.graphics.PixelFormat.TRANSLUCENT;
-            }
-        };
+        // a plain code: the hole the writer leaves in its middle stays empty (null would put Telegram's logo there)
+        final Drawable center = new android.graphics.drawable.ColorDrawable(0);
         Utilities.globalQueue.postRunnable(() -> {
             Bitmap bitmap = null;
             // the same steps as Telegram's own QR screen: a small fixed version first (room for the logo), then any
@@ -208,8 +194,8 @@ public class SoleDropQrSheet extends BottomSheet {
                 expiresView.setOnClickListener(null);
                 qrView.set(qr, name, username != null ? "@" + username : null);
                 qrView.animate().alpha(1f).setDuration(SolegramMotion.NORMAL).start();
-                final int left = SoleDropIdentity.expiresIn(account);
-                expiresView.setText(getString(R.string.SG_SoleDropCodeRenews));
+                final int left = WalletIdentity.expiresIn(account);
+                expiresView.setText(getString(R.string.SG_WalletQrRenews));
                 AndroidUtilities.cancelRunOnUIThread(renew);
                 if (left > 0) {
                     AndroidUtilities.runOnUIThread(renew, Math.max(30, left - 30) * 1000L);
@@ -224,7 +210,7 @@ public class SoleDropQrSheet extends BottomSheet {
         super.dismissInternal();
     }
 
-    /** The code on a white card with a sunset frame, the drop in the middle, the name under it. */
+    /** The code on a white card with a frame in the theme's colour, the name under it. */
     @SuppressLint("ViewConstructor")
     private static final class QrView extends View {
         private final Paint frame = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -256,7 +242,7 @@ public class SoleDropQrSheet extends BottomSheet {
             this.code = code;
             this.name = name;
             this.sub = sub;
-            setContentDescription(getString(R.string.SG_SoleDropMyCode) + ", " + name);
+            setContentDescription(getString(R.string.SG_WalletQrTitle) + ", " + name);
             invalidate();
         }
 
@@ -265,9 +251,9 @@ public class SoleDropQrSheet extends BottomSheet {
             final int w = getWidth(), h = getHeight();
             if (built != w) {
                 built = w;
-                // the code itself is drawn in the sunset gradient (it stays dark enough to scan)
                 codePaint.setShader(null);
-                frame.setShader(new LinearGradient(0, 0, w, h, SoleDropPalette.BUTTON, null, Shader.TileMode.CLAMP));
+                frame.setShader(null);
+                frame.setColor(Theme.getColor(Theme.key_featuredStickers_addButton));
             }
             rect.set(0, 0, w, h);
             canvas.drawRoundRect(rect, dp(30), dp(30), frame);

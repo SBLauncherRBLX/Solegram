@@ -3,7 +3,7 @@
  * It is licensed under GNU GPL v. 2 or later.
  */
 
-package com.solegram.messenger.soledrop;
+package com.solegram.messenger.wallet.tap;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -26,9 +26,9 @@ import org.telegram.tgnet.TLRPC;
  * <p>
  * Tokens expire, so each account keeps a fresh one on disk: the card emulation service may start in a cold
  * process and has to answer in milliseconds, long before any request could return. A token is renewed when the
- * app opens, when SoleDrop opens and after a tap, some minutes before it runs out.
+ * app opens, when SoleWallet opens and after a tap, some minutes before it runs out.
  */
-public final class SoleDropIdentity {
+public final class WalletIdentity {
 
     /** Renewed this long before it expires. */
     private static final int REFRESH_BEFORE = 10 * 60;
@@ -41,7 +41,7 @@ public final class SoleDropIdentity {
     public final String token;
     public final int expires;
 
-    private SoleDropIdentity(long userId, String name, @Nullable String username, @Nullable String token, int expires) {
+    private WalletIdentity(long userId, String name, @Nullable String username, @Nullable String token, int expires) {
         this.userId = userId;
         this.name = name;
         this.username = username;
@@ -58,7 +58,7 @@ public final class SoleDropIdentity {
     }
 
     private static SharedPreferences prefs() {
-        return ApplicationLoader.applicationContext.getSharedPreferences("solegram_soledrop", Context.MODE_PRIVATE);
+        return ApplicationLoader.applicationContext.getSharedPreferences("solegram_wallet_tap", Context.MODE_PRIVATE);
     }
 
     private static final boolean[] requesting = new boolean[UserConfig.MAX_ACCOUNT_COUNT];
@@ -68,7 +68,7 @@ public final class SoleDropIdentity {
      * when the user chose not to show them before the other side resolves the token.
      */
     @Nullable
-    public static SoleDropIdentity get(int account) {
+    public static WalletIdentity get(int account) {
         if (account < 0 || account >= UserConfig.MAX_ACCOUNT_COUNT) {
             return null;
         }
@@ -82,15 +82,15 @@ public final class SoleDropIdentity {
         if (expires <= now()) {
             token = null;
         }
-        final boolean share = SoleDrop.shareName();
+        final boolean share = true;
         final String name = share ? p.getString("name_" + account, "") : "";
         final String username = share ? p.getString("username_" + account, null) : null;
-        return new SoleDropIdentity(userId, name, TextUtils.isEmpty(username) ? null : username, token, expires);
+        return new WalletIdentity(userId, name, TextUtils.isEmpty(username) ? null : username, token, expires);
     }
 
     /** Fills a packet with this account's identity (the sender's in an offer, the receiver's in an identity). */
-    public static boolean fill(int account, SoleDropProtocol.Packet packet) {
-        final SoleDropIdentity id = get(account);
+    public static boolean fill(int account, WalletTapProtocol.Packet packet) {
+        final WalletIdentity id = get(account);
         if (id == null) {
             return false;
         }
@@ -149,7 +149,7 @@ public final class SoleDropIdentity {
             lastError = err != null ? err.text : null;
             if (res instanceof TLRPC.TL_exportedContactToken) {
                 final TLRPC.TL_exportedContactToken t = (TLRPC.TL_exportedContactToken) res;
-                String token = SoleDropProtocol.tokenFromLink(t.url);
+                String token = WalletTapProtocol.tokenFromLink(t.url);
                 if (token == null && !TextUtils.isEmpty(t.url)) {
                     // an unexpected link format: the last part of the link is still the token, and the link itself
                     // is what the QR code needs
@@ -214,7 +214,7 @@ public final class SoleDropIdentity {
         final long delay = Math.max(60, expires - REFRESH_BEFORE - now() + 5) * 1000L;
         scheduled[account] = () -> {
             scheduled[account] = null;
-            if (SoleDrop.receiveMode() != SoleDrop.RECEIVE_OFF || !ApplicationLoader.mainInterfacePaused) {
+            if (WalletTap.receiving() || !ApplicationLoader.mainInterfacePaused) {
                 refresh(account, null);
             }
         };

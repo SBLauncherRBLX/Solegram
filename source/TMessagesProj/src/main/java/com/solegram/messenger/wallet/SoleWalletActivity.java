@@ -27,7 +27,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.solegram.messenger.soledrop.SoleDropProtocol;
+import com.solegram.messenger.wallet.tap.WalletTap;
+import com.solegram.messenger.wallet.tap.WalletTapProtocol;
 import com.solegram.messenger.ui.SolegramIconMotion;
 import com.solegram.messenger.ui.SolegramMotion;
 
@@ -38,6 +39,8 @@ import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
+import androidx.annotation.Nullable;
+
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
@@ -65,7 +68,7 @@ import java.util.ArrayList;
  */
 public class SoleWalletActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
-    private static final int MENU_CODE = 1, MENU_REMOVE_CODE = 2, MENU_STYLE = 3, MENU_TOUR = 4, MENU_LOCK = 5, MENU_BIO = 6, MENU_UNIFIED = 7;
+    private static final int MENU_CODE = 1, MENU_REMOVE_CODE = 2, MENU_STYLE = 3, MENU_TOUR = 4, MENU_LOCK = 5, MENU_BIO = 6, MENU_UNIFIED = 7, MENU_COPY_NUMBER = 8;
 
     private FrameLayout root;
     private SoleWalletCardView card;
@@ -135,6 +138,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     @Override
     public void onResume() {
         super.onResume();
+        // while the wallet is on the screen, a tap of another phone gets this account's contact (to send it a gift)
+        WalletTap.setReceiving(currentAccount);
         // what the wallet shows stays out of screenshots, recordings and the recent apps' picture
         // (not while Solegram Studio records the scenes the person started: the video would be black)
         if (getParentActivity() != null && !com.solegram.messenger.studio.SolegramStudio.isRunning()) {
@@ -150,6 +155,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     @Override
     public void onPause() {
         super.onPause();
+        WalletTap.setReceiving(-1);
         if (getParentActivity() != null) {
             getParentActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
         }
@@ -188,6 +194,10 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                     askRemoveCode();
                 } else if (id == MENU_STYLE) {
                     pickStyle();
+                } else if (id == MENU_COPY_NUMBER) {
+                    if (AndroidUtilities.addToClipboard(SoleWallet.cardNumberGrouped(currentAccount, false).replace("  ", " "))) {
+                        BulletinFactory.of(SoleWalletActivity.this).createCopyBulletin(getString(R.string.SG_WalletCardCopied)).show();
+                    }
                 } else if (id == MENU_TOUR) {
                     showIntro(0);
                 } else if (id == MENU_LOCK) {
@@ -202,6 +212,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         });
         final ActionBarMenuItem other = actionBar.createMenu().addItem(0, R.drawable.ic_ab_other);
         other.addSubItem(MENU_STYLE, R.drawable.msg_palette, getString(R.string.SG_WalletCardStyle));
+        // the number others send a gift to, anonymously
+        other.addSubItem(MENU_COPY_NUMBER, R.drawable.msg_copy, getString(R.string.SG_WalletCopyCardNumber));
         other.addSubItem(MENU_CODE, R.drawable.msg_permissions, getString(R.string.SG_WalletChangeCode));
         other.addSubItem(MENU_LOCK, R.drawable.msg_secret, getString(R.string.SG_WalletLockNow));
         if (SoleWallet.biometricAvailable(context)) {
@@ -1448,13 +1460,75 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         final ItemOptions o = ItemOptions.makeOptions(this, card);
         o.add(R.drawable.msg_contacts, getString(R.string.SG_WalletSendContact), this::pickContact);
         o.add(R.drawable.msg_qrcode, getString(R.string.SG_WalletSendCode), this::scanCode);
-        // by a tap of the phones: SoleDrop finds the person, then Telegram's own gift sheet sends
-        o.add(R.drawable.msg_soledrop, getString(R.string.SG_WalletSendTapStars),
-            () -> com.solegram.messenger.soledrop.SoleDrop.open(this, com.solegram.messenger.soledrop.SoleDropItem.stars()));
-        o.add(R.drawable.msg_gift_premium, getString(R.string.SG_WalletSendTapGift),
-            () -> com.solegram.messenger.soledrop.SoleDrop.open(this, com.solegram.messenger.soledrop.SoleDropItem.gift()));
+        // by the number on the recipient's card: anonymously
+        o.add(R.drawable.msg_payment_card, getString(R.string.SG_WalletSendCard), this::askCardNumber);
+        // by a tap of the phones: the other phone (SoleWallet open) gives its contact, Telegram's own gift sheet sends
+        o.add(R.drawable.msg_premium_liststar, getString(R.string.SG_WalletSendTapStars), () -> tap(WalletTapProtocol.ITEM_STARS));
+        o.add(R.drawable.msg_gift_premium, getString(R.string.SG_WalletSendTapGift), () -> tap(WalletTapProtocol.ITEM_GIFT));
         o.setGravity(Gravity.CENTER_HORIZONTAL);
         o.show();
+    }
+
+    private void tap(int item) {
+        com.solegram.messenger.wallet.tap.WalletTapSheet.show(this, item, new com.solegram.messenger.wallet.tap.WalletTapSheet.Callback() {
+            @Override
+            public void onFound(WalletTapProtocol.Packet identity) {
+                resolvePeer(identity);
+            }
+
+            @Override
+            public void onScanInstead() {
+                scanCode();
+            }
+        });
+    }
+
+    /** Telegram finds the person behind a tap: the contact token, else the username, else a user already known. */
+    private void resolvePeer(WalletTapProtocol.Packet identity) {
+        if (identity.userId != 0 && identity.userId == getUserConfig().getClientUserId()) {
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_WalletTapSelf)).show();
+            return;
+        }
+        final Runnable byUsername = () -> {
+            if (identity.username != null && WalletTapProtocol.isUsername(identity.username)) {
+                getMessagesController().getUserNameResolver().resolve(identity.username, id -> {
+                    final TLRPC.User user = id != null && id > 0 ? getMessagesController().getUser(id) : null;
+                    foundPeer(user != null ? user : knownUser(identity.userId));
+                });
+            } else {
+                foundPeer(knownUser(identity.userId));
+            }
+        };
+        if (identity.token == null) {
+            byUsername.run();
+            return;
+        }
+        final TLRPC.TL_contacts_importContactToken req = new TLRPC.TL_contacts_importContactToken();
+        req.token = identity.token;
+        getConnectionsManager().sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+            if (res instanceof TLRPC.User) {
+                final TLRPC.User user = (TLRPC.User) res;
+                getMessagesController().putUser(user, false);
+                foundPeer(user);
+            } else {
+                byUsername.run();
+            }
+        }), ConnectionsManager.RequestFlagFailOnServerErrors);
+    }
+
+    private void foundPeer(@Nullable TLRPC.User user) {
+        if (user == null) {
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_WalletTapNotFound)).show();
+            return;
+        }
+        confirmPerson(user);
+    }
+
+    /** A user this account can already address (a contact, someone from a chat). */
+    @Nullable
+    private TLRPC.User knownUser(long userId) {
+        final TLRPC.User user = userId > 0 ? getMessagesController().getUser(userId) : null;
+        return user != null && (user.access_hash != 0 || user.contact) ? user : null;
     }
 
     private void pickContact() {
@@ -1485,7 +1559,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
 
     /** A wallet code is a Telegram contact link (https://t.me/contact/…): Telegram finds the person by it. */
     private void resolveCode(String text) {
-        final String token = SoleDropProtocol.tokenFromLink(text);
+        final String token = WalletTapProtocol.tokenFromLink(text);
         if (token == null) {
             BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_WalletBadCode)).show();
             return;
@@ -1517,18 +1591,147 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     }
 
     private void openGiftFor(long userId) {
+        openGiftFor(userId, false);
+    }
+
+    /** Telegram's gift sheet for the person; {@code anonymous}: what is sent goes with "hide my name" on. */
+    private void openGiftFor(long userId, boolean anonymous) {
         if (getParentActivity() == null) {
             return;
         }
-        new GiftSheet(getParentActivity(), currentAccount, userId, closeParent -> {
+        final GiftSheet sheet = new GiftSheet(getParentActivity(), currentAccount, userId, closeParent -> {
             StarsController.getInstance(currentAccount).invalidateBalance();
             StarsController.getInstance(currentAccount).invalidateTransactions(true);
-        }).show();
+        });
+        sheet.solegramAnonymous = anonymous;
+        sheet.show();
+    }
+
+    // ------------------------------------------------------------------ by a card number
+
+    /** The number from someone's SoleWallet card: a gift or Stars to its owner, anonymously. */
+    private void askCardNumber() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        final android.widget.EditText edit = new android.widget.EditText(getParentActivity());
+        edit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        edit.setSingleLine(true);
+        edit.setTextColor(text());
+        edit.setHintTextColor(gray());
+        edit.setHint("7000  0000  0000  0000");
+        edit.setTypeface(android.graphics.Typeface.MONOSPACE);
+        // the number in groups of four as it is typed (or pasted with or without spaces)
+        edit.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789 "));
+        edit.addTextChangedListener(new android.text.TextWatcher() {
+            private boolean busy;
+
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                if (busy) {
+                    return;
+                }
+                String digits = e.toString().replaceAll("[^0-9]", "");
+                if (digits.length() > 16) {
+                    digits = digits.substring(0, 16);
+                }
+                final StringBuilder grouped = new StringBuilder();
+                for (int i = 0; i < digits.length(); i++) {
+                    if (i > 0 && i % 4 == 0) {
+                        grouped.append("  ");
+                    }
+                    grouped.append(digits.charAt(i));
+                }
+                if (!grouped.toString().equals(e.toString())) {
+                    busy = true;
+                    e.replace(0, e.length(), grouped);
+                    busy = false;
+                }
+            }
+        });
+        final AlertDialog dialog = new AlertDialog.Builder(getParentActivity(), getResourceProvider())
+            .setTitle(getString(R.string.SG_WalletCardNumberTitle))
+            .setMessage(getString(R.string.SG_WalletCardNumberInfo))
+            .setView(wrap(edit))
+            .setPositiveButton(getString(R.string.SG_WalletContinue), (d, w) -> sendByCard(edit.getText().toString()))
+            .setNegativeButton(getString(R.string.Cancel), null)
+            .create();
+        showDialog(dialog);
+        AndroidUtilities.runOnUIThread(() -> {
+            edit.requestFocus();
+            AndroidUtilities.showKeyboard(edit);
+        }, 250);
+    }
+
+    private void sendByCard(String number) {
+        final long userId = SoleWallet.userIdFromCard(number);
+        if (userId == 0) {
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_WalletCardBad)).show();
+            return;
+        }
+        if (userId == getUserConfig().getClientUserId()) {
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.error, getString(R.string.SG_WalletCardSelf)).show();
+            return;
+        }
+        final TLRPC.User known = knownUser(userId);
+        if (known != null) {
+            confirmCard(known, number);
+            return;
+        }
+        // not seen by this account yet: Telegram may still know it (a cached peer); else the QR code or a tap is the way
+        final TLRPC.TL_users_getUsers req = new TLRPC.TL_users_getUsers();
+        final TLRPC.TL_inputUser input = new TLRPC.TL_inputUser();
+        input.user_id = userId;
+        req.id.add(input);
+        getConnectionsManager().sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+            TLRPC.User found = null;
+            if (res instanceof org.telegram.tgnet.Vector) {
+                for (Object o : ((org.telegram.tgnet.Vector<?>) res).objects) {
+                    if (o instanceof TLRPC.User && ((TLRPC.User) o).id == userId && !(o instanceof TLRPC.TL_userEmpty)) {
+                        found = (TLRPC.User) o;
+                    }
+                }
+            }
+            if (found != null) {
+                getMessagesController().putUser(found, false);
+                confirmCard(found, number);
+            } else {
+                showDialog(new AlertDialog.Builder(getParentActivity(), getResourceProvider())
+                    .setTitle(getString(R.string.SG_WalletCardNumberTitle))
+                    .setMessage(getString(R.string.SG_WalletCardUnknown))
+                    .setPositiveButton(getString(R.string.SG_WalletSendCode), (d, w) -> scanCode())
+                    .setNegativeButton(getString(R.string.Cancel), null)
+                    .create());
+            }
+        }), ConnectionsManager.RequestFlagFailOnServerErrors);
+    }
+
+    /** Whose card it is (so a wrong number is noticed), and that the gift goes without the sender's name. */
+    private void confirmCard(TLRPC.User user, String number) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        final String digits = number.replaceAll("[^0-9]", "");
+        final String masked = "•••• " + digits.substring(12);
+        showDialog(new AlertDialog.Builder(getParentActivity(), getResourceProvider())
+            .setTitle(getString(R.string.SG_WalletSendTo))
+            .setMessage(formatString(R.string.SG_WalletCardConfirm, UserObject.getUserName(user), masked))
+            .setPositiveButton(getString(R.string.SG_WalletContinue), (d, w) -> openGiftFor(user.id, true))
+            .setNegativeButton(getString(R.string.Cancel), null)
+            .create());
     }
 
     /** Receiving: the wallet code (the account's contact link) as a QR in its own sheet, to show or share. */
     private void receive() {
-        com.solegram.messenger.soledrop.SoleDropQrSheet.show(this, currentAccount);
+        com.solegram.messenger.wallet.tap.WalletQrSheet.show(this, currentAccount);
     }
 
     private void openGifts() {

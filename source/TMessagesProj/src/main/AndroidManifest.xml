@@ -18,7 +18,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera2" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />
-    <!-- Solegram SoleDrop: phone-to-phone by NFC, optional (a QR code works without it) -->
+    <!-- SoleWallet: gifts and Stars by a tap of the phones (NFC), optional (a QR code works without it) -->
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
 
@@ -1029,8 +1029,8 @@
 
         <!-- Solegram music in the profile: Android shows the players' media sessions only to an app with
              notification access; notifications themselves are not used -->
-        <!-- Solegram SoleDrop: the receiving phone answers a tap as a card under SoleDrop's private AID
-             (only while unlocked; switched off as a component when receiving is off in the settings) -->
+        <!-- SoleWallet: the receiving phone answers a tap as a card under the wallet's private AID
+             (only while unlocked and SoleWallet is open) -->
         <!-- Solegram Studio (betas): records the screen while it plays a scene the person started (Android's capture dialog first) -->
         <activity
             android:name="com.solegram.messenger.studio.StudioCaptureActivity"
@@ -1044,7 +1044,7 @@
             android:foregroundServiceType="mediaProjection" />
 
         <service
-            android:name="com.solegram.messenger.soledrop.SoleDropHceService"
+            android:name="com.solegram.messenger.wallet.tap.WalletTapService"
             android:exported="true"
             android:permission="android.permission.BIND_NFC_SERVICE">
             <intent-filter>
@@ -1052,7 +1052,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.nfc.cardemulation.host_apdu_service"
-                android:resource="@xml/soledrop_apdu_service" />
+                android:resource="@xml/wallet_tap_apdu_service" />
         </service>
 
         <service

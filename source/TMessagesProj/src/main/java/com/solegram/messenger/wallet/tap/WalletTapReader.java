@@ -3,7 +3,7 @@
  * It is licensed under GNU GPL v. 2 or later.
  */
 
-package com.solegram.messenger.soledrop;
+package com.solegram.messenger.wallet.tap;
 
 import android.app.Activity;
 import android.nfc.NfcAdapter;
@@ -21,21 +21,21 @@ import org.telegram.messenger.Utilities;
 import java.io.IOException;
 
 /**
- * The sending side of SoleDrop: NFC reader mode while the SoleDrop screen is open, and the exchange with the
+ * The sending side of a SoleWallet tap: NFC reader mode while the tap sheet is open, and the exchange with the
  * other phone when it comes close (on the NFC binder thread; results go to the UI thread).
  * <p>
  * Reader mode turns this phone's own card emulation off. To let two phones that both show "My profile" find
  * each other (each wants to give its contact), the reader then works in turns of a random length: while it
  * pauses, this phone answers as a card, and whichever reads first carries both contacts across.
  */
-public final class SoleDropReader implements NfcAdapter.ReaderCallback {
+public final class WalletTapReader implements NfcAdapter.ReaderCallback {
 
     public interface Listener {
-        /** A SoleDrop phone answered: the moment of contact (UI thread). */
+        /** A SoleWallet phone answered: the moment of contact (UI thread). */
         void onContact();
 
         /** The other phone's identity (UI thread). */
-        void onExchanged(SoleDropProtocol.Packet identity);
+        void onExchanged(WalletTapProtocol.Packet identity);
 
         /**
          * The tap did not complete (UI thread).
@@ -53,17 +53,17 @@ public final class SoleDropReader implements NfcAdapter.ReaderCallback {
 
     private final Listener listener;
     private Activity activity;
-    private volatile SoleDropProtocol.Packet offer;
+    private volatile WalletTapProtocol.Packet offer;
     private volatile boolean armed;
     private boolean enabled, readerOn, alternate;
     private long lastExchange;
 
-    public SoleDropReader(Listener listener) {
+    public WalletTapReader(Listener listener) {
         this.listener = listener;
     }
 
     /** What the next tap offers (built on the UI thread; a new session for every new tap). */
-    public void setOffer(@Nullable SoleDropProtocol.Packet offer) {
+    public void setOffer(@Nullable WalletTapProtocol.Packet offer) {
         this.offer = offer;
     }
 
@@ -124,7 +124,7 @@ public final class SoleDropReader implements NfcAdapter.ReaderCallback {
     };
 
     private void setReader(boolean on) {
-        final NfcAdapter adapter = SoleDrop.adapter();
+        final NfcAdapter adapter = WalletTap.adapter();
         if (adapter == null || activity == null) {
             readerOn = false;
             return;
@@ -148,7 +148,7 @@ public final class SoleDropReader implements NfcAdapter.ReaderCallback {
 
     @Override
     public void onTagDiscovered(Tag tag) {
-        final SoleDropProtocol.Packet offer = this.offer;
+        final WalletTapProtocol.Packet offer = this.offer;
         if (!armed || offer == null) {
             return;
         }
@@ -161,16 +161,16 @@ public final class SoleDropReader implements NfcAdapter.ReaderCallback {
         try {
             iso.connect();
             iso.setTimeout(1200);
-            final SoleDropProtocol.Packet identity = SoleDropProtocol.exchange(iso::transceive, offer, () -> {
+            final WalletTapProtocol.Packet identity = WalletTapProtocol.exchange(iso::transceive, offer, () -> {
                 contact[0] = true;
                 AndroidUtilities.runOnUIThread(listener::onContact);
             });
             armed = false; // one phone per tap; the screen arms again for the next one
             AndroidUtilities.runOnUIThread(() -> listener.onExchanged(identity));
-        } catch (SoleDropProtocol.ProtocolException e) {
-            final int reason = e.statusWord == SoleDropProtocol.SW_NOT_ACCEPTING ? FAIL_REFUSED
-                : e.statusWord == SoleDropProtocol.SW_NEEDS_CONFIRMATION ? FAIL_CONFIRM : FAIL_LOST;
-            // a phone without SoleDrop answers "not found": that is not a contact at all
+        } catch (WalletTapProtocol.ProtocolException e) {
+            final int reason = e.statusWord == WalletTapProtocol.SW_NOT_ACCEPTING ? FAIL_REFUSED
+                : e.statusWord == WalletTapProtocol.SW_NEEDS_CONFIRMATION ? FAIL_CONFIRM : FAIL_LOST;
+            // a phone without SoleWallet open answers "not found": that is not a contact at all
             if (contact[0] || reason != FAIL_LOST) {
                 AndroidUtilities.runOnUIThread(() -> listener.onFailed(reason, contact[0]));
             }

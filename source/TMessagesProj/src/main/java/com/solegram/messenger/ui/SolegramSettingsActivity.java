@@ -84,7 +84,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     public static final int PAGE_PROXY = 13;
     public static final int PAGE_SCAM = 14;
     public static final int PAGE_PREMIUM = 15;
-    public static final int PAGE_SOLEDROP = 30;
     public static final int PAGE_MAPS = 16;
 
     private final int page;
@@ -111,17 +110,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_REMINDERS = 19;
     private static final int ID_SCAM = 20;
     private static final int ID_SECURITY = 26;
-    private static final int ID_SOLEDROP = 40;
 
-    // SoleDrop
-    private static final int ID_SOLEDROP_OPEN = 1101;
-    private static final int ID_SOLEDROP_CODE = 1102;
-    private static final int ID_SOLEDROP_NFC = 1103;
-    private static final int ID_SOLEDROP_OFF = 1104;
-    private static final int ID_SOLEDROP_OPEN_ONLY = 1105;
-    private static final int ID_SOLEDROP_ALWAYS = 1106;
-    private static final int ID_SOLEDROP_ACCOUNT = 1107;
-    private static final int ID_SOLEDROP_SHARE_NAME = 1108;
 
     // music in the profile
     private static final int ID_NP_STYLE_COVER = 706;
@@ -430,9 +419,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 break;
             case PAGE_PROXY:
                 fillProxy(items);
-                break;
-            case PAGE_SOLEDROP:
-                fillSoleDrop(items);
                 break;
             case PAGE_SCAM:
                 fillScam(items);
@@ -1143,11 +1129,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_SCAM, ID_SCAM_NANO, R.string.SG_ScamNano, 19},
         {PAGE_SCAM, ID_SCAM_NORMAL, R.string.SG_ScamSensitivity, 19},
         {PAGE_SCAM, ID_SCAM_TRUSTED, R.string.SG_ScamTrusted, 19},
-        {PAGE_SOLEDROP, 0, R.string.SG_SoleDrop, 20},
-        {PAGE_SOLEDROP, ID_SOLEDROP_OPEN_ONLY, R.string.SG_SoleDropReceive, 20},
-        {PAGE_SOLEDROP, ID_SOLEDROP_ACCOUNT, R.string.SG_SoleDropReceiveAccount, 20},
-        {PAGE_SOLEDROP, ID_SOLEDROP_SHARE_NAME, R.string.SG_SoleDropShareName, 20},
-        {PAGE_SOLEDROP, ID_SOLEDROP_CODE, R.string.SG_SoleDropMyCode, 20},
         {PAGE_HIDDEN_CHATS, 0, R.string.SG_HiddenChats, 21},
         {PAGE_HIDDEN_CHATS, SolegramHiddenSettingsActivity.ID_OPEN, R.string.SG_HiddenOpen, 21},
         {PAGE_HIDDEN_CHATS, SolegramHiddenSettingsActivity.ID_NOTIFY_NORMAL, R.string.SG_HiddenNotify, 21},
@@ -1175,7 +1156,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         "ссылки ссылка профили соцсети социальные сети о себе био инстаграм тикток ютуб гитхаб вк твич дискорд стим сайт links bio instagram tiktok youtube github vk twitch discord steam x twitter website",
         "иконки значки иконка набор пак стиль тонкие линейные заливка залитые phosphor icons icon pack thin outline filled",
         "мошенники мошенник мошенничество скам скамер обман развод фишинг подозрительные ссылки опасные ссылки аккаунты безопасность защита антискам доверенные сайты scam scammer phishing fraud suspicious links anti-scam safety trusted sites",
-        "soledrop солдроп nfc нфс airdrop эирдроп аирдроп namedrop неймдроп поднести телефон касание передать бесконтактно обмен контактами qr код send phones tap share contact",
+        "", // (was SoleDrop: the rows below refer to their keywords by position)
         "скрытые чаты скрыть чат спрятать тайные секретные невидимые папка отпечаток пальца жест блокировка hidden chats hide chat secret private folder fingerprint biometric gesture lock",
         "поиск по смыслу смысл найти переписку вопрос похожие слова синонимы где мы обсуждали умный поиск семантический semantic search meaning smart search ai ии gemini nano",
     };
@@ -1289,8 +1270,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return LocaleController.getString(R.string.SG_Scam);
             case PAGE_HIDDEN_CHATS:
                 return LocaleController.getString(R.string.SG_HiddenChats);
-            case PAGE_SOLEDROP:
-                return LocaleController.getString(R.string.SG_SoleDrop);
             case PAGE_PREMIUM:
                 return LocaleController.getString(R.string.SG_ProfilePage);
             default:
@@ -1610,73 +1589,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         showDialog(builder.create());
     }
 
-    // region SoleDrop
-
-    private void fillSoleDrop(ArrayList<UItem> items) {
-        items.add(tile(UItem.asButton(ID_SOLEDROP_OPEN, R.drawable.msg_soledrop, getString(R.string.SG_SoleDropOpen)), TILE_PINK));
-        items.add(tile(UItem.asButton(ID_SOLEDROP_CODE, R.drawable.msg_qrcode, getString(R.string.SG_SoleDropMyCode)), TILE_PURPLE));
-        if (com.solegram.messenger.soledrop.SoleDrop.hasNfc() && !com.solegram.messenger.soledrop.SoleDrop.nfcEnabled()) {
-            items.add(tile(UItem.asButton(ID_SOLEDROP_NFC, R.drawable.msg_settings, getString(R.string.SG_SoleDropNfcOff), getString(R.string.SG_SoleDropNfcTurnOn)), TILE_ORANGE));
-        }
-        items.add(UItem.asShadow(getString(R.string.SG_SoleDropSub)));
-
-        final int mode = com.solegram.messenger.soledrop.SoleDrop.receiveMode();
-        items.add(UItem.asHeader(getString(R.string.SG_SoleDropReceive)));
-        items.add(UItem.asRadio(ID_SOLEDROP_OFF, getString(R.string.SG_SoleDropReceiveOff)).setChecked(mode == com.solegram.messenger.soledrop.SoleDrop.RECEIVE_OFF));
-        items.add(UItem.asRadio(ID_SOLEDROP_OPEN_ONLY, getString(R.string.SG_SoleDropReceiveOpen)).setChecked(mode == com.solegram.messenger.soledrop.SoleDrop.RECEIVE_OPEN));
-        items.add(UItem.asRadio(ID_SOLEDROP_ALWAYS, getString(R.string.SG_SoleDropReceiveAlways)).setChecked(mode == com.solegram.messenger.soledrop.SoleDrop.RECEIVE_ALWAYS));
-        items.add(UItem.asShadow(getString(com.solegram.messenger.soledrop.SoleDrop.hasHce() ? R.string.SG_SoleDropReceiveInfo : R.string.SG_SoleDropNoHce)));
-
-        if (activatedAccounts().size() > 1) {
-            items.add(UItem.asButton(ID_SOLEDROP_ACCOUNT, R.drawable.msg_openprofile, getString(R.string.SG_SoleDropReceiveAccount), soleDropAccountName()));
-        }
-        items.add(UItem.asButtonCheck(ID_SOLEDROP_SHARE_NAME, getString(R.string.SG_SoleDropShareName), getString(R.string.SG_SoleDropShareNameInfo))
-            .setChecked(com.solegram.messenger.soledrop.SoleDrop.shareName()));
-        items.add(UItem.asShadow(null));
-    }
-
-    private static ArrayList<Integer> activatedAccounts() {
-        final ArrayList<Integer> list = new ArrayList<>();
-        for (int a = 0; a < org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (org.telegram.messenger.UserConfig.getInstance(a).isClientActivated()) {
-                list.add(a);
-            }
-        }
-        return list;
-    }
-
-    private static String accountName(int account) {
-        final org.telegram.tgnet.TLRPC.User user = org.telegram.messenger.UserConfig.getInstance(account).getCurrentUser();
-        return user != null ? org.telegram.messenger.UserObject.getUserName(user) : String.valueOf(account + 1);
-    }
-
-    private String soleDropAccountName() {
-        final int chosen = com.solegram.messenger.soledrop.SoleDrop.receiveAccountSetting();
-        if (chosen < 0 || !org.telegram.messenger.UserConfig.getInstance(chosen).isClientActivated()) {
-            return getString(R.string.SG_SoleDropAccountCurrent);
-        }
-        return accountName(chosen);
-    }
-
-    private void chooseSoleDropAccount() {
-        if (getParentActivity() == null) {
-            return;
-        }
-        final ArrayList<Integer> accounts = activatedAccounts();
-        final CharSequence[] names = new CharSequence[accounts.size() + 1];
-        names[0] = getString(R.string.SG_SoleDropAccountCurrent);
-        for (int i = 0; i < accounts.size(); i++) {
-            names[i + 1] = accountName(accounts.get(i));
-        }
-        final AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
-        builder.setTitle(getString(R.string.SG_SoleDropReceiveAccount));
-        builder.setItems(names, (d, which) -> {
-            com.solegram.messenger.soledrop.SoleDrop.setReceiveAccount(which == 0 ? -1 : accounts.get(which - 1));
-            listView.adapter.update(true);
-        });
-        showDialog(builder.create());
-    }
-    // endregion
 
     private void fillScam(ArrayList<UItem> items) {
         items.add(UItem.asRippleCheck(ID_SCAM_LINKS, getString(R.string.SG_ScamLinks)).setChecked(SolegramConfig.scamLinks));
@@ -2314,44 +2226,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_SCAM:
                 presentFragment(new SolegramSettingsActivity(PAGE_SCAM));
                 return;
-            case ID_SOLEDROP:
-                presentFragment(new SolegramSettingsActivity(PAGE_SOLEDROP));
-                return;
-
-            // SoleDrop
-            case ID_SOLEDROP_OPEN:
-                com.solegram.messenger.soledrop.SoleDrop.open(this, null);
-                return;
-            case ID_SOLEDROP_CODE:
-                com.solegram.messenger.soledrop.SoleDropQrSheet.show(this, com.solegram.messenger.soledrop.SoleDrop.receiveAccount());
-                return;
-            case ID_SOLEDROP_NFC:
-                try {
-                    getParentActivity().startActivity(com.solegram.messenger.soledrop.SoleDrop.nfcSettingsIntent());
-                } catch (Throwable e) {
-                    FileLog.e(e);
-                }
-                return;
-            case ID_SOLEDROP_OFF:
-            case ID_SOLEDROP_OPEN_ONLY:
-            case ID_SOLEDROP_ALWAYS:
-                com.solegram.messenger.soledrop.SoleDrop.setReceiveMode(item.id == ID_SOLEDROP_OFF ? com.solegram.messenger.soledrop.SoleDrop.RECEIVE_OFF
-                    : item.id == ID_SOLEDROP_ALWAYS ? com.solegram.messenger.soledrop.SoleDrop.RECEIVE_ALWAYS : com.solegram.messenger.soledrop.SoleDrop.RECEIVE_OPEN);
-                listView.adapter.update(true);
-                return;
-            case ID_SOLEDROP_ACCOUNT:
-                chooseSoleDropAccount();
-                return;
-            case ID_SOLEDROP_SHARE_NAME: {
-                final boolean share = !com.solegram.messenger.soledrop.SoleDrop.shareName();
-                com.solegram.messenger.soledrop.SoleDrop.setShareName(share);
-                if (view instanceof NotificationsCheckCell) {
-                    ((NotificationsCheckCell) view).setChecked(share);
-                } else if (view instanceof TextCheckCell) {
-                    ((TextCheckCell) view).setChecked(share);
-                }
-                return;
-            }
             case ID_SECURITY:
                 presentFragment(new SolegramSecurityActivity(false));
                 return;

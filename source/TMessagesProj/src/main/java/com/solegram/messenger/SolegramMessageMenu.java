@@ -39,7 +39,6 @@ public final class SolegramMessageMenu {
     public static final int OPTION_SUMMARY = 9004;
     public static final int OPTION_FILTER_SIMILAR = 9005;
     public static final int OPTION_REMIND = 9006;
-    public static final int OPTION_SOLEDROP = 9007;
     public static final int OPTION_SAVED_TAG = 9008;
     public static final int OPTION_AI = 9009;
     public static final int OPTION_PLUGIN_BASE = 9100;
@@ -119,13 +118,6 @@ public final class SolegramMessageMenu {
             options.add(OPTION_SUMMARY);
             icons.add(R.drawable.sg_ai_summary);
         }
-        // SoleDrop: right after Forward, for what may be forwarded (an album goes whole)
-        final int forwardIndex = options.indexOf(ChatActivity.OPTION_FORWARD);
-        if (forwardIndex >= 0 && com.solegram.messenger.soledrop.SoleDropItem.messages(soleDropMessages(message, group)) != null) {
-            items.add(forwardIndex + 1, LocaleController.getString(R.string.SG_SoleDrop));
-            options.add(forwardIndex + 1, OPTION_SOLEDROP);
-            icons.add(forwardIndex + 1, R.drawable.msg_soledrop);
-        }
         if (SolegramReminders.canRemindIn(chat) && SolegramReminders.canRemind(message)) {
             items.add(LocaleController.getString(R.string.SG_Remind));
             options.add(OPTION_REMIND);
@@ -191,10 +183,6 @@ public final class SolegramMessageMenu {
         }
         if (option == OPTION_SUMMARY) {
             chat.solegramToggleSummary(SolegramInlineTranslate.target(message, group));
-            return true;
-        }
-        if (option == OPTION_SOLEDROP) {
-            com.solegram.messenger.soledrop.SoleDrop.open(chat, com.solegram.messenger.soledrop.SoleDropItem.messages(soleDropMessages(message, group)));
             return true;
         }
         if (option == OPTION_SAVED_TAG) {
@@ -362,21 +350,14 @@ public final class SolegramMessageMenu {
     public static final int HEADER_FILTERS = 19991;
     /** Selection action bar: a reminder made from the selected messages. */
     public static final int ACTION_REMIND = 19992;
-    /** Selection action bar: the selected messages go by SoleDrop. */
-    public static final int ACTION_SOLEDROP = 19993;
     /** Saved Messages menu: the tags kept on this device. */
     public static final int HEADER_SAVED_TAGS = 19994;
     /** Solegram AI: what one missed in this chat. */
     public static final int HEADER_AI_CATCH_UP = 19995;
-    /** Profile menu: the account, group or channel goes by SoleDrop. */
-    public static final int PROFILE_SOLEDROP = 20990;
     /** Profile menu: the chat is hidden from the lists of this device (or shown again). */
     public static final int PROFILE_HIDE = 20991;
     private static final Map<ProfileActivity, org.telegram.ui.ActionBar.ActionBarMenuSubItem> hideItems = java.util.Collections.synchronizedMap(new WeakHashMap<>());
 
-    private static List<MessageObject> soleDropMessages(MessageObject message, MessageObject.GroupedMessages group) {
-        return group != null && !group.messages.isEmpty() ? group.messages : java.util.Collections.singletonList(message);
-    }
     private static final Map<ChatActivity, ActionBarMenuItem.Item> filterItems = java.util.Collections.synchronizedMap(new WeakHashMap<>());
 
     public static void addHeaderItems(ChatActivity chat, ActionBarMenuItem headerItem) {
@@ -411,14 +392,6 @@ public final class SolegramMessageMenu {
     }
 
     public static boolean onHeaderItem(ChatActivity chat, int id) {
-        if (id == ACTION_SOLEDROP) {
-            final com.solegram.messenger.soledrop.SoleDropItem item = com.solegram.messenger.soledrop.SoleDropItem.messages(chat.solegramSelectedMessages());
-            chat.clearSelectionMode();
-            if (item != null) {
-                com.solegram.messenger.soledrop.SoleDrop.open(chat, item);
-            }
-            return true;
-        }
         if (id == ACTION_REMIND) {
             final ArrayList<MessageObject> selected = chat.solegramSelectedMessages();
             chat.clearSelectionMode();
@@ -497,7 +470,6 @@ public final class SolegramMessageMenu {
         profileItems.remove(profile);
         profileContexts.put(profile, ctx);
         if (otherItem != null && ctx.get("dialog_id") instanceof Long && (Long) ctx.get("dialog_id") != 0) {
-            otherItem.addSubItem(PROFILE_SOLEDROP, R.drawable.msg_soledrop, LocaleController.getString(R.string.SG_SoleDropSendVia));
             final long dialogId = (Long) ctx.get("dialog_id");
             final int account = profile.getCurrentAccount();
             hideItems.remove(profile);
@@ -525,14 +497,6 @@ public final class SolegramMessageMenu {
             final Map<String, Object> ctx = profileContexts.get(profile);
             if (ctx != null && ctx.get("dialog_id") instanceof Long) {
                 toggleHidden(profile, (Long) ctx.get("dialog_id"));
-            }
-            return true;
-        }
-        if (id == PROFILE_SOLEDROP) {
-            final Map<String, Object> ctx = profileContexts.get(profile);
-            if (ctx != null && ctx.get("dialog_id") instanceof Long) {
-                com.solegram.messenger.soledrop.SoleDrop.open(profile,
-                    com.solegram.messenger.soledrop.SoleDropItem.peer(profile.getCurrentAccount(), (Long) ctx.get("dialog_id")));
             }
             return true;
         }

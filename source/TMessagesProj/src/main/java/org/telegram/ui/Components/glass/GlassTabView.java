@@ -342,7 +342,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
 
     private static final android.view.animation.BounceInterpolator SOLEGRAM_BOUNCE = new android.view.animation.BounceInterpolator();
 
-    /** Solegram: the tab's own motion on demand (tabs outside the main bar, e.g. SoleDrop's). */
+    /** Solegram: the tab's own motion on demand (tabs outside the main bar). */
     public void solegramPlayMotion() {
         solegramPlaySelectMotion();
     }
@@ -882,7 +882,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         REPLIES(R.raw.tab_reply, R.raw.tab_reply_reverse),
         WALLET(R.raw.tab_wallet, R.raw.tab_wallet_reverse),
         LINK(TabAnimationType.STATIC, R.drawable.tabs_link_24),
-        STARS(TabAnimationType.STATIC, R.drawable.settings_stars), // Solegram: SoleDrop
+        STARS(TabAnimationType.STATIC, R.drawable.settings_stars), // Solegram
         SG_MUSIC(TabAnimationType.STATIC, R.drawable.files_music), // Solegram: the Music tab (drawn by SolegramMusicTabIcon)
         ARTICLE(R.raw.tab_article, R.raw.tab_article_reverse),
         GRAM(R.raw.gram, R.raw.gram_reverse),

@@ -100,8 +100,6 @@ public final class SolegramStudio {
                 + "{\"swipe\":[0.5,0.8,0.5,0.4,700]},{\"wait\":1200},{\"back\":true},{\"wait\":800}]"));
             list.add(scene("player", "Player", "["
                 + "{\"open\":\"player\"},{\"wait\":3000},{\"shot\":\"player\"},{\"wait\":3000},{\"back\":true},{\"wait\":800}]"));
-            list.add(scene("soledrop", "SoleDrop", "["
-                + "{\"open\":\"soledrop\"},{\"wait\":2500},{\"shot\":\"soledrop\"},{\"wait\":1500},{\"back\":true},{\"wait\":800}]"));
             list.add(scene("settings", "Settings", "["
                 + "{\"open\":\"settings\"},{\"wait\":1500},{\"swipe\":[0.5,0.8,0.5,0.3,800]},{\"wait\":1000},{\"shot\":\"settings\"},"
                 + "{\"back\":true},{\"wait\":600},{\"open\":\"chat_settings\"},{\"wait\":1500},{\"shot\":\"chat-settings\"},"
@@ -211,9 +209,6 @@ public final class SolegramStudio {
                 return f.presentFragment(new com.solegram.messenger.ui.SolegramMusicActivity(null));
             case "player":
                 openPlayer(f);
-                return true;
-            case "soledrop":
-                com.solegram.messenger.soledrop.SoleDrop.open(f, null);
                 return true;
             case "settings":
                 return f.presentFragment(new org.telegram.ui.SettingsActivity());

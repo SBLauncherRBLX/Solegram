@@ -815,7 +815,7 @@ public final class QrScanOverlay extends FrameLayout {
      * The glass of the QR screen: the blurred backdrop (here the camera), a faint white fill, a top sheen and the
      * Dark out rim. Without a blur source the fill is a little darker instead.
      */
-    // Solegram: the scanner's buttons as on Solegram's camera and SoleDrop's scanner: with liquid glass on, the
+    // Solegram: the scanner's buttons as on Solegram's camera and the wallet's scanner: with liquid glass on, the
     // blurred camera under a grey veil with a light rim at the top and a soft shadow; otherwise the camera's plain dark
     // circles with a hairline (no Telegram glass sheen or rim)
     private final Paint sgStroke = new Paint(Paint.ANTI_ALIAS_FLAG);

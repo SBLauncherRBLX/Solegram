@@ -2487,7 +2487,6 @@ final class SolegramIconMaps {
             R.drawable.sg_settings_mark, R.drawable.sg_settings_mark, // the new mark itself, not a sun
             R.drawable.sg_plus_mark, R.drawable.sg_line_plus_circle,
             R.drawable.sg_ai_summary, R.drawable.sg_line_sparkle,
-            R.drawable.msg_soledrop, R.drawable.sg_line_soledrop,
             R.drawable.sg_brand_link, R.drawable.sg_line_link_simple,
             R.drawable.msg_voicechat, R.drawable.sg_line_waveform,
             R.drawable.msg_newphone, R.drawable.sg_line_device_mobile,

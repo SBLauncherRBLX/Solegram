@@ -190,6 +190,9 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
     private StarParticlesView particlesView;
     private @Nullable LinkSpanDrawable.LinksTextView subtitleStarsView2;
 
+    /** Solegram: gifts from this sheet go with "hide my name" on (SoleWallet, by a card number). */
+    public boolean solegramAnonymous;
+
     public GiftSheet(Context context, int currentAccount, long userId, Utilities.Callback<Boolean> closeParentSheet) {
         this(context, currentAccount, userId, null, closeParentSheet);
     }
@@ -481,6 +484,7 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
             if (item.instanceOf(GiftCell.Factory.class)) {
                 if (item.object instanceof GiftPremiumBottomSheet.GiftTier) {
                     final GiftPremiumBottomSheet.GiftTier premiumTier = (GiftPremiumBottomSheet.GiftTier) item.object;
+                    SendGiftSheet.solegramNextAnonymous = solegramAnonymous;
                     new SendGiftSheet(context, currentAccount, premiumTier, this.dialogId, () -> {
                         if (closeParentSheet != null) {
                             closeParentSheet.run(false);
@@ -586,6 +590,7 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
                         return;
                     }
                     final Runnable openSendSheet = () -> {
+                        SendGiftSheet.solegramNextAnonymous = solegramAnonymous;
                         new SendGiftSheet(context, currentAccount, gift, this.dialogId, () -> {
                             if (closeParentSheet != null) {
                                 closeParentSheet.run(false);

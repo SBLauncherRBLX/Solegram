@@ -145,21 +145,96 @@ public final class SoleWallet {
     // ------------------------------------------------------------------ the card
 
     /**
-     * The card's number: sixteen digits drawn from the account (a hash of its id), the same on every device of the
-     * user and unique to them. A mark, not a payment card: nothing can be paid with it.
+     * The card's number: sixteen digits that stand for the account and nothing else - unique to it (two accounts
+     * never share one), the same on every device of the user, and leading back to the account: a gift can be sent
+     * by it. "7", the account's id through a keyed permutation (so the digits tell nothing about the id), and a
+     * Luhn check digit as on bank cards (a mistyped digit is caught at once). A mark, not a payment card: nothing
+     * can be paid with it.
      */
     public static String cardNumber(int account) {
-        try {
-            final MessageDigest md = MessageDigest.getInstance("SHA-256");
-            final byte[] h = md.digest(("SoleWallet:" + UserConfig.getInstance(account).getClientUserId()).getBytes("UTF-8"));
-            final StringBuilder sb = new StringBuilder("7365"); // "se", Solegram's prefix
-            for (int i = 0; sb.length() < 16; i++) {
-                sb.append((h[i] & 0xFF) % 10);
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return "7365000000000000";
+        return cardNumberFor(UserConfig.getInstance(account).getClientUserId());
+    }
+
+    /** The 14 digits in the middle: ids below 10^14 (Telegram's are far below). */
+    private static final long CARD_SPACE = 100_000_000_000_000L;
+    private static final int CARD_HALF_BITS = 24;
+    private static final long CARD_HALF_MASK = (1L << CARD_HALF_BITS) - 1;
+    private static final int CARD_ROUNDS = 8;
+
+    public static String cardNumberFor(long userId) {
+        long x = Math.floorMod(userId, CARD_SPACE);
+        // cycle walking: the permutation is of 48 bits, the digits hold a bit less; it is applied until the value fits
+        do {
+            x = feistel(x, false);
+        } while (x >= CARD_SPACE);
+        final String body = "7" + String.format(java.util.Locale.US, "%014d", x);
+        return body + luhnDigit(body);
+    }
+
+    /** The account a card number stands for, or 0 when it is not a SoleWallet card number (wrong digits). */
+    public static long userIdFromCard(String number) {
+        if (number == null) {
+            return 0;
         }
+        final String digits = number.replaceAll("[^0-9]", "");
+        if (digits.length() != 16 || digits.charAt(0) != '7' || luhnDigit(digits.substring(0, 15)) != digits.charAt(15) - '0') {
+            return 0;
+        }
+        long x;
+        try {
+            x = Long.parseLong(digits.substring(1, 15));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+        do {
+            x = feistel(x, true);
+        } while (x >= CARD_SPACE);
+        return x;
+    }
+
+    /** A balanced Feistel network over 48 bits (its inverse with {@code inverse}): a fixed, keyed permutation. */
+    private static long feistel(long value, boolean inverse) {
+        long left = (value >>> CARD_HALF_BITS) & CARD_HALF_MASK, right = value & CARD_HALF_MASK;
+        if (!inverse) {
+            for (int round = 0; round < CARD_ROUNDS; round++) {
+                final long next = left ^ roundFunction(right, round);
+                left = right;
+                right = next;
+            }
+        } else {
+            for (int round = CARD_ROUNDS - 1; round >= 0; round--) {
+                final long previous = right ^ roundFunction(left, round);
+                right = left;
+                left = previous;
+            }
+        }
+        return (left << CARD_HALF_BITS) | right;
+    }
+
+    private static long roundFunction(long half, int round) {
+        long h = half * 0x9E3779B97F4A7C15L + (round + 1) * 0xC2B2AE3D27D4EB4FL + 0x5017A11E7L;
+        h ^= h >>> 31;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 29;
+        return h & CARD_HALF_MASK;
+    }
+
+    /** The Luhn check digit of a string of digits. */
+    private static int luhnDigit(String digits) {
+        int sum = 0;
+        boolean twice = true; // the rightmost digit of the body is doubled (the check digit goes after it)
+        for (int i = digits.length() - 1; i >= 0; i--) {
+            int d = digits.charAt(i) - '0';
+            if (twice) {
+                d *= 2;
+                if (d > 9) {
+                    d -= 9;
+                }
+            }
+            sum += d;
+            twice = !twice;
+        }
+        return (10 - sum % 10) % 10;
     }
 
     public static String cardNumberGrouped(int account, boolean masked) {

@@ -3,7 +3,7 @@
  * It is licensed under GNU GPL v. 2 or later.
  */
 
-package com.solegram.messenger.soledrop;
+package com.solegram.messenger.wallet.tap;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -14,7 +14,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The SoleDrop handshake over NFC, without anything of Android in it (a JVM harness runs it as it is).
+ * The wallet tap handshake over NFC, without anything of Android in it (a JVM harness runs it as it is).
  * <p>
  * The receiving phone emulates a card (host card emulation) under a private AID, the sending phone reads it
  * (reader mode, ISO-DEP). One tap is a handful of short APDUs, well under a second:
@@ -30,13 +30,13 @@ import java.nio.charset.StandardCharsets;
  * tags are skipped, so a newer phone still talks to an older one. Every APDU stays under {@link #CHUNK} bytes
  * of data (short APDUs, safe on every controller); anything longer is chunked.
  */
-public final class SoleDropProtocol {
+public final class WalletTapProtocol {
 
-    private SoleDropProtocol() {
+    private WalletTapProtocol() {
     }
 
-    /** "SOLEDROP" under the proprietary RID prefix F0: no other app answers it. Also in res/xml/soledrop_apdu_service.xml. */
-    public static final byte[] AID = {(byte) 0xF0, 0x53, 0x4F, 0x4C, 0x45, 0x44, 0x52, 0x4F, 0x50};
+    /** "SOLEWAL" under the proprietary RID prefix F0: no other app answers it. Also in res/xml/wallet_tap_apdu_service.xml. */
+    public static final byte[] AID = {(byte) 0xF0, 0x53, 0x4F, 0x4C, 0x45, 0x57, 0x41, 0x4C};
 
     public static final int VERSION = 1;
     /** Data bytes per APDU: short APDUs (Lc and Le up to 255) with room to spare on every NFC controller. */
@@ -117,7 +117,7 @@ public final class SoleDropProtocol {
     public static final int MAX_USERNAME = 32;
     public static final int MAX_TOKEN = 128;
 
-    /** Thrown for anything that is not a well formed SoleDrop packet or exchange. */
+    /** Thrown for anything that is not a well formed wallet tap packet or exchange. */
     public static class ProtocolException extends IOException {
         public final int statusWord;
 
@@ -807,7 +807,7 @@ public final class SoleDropProtocol {
     }
 
     /**
-     * @param onSelected called (on the reader's thread) as soon as the other side answered as a SoleDrop phone
+     * @param onSelected called (on the reader's thread) as soon as the other side answered as a SoleWallet phone
      *                   that receives: the moment of contact, before the rest of the exchange
      */
     public static Packet exchange(Transceiver t, Packet offer, Runnable onSelected) throws IOException {
