@@ -1754,7 +1754,10 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                         canvas.drawColor(pageColor | 0xFF000000);
                         for (int i = 0, n = root.getChildCount(); i < n; i++) {
                             final View page = root.getChildAt(i);
-                            if (page instanceof ActionBar || page.getVisibility() != View.VISIBLE || page.getAlpha() <= 0f) {
+                            // not the header, and not the menus' overlay: an open menu is made of this glass, in its own
+                            // picture it drew itself (a loop the renderer crashed on - the ⋮ menu closed the app)
+                            if (page instanceof ActionBar || page instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay
+                                || page.getVisibility() != View.VISIBLE || page.getAlpha() <= 0f) {
                                 continue;
                             }
                             canvas.save();
@@ -1779,6 +1782,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                         hash.add(root.getChildCount());
                         for (int i = 0, n = root.getChildCount(); i < n; i++) {
                             final View page = root.getChildAt(i);
+                            if (page instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay) {
+                                continue; // not in the picture (see above)
+                            }
                             hash.add(System.identityHashCode(page));
                             hash.add(page.getScrollY());
                             hash.addF(page.getTranslationX());
@@ -1861,8 +1867,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
 
         @Override
         protected boolean drawChild(@androidx.annotation.NonNull Canvas canvas, View child, long drawingTime) {
-            if (child instanceof ActionBar && !blurDrawn) {
-                drawHeaderBlur(canvas); // a header of this root's own stays sharp over the blur
+            if ((child instanceof ActionBar || child instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay) && !blurDrawn) {
+                drawHeaderBlur(canvas); // a header of this root's own, and an open menu, stay sharp over the blur
             }
             return super.drawChild(canvas, child, drawingTime);
         }
@@ -1872,7 +1878,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             int k = 0;
             for (int i = 0, n = getChildCount(); i < n && k < pages.length; i++) {
                 final View child = getChildAt(i);
-                if (!(child instanceof ActionBar)) {
+                if (!(child instanceof ActionBar) && !(child instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay)) {
                     pages[k++] = child;
                 }
             }

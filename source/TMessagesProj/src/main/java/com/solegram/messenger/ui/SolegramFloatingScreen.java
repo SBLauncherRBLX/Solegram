@@ -432,7 +432,55 @@ public class SolegramFloatingScreen {
         canvas.clipRect(0, 0, fragmentView.getRight() + fragmentView.getTranslationX(), glassHeight());
         canvas.drawColor(lastPageColor);
         canvas.translate(fragmentView.getLeft() + fragmentView.getTranslationX(), fragmentView.getTop() + fragmentView.getTranslationY());
-        fragmentView.draw(canvas);
+        if (openMenuIn(fragmentView)) {
+            drawWithoutMenus((ViewGroup) fragmentView, canvas);
+        } else {
+            fragmentView.draw(canvas);
+        }
         canvas.restore();
+    }
+
+    /** An open menu of the header in the screen's overlay (a child of the screen). */
+    private static boolean openMenuIn(View view) {
+        if (!(view instanceof ViewGroup)) {
+            return false;
+        }
+        final ViewGroup group = (ViewGroup) view;
+        for (int i = 0, n = group.getChildCount(); i < n; i++) {
+            final View child = group.getChildAt(i);
+            if (child instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay && child.getVisibility() == View.VISIBLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The screen without the menus' overlay: an open menu is made of this glass, and drawn into its own picture it made
+     * the picture draw itself - a loop the renderer crashes on.
+     */
+    private static void drawWithoutMenus(ViewGroup group, Canvas canvas) {
+        final android.graphics.drawable.Drawable background = group.getBackground();
+        if (background != null) {
+            background.setBounds(0, 0, group.getWidth(), group.getHeight());
+            background.draw(canvas);
+        }
+        for (int i = 0, n = group.getChildCount(); i < n; i++) {
+            final View child = group.getChildAt(i);
+            if (child instanceof org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay || child.getVisibility() != View.VISIBLE || child.getAlpha() <= 0f) {
+                continue;
+            }
+            canvas.save();
+            canvas.translate(child.getLeft() + child.getTranslationX(), child.getTop() + child.getTranslationY());
+            if (child.getAlpha() < 1f) {
+                canvas.saveLayerAlpha(0, 0, child.getWidth(), child.getHeight(), (int) (255 * child.getAlpha()));
+            }
+            canvas.translate(-child.getScrollX(), -child.getScrollY());
+            child.draw(canvas);
+            canvas.restore();
+            if (child.getAlpha() < 1f) {
+                canvas.restore();
+            }
+        }
     }
 }
