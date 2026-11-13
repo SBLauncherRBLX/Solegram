@@ -29,10 +29,12 @@ public final class SolegramInlineTranslate {
     private static final class Entry {
         final String source;
         final String text;
+        final String lang;
 
-        Entry(String source, String text) {
+        Entry(String source, String text, String lang) {
             this.source = source;
             this.text = text;
+            this.lang = lang;
         }
     }
 
@@ -105,6 +107,15 @@ public final class SolegramInlineTranslate {
     }
 
     public static void toggle(ChatActivity chat, MessageObject message) {
+        toggle(chat, message, TranslateAlert2.getToLanguage());
+    }
+
+    /** Whether the translation of this message is on the screen now (tapping again shows the original). */
+    public static boolean isShownNow(MessageObject message) {
+        return message != null && shown.contains(key(message));
+    }
+
+    public static void toggle(ChatActivity chat, MessageObject message, String toLang) {
         if (!canTranslate(message)) {
             return;
         }
@@ -121,7 +132,7 @@ public final class SolegramInlineTranslate {
         }
         final String source = message.messageOwner.message;
         final Entry cached = translations.get(key);
-        if (cached != null && TextUtils.equals(cached.source, source)) {
+        if (cached != null && TextUtils.equals(cached.source, source) && TextUtils.equals(cached.lang, toLang)) {
             shown.add(key);
             refresh(message);
             return;
@@ -131,7 +142,7 @@ public final class SolegramInlineTranslate {
         }
         // the bubble shows that the translation is on its way
         NotificationCenter.getInstance(message.currentAccount).postNotificationName(NotificationCenter.messageTranslating, message);
-        SolegramTranslator.translate(source, TranslateAlert2.getToLanguage(), result -> {
+        SolegramTranslator.translate(source, toLang, result -> {
             loading.remove(key);
             if (result == null) {
                 NotificationCenter.getInstance(message.currentAccount).postNotificationName(NotificationCenter.messageTranslating, message);
@@ -140,7 +151,7 @@ public final class SolegramInlineTranslate {
                 }
                 return;
             }
-            translations.put(key, new Entry(source, result));
+            translations.put(key, new Entry(source, result, toLang));
             shown.add(key);
             refresh(message);
         });

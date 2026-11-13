@@ -798,6 +798,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(102, 0xFFB57BFF, 0xFF7C4DFF, R.drawable.msg_openprofile, getString(R.string.SG_ProfilePage), getString(R.string.SG_ProfilePageSub)));
         items.add(SettingCell.Factory.of(103, 0xFFFF8FA3, 0xFFE8506B, R.drawable.files_music, getString(R.string.SG_NowPlaying), getString(R.string.SG_NowPlayingSub)));
         items.add(SettingCell.Factory.of(104, 0xFF9C8CFF, 0xFF5E5CE6, R.drawable.sg_ai_spark, getString(R.string.SG_AiPage), getString(R.string.SG_AiPageSub)));
+        items.add(SettingCell.Factory.of(108, 0xFF7AA7FF, 0xFF4767E8, R.drawable.msg_reactions, getString(R.string.SG_Gestures), getString(R.string.SG_GesturesShort)));
         items.add(UItem.asShadow(null));
 
         final boolean walletAbove = getConnectionsManager().getCurrentTime() - 1791538462 < 4 * 7 * 24 * 60 * 60;
@@ -948,6 +949,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             case 106:
                 presentSettingFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
+                break;
+            case 108:
+                presentSettingFragment(new com.solegram.messenger.ui.SolegramGesturesActivity());
                 break;
             case 107:
                 presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_PROXY));

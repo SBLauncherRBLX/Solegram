@@ -200,7 +200,14 @@ public final class SolegramMessageMenu {
             return true;
         }
         if (option == OPTION_TRANSLATE_HERE) {
-            SolegramInlineTranslate.toggle(chat, SolegramInlineTranslate.target(message, group));
+            final MessageObject target = SolegramInlineTranslate.target(message, group);
+            if (!SolegramInlineTranslate.isShownNow(target) && com.solegram.messenger.ui.SolegramLanguagePicker.enabled()) {
+                // the language to translate into is picked first
+                com.solegram.messenger.ui.SolegramLanguagePicker.show(chat, org.telegram.ui.Components.TranslateAlert2.getToLanguage(),
+                    lang -> SolegramInlineTranslate.toggle(chat, target, lang));
+            } else {
+                SolegramInlineTranslate.toggle(chat, target);
+            }
             return true;
         }
         if (option >= OPTION_PLUGIN_BASE && option < OPTION_PLUGIN_BASE + 500) {

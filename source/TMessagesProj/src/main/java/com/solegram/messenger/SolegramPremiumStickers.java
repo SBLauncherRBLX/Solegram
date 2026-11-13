@@ -150,6 +150,9 @@ public final class SolegramPremiumStickers {
         if (message == null || TextUtils.isEmpty(message.message) || !enabled()) {
             return;
         }
+        if (message.message.indexOf(EMOJI_START) >= 0) {
+            restoreEmoji(message);
+        }
         if (message.message.indexOf(START) < 0) {
             return;
         }
@@ -246,4 +249,107 @@ public final class SolegramPremiumStickers {
     }
     // endregion
 
+
+    // region Premium emoji
+
+    private static final char EMOJI_START = '\u2061';
+    private static final int EMOJI_ENTRY = 4 + 2 + 16;
+
+    /**
+     * Before a text goes out from an account without Premium: its Premium emoji (custom emoji entities, which
+     * Telegram would drop) are written into an invisible mark at the end, and the entities are taken out. Solegram
+     * users get them back from the mark; others see the plain emoji under them.
+     */
+    public static void prepareOutgoing(int account, SendMessagesHelper.SendMessageParams p) {
+        if (p == null || !enabled() || UserConfig.getInstance(account).isPremium() || p.entities == null || p.entities.isEmpty()) {
+            return;
+        }
+        if (p.message == null || p.document != null || p.photo != null) {
+            return;
+        }
+        final StringBuilder mark = new StringBuilder();
+        final java.util.Iterator<TLRPC.MessageEntity> it = p.entities.iterator();
+        while (it.hasNext()) {
+            final TLRPC.MessageEntity e = it.next();
+            if (e instanceof TLRPC.TL_messageEntityCustomEmoji) {
+                final long id = ((TLRPC.TL_messageEntityCustomEmoji) e).document_id;
+                if (e.offset < 0 || e.offset > 0xFFFF || e.length <= 0 || e.length > 0xFF || id == 0) {
+                    continue;
+                }
+                put4(mark, e.offset);
+                put2(mark, e.length);
+                put(mark, id);
+                it.remove();
+            }
+        }
+        if (mark.length() == 0) {
+            return;
+        }
+        if (p.message.length() + 2 + mark.length() > 4096) {
+            return; // no room: Telegram drops them as it always did
+        }
+        p.message = p.message + EMOJI_START + (char) (0xFE00 + VERSION) + mark;
+    }
+
+    private static void put4(StringBuilder sb, int v) {
+        for (int i = 3; i >= 0; i--) {
+            sb.append((char) (0xFE00 + ((v >>> (i * 4)) & 0xF)));
+        }
+    }
+
+    private static void put2(StringBuilder sb, int v) {
+        for (int i = 1; i >= 0; i--) {
+            sb.append((char) (0xFE00 + ((v >>> (i * 4)) & 0xF)));
+        }
+    }
+
+    /** A received text with the mark: the Premium emoji come back as custom emoji, the mark goes. */
+    private static void restoreEmoji(TLRPC.Message message) {
+        final String text = message.message;
+        final int at = text.lastIndexOf(EMOJI_START);
+        if (at < 0 || at + 1 >= text.length() || text.charAt(at + 1) != (char) (0xFE00 + VERSION)) {
+            return;
+        }
+        int i = at + 2;
+        final ArrayList<TLRPC.TL_messageEntityCustomEmoji> found = new ArrayList<>();
+        while (i + EMOJI_ENTRY <= text.length()) {
+            long v = 0;
+            boolean ok = true;
+            final long[] parts = new long[3];
+            final int[] sizes = {4, 2, 16};
+            int k = i;
+            for (int part = 0; part < 3 && ok; part++) {
+                v = 0;
+                for (int n = 0; n < sizes[part]; n++) {
+                    final char c = text.charAt(k++);
+                    if (c < 0xFE00 || c > 0xFE0F) {
+                        ok = false;
+                        break;
+                    }
+                    v = (v << 4) | (c - 0xFE00);
+                }
+                parts[part] = v;
+            }
+            if (!ok) {
+                break;
+            }
+            final TLRPC.TL_messageEntityCustomEmoji e = new TLRPC.TL_messageEntityCustomEmoji();
+            e.offset = (int) parts[0];
+            e.length = (int) parts[1];
+            e.document_id = parts[2];
+            found.add(e);
+            i = k;
+        }
+        message.message = text.substring(0, at) + text.substring(i);
+        final int len = message.message.length();
+        if (message.entities == null) {
+            message.entities = new ArrayList<>();
+        }
+        for (TLRPC.TL_messageEntityCustomEmoji e : found) {
+            if (e.offset + e.length <= len) {
+                message.entities.add(e);
+            }
+        }
+    }
+    // endregion
 }

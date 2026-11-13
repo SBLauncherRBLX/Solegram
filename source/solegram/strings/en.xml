@@ -1937,5 +1937,6 @@
     <string name="SG_IgnoreOn">Ignored</string>
     <string name="SG_IgnoreTurnedOn">Ignore mode on: you will not see their new messages</string>
     <string name="SG_IgnoreTurnedOff">Ignore mode off: everything they wrote is back</string>
-    <string name="SG_PremiumStickersShare">Premium stickers for Solegram users</string>
+    <string name="SG_PremiumStickersShare">Premium stickers and emoji for Solegram users</string>
+    <string name="SG_GesturesShort">Shake, flip or twist the phone for an action</string>
 </resources>

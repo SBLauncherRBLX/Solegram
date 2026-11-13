@@ -2896,7 +2896,8 @@ public class MessagesStorage extends BaseController {
             cursor = database.queryFinalized("SELECT did, folder_id, unread_count, unread_count_i FROM dialogs WHERE unread_count > 0 OR flags > 0 UNION ALL " +
                     "SELECT did, folder_id, unread_count, unread_count_i FROM dialogs WHERE unread_count_i > 0");
             // Solegram: hidden chats count in no unread counter (chat list, folders, archive, the Chats tab)
-            final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
+            // ignored chats too: their messages tell nothing until the ignore mode is off
+            final long[] solegramHidden = com.solegram.messenger.SolegramIgnore.withIgnored(currentAccount, com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount));
             while (cursor.next()) {
                 int folderId = cursor.intValue(1);
                 long did = cursor.longValue(0);
@@ -6247,7 +6248,7 @@ public class MessagesStorage extends BaseController {
         LongSparseArray<Integer> dialogsByFolders = new LongSparseArray<>();
         LongSparseArray<Integer> newUnreadDialogs = new LongSparseArray<>();
         // Solegram: hidden chats were never counted (calcUnreadCounters), so they are neither added nor taken away
-        final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount);
+        final long[] solegramHidden = com.solegram.messenger.SolegramIgnore.withIgnored(currentAccount, com.solegram.messenger.SolegramHiddenChats.idsFor(currentAccount));
 
         for (int b = 0; b < 2; b++) {
             LongSparseIntArray array = b == 0 ? dialogsToUpdate : dialogsToUpdateMentions;

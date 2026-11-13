@@ -461,8 +461,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_ADD_ACCOUNT, R.drawable.outline_add_account, getString(R.string.SG_Accounts),
             org.telegram.messenger.UserConfig.getActivatedAccountsCount() + " / " + org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT), TILE_BLUE)
             .setSolegramSubtitle(getString(R.string.SG_AccountsSub)));
-        items.add(category(ID_GESTURES, R.drawable.msg_reactions, R.string.SG_Gestures, R.string.SG_GesturesSub,
-            com.solegram.messenger.SolegramGestures.enabled() ? getString(R.string.SG_On) : null, TILE_INDIGO));
         // the Studio is for betas only: recording trailers is not a feature of the public app
         if (org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")) {
             items.add(category(ID_STUDIO, R.drawable.msg_camera, R.string.SG_Studio, R.string.SG_StudioSub, null, TILE_PINK));

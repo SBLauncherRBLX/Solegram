@@ -3576,10 +3576,19 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         if (ChatObject.isMonoForum(localChat)) {
                             newMentionCount = 0;
                         }
-                        if (dialog != null && (unreadCount != newCount || markUnread != dialog.unread_mark || mentionCount != newMentionCount || reactionMentionCount != newReactionCout)) {
+                        // Solegram: ignore mode, no counter ever shows, not even for a moment
+                        final boolean sgIgnoredNow = dialog != null && com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, dialog.id);
+                        if (sgIgnoredNow) {
+                            newCount = 0;
+                            newMentionCount = 0;
+                            newReactionCout = 0;
+                            newPollVotesCount = 0;
+                        }
+                        final boolean sgMarkUnread = dialog != null && dialog.unread_mark && !sgIgnoredNow;
+                        if (dialog != null && (unreadCount != newCount || markUnread != sgMarkUnread || mentionCount != newMentionCount || reactionMentionCount != newReactionCout)) {
                             unreadCount = newCount;
                             mentionCount = newMentionCount;
-                            markUnread = dialog.unread_mark;
+                            markUnread = sgMarkUnread;
                             reactionMentionCount = newReactionCout;
                             pollVotesMentionCount = newPollVotesCount;
                             continueUpdate = true;

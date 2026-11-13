@@ -2191,6 +2191,7 @@
     <string name="SG_IgnoreOn">Игнор включён</string>
     <string name="SG_IgnoreTurnedOn">Игнор включён: новые сообщения от них вы не увидите</string>
     <string name="SG_IgnoreTurnedOff">Игнор выключен: всё, что они написали, снова видно</string>
-    <string name="SG_PremiumStickersShare">Премиум-стикеры для пользователей Solegram</string>
+    <string name="SG_PremiumStickersShare">Премиум-стикеры и эмодзи для пользователей Solegram</string>
+    <string name="SG_GesturesShort">Встряхнуть, перевернуть или повернуть телефон</string>
     <!-- SOLEGRAM END -->
 </resources>

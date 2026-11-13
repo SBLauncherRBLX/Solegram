@@ -4450,6 +4450,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (sendMessageParams == null) {
             return;
         }
+        // Solegram: Premium emoji without Premium travel in an invisible mark, for Solegram users
+        com.solegram.messenger.SolegramPremiumStickers.prepareOutgoing(currentAccount, sendMessageParams);
         // Solegram: a repeat without Premium is kept on this device (the server would refuse it)
         if (com.solegram.messenger.SolegramConfig.localRepeats) {
             com.solegram.messenger.SolegramRepeats.takeOver(currentAccount, sendMessageParams);

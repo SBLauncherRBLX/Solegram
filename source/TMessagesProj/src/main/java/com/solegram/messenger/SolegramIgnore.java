@@ -92,9 +92,14 @@ public final class SolegramIgnore {
             }
             save(account);
         }
+        // every list, counter and header follows at once: the counters are counted again with or without the chat
+        final MessagesController controller = MessagesController.getInstance(account);
+        controller.sortDialogs(null);
         final NotificationCenter nc = NotificationCenter.getInstance(account);
-        nc.postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_READ_DIALOG_MESSAGE | MessagesController.UPDATE_MASK_NAME | MessagesController.UPDATE_MASK_CHAT_NAME);
         nc.postNotificationName(NotificationCenter.dialogsNeedReload);
+        nc.postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
+        final org.telegram.messenger.MessagesStorage storage = org.telegram.messenger.MessagesStorage.getInstance(account);
+        storage.getStorageQueue().postRunnable(() -> storage.resetAllUnreadCounters(false));
         org.telegram.messenger.NotificationsController.getInstance(account).updateBadge();
         return on;
     }

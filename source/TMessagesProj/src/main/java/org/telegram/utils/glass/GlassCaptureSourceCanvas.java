@@ -51,9 +51,11 @@ public class GlassCaptureSourceCanvas {
             GlassFadeBlurredDrawable.GlassFadeDownsampledSource {
     }
 
-    // Solegram: the glass (the liquid lens) sees the screen at full resolution, as before Telegram 13.2: through a
-    // capture five times smaller the refraction read as a plain blur
-    private static final int GLASS_DOWNSAMPLE = 1;
+    // Solegram: the glass (the liquid lens) sees the screen at half resolution: Telegram 13.2's capture five times
+    // smaller made the refraction read as a plain blur, and the full resolution made long scrolling lists under the
+    // glass (the gallery of the attach menu with hundreds of photos) stutter; half keeps the lens sharp on today's
+    // dense screens at a quarter of the work per frame
+    private static final int GLASS_DOWNSAMPLE = 2;
     private static final ColorFilter IDENTITY_FILTER = new ColorMatrixColorFilter(new ColorMatrix());
     private static final int FROSTED_GLASS_DOWNSAMPLE = 10;
 

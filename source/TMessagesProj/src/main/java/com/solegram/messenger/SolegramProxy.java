@@ -63,17 +63,29 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
         {"https://raw.githubusercontent.com/Argh94/Proxy-List/main/MTProto.txt", "https://cdn.jsdelivr.net/gh/Argh94/Proxy-List@main/MTProto.txt"},
     };
 
+    /**
+     * Public SOCKS5 lists (plain "host:port" or "socks5://host:port" lines). Most of them do not reach Telegram, so
+     * only a random part of each is checked; whatever passes is tried for real like every other proxy.
+     */
+    public static final String[][] SOCKS_SOURCES = {
+        {"https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/protocols/socks5/data.txt", "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/socks5/data.txt"},
+        {"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt", "https://cdn.jsdelivr.net/gh/TheSpeedX/SOCKS-List@master/socks5.txt"},
+        {"https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt", "https://cdn.jsdelivr.net/gh/hookzof/socks5_list@master/proxy.txt"},
+    };
+    private static final int PER_SOCKS_SOURCE = 60;
+    private static final Pattern PLAIN_SOCKS = Pattern.compile("^(?:socks5h?://)?([0-9]{1,3}(?:\\.[0-9]{1,3}){3}):([0-9]{2,5})\\s*$");
+
     /** How many working proxies go into Telegram's list (rotation switches between them). */
-    private static final int KEEP = 6;
+    private static final int KEEP = 10;
     /** Enough working ones found: the search stops early. */
-    private static final int ENOUGH = 10;
-    private static final int MAX_CHECKS = 120;
+    private static final int ENOUGH = 20;
+    private static final int MAX_CHECKS = 450;
     /** Checks in flight; Telegram runs 4 at a time and queues the rest. */
-    private static final int PARALLEL = 8;
-    private static final long CHECK_TIMEOUT = 15_000;
+    private static final int PARALLEL = 16;
+    private static final long CHECK_TIMEOUT = 10_000;
     /** When Telegram's checker cannot run at all, proxies are tried for real, one by one. */
-    private static final int LIVE_TRIES = 5;
-    private static final long LIVE_TIMEOUT = 20_000;
+    private static final int LIVE_TRIES = 8;
+    private static final long LIVE_TIMEOUT = 15_000;
     /** Auto mode: no connection for this long and a proxy is searched for. */
     private static final long STUCK_DELAY = 20_000;
     /** Longer while one of Solegram's proxies is on: Telegram's rotation gets to try the others first. */
@@ -447,12 +459,15 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
             return;
         }
         Collections.sort(working, (a, b) -> Long.compare(a.ping, b.ping));
-        final List<Candidate> best = working.subList(0, Math.min(KEEP, working.size()));
-        apply(best);
-        remember(best);
-        final Candidate first = best.get(0);
-        finish(new Result(RESULT_OK, byUser, first.settings.getAddress(), first.ping, working.size(), progress, fromCache));
+        // a proxy that answers a ping does not always carry Telegram: the fastest ones are tried for real, one by one,
+        // and only one Telegram really connected through goes on (with the others that answered, as reserves)
+        candidates = new ArrayList<>(working);
+        verifying = true;
+        startLive();
     }
+
+    /** The proxies being tried for real come from the checked ones (not the raw lists). */
+    private static boolean verifying;
 
     private static void finish(Result result) {
         session++;
@@ -494,9 +509,13 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
         if (phase != PHASE_TRYING) {
             return;
         }
+        if (liveCandidate != null) {
+            failed.add(liveCandidate.key); // did not connect for real
+        }
         dropLiveInfo();
         if (liveIndex >= progressTotal) {
             restorePrevious();
+            verifying = false;
             finish(new Result(RESULT_NONE_WORKING, byUser, null, 0, 0, liveIndex, fromCache));
             return;
         }
@@ -520,12 +539,21 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
             addedKeys().add(c.key);
         }
         liveInfo = null;
-        c.ping = 0;
         final ArrayList<Candidate> best = new ArrayList<>();
         best.add(c);
+        if (verifying && working != null) {
+            for (Candidate w : working) {
+                if (w != c && best.size() < KEEP && !failed.contains(w.key)) {
+                    best.add(w);
+                }
+            }
+        } else {
+            c.ping = 0;
+        }
+        verifying = false;
         apply(best);
         remember(best);
-        finish(new Result(RESULT_OK, byUser, c.settings.getAddress(), 0, 1, liveIndex, fromCache));
+        finish(new Result(RESULT_OK, byUser, c.settings.getAddress(), c.ping, best.size(), liveIndex, fromCache));
     }
 
     /** A proxy tried for real that did not connect leaves the list again (if Solegram added it). */
@@ -832,11 +860,15 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
 
     private static Loaded load() {
         final LinkedHashMap<String, Candidate> all = new LinkedHashMap<>();
-        final ExecutorService pool = Executors.newFixedThreadPool(SOURCES.length);
+        final ExecutorService pool = Executors.newFixedThreadPool(SOURCES.length + SOCKS_SOURCES.length);
+        final ArrayList<Future<String>> socksFutures = new ArrayList<>();
         try {
             final ArrayList<Future<String>> futures = new ArrayList<>();
             for (String[] mirrors : SOURCES) {
                 futures.add(pool.submit(() -> downloadAny(mirrors)));
+            }
+            for (String[] mirrors : SOCKS_SOURCES) {
+                socksFutures.add(pool.submit(() -> downloadAny(mirrors)));
             }
             final long deadline = SystemClock.elapsedRealtime() + 40_000;
             for (int i = 0; i < futures.size(); i++) {
@@ -848,6 +880,13 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
                 }
                 if (text != null) {
                     addLinks(all, text, i == 0, PER_SOURCE_MAX);
+                }
+            }
+            for (int i = 0; i < socksFutures.size(); i++) {
+                try {
+                    addPlainSocks(all, socksFutures.get(i).get(Math.max(1, deadline - SystemClock.elapsedRealtime()), TimeUnit.MILLISECONDS));
+                } catch (Throwable e) {
+                    FileLog.d("SolegramProxy: socks list " + i + " failed: " + e);
                 }
             }
         } finally {
@@ -984,6 +1023,26 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
     private static final Pattern IPV6 = Pattern.compile("[0-9a-f:.]+");
     private static final Pattern SECRET = Pattern.compile("[0-9A-Za-z_+/=-]{16,512}");
     private static final Pattern HEX = Pattern.compile("[0-9a-fA-F]+");
+
+    /** A random part of a plain SOCKS5 list, as links, so they go through the same checks. */
+    private static void addPlainSocks(LinkedHashMap<String, Candidate> into, String text) {
+        if (text == null) {
+            return;
+        }
+        final ArrayList<String> lines = new ArrayList<>();
+        for (String line : text.split("\\n")) {
+            final Matcher m = PLAIN_SOCKS.matcher(line.trim());
+            if (m.matches()) {
+                lines.add("tg://socks?server=" + m.group(1) + "&port=" + m.group(2));
+            }
+        }
+        Collections.shuffle(lines);
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(PER_SOCKS_SOURCE, lines.size()); i++) {
+            sb.append(lines.get(i)).append('\n');
+        }
+        addLinks(into, sb.toString(), false, PER_SOCKS_SOURCE);
+    }
 
     /** Adds every proxy link in the text; the key is the link Telegram makes, so lists de-duplicate. */
     private static void addLinks(LinkedHashMap<String, Candidate> into, String text, boolean own, int max) {
