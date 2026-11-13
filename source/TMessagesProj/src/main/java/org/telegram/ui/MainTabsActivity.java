@@ -455,27 +455,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
         iBlur3FactoryFade.setSourceRootView(viewPositionWatcher, contentView);
 
-        // Solegram: above the tab bar the pages blur out of focus (Android 12+) instead of fading into the background
-        final com.solegram.messenger.ui.SolegramEdgeBlur sgEdgeBlur = new com.solegram.messenger.ui.SolegramEdgeBlur();
+        // Solegram: nothing above the tab bar - no blur and no fade at the bottom of the screen (only under the header)
         fadeView = new View(context) {
-            private final View[] pages = new View[1];
-
             @Override
             public void draw(Canvas canvas) {
-                if (viewPager != null && contentView != null && viewPager.getParent() == contentView
-                        && com.solegram.messenger.ui.SolegramEdgeBlur.supported(canvas) && getParent() == contentView) {
-                    final float top = getTop() + getTranslationY();
-                    pages[0] = viewPager;
-                    canvas.save();
-                    canvas.translate(-getLeft() - getTranslationX(), -top);
-                    final boolean drawn = sgEdgeBlur.draw(canvas, pages, getWidth(), top, getHeight(), false, getEstBackgroundColor(), 0, 1f);
-                    canvas.restore();
-                    pages[0] = null;
-                    if (drawn) {
-                        return;
-                    }
-                }
-                // no blur here: nothing (no darkening above the bar)
             }
         };
         BlurredBackgroundWithFadeDrawable fadeDrawable = new BlurredBackgroundWithFadeDrawable(iBlur3FactoryFade.create(fadeView, null));

@@ -147,7 +147,7 @@ public class ChatActivityFadeView extends View implements Theme.Colorable {
             overlayPaint.setAlpha(fadeDrawableTop.getAlpha());
             canvas.drawRect(0, 0, getMeasuredWidth(), fadeZoneTop, overlayPaint);
         }
-        if (fadeZoneBottom > 0) {
+        if (fadeZoneBottom > 0 && Theme.isCompactMode(resourcesProvider)) {
             if (overlayShaderBottom == null) {
                 overlayShaderBottom = createOverlayShader(false);
             }
@@ -169,7 +169,7 @@ public class ChatActivityFadeView extends View implements Theme.Colorable {
             drawCompactFades(canvas);
         } else {
             fadeDrawableTop.draw(canvas);
-            fadeDrawableBottom.draw(canvas);
+            // Solegram: no blur at the bottom of the chat (under the input), only at the top under the header
         }
         drawOverlay(canvas);
     }
