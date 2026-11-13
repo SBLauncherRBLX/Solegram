@@ -303,6 +303,39 @@ public final class SolegramPremiumStickers {
         }
     }
 
+    /**
+     * The server's entities for a message just sent replace the local ones; the Premium emoji restored from the mark
+     * are not among them (the server never had them), so they are carried over. Without this they were lost for
+     * good once the chat was opened again: the text in the database no longer had the mark.
+     */
+    public static ArrayList<TLRPC.MessageEntity> keepEmoji(@androidx.annotation.Nullable ArrayList<TLRPC.MessageEntity> before, @androidx.annotation.Nullable ArrayList<TLRPC.MessageEntity> fresh) {
+        if (before == null || before.isEmpty() || before == fresh) {
+            return fresh != null ? fresh : new ArrayList<>();
+        }
+        ArrayList<TLRPC.MessageEntity> out = null;
+        for (TLRPC.MessageEntity e : before) {
+            if (!(e instanceof TLRPC.TL_messageEntityCustomEmoji)) {
+                continue;
+            }
+            boolean present = false;
+            if (fresh != null) {
+                for (TLRPC.MessageEntity f : fresh) {
+                    if (f instanceof TLRPC.TL_messageEntityCustomEmoji && f.offset == e.offset) {
+                        present = true;
+                        break;
+                    }
+                }
+            }
+            if (!present) {
+                if (out == null) {
+                    out = fresh != null ? new ArrayList<>(fresh) : new ArrayList<>();
+                }
+                out.add(e);
+            }
+        }
+        return out != null ? out : fresh != null ? fresh : new ArrayList<>();
+    }
+
     /** A received text with the mark: the Premium emoji come back as custom emoji, the mark goes. */
     private static void restoreEmoji(TLRPC.Message message) {
         final String text = message.message;

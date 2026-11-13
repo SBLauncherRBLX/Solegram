@@ -8346,7 +8346,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             existFlags = msgObj.getMediaExistanceFlags();
                             newMsgObj.local_id = newMsgObj.id = res.id;
                             newMsgObj.date = res.date;
-                            newMsgObj.entities = res.entities;
+                            newMsgObj.entities = com.solegram.messenger.SolegramPremiumStickers.keepEmoji(newMsgObj.entities, res.entities); // Solegram: the Premium emoji from the mark stay
                             newMsgObj.out = res.out;
                             if ((res.flags & 33554432) != 0) {
                                 newMsgObj.ttl_period = res.ttl_period;
@@ -8498,7 +8498,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                     msgObj.messageOwner.ttl_period = message.ttl_period;
                                     msgObj.messageOwner.flags |= 33554432;
                                 }
-                                msgObj.messageOwner.entities = message.entities;
+                                msgObj.messageOwner.entities = com.solegram.messenger.SolegramPremiumStickers.keepEmoji(msgObj.messageOwner.entities, message.entities); // Solegram
                                 msgObj.messageOwner.quick_reply_shortcut_id = message.quick_reply_shortcut_id;
                                 if (msgObj.messageOwner.quick_reply_shortcut_id != 0) {
                                     msgObj.messageOwner.flags |= 1073741824;

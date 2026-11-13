@@ -1,6 +1,6 @@
 # Solegram: исходный код
 
-Здесь лежит полный исходный код Solegram, неофициального клиента Telegram для Android, версии **3.3.1-beta2 (168)** на основе **Telegram 13.2.1**. Код выпущен под лицензией **GPL-2.0**, как и исходный код Telegram (см. `LICENSE`).
+Здесь лежит полный исходный код Solegram, неофициального клиента Telegram для Android, версии **3.3.1-beta3 (169)** на основе **Telegram 13.2.1**. Код выпущен под лицензией **GPL-2.0**, как и исходный код Telegram (см. `LICENSE`).
 
 Solegram не связан с Telegram FZ-LLC. Оригинальный README Telegram лежит в `TELEGRAM_README.md`.
 

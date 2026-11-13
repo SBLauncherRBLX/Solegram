@@ -66,7 +66,7 @@ import java.util.regex.Pattern;
  */
 public class SolegramMentionCard extends FrameLayout {
 
-    private static final Pattern TOKEN = Pattern.compile("(?:^|[\\s(])@([A-Za-z0-9_]{4,32})$");
+    private static final Pattern TOKEN = Pattern.compile("(?:^|[\\s(])@([A-Za-z0-9_]{4,32}) ?$");
 
     /** Runs the card for one chat: call {@link #onText} as the text in the field changes. */
     public static final class Controller {
@@ -82,6 +82,20 @@ public class SolegramMentionCard extends FrameLayout {
         }
 
         public void onText(CharSequence text, int cursor) {
+            // someone without a username, picked from the suggestions, is a name link in the field
+            final long linked = linkedAt(text, cursor);
+            if (linked != 0) {
+                final String key = "#" + linked;
+                if (key.equals(shownFor)) {
+                    return;
+                }
+                final TLRPC.User u = chat.getMessagesController().getUser(linked);
+                if (u != null) {
+                    hide();
+                    show(key, u);
+                    return;
+                }
+            }
             final String name = tokenAt(text, cursor);
             if (name == null) {
                 hide();
@@ -164,6 +178,28 @@ public class SolegramMentionCard extends FrameLayout {
             }
             card = null;
         }
+    }
+
+    /** A name link (a mention of someone without a username) that ends at the cursor, or a space before it. */
+    static long linkedAt(CharSequence text, int cursor) {
+        if (!(text instanceof Spanned) || cursor <= 0 || cursor > text.length()) {
+            return 0;
+        }
+        final Spanned sp = (Spanned) text;
+        final org.telegram.ui.Components.URLSpanUserMention[] spans = sp.getSpans(Math.max(0, cursor - 2), cursor, org.telegram.ui.Components.URLSpanUserMention.class);
+        if (spans == null) {
+            return 0;
+        }
+        for (org.telegram.ui.Components.URLSpanUserMention span : spans) {
+            final int end = sp.getSpanEnd(span);
+            if (end == cursor || end == cursor - 1 && text.charAt(cursor - 1) == ' ') {
+                try {
+                    return Long.parseLong(span.getURL());
+                } catch (Exception ignore) {
+                }
+            }
+        }
+        return 0;
     }
 
     /** The username being typed right at the cursor (the whole word up to it), or null. */
