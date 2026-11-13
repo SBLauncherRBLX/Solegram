@@ -307,6 +307,8 @@ public class SolegramConfig {
     public static boolean confirmCalls;
     public static boolean disableProximitySensor;
     public static boolean hidePremiumSettings;
+    /** Without Premium: no Premium stickers, locks and offers to buy Premium (Telegram's own mode for where Premium is not sold). */
+    public static boolean hidePremiumNags;
     public static boolean hideGiftButtons;
     // endregion
 
@@ -582,6 +584,7 @@ public class SolegramConfig {
         confirmCalls = p.getBoolean("confirmCalls", false);
         disableProximitySensor = p.getBoolean("disableProximitySensor", false);
         hidePremiumSettings = p.getBoolean("hidePremiumSettings", false);
+        hidePremiumNags = p.getBoolean("hidePremiumNags", true);
         hideGiftButtons = p.getBoolean("hideGiftButtons", false);
 
         proxyAuto = p.getBoolean("proxyAuto", false);
@@ -731,6 +734,7 @@ public class SolegramConfig {
 
     private static boolean defaultBoolean(String key) {
         switch (key) {
+            case "hidePremiumNags":
             case "unifiedWallet":
             case "profileCards":
             case "ghostReadOnInteract":

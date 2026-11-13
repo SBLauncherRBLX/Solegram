@@ -113,10 +113,27 @@ public class SolegramIconPackPicker extends View {
     }
 
     public void setSelected(int pack) {
-        if (selected != pack) {
+        selected = Math.max(0, Math.min(N - 1, pack));
+        invalidate();
+    }
+
+    /** The pack really in use: whatever instance is on the screen, the check and the rim follow the setting. */
+    private void syncWithSetting() {
+        final int pack = Math.max(0, Math.min(N - 1, SolegramConfig.iconPack));
+        if (pack != selected && pressed < 0) {
             selected = pack;
-            invalidate();
         }
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        // shown again (the list is rebuilt after a pack change): the marks jump to the pack in use at once
+        selected = Math.max(0, Math.min(N - 1, SolegramConfig.iconPack));
+        for (int c = 0; c < N; c++) {
+            selection[c].set(selected == c, true);
+        }
+        invalidate();
     }
 
     @Override
@@ -177,6 +194,7 @@ public class SolegramIconPackPicker extends View {
         final float iconSize = dp(21), rowGap = dp(12);
         final float cardHeight = dp(CARD_HEIGHT), radius = dp(16);
 
+        syncWithSetting();
         for (int c = 0; c < N; c++) {
             final float p = selection[c].set(selected == c, !animate);
             final float s = 1f - 0.04f * press[c].set(pressed == c && SolegramConfig.pressScale, !animate);

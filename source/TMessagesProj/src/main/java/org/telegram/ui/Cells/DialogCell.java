@@ -2376,6 +2376,16 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
 
+        // Solegram: ignore mode, nothing of what they wrote: no text, no sender, no pictures, no counters
+        final boolean sgIgnored = !isForumCell() && currentDialogId != 0 && com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, currentDialogId);
+        if (sgIgnored) {
+            messageString = getString(R.string.SG_IgnoreOn);
+            messageNameString = null;
+            thumbsCount = 0;
+            drawCount = false;
+            drawMention = false;
+            drawReactionMention = false;
+        }
         // Solegram: the developer's, a tester's or the official channel's badge takes the verified badge's place
         solegramBadge = !forbidVerified && !drawVerified && drawScam == 0 && currentDialogId != 0 && !isForumCell()
             && currentDialogId != UserConfig.getInstance(currentAccount).getClientUserId()
@@ -2465,6 +2475,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             if (sgStreak != null) {
                 nameStringFinal = com.solegram.messenger.SolegramStreak.append(nameStringFinal, sgStreak);
                 ellipsizeWidth += sgStreak.width(Theme.dialogs_namePaint[paintIndex]);
+            }
+            // Solegram: a ghost after the name while the chat is ignored
+            if (sgIgnored) {
+                final android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(nameStringFinal).append("  g");
+                final org.telegram.ui.Components.ColoredImageSpan ghost = new org.telegram.ui.Components.ColoredImageSpan(R.drawable.ghost);
+                ghost.setSize(dp(15));
+                sb.setSpan(ghost, sb.length() - 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                nameStringFinal = sb;
             }
             if (message != null && message.hasHighlightedWords()) {
                 CharSequence s = AndroidUtilities.highlightText(nameStringFinal, message.highlightedWords, resourcesProvider);
@@ -3370,6 +3388,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             mentionCount = 0;
                         }
                         markUnread = dialog.unread_mark;
+                        // Solegram: ignore mode, no counters at all
+                        if (com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, dialog.id)) {
+                            unreadCount = 0;
+                            mentionCount = 0;
+                            reactionMentionCount = 0;
+                            pollVotesMentionCount = 0;
+                            markUnread = false;
+                        }
                         currentEditDate = message != null ? message.messageOwner.edit_date : 0;
                         lastMessageDate = dialog.last_message_date;
                         if (dialogsType == 7 || dialogsType == 8) {
@@ -3945,6 +3971,15 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             translationDrawable = Theme.dialogs_swipeUnmuteDrawable;
                         } else {
                             swipeMessage = getString(swipeMessageStringId = R.string.SwipeMute);
+                            translationDrawable = Theme.dialogs_swipeMuteDrawable;
+                        }
+                    } else if (SharedConfig.getChatSwipeAction(currentAccount) == SwipeGestureSettingsView.SWIPE_GESTURE_IGNORE) {
+                        // Solegram: ignore mode
+                        if (com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, currentDialogId)) {
+                            swipeMessage = getString(swipeMessageStringId = R.string.SG_SwipeUnignore);
+                            translationDrawable = Theme.dialogs_swipeUnmuteDrawable;
+                        } else {
+                            swipeMessage = getString(swipeMessageStringId = R.string.SG_SwipeIgnoreShort);
                             translationDrawable = Theme.dialogs_swipeMuteDrawable;
                         }
                     } else if (SharedConfig.getChatSwipeAction(currentAccount) == SwipeGestureSettingsView.SWIPE_GESTURE_DELETE) {

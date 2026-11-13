@@ -98,6 +98,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_ABOUT = 7;
     /** Only for the official channel's admins: the developer's panel. */
     private static final int ID_DEV_PANEL = 4242;
+    private static final int ID_GESTURES = 4244;
     private static final int ID_EXPORT = 8;
     private static final int ID_IMPORT = 9;
     private static final int ID_RESET = 10;
@@ -274,6 +275,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_BATTERY = 402;
     private static final int ID_CONFIRM_CALLS = 403;
     private static final int ID_HIDE_PREMIUM = 404;
+    private static final int ID_PREMIUM_NAGS = 4243;
+    private static final int ID_PREMIUM_STICKERS = 4245;
     private static final int ID_HIDE_GIFTS = 405;
     private static final int ID_PROXIMITY = 406;
     private static final int ID_NO_VIBRATION = 407;
@@ -458,6 +461,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_ADD_ACCOUNT, R.drawable.outline_add_account, getString(R.string.SG_Accounts),
             org.telegram.messenger.UserConfig.getActivatedAccountsCount() + " / " + org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT), TILE_BLUE)
             .setSolegramSubtitle(getString(R.string.SG_AccountsSub)));
+        items.add(category(ID_GESTURES, R.drawable.msg_reactions, R.string.SG_Gestures, R.string.SG_GesturesSub,
+            com.solegram.messenger.SolegramGestures.enabled() ? getString(R.string.SG_On) : null, TILE_INDIGO));
         // the Studio is for betas only: recording trailers is not a feature of the public app
         if (org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")) {
             items.add(category(ID_STUDIO, R.drawable.msg_camera, R.string.SG_Studio, R.string.SG_StudioSub, null, TILE_PINK));
@@ -528,6 +533,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_HIDE_STORIES, getString(R.string.SG_HideStories)).setChecked(SolegramConfig.hideStories));
         items.add(UItem.asCheck(ID_HIDE_EMOJI_STATUS, getString(R.string.SG_HideEmojiStatus)).setChecked(SolegramConfig.hideEmojiStatus));
         items.add(UItem.asCheck(ID_HIDE_PREMIUM, getString(R.string.SG_HidePremium)).setChecked(SolegramConfig.hidePremiumSettings));
+        items.add(UItem.asCheck(ID_PREMIUM_NAGS, getString(R.string.SG_HidePremiumNags)).setChecked(SolegramConfig.hidePremiumNags));
+        items.add(UItem.asCheck(ID_PREMIUM_STICKERS, getString(R.string.SG_PremiumStickersShare)).setChecked(com.solegram.messenger.SolegramPremiumStickers.enabled()));
         items.add(UItem.asCheck(ID_HIDE_GIFTS, getString(R.string.SG_HideGifts)).setChecked(SolegramConfig.hideGiftButtons));
         items.add(UItem.asShadow(null));
     }
@@ -551,6 +558,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private void setIconPack(int pack) {
         SolegramConfig.putInt("iconPack", pack);
         refreshIcons();
+        if (iconPackPicker != null) {
+            iconPackPicker.setSelected(pack); // the check and the rim on the new pack, in whichever list shows it
+        }
     }
 
     /** Every screen draws its icons again: the icon pack or the settings icon style changed. */
@@ -2397,6 +2407,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_ABOUT:
                 presentFragment(new SolegramSettingsActivity(PAGE_ABOUT));
                 return;
+            case ID_GESTURES:
+                presentFragment(new SolegramGesturesActivity());
+                return;
             case ID_DEV_PANEL:
                 if (com.solegram.messenger.SolegramBadges.isAdmin(currentAccount)) {
                     presentFragment(new SolegramDevPanelActivity());
@@ -2849,6 +2862,19 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_HIDE_PREMIUM:
                 toggleCheck(view, "hidePremiumSettings");
                 return;
+            case ID_PREMIUM_NAGS:
+                toggleCheck(view, "hidePremiumNags");
+                return;
+            case ID_PREMIUM_STICKERS: {
+                final boolean on = !com.solegram.messenger.SolegramPremiumStickers.enabled();
+                SolegramConfig.prefs().edit().putBoolean("premiumStickersShare", on).apply();
+                if (view instanceof org.telegram.ui.Cells.TextCheckCell) {
+                    ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(on);
+                } else if (listView != null && listView.adapter != null) {
+                    listView.adapter.update(true);
+                }
+                return;
+            }
             case ID_HIDE_GIFTS:
                 toggleCheck(view, "hideGiftButtons");
                 return;

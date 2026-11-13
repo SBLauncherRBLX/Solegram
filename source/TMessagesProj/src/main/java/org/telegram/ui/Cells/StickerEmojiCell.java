@@ -304,7 +304,7 @@ public class StickerEmojiCell extends FrameLayout implements NotificationCenter.
             showPremiumLock = false;
         }
         FrameLayout.LayoutParams layoutParams = (LayoutParams) premiumIconView.getLayoutParams();
-        if (!UserConfig.getInstance(currentAccount).isPremium()) {
+        if (!UserConfig.getInstance(currentAccount).isPremium() && !com.solegram.messenger.SolegramPremiumStickers.enabled()) {
             layoutParams.height = layoutParams.width = AndroidUtilities.dp(24);
             layoutParams.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
             layoutParams.rightMargin = 0;
@@ -317,7 +317,7 @@ public class StickerEmojiCell extends FrameLayout implements NotificationCenter.
             layoutParams.rightMargin = AndroidUtilities.dp(8);
             premiumIconView.setPadding(AndroidUtilities.dp(1), AndroidUtilities.dp(1), AndroidUtilities.dp(1), AndroidUtilities.dp(1));
         }
-        premiumIconView.setLocked(!UserConfig.getInstance(currentAccount).isPremium());
+        premiumIconView.setLocked(!UserConfig.getInstance(currentAccount).isPremium() && !com.solegram.messenger.SolegramPremiumStickers.enabled());
         AndroidUtilities.updateViewVisibilityAnimated(premiumIconView, showPremiumLock, 0.9f, animated);
         invalidate();
     }

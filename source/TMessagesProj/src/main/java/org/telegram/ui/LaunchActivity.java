@@ -6899,6 +6899,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     @Override
     protected void onPause() {
         com.solegram.messenger.ui.SolegramFluidTouch.releaseNow(); // Solegram: never leave a held element or its light behind
+        com.solegram.messenger.SolegramGestures.onPause(); // Solegram: no motion sensors in the background
         super.onPause();
         isResumed = false;
         com.solegram.messenger.plugins.PluginsController.getInstance().dispatchAppEvent(com.solegram.messenger.plugins.PluginsController.APP_EVENT_PAUSE);
@@ -7222,6 +7223,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         com.solegram.messenger.BackgroundConnection.ensureRunning(this);
         com.solegram.messenger.wallet.tap.WalletTap.onAppResumed(); // Solegram: a fresh contact token for SoleWallet's next tap
         com.solegram.messenger.SolegramBadges.refreshIfStale(); // Solegram: the badges list, now and then
+        com.solegram.messenger.SolegramRefreshRate.apply(getWindow()); // Solegram: the screen's fastest refresh rate (120 Hz where there is one)
+        com.solegram.messenger.SolegramGestures.onResume(); // Solegram: motion shortcuts, only while the app is on the screen
         com.solegram.messenger.plugins.PluginsController.getInstance().dispatchAppEvent(com.solegram.messenger.plugins.PluginsController.APP_EVENT_RESUME);
         // Solegram: keep Material You colors in sync.
         AndroidUtilities.runOnUIThread(() -> {

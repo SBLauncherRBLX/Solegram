@@ -34,6 +34,8 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
     public static final int SWIPE_GESTURE_MUTE = 3;
     public static final int SWIPE_GESTURE_DELETE = 4;
     public static final int SWIPE_GESTURE_FOLDERS = 5;
+    /** Solegram: ignore mode for the chat. */
+    public static final int SWIPE_GESTURE_IGNORE = 6;
 
     Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     Paint filledPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -44,12 +46,27 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
 
     private NumberPicker picker;
 
-    String[] strings = new String[6];
-    int[] backgroundKeys = new int[6];
-    RLottieDrawable[] icons = new RLottieDrawable[6];
-    private final RLottieDrawable[] lastIconDrawables = new RLottieDrawable[6];
-    private final int[] lastIconColors = new int[6];
-    private final int[] lastIconBackgroundColors = new int[6];
+    String[] strings = new String[7];
+    int[] backgroundKeys = new int[7];
+    RLottieDrawable[] icons = new RLottieDrawable[7];
+    private final RLottieDrawable[] lastIconDrawables = new RLottieDrawable[7];
+    private final int[] lastIconColors = new int[7];
+    private final int[] lastIconBackgroundColors = new int[7];
+    /** Solegram: the order of the actions in the picker (Folders stays the last one, shown only with folders). */
+    private int[] order;
+
+    private int action(int pickerValue) {
+        return order[Math.max(0, Math.min(order.length - 1, pickerValue))];
+    }
+
+    private int indexOfAction(int action) {
+        for (int i = 0; i < order.length; i++) {
+            if (order[i] == action) {
+                return i;
+            }
+        }
+        return 0;
+    }
 
     int currentIconIndex;
     RLottieImageView[] iconViews = new RLottieImageView[2];
@@ -70,6 +87,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
         strings[SWIPE_GESTURE_MUTE] = LocaleController.getString(R.string.SwipeSettingsMute);
         strings[SWIPE_GESTURE_DELETE] = LocaleController.getString(R.string.SwipeSettingsDelete);
         strings[SWIPE_GESTURE_FOLDERS] = LocaleController.getString(R.string.SwipeSettingsFolders);
+        strings[SWIPE_GESTURE_IGNORE] = LocaleController.getString(R.string.SG_SwipeIgnore);
 
         backgroundKeys[SWIPE_GESTURE_PIN] = Theme.key_chats_archiveBackground;
         backgroundKeys[SWIPE_GESTURE_READ] = Theme.key_chats_archiveBackground;
@@ -77,6 +95,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
         backgroundKeys[SWIPE_GESTURE_MUTE] = Theme.key_chats_archiveBackground;
         backgroundKeys[SWIPE_GESTURE_DELETE] = Theme.key_dialogSwipeRemove;
         backgroundKeys[SWIPE_GESTURE_FOLDERS] = Theme.key_chats_archivePinBackground;
+        backgroundKeys[SWIPE_GESTURE_IGNORE] = Theme.key_chats_archiveBackground;
 
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeWidth(AndroidUtilities.dp(1));
@@ -110,21 +129,24 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
         picker.setMinValue(0);
         picker.setDrawDividers(false);
         hasTabs = !MessagesController.getInstance(currentAccount).dialogFilters.isEmpty();
-        picker.setMaxValue(hasTabs ? strings.length - 1 : strings.length - 2);
-        picker.setAllItemsCount(hasTabs ? strings.length : strings.length - 1);
+        order = hasTabs
+            ? new int[]{SWIPE_GESTURE_PIN, SWIPE_GESTURE_READ, SWIPE_GESTURE_ARCHIVE, SWIPE_GESTURE_MUTE, SWIPE_GESTURE_DELETE, SWIPE_GESTURE_IGNORE, SWIPE_GESTURE_FOLDERS}
+            : new int[]{SWIPE_GESTURE_PIN, SWIPE_GESTURE_READ, SWIPE_GESTURE_ARCHIVE, SWIPE_GESTURE_MUTE, SWIPE_GESTURE_DELETE, SWIPE_GESTURE_IGNORE};
+        picker.setMaxValue(order.length - 1);
+        picker.setAllItemsCount(order.length);
         picker.setWrapSelectorWheel(true);
-        picker.setFormatter(value -> strings[value]);
+        picker.setFormatter(value -> strings[action(value)]);
         picker.setOnValueChangedListener((picker, oldVal, newVal) -> {
             swapIcons();
 
-            SharedConfig.updateChatListSwipeSetting(newVal);
+            SharedConfig.updateChatListSwipeSetting(action(newVal));
             invalidate();
             try {
                 picker.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
             } catch (Exception ignored) {}
         });
         picker.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        picker.setValue(SharedConfig.getChatSwipeAction(currentAccount));
+        picker.setValue(indexOfAction(SharedConfig.getChatSwipeAction(currentAccount)));
 
         addView(picker, LayoutHelper.createFrame(132, LayoutHelper.MATCH_PARENT, Gravity.RIGHT, 21, 0, 21, 0));
 
@@ -136,7 +158,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
             addView(iconViews[i], LayoutHelper.createFrame(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0,  132 + 21 + 21 + 10, 0));
         }
 
-        RLottieDrawable currentIcon = getIcon(picker.getValue());
+        RLottieDrawable currentIcon = getIcon(action(picker.getValue()));
         if (currentIcon != null) {
             iconViews[0].setImageDrawable(currentIcon);
             currentIcon.setCurrentFrame(currentIcon.getFramesCount() - 1);
@@ -144,8 +166,8 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
         AndroidUtilities.updateViewVisibilityAnimated(iconViews[0], true, 0.5f, false);
         AndroidUtilities.updateViewVisibilityAnimated(iconViews[1], false, 0.5f, false);
 
-        progressToSwipeFolders = picker.getValue() == SWIPE_GESTURE_FOLDERS ? 1f : 0;
-        currentIconValue = picker.getValue();
+        progressToSwipeFolders = action(picker.getValue()) == SWIPE_GESTURE_FOLDERS ? 1f : 0;
+        currentIconValue = action(picker.getValue());
 
     }
 
@@ -155,7 +177,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
         if (swapIconRunnable != null) {
             return;
         }
-        int newValue = picker.getValue();
+        int newValue = action(picker.getValue());
         if (currentIconValue != newValue) {
             currentIconValue = newValue;
             int nextIconIndex = (currentIconIndex + 1) % 2;
@@ -189,7 +211,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        boolean changeFolder = picker.getValue() == SWIPE_GESTURE_FOLDERS;
+        boolean changeFolder = action(picker.getValue()) == SWIPE_GESTURE_FOLDERS;
 
         if (changeFolder && progressToSwipeFolders != 1f) {
             progressToSwipeFolders += 16 / 300f;
@@ -224,14 +246,14 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
 
         int color;
         if (currentColorKey < 0) {
-            currentColorKey = backgroundKeys[picker.getValue()];
+            currentColorKey = backgroundKeys[action(picker.getValue())];
             colorProgress = 1f;
             color = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhite), Theme.getColor(currentColorKey), 0.9f);
             fromColor = color;
-        } else if (backgroundKeys[picker.getValue()] != currentColorKey) {
+        } else if (backgroundKeys[action(picker.getValue())] != currentColorKey) {
             fromColor = ColorUtils.blendARGB(fromColor, ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhite), Theme.getColor(currentColorKey), 0.9f), colorProgress);
             colorProgress = 0;
-            currentColorKey = backgroundKeys[picker.getValue()];
+            currentColorKey = backgroundKeys[action(picker.getValue())];
         }
 
         if (colorProgress != 1f) {
@@ -311,6 +333,9 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
                 case SWIPE_GESTURE_FOLDERS:
                     rawId = R.raw.swipe_disabled;
                     break;
+                case SWIPE_GESTURE_IGNORE:
+                    rawId = R.raw.swipe_mute;
+                    break;
             }
             icons[i] = new RLottieDrawable(rawId, AndroidUtilities.dp(28), AndroidUtilities.dp(28), true, null);
             updateIconColor(i);
@@ -359,7 +384,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
         info.setEnabled(true);
-        info.setContentDescription(strings[picker.getValue()]);
+        info.setContentDescription(strings[action(picker.getValue())]);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null));
         }
@@ -373,7 +398,7 @@ public class SwipeGestureSettingsView extends FrameLayout implements Theme.Color
             if (newValue > picker.getMaxValue() || newValue < 0) {
                 newValue = 0;
             }
-            setContentDescription(strings[newValue]);
+            setContentDescription(strings[action(newValue)]);
             picker.changeValueByOne(true);
         }
     }

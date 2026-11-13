@@ -2345,7 +2345,8 @@ public class EmojiView extends FrameLayout implements
                     return;
                 }
                 StickerEmojiCell cell = (StickerEmojiCell) view;
-                if (cell.getSticker() != null && MessageObject.isPremiumSticker(cell.getSticker()) && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()) {
+                if (cell.getSticker() != null && MessageObject.isPremiumSticker(cell.getSticker()) && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()
+                    && !com.solegram.messenger.SolegramPremiumStickers.enabled()) {
                     ContentPreviewViewer.getInstance().showMenuFor(cell);
                     return;
                 }
@@ -6371,7 +6372,7 @@ public class EmojiView extends FrameLayout implements
                     }
                 }
             }
-            if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+            if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && !com.solegram.messenger.SolegramPremiumStickers.enabled()) {
                 for (int a = 0; a < favouriteStickers.size(); a++) {
                     if (MessageObject.isPremiumSticker(favouriteStickers.get(a))) {
                         favouriteStickers.remove(a);

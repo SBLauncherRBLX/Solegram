@@ -740,7 +740,8 @@ public class MessagesController extends BaseController implements NotificationCe
         return !starsLocked;
     }
     public boolean premiumFeaturesBlocked() {
-        return premiumLocked && !getUserConfig().isPremium();
+        // Solegram: without Premium, its stickers, locks and offers can be hidden the way Telegram hides them where Premium is not sold
+        return (premiumLocked || com.solegram.messenger.SolegramConfig.hidePremiumNags) && !getUserConfig().isPremium();
     }
     public boolean premiumPurchaseBlocked() {
         return premiumLocked;
@@ -14785,6 +14786,10 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public void markDialogAsRead(long dialogId, int maxPositiveId, int maxNegativeId, int maxDate, boolean popup, long threadId, int countDiff, boolean readNow, int scheduledCount) {
         boolean createReadTask;
+        // Solegram: ignore mode, nothing is marked as read (the other side sees no "read")
+        if (com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, dialogId)) {
+            return;
+        }
 
         if (threadId != 0) {
             createReadTask = maxPositiveId != Integer.MAX_VALUE;

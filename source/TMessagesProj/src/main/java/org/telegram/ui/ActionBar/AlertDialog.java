@@ -1577,6 +1577,7 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.solegram.messenger.SolegramRefreshRate.apply(getWindow()); // Solegram: the screen's fastest refresh rate
         inflateContent(true);
         NotificationCenter.getGlobalInstance().addWeakObserver(this, NotificationCenter.emojiLoaded);
     }

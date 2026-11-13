@@ -2074,6 +2074,7 @@ public class MessageObject {
         this.searchType = searchType;
 
         currentAccount = accountNum;
+        com.solegram.messenger.SolegramPremiumStickers.transform(accountNum, message); // Solegram: a Premium sticker sent by a Solegram user without Premium
         messageOwner = message;
         replyMessageObject = replyToMessage;
         eventId = eid;

@@ -1455,6 +1455,7 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         onCreateInternal();
+        com.solegram.messenger.SolegramRefreshRate.apply(getWindow()); // Solegram: the screen's fastest refresh rate
     }
 
     private void onCreateInternal() {

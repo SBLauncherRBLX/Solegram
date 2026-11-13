@@ -2080,6 +2080,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (document == null) {
             return;
         }
+        // Solegram: a Premium sticker without Premium goes as its emoji with a mark that Solegram users see as the sticker
+        if (!DialogObject.isEncryptedDialog(peer) && stars <= 0 && com.solegram.messenger.SolegramPremiumStickers.needsWorkaround(currentAccount, document)
+            && com.solegram.messenger.SolegramPremiumStickers.send(currentAccount, document, peer, replyToMsg, replyToTopMsg, notify, scheduleDate)) {
+            return;
+        }
         if (DialogObject.isEncryptedDialog(peer)) {
             int encryptedId = DialogObject.getEncryptedChatId(peer);
             TLRPC.EncryptedChat encryptedChat = getMessagesController().getEncryptedChat(encryptedId);

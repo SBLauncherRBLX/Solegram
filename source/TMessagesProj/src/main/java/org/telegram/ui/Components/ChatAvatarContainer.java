@@ -949,6 +949,15 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (value != null) {
             value = Emoji.replaceEmoji(value, titleTextView.getPaint().getFontMetricsInt(), false);
         }
+        // Solegram: a ghost after the name while the chat is ignored
+        if (value != null && parentFragment != null && parentFragment.getChatMode() == 0
+            && com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, parentFragment.getDialogId())) {
+            final android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(value).append("  g");
+            final ColoredImageSpan ghost = new ColoredImageSpan(R.drawable.ghost);
+            ghost.setSize(dp(16));
+            sb.setSpan(ghost, sb.length() - 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            value = sb;
+        }
         titleTextView.setText(value);
         rightDrawableIsScam = false;
         // Solegram: the developer's, a tester's or the official channel's badge next to the name
@@ -1266,6 +1275,12 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                     isOnline[0] = false;
                     newStatus = LocaleController.formatUserStatus(currentAccount, user, isOnline, allowShorterStatus ? statusMadeShorter : null);
                     useOnlineColor = isOnline[0];
+                    // Solegram: the streak with this person, right after "online" / "last seen"
+                    final com.solegram.messenger.SolegramStreak.Span streak = parentFragment != null && parentFragment.getChatMode() == 0
+                        ? com.solegram.messenger.SolegramStreak.span(currentAccount, user.id) : null;
+                    if (streak != null && newStatus != null) {
+                        newStatus = com.solegram.messenger.SolegramStreak.append(newStatus, streak);
+                    }
                 }
                 newSubtitle = newStatus;
             } else {

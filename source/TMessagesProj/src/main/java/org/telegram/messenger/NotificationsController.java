@@ -1296,6 +1296,10 @@ public class NotificationsController extends BaseController implements Notificat
                 if (value && com.solegram.messenger.SolegramHiddenChats.silences(currentAccount, originalDialogId)) {
                     value = false;
                 }
+                // Solegram: ignore mode, nothing tells that they wrote
+                if (value && com.solegram.messenger.SolegramIgnore.isIgnored(currentAccount, originalDialogId)) {
+                    value = false;
+                }
 
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d("NotificationsController: process new messages, value is " + value + " ("+dialogId+", "+isChannel+", "+messageObject.isReactionPush+", "+messageObject.isStoryReactionPush+")");
@@ -1806,7 +1810,7 @@ public class NotificationsController extends BaseController implements Notificat
                 continue;
             }
             // Solegram: unread messages of hidden chats do not show on the app icon
-            final long[] solegramHidden = com.solegram.messenger.SolegramHiddenChats.idsFor(a);
+            final long[] solegramHidden = com.solegram.messenger.SolegramIgnore.withIgnored(a, com.solegram.messenger.SolegramHiddenChats.idsFor(a)); // ignored chats do not count either
 
             if (controller.showBadgeMessages) {
                 if (controller.showBadgeMuted) {

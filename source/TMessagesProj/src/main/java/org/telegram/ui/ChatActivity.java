@@ -20376,6 +20376,15 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    /** Solegram: asks which language to translate into (unless turned off), then translates. */
+    private void sgTranslateWith(String suggested, Utilities.Callback<String> open) {
+        if (com.solegram.messenger.ui.SolegramLanguagePicker.enabled()) {
+            com.solegram.messenger.ui.SolegramLanguagePicker.show(this, suggested, open);
+        } else {
+            open.run(suggested);
+        }
+    }
+
     /** Solegram: the streak item in the menu is there only while a streak is. */
     private void sgUpdateStreakItem() {
         if (headerItem == null || currentUser == null) {
@@ -33026,9 +33035,12 @@ public class ChatActivity extends BaseFragment implements
                                     return;
                                 }
                                 String toLangValue = fromLang != null && fromLang.equals(toLang) ? toLangDefault : toLang;
-                                TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], fromLang, toLangValue, richMessageToTranslate, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
-                                alert.setDimBehind(false);
                                 closeMenu(false);
+                                // Solegram: the language to translate into is picked first
+                                sgTranslateWith(toLangValue, sgTo -> {
+                                    TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], fromLang, sgTo, richMessageToTranslate, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                    alert.setDimBehind(false);
+                                });
 
                                 int hintCount = MessagesController.getNotificationsSettings(currentAccount).getInt("dialog_show_translate_count" + getDialogId(), 5);
                                 if (hintCount > 0) {
@@ -33053,9 +33065,12 @@ public class ChatActivity extends BaseFragment implements
 
                                 String toLangValue = fromLang != null && fromLang.equals(toLang) ? toLangDefault : toLang;
                                 ArrayList<TLRPC.MessageEntity> entities = selectedObject != null && selectedObject.messageOwner != null ? selectedObject.messageOwner.entities : null;
-                                TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, fromLang, toLangValue, finalMessageText, entities, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
-                                alert.setDimBehind(false);
                                 closeMenu(false);
+                                // Solegram: the language to translate into is picked first
+                                sgTranslateWith(toLangValue, sgTo -> {
+                                    TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, fromLang, sgTo, finalMessageText, entities, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                    alert.setDimBehind(false);
+                                });
                                 
 //                                final TranslateAlert3 alert =
 //                                    new TranslateAlert3(getContext(), resourceProvider)
@@ -33111,9 +33126,12 @@ public class ChatActivity extends BaseFragment implements
                                 }
                                 String toLangValue = fromLang[0] != null && fromLang[0].equals(toLang) ? toLangDefault : toLang;
                                 ArrayList<TLRPC.MessageEntity> entities = selectedObject != null && selectedObject.messageOwner != null ? selectedObject.messageOwner.entities : null;
-                                TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, fromLang[0], toLangValue, finalMessageText, entities, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
-                                alert.setDimBehind(false);
                                 closeMenu(false);
+                                // Solegram: the language to translate into is picked first
+                                sgTranslateWith(toLangValue, sgTo -> {
+                                    TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, fromLang[0], sgTo, finalMessageText, entities, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                    alert.setDimBehind(false);
+                                });
 
 //                                final TranslateAlert3 alert =
 //                                    new TranslateAlert3(getContext(), resourceProvider)
@@ -33145,9 +33163,12 @@ public class ChatActivity extends BaseFragment implements
                                     return;
                                 }
 
-                                TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, "und", toLang, finalMessageText, null, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
-                                alert.setDimBehind(false);
                                 closeMenu(false);
+                                // Solegram: the language to translate into is picked first
+                                sgTranslateWith(toLang, sgTo -> {
+                                    TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, "und", sgTo, finalMessageText, null, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                    alert.setDimBehind(false);
+                                });
 
 //                                final TranslateAlert3 alert = new TranslateAlert3(getContext(), getResourceProvider())
 //                                    .setMessage(dialog_id, shouldTranslateByText ? 0 : messageIdToTranslate[0], selectedObject.summarized)
@@ -35281,7 +35302,14 @@ public class ChatActivity extends BaseFragment implements
 
     /** 0 = shown as usual, 1 = a slim line, 2 = nothing (also a date whose whole day is hidden). */
     private int solegramFilterState(ArrayList<MessageObject> list, int index) {
-        if (index < 0 || index >= list.size() || !solegramFiltersApply()) {
+        if (index < 0 || index >= list.size()) {
+            return 0;
+        }
+        // Solegram: ignore mode, their messages after it was turned on are not there until it is off
+        if (chatMode == MODE_DEFAULT && com.solegram.messenger.SolegramIgnore.hides(currentAccount, dialog_id, list.get(index))) {
+            return 2;
+        }
+        if (!solegramFiltersApply()) {
             return 0;
         }
         final MessageObject m = list.get(index);
@@ -35331,6 +35359,10 @@ public class ChatActivity extends BaseFragment implements
         if (m.isDateObject) {
             solegramHiddenDates.add(m);
             cell.set(m, true, "", null);
+            return;
+        }
+        if (chatMode == MODE_DEFAULT && com.solegram.messenger.SolegramIgnore.hides(currentAccount, dialog_id, m)) {
+            cell.set(m, true, "", null); // ignore mode: takes no space
             return;
         }
         final com.solegram.messenger.SolegramFilterEngine.Rule rule = solegramFilterRule(m);

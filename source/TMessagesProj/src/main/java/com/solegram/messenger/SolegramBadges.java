@@ -56,7 +56,9 @@ public final class SolegramBadges {
 
     private static final char START = '⁤';
     private static final int VERSION = 1;
-    private static final long STALE_MS = 6 * 60 * 60 * 1000L;
+    /** A badge given a moment ago reaches everyone soon: the list is read on every start and then every 20 minutes. */
+    private static final long STALE_MS = 20 * 60 * 1000L;
+    private static boolean readThisRun;
 
     private static final String PREFS = "solegram_badges";
 
@@ -299,7 +301,7 @@ public final class SolegramBadges {
 
     /** Checks the list now and then (on start and every few hours). */
     public static void refreshIfStale() {
-        if (System.currentTimeMillis() - prefs().getLong("checked", 0) > STALE_MS) {
+        if (!readThisRun || System.currentTimeMillis() - prefs().getLong("checked", 0) > STALE_MS) {
             refresh(null);
         }
     }
@@ -335,6 +337,7 @@ public final class SolegramBadges {
                         }
                         return;
                     }
+                    readThisRun = true;
                     apply(chat.id, about);
                     checkAdmins(chat);
                     if (done != null) {
