@@ -12119,7 +12119,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 Drawable leftIcon = currentEncryptedChat != null ? getLockIconDrawable() : null;
                 boolean rightIconIsPremium = false, rightIconIsStatus = false;
                 nameTextView.setRightDrawableOutside(false);
-                final int solegramRole = com.solegram.messenger.SolegramBadges.roleOf(user);
+                // the Saved Messages page is not a person: no badge there, even on the own account
+                final int solegramRole = saved && UserObject.isUserSelf(user) ? com.solegram.messenger.SolegramBadges.NONE : com.solegram.messenger.SolegramBadges.roleOf(user);
                 nameTextView.setRightDrawable2OnClick(null);
                 if (user.scam || user.fake) {
                     nameTextView.setRightDrawable2(getScamDrawable(user.scam ? 0 : 1));

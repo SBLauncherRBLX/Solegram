@@ -961,7 +961,8 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         titleTextView.setText(value);
         rightDrawableIsScam = false;
         // Solegram: the developer's, a tester's or the official channel's badge next to the name
-        final int solegramRole = !scam && !fake && !verified && parentFragment != null ? com.solegram.messenger.SolegramBadges.roleOf(parentFragment.getDialogId()) : com.solegram.messenger.SolegramBadges.NONE;
+        final int solegramRole = !scam && !fake && !verified && parentFragment != null
+            && parentFragment.getDialogId() != org.telegram.messenger.UserConfig.getInstance(currentAccount).getClientUserId() ? com.solegram.messenger.SolegramBadges.roleOf(parentFragment.getDialogId()) : com.solegram.messenger.SolegramBadges.NONE;
         if (solegramRole != com.solegram.messenger.SolegramBadges.NONE) {
             if (!(titleTextView.getRightDrawable2() instanceof com.solegram.messenger.ui.SolegramBadgeDrawable)
                 || ((com.solegram.messenger.ui.SolegramBadgeDrawable) titleTextView.getRightDrawable2()).getRole() != solegramRole) {

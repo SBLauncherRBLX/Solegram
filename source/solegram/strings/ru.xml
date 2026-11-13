@@ -1902,6 +1902,9 @@
     <string name="SG_DevPanelPackNotFound">Набор эмодзи по этой ссылке не найден</string>
     <string name="SG_DevPanelNoStatus">У них нет эмодзи-статуса</string>
     <string name="SG_HidePremiumNags">Без напоминаний о Premium</string>
+    <string name="SG_MentionCards">Карточки профиля при упоминании</string>
+    <string name="SG_MentionCardSubscribers">подписчиков: %1$s</string>
+    <string name="SG_MentionCardMembers">участников: %1$s</string>
     <string name="SG_TranslateRecent">Недавние</string>
     <string name="SG_TranslateAll">Все языки</string>
     <string name="SG_Gestures">Жесты</string>

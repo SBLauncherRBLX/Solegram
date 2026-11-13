@@ -113,6 +113,8 @@ public class SolegramProfileLinksView extends View {
         LinearGradient rim;
         float press;
         ValueAnimator animator;
+        /** When the mark last waved (idle) or bounced (tap); 0: never. */
+        long waveStart, bounceStart;
 
         Chip(@Nullable SolegramProfileLinks.Link link) {
             this.link = link;
@@ -202,6 +204,7 @@ public class SolegramProfileLinksView extends View {
             }
         }
         laidOutWidth = -1;
+        appearStart = 0;
         accessHelper.invalidateRoot();
         requestLayout();
         invalidate();
@@ -348,12 +351,15 @@ public class SolegramProfileLinksView extends View {
                     circle = ColorUtils.blendARGB(circle, 0xFFFFFFFF, 0.16f);
                 }
                 circlePaint.setColor(circle);
+                canvas.save();
+                markTransform(canvas, c, chips.indexOf(c), cx, cy);
                 canvas.drawCircle(cx, cy, iconSize / 2f, circlePaint);
                 if (c.icon != null) {
                     final int half = dp(6.5f);
                     c.icon.setBounds((int) cx - half, (int) cy - half, (int) cx + half, (int) cy + half);
                     c.icon.draw(canvas);
                 }
+                canvas.restore();
                 tx = LocaleController.isRTL ? r.right - dp(MARK_PAD + ICON + TEXT_PAD) - c.labelWidth : r.left + dp(MARK_PAD + ICON + TEXT_PAD);
             }
             canvas.drawText(c.label, tx, cy - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint);
@@ -418,6 +424,8 @@ public class SolegramProfileLinksView extends View {
                 }
                 final Chip chip = pressed;
                 release();
+                chip.bounceStart = android.os.SystemClock.uptimeMillis();
+                invalidate();
                 if (!longPressed) {
                     playSoundEffect(android.view.SoundEffectConstants.CLICK);
                     perform(chip, false);
@@ -465,7 +473,102 @@ public class SolegramProfileLinksView extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         release();
+        removeCallbacks(idleWave);
     }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        appearStart = 0;
+        removeCallbacks(idleWave);
+        postDelayed(idleWave, IDLE_WAVE_MS);
+    }
+
+    // region Living marks: they pop in one after another, now and then one waves, a tap bounces it
+
+    private static final long APPEAR_MS = 520, APPEAR_STAGGER = 70, WAVE_MS = 900, BOUNCE_MS = 420, IDLE_WAVE_MS = 4200;
+    private long appearStart;
+    private int waveIndex;
+
+    private final Runnable idleWave = new Runnable() {
+        @Override
+        public void run() {
+            if (!isAttachedToWindow()) {
+                return;
+            }
+            if (animationsOn() && getVisibility() == VISIBLE && isShown()) {
+                final ArrayList<Chip> marks = new ArrayList<>();
+                for (Chip c : chips) {
+                    if (c.link != null) {
+                        marks.add(c);
+                    }
+                }
+                if (!marks.isEmpty()) {
+                    marks.get(waveIndex++ % marks.size()).waveStart = android.os.SystemClock.uptimeMillis();
+                    invalidate();
+                }
+            }
+            postDelayed(this, IDLE_WAVE_MS);
+        }
+    };
+
+    private static boolean animationsOn() {
+        return LiteMode.isEnabled(LiteMode.FLAGS_ANIMATED_EMOJI);
+    }
+
+    private void markTransform(Canvas canvas, Chip c, int index, float cx, float cy) {
+        if (!animationsOn()) {
+            return;
+        }
+        final long now = android.os.SystemClock.uptimeMillis();
+        if (appearStart == 0) {
+            appearStart = now;
+        }
+        boolean running = false;
+        float scale = 1f, angle = 0f;
+        // appearing: grows from nothing with an overshoot, turning into place
+        final long a = now - appearStart - index * APPEAR_STAGGER;
+        if (a < APPEAR_MS) {
+            final float t = Math.max(0f, a / (float) APPEAR_MS);
+            scale *= CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(t);
+            angle += -40f * (1f - CubicBezierInterpolator.EASE_OUT.getInterpolation(t));
+            running = true;
+        }
+        // an idle wave: a few decaying swings, as a hand waves
+        if (c.waveStart != 0) {
+            final long w = now - c.waveStart;
+            if (w < WAVE_MS) {
+                final float t = w / (float) WAVE_MS;
+                angle += (float) (Math.sin(t * Math.PI * 4) * 16f * (1f - t));
+                scale *= 1f + 0.08f * (float) Math.sin(t * Math.PI);
+                running = true;
+            } else {
+                c.waveStart = 0;
+            }
+        }
+        // a tap: a quick bounce
+        if (c.bounceStart != 0) {
+            final long b = now - c.bounceStart;
+            if (b < BOUNCE_MS) {
+                final float t = b / (float) BOUNCE_MS;
+                scale *= 1f + 0.28f * (float) Math.sin(t * Math.PI) * (1f - t * 0.5f);
+                angle += 12f * (float) Math.sin(t * Math.PI * 2) * (1f - t);
+                running = true;
+            } else {
+                c.bounceStart = 0;
+            }
+        }
+        if (scale != 1f) {
+            canvas.scale(scale, scale, cx, cy);
+        }
+        if (angle != 0f) {
+            canvas.rotate(angle, cx, cy);
+        }
+        if (running) {
+            postInvalidateOnAnimation();
+        }
+    }
+    // endregion
 
     @Override
     protected boolean dispatchHoverEvent(MotionEvent event) {

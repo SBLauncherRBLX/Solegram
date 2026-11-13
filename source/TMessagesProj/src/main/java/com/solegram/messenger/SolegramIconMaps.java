@@ -2140,6 +2140,8 @@ final class SolegramIconMaps {
 
     static int[] line() {
         return new int[]{
+            R.drawable.sg_sls_feature_ai, R.drawable.sg_line_sparkle,
+            R.drawable.sg_sls_feature_gestures, R.drawable.sg_line_hand_waving,
             R.drawable.menu_reply, R.drawable.sg_line_arrow_bend_up_left,
             R.drawable.msg_copy, R.drawable.sg_line_copy,
             R.drawable.msg_forward, R.drawable.sg_line_arrow_bend_up_right,

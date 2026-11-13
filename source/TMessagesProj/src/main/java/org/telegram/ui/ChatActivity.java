@@ -2216,10 +2216,6 @@ public class ChatActivity extends BaseFragment implements
             if (suggestEmojiPanel != null) {
                 suggestEmojiPanel.onTextSelectionChanged(start, end);
             }
-            if (sgMentionCard != null) {
-                AndroidUtilities.cancelRunOnUIThread(sgMentionCheck);
-                AndroidUtilities.runOnUIThread(sgMentionCheck);
-            }
         }
 
         @Override
@@ -2228,12 +2224,6 @@ public class ChatActivity extends BaseFragment implements
             if (mentionContainer != null && mentionContainer.getAdapter() != null) {
                 mentionContainer.getAdapter().searchUsernameOrHashtag(text, chatActivityEnterView.getCursorPosition(), messages, false, false);
             }
-            if (sgMentionCard == null) {
-                sgMentionCard = new com.solegram.messenger.ui.SolegramMentionCard.Controller(ChatActivity.this);
-            }
-            // the cursor moves after this call: read it a frame later, with the text as it is then
-            AndroidUtilities.cancelRunOnUIThread(sgMentionCheck);
-            AndroidUtilities.runOnUIThread(sgMentionCheck);
             if (waitingForCharaterEnterRunnable != null) {
                 AndroidUtilities.cancelRunOnUIThread(waitingForCharaterEnterRunnable);
                 waitingForCharaterEnterRunnable = null;
@@ -3375,9 +3365,6 @@ public class ChatActivity extends BaseFragment implements
 
     @Override
     public void onFragmentDestroy() {
-        if (sgMentionCard != null) {
-            sgMentionCard.hide();
-        }
         super.onFragmentDestroy();
         if (solegramMenuLiquid != null) {
             solegramMenuLiquid.finishNow();
@@ -31089,9 +31076,6 @@ public class ChatActivity extends BaseFragment implements
 
     @Override
     public void onPause() {
-        if (sgMentionCard != null) {
-            sgMentionCard.hide();
-        }
         super.onPause();
         scrolling = false;
         if (scrimPopupWindow != null) {
@@ -35317,20 +35301,6 @@ public class ChatActivity extends BaseFragment implements
     }
 
     /** 0 = shown as usual, 1 = a slim line, 2 = nothing (also a date whose whole day is hidden). */
-    private com.solegram.messenger.ui.SolegramMentionCard.Controller sgMentionCard;
-    private final Runnable sgMentionCheck = () -> {
-        if (sgMentionCard != null && chatActivityEnterView != null && chatActivityEnterView.getEditField() != null && !isFinishing()) {
-            sgMentionCard.onText(chatActivityEnterView.getEditField().getText(), chatActivityEnterView.getCursorPosition());
-        }
-    };
-
-    /** The mention card took over from the suggestions for this exact username: the list is closed. */
-    public void sgCloseMentionSuggestions() {
-        if (mentionContainer != null && mentionContainer.getAdapter() != null) {
-            mentionContainer.getAdapter().searchUsernameOrHashtag(null, 0, null, false, true);
-        }
-    }
-
     private int solegramFilterState(ArrayList<MessageObject> list, int index) {
         if (index < 0 || index >= list.size()) {
             return 0;

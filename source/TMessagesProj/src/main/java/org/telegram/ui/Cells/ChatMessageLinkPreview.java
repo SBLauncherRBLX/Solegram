@@ -158,7 +158,7 @@ class ChatMessageLinkPreview {
         boolean restore = false;
         boolean drawInstantButtonInside = false;
         boolean loading = cell.delegate != null && cell.delegate.isProgressLoading(cell, ChatActivity.PROGRESS_INSTANT);
-        if (!cell.hasInvoicePreview && !cell.currentMessageObject.isGiveawayOrGiveawayResults() && !cell.currentMessageObject.isUnsupported()) {
+        if (!cell.hasInvoicePreview && !cell.currentMessageObject.isGiveawayOrGiveawayResults() && !cell.currentMessageObject.isUnsupported() && !cell.sgMentionCard) {
             drawInstantButtonInside = true;
 
             if (bounce == null) {
@@ -654,6 +654,9 @@ class ChatMessageLinkPreview {
         cell.drawVideoTimestamps(canvas, cell.linkLine.getColor());
         cell.giveawayMessageCell.draw(canvas, cell.namesOffset, linkX, cell.resourcesProvider);
         cell.giveawayResultsMessageCell.draw(canvas, cell.namesOffset, linkX, cell.resourcesProvider);
+        if (cell.sgMentionCard) {
+            cell.sgMention.draw(canvas, linkX, startY, cell.currentMessageObject.isOutOwner());
+        }
 
         if (cell.drawInstantView) {
             Drawable instantDrawable;

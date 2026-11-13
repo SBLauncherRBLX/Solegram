@@ -277,6 +277,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_HIDE_PREMIUM = 404;
     private static final int ID_PREMIUM_NAGS = 4243;
     private static final int ID_PREMIUM_STICKERS = 4245;
+    private static final int ID_MENTION_CARDS = 4246;
     private static final int ID_HIDE_GIFTS = 405;
     private static final int ID_PROXIMITY = 406;
     private static final int ID_NO_VIBRATION = 407;
@@ -533,6 +534,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_HIDE_PREMIUM, getString(R.string.SG_HidePremium)).setChecked(SolegramConfig.hidePremiumSettings));
         items.add(UItem.asCheck(ID_PREMIUM_NAGS, getString(R.string.SG_HidePremiumNags)).setChecked(SolegramConfig.hidePremiumNags));
         items.add(UItem.asCheck(ID_PREMIUM_STICKERS, getString(R.string.SG_PremiumStickersShare)).setChecked(com.solegram.messenger.SolegramPremiumStickers.enabled()));
+        items.add(UItem.asCheck(ID_MENTION_CARDS, getString(R.string.SG_MentionCards)).setChecked(SolegramConfig.mentionCards));
         items.add(UItem.asCheck(ID_HIDE_GIFTS, getString(R.string.SG_HideGifts)).setChecked(SolegramConfig.hideGiftButtons));
         items.add(UItem.asShadow(null));
     }
@@ -2862,6 +2864,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_PREMIUM_NAGS:
                 toggleCheck(view, "hidePremiumNags");
+                return;
+            case ID_MENTION_CARDS:
+                toggleCheck(view, "mentionCards");
+                redrawEverything();
                 return;
             case ID_PREMIUM_STICKERS: {
                 final boolean on = !com.solegram.messenger.SolegramPremiumStickers.enabled();

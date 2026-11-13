@@ -13571,6 +13571,9 @@
     <string name="SG_DevPanelPackNotFound">No emoji pack found by that link</string>
     <string name="SG_DevPanelNoStatus">They have no emoji status</string>
     <string name="SG_HidePremiumNags">No Premium nags</string>
+    <string name="SG_MentionCards">Profile cards for mentions</string>
+    <string name="SG_MentionCardSubscribers">%1$s subscribers</string>
+    <string name="SG_MentionCardMembers">%1$s members</string>
     <string name="SG_TranslateRecent">Recent</string>
     <string name="SG_TranslateAll">All languages</string>
     <string name="SG_Gestures">Gestures</string>
