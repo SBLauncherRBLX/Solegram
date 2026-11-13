@@ -13385,11 +13385,10 @@
     <string name="SG_IconPixel">8-bit</string>
     <string name="SG_IconCandy">Match three</string>
     <string name="SG_IconRetro">Retro desktop</string>
-    <string name="SG_IconJellyfish">Jellyfish</string>
-    <string name="SG_IconDroid">Droid</string>
     <string name="SG_IconNotebook">Notebook</string>
     <string name="SG_IconHolo">Holo</string>
     <string name="SG_IconHoloLight">Holo light</string>
+    <string name="SG_IconAero">Aero</string>
     <string name="SG_IconsMaterial">Material You</string>
     <string name="SG_IconM3Sky">Sky</string>
     <string name="SG_IconM3Sage">Sage</string>
