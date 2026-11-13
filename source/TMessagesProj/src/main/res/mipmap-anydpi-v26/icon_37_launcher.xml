@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Solegram retro desktop launcher icon: the mark in a window of an old desktop OS on teal, drawn pixel for pixel (branding/themed/retro_window.py) -->
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/sg_icon_bg_xp" />
-    <foreground android:drawable="@mipmap/sg_icon_fg_xp" />
-    <monochrome android:drawable="@drawable/sg_icon_fg_mono" />
-</adaptive-icon>

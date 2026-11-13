@@ -542,8 +542,8 @@
             android:enabled="false"
             android:name="org.telegram.messenger.RetroIcon"
             android:targetActivity="org.telegram.ui.LaunchActivity"
-            android:icon="@mipmap/icon_37_launcher"
-            android:roundIcon="@mipmap/icon_37_launcher_round"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
             android:exported="true">
 
             <intent-filter>
@@ -692,8 +692,8 @@
             android:enabled="false"
             android:name="org.telegram.messenger.AeroIcon"
             android:targetActivity="org.telegram.ui.LaunchActivity"
-            android:icon="@mipmap/icon_47_launcher"
-            android:roundIcon="@mipmap/icon_47_launcher_round"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
             android:exported="true">
 
             <intent-filter>

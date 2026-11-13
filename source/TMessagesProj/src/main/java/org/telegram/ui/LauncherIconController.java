@@ -15,7 +15,7 @@ import java.util.Calendar;
 
 public class LauncherIconController {
     /** Icons taken out of the picker; their launcher entries stay in the manifest so an install that has one on keeps an icon until the switch below. */
-    private static final String[] RETIRED = {"NeonIcon", "SpinIcon", "NebulaIcon", "FrostIcon", "MangaIcon", "JellyfishIcon", "DroidIcon"};
+    private static final String[] RETIRED = {"NeonIcon", "SpinIcon", "NebulaIcon", "FrostIcon", "MangaIcon", "JellyfishIcon", "DroidIcon", "RetroIcon", "AeroIcon"};
 
     public static void tryFixLauncherIconIfNeeded() {
         // Solegram: a retired icon that is still on gives way to the default one
@@ -234,12 +234,10 @@ public class LauncherIconController {
         CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true),
         // Solegram 3.3: an early 2000s desktop, a deep sea
         // jellyfish, a green robot - homages to styles, no names or characters
-        RETRO("RetroIcon", R.mipmap.sg_icon_bg_xp, R.mipmap.sg_icon_fg_xp, R.string.SG_IconRetro, false, true),
         // the mark drawn in blue ballpoint on a squared school notebook page, hastily filled in
         NOTEBOOK("NotebookIcon", R.mipmap.sg_icon_bg_notebook, R.mipmap.sg_icon_fg_notebook, R.string.SG_IconNotebook, false, true),
         HOLO("HoloIcon", R.mipmap.sg_icon_bg_holo, R.mipmap.sg_icon_fg_holo, R.string.SG_IconHolo, false, true),
         HOLO_LIGHT("HoloLightIcon", R.mipmap.sg_icon_bg_holo_light, R.mipmap.sg_icon_fg_holo_light, R.string.SG_IconHoloLight, false, true),
-        AERO("AeroIcon", R.mipmap.sg_icon_bg_aero, R.mipmap.sg_icon_fg_aero, R.string.SG_IconAero, false, true),
         // Solegram 3.3: Material You - the mark in two tones of one hue on its tonal container (with the colour icons)
         MATERIAL_SKY("MaterialSkyIcon", R.drawable.sg_icon_bg_m3sky, R.drawable.sg_icon_fg_m3sky, R.string.SG_IconM3Sky, false, false, false),
         MATERIAL_SAGE("MaterialSageIcon", R.drawable.sg_icon_bg_m3sage, R.drawable.sg_icon_fg_m3sage, R.string.SG_IconM3Sage, false, false, false),

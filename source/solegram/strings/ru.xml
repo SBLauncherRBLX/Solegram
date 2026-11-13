@@ -1715,11 +1715,9 @@
     <string name="SG_IconDoor">Фиолетовая дверь</string>
     <string name="SG_IconPixel">8 бит</string>
     <string name="SG_IconCandy">Три в ряд</string>
-    <string name="SG_IconRetro">Ретро-рабочий стол</string>
     <string name="SG_IconNotebook">Тетрадка</string>
     <string name="SG_IconHolo">Голограмма</string>
     <string name="SG_IconHoloLight">Голограмма светлая</string>
-    <string name="SG_IconAero">Аэро</string>
     <string name="SG_IconsMaterial">Material You</string>
     <string name="SG_IconM3Sky">Небо</string>
     <string name="SG_IconM3Sage">Шалфей</string>
