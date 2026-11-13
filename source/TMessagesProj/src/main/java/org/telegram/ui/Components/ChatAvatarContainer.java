@@ -951,7 +951,23 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         }
         titleTextView.setText(value);
         rightDrawableIsScam = false;
-        if (scam || fake) {
+        // Solegram: the developer's, a tester's or the official channel's badge next to the name
+        final int solegramRole = !scam && !fake && !verified && parentFragment != null ? com.solegram.messenger.SolegramBadges.roleOf(parentFragment.getDialogId()) : com.solegram.messenger.SolegramBadges.NONE;
+        if (solegramRole != com.solegram.messenger.SolegramBadges.NONE) {
+            if (!(titleTextView.getRightDrawable2() instanceof com.solegram.messenger.ui.SolegramBadgeDrawable)
+                || ((com.solegram.messenger.ui.SolegramBadgeDrawable) titleTextView.getRightDrawable2()).getRole() != solegramRole) {
+                titleTextView.setRightDrawable2(new com.solegram.messenger.ui.SolegramBadgeDrawable(solegramRole, dp(17)));
+            }
+            rightDrawableIsScamOrVerified = true;
+            rightDrawable2ContentDescription = getString(com.solegram.messenger.ui.SolegramBadgeSheet.titleOf(solegramRole));
+        } else if (titleTextView.getRightDrawable2() instanceof com.solegram.messenger.ui.SolegramBadgeDrawable) {
+            titleTextView.setRightDrawable2(null);
+            rightDrawableIsScamOrVerified = false;
+            rightDrawable2ContentDescription = null;
+        }
+        if (solegramRole != com.solegram.messenger.SolegramBadges.NONE) {
+            // the badge is set
+        } else if (scam || fake) {
             rightDrawableIsScam = true;
             if (!(titleTextView.getRightDrawable() instanceof ScamDrawable)) {
                 ScamDrawable drawable = new ScamDrawable(11, scam ? 0 : 1);

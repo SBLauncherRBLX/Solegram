@@ -681,6 +681,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private StaticLayout mentionLayout;
 
     private boolean drawVerified;
+    private android.graphics.drawable.Drawable solegramBadge;
     private boolean drawBotVerified;
     private boolean drawPremium;
     private final View emojiStatusView;
@@ -2375,6 +2376,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
 
+        // Solegram: the developer's, a tester's or the official channel's badge takes the verified badge's place
+        solegramBadge = !forbidVerified && !drawVerified && drawScam == 0 && currentDialogId != 0 && !isForumCell()
+            && currentDialogId != UserConfig.getInstance(currentAccount).getClientUserId()
+            ? com.solegram.messenger.ui.SolegramBadgeDrawable.forDialog(currentDialogId, Theme.dialogs_verifiedDrawable.getIntrinsicWidth()) : null;
+        if (solegramBadge != null) {
+            drawVerified = true;
+            drawPremium = false;
+        }
         nameAdditionalsForChannelSubscriber = 0;
         final boolean reserveMuteSlot = (dialogMuted || isHiddenInCommunity || drawUnmute || dialogMutedProgress > 0) && !drawVerified && drawScam == 0;
         if (drawPremium && emojiStatus.getDrawable() != null) {
@@ -4556,10 +4565,15 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
                     y -= dp(9);
                 }
+                if (solegramBadge != null) {
+                    setDrawableBounds(solegramBadge, nameMuteLeft - dp(1), y);
+                    solegramBadge.draw(canvas);
+                } else {
                 setDrawableBounds(Theme.dialogs_verifiedDrawable, nameMuteLeft - dp(1), y);
                 setDrawableBounds(Theme.dialogs_verifiedCheckDrawable, nameMuteLeft - dp(1), y);
                 Theme.dialogs_verifiedDrawable.draw(canvas);
                 Theme.dialogs_verifiedCheckDrawable.draw(canvas);
+                }
             } else if (drawPremium) {
                 int y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 12.5f : 15.5f);
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {

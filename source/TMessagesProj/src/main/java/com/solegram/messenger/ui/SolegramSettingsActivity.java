@@ -96,6 +96,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_PLUGINS = 5;
     private static final int ID_UPDATES = 6;
     private static final int ID_ABOUT = 7;
+    /** Only for the official channel's admins: the developer's panel. */
+    private static final int ID_DEV_PANEL = 4242;
     private static final int ID_EXPORT = 8;
     private static final int ID_IMPORT = 9;
     private static final int ID_RESET = 10;
@@ -459,6 +461,11 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         // the Studio is for betas only: recording trailers is not a feature of the public app
         if (org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")) {
             items.add(category(ID_STUDIO, R.drawable.msg_camera, R.string.SG_Studio, R.string.SG_StudioSub, null, TILE_PINK));
+        }
+        // the developer's panel: shown only to an account that may change the official channel's info
+        if (com.solegram.messenger.SolegramBadges.isAdmin(currentAccount)) {
+            items.add(UItem.asButton(ID_DEV_PANEL, new SolegramBadgeDrawable(com.solegram.messenger.SolegramBadges.DEVELOPER, AndroidUtilities.dp(24)), getString(R.string.SG_DevPanel))
+                .setSolegramSubtitle(getString(R.string.SG_DevPanelSub)));
         }
         items.add(UItem.asShadow(getString(R.string.SG_SettingsMovedInfo)));
 
@@ -2389,6 +2396,11 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_ABOUT:
                 presentFragment(new SolegramSettingsActivity(PAGE_ABOUT));
+                return;
+            case ID_DEV_PANEL:
+                if (com.solegram.messenger.SolegramBadges.isAdmin(currentAccount)) {
+                    presentFragment(new SolegramDevPanelActivity());
+                }
                 return;
             case ID_EXPORT:
                 exportSettings();

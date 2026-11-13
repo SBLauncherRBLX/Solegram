@@ -12119,12 +12119,19 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 Drawable leftIcon = currentEncryptedChat != null ? getLockIconDrawable() : null;
                 boolean rightIconIsPremium = false, rightIconIsStatus = false;
                 nameTextView.setRightDrawableOutside(false);
+                final int solegramRole = com.solegram.messenger.SolegramBadges.roleOf(user);
+                nameTextView.setRightDrawable2OnClick(null);
                 if (user.scam || user.fake) {
                     nameTextView.setRightDrawable2(getScamDrawable(user.scam ? 0 : 1));
                     nameTextViewRightDrawable2ContentDescription = LocaleController.getString(R.string.ScamMessage);
                 } else if (user.verified) {
                     nameTextView.setRightDrawable2(getVerifiedCrossfadeDrawable());
                     nameTextViewRightDrawable2ContentDescription = LocaleController.getString(R.string.AccDescrVerified);
+                } else if (solegramRole != com.solegram.messenger.SolegramBadges.NONE) {
+                    // Solegram: the developer's or a tester's badge, a tap tells what it is
+                    nameTextView.setRightDrawable2(new com.solegram.messenger.ui.SolegramBadgeDrawable(solegramRole, dp(20)));
+                    nameTextView.setRightDrawable2OnClick(v -> com.solegram.messenger.ui.SolegramBadgeSheet.show(ProfileActivity.this, solegramRole));
+                    nameTextViewRightDrawable2ContentDescription = LocaleController.getString(com.solegram.messenger.ui.SolegramBadgeSheet.titleOf(solegramRole));
                 } else {
                     nameTextView.setRightDrawable2(null);
                     nameTextViewRightDrawable2ContentDescription = null;
@@ -12387,12 +12394,19 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 nameTextView.setRightDrawableOutside(false);
                 nameTextView.setRightDrawableOnClick(null);
                 nameTextViewRightDrawable2ContentDescription = null;
+                final int solegramRole = com.solegram.messenger.SolegramBadges.roleOf(chat);
+                nameTextView.setRightDrawable2OnClick(null);
                 if (chat.scam || chat.fake) {
                     nameTextView.setRightDrawable2(getScamDrawable(chat.scam ? 0 : 1));
                     nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.ScamMessage);
                 } else if (chat.verified) {
                     nameTextView.setRightDrawable2(getVerifiedCrossfadeDrawable());
                     nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrVerified);
+                } else if (solegramRole != com.solegram.messenger.SolegramBadges.NONE) {
+                    // Solegram: the official channel's badge
+                    nameTextView.setRightDrawable2(new com.solegram.messenger.ui.SolegramBadgeDrawable(solegramRole, dp(20)));
+                    nameTextView.setRightDrawable2OnClick(v -> com.solegram.messenger.ui.SolegramBadgeSheet.show(ProfileActivity.this, solegramRole));
+                    nameTextViewRightDrawableContentDescription = LocaleController.getString(com.solegram.messenger.ui.SolegramBadgeSheet.titleOf(solegramRole));
                 } else {
                     nameTextView.setRightDrawable2(null);
                     nameTextViewRightDrawableContentDescription = null;

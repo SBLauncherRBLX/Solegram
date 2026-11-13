@@ -1328,8 +1328,56 @@ public class SimpleTextView extends View implements Drawable.Callback {
         rightDrawableOnClickListener = onClickListener;
     }
 
+    // Solegram: a tap on the second right drawable (a badge next to a name)
+    private OnClickListener rightDrawable2OnClickListener;
+    private boolean maybeClick2;
+
+    public void setRightDrawable2OnClick(OnClickListener onClickListener) {
+        rightDrawable2OnClickListener = onClickListener;
+    }
+
+    private boolean solegramTouchRightDrawable2(MotionEvent event) {
+        if (rightDrawable2OnClickListener == null || rightDrawable2 == null || rightDrawable2.getBounds().isEmpty()) {
+            maybeClick2 = false;
+            return false;
+        }
+        final Rect b = rightDrawable2.getBounds();
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            AndroidUtilities.rectTmp.set(b.left - dp(10), b.top - dp(10), b.right + dp(10), b.bottom + dp(10));
+            if (AndroidUtilities.rectTmp.contains(event.getX(), event.getY())) {
+                maybeClick2 = true;
+                touchDownX = event.getX();
+                touchDownY = event.getY();
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_MOVE && maybeClick2) {
+            if (Math.abs(event.getX() - touchDownX) >= AndroidUtilities.touchSlop || Math.abs(event.getY() - touchDownY) >= AndroidUtilities.touchSlop) {
+                maybeClick2 = false;
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+            final boolean click = maybeClick2 && event.getAction() == MotionEvent.ACTION_UP;
+            maybeClick2 = false;
+            if (getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(false);
+            }
+            if (click) {
+                rightDrawable2OnClickListener.onClick(this);
+                return true;
+            }
+        }
+        return maybeClick2;
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (solegramTouchRightDrawable2(event)) {
+            return true;
+        }
         if (rightDrawableOnClickListener != null && rightDrawable != null) {
             AndroidUtilities.rectTmp.set(rightDrawableX - dp(16), rightDrawableY - dp(16), rightDrawableX + dp(16), rightDrawableY + dp(16));
             if (event.getAction() == MotionEvent.ACTION_DOWN && AndroidUtilities.rectTmp.contains((int) event.getX(), (int) event.getY())) {

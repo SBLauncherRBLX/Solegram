@@ -3638,8 +3638,11 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             imageReceiver.setImageCoords(rectF);
             imageReceiver.draw(canvas);
 
+            // Solegram: the story ring takes the avatar's shape (the receiver scales the avatar's corners by the
+            // "avatar corners" option), a little wider round it
+            final float avatarR = isForum ? dp(18) : Math.min(rectF.width() / 2f, dp(54) * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f);
             final float r = rectF.width() / 2f + dp(4);
-            final float rr = dp(isForum ? 22 : 58);
+            final float rr = avatarR + dp(4);
             canvas.drawRoundRect(
                     rectF.centerX() - r,
                     rectF.centerY() - r,

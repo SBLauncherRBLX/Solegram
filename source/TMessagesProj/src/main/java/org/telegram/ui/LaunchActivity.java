@@ -7221,6 +7221,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         isResumed = true;
         com.solegram.messenger.BackgroundConnection.ensureRunning(this);
         com.solegram.messenger.wallet.tap.WalletTap.onAppResumed(); // Solegram: a fresh contact token for SoleWallet's next tap
+        com.solegram.messenger.SolegramBadges.refreshIfStale(); // Solegram: the badges list, now and then
         com.solegram.messenger.plugins.PluginsController.getInstance().dispatchAppEvent(com.solegram.messenger.plugins.PluginsController.APP_EVENT_RESUME);
         // Solegram: keep Material You colors in sync.
         AndroidUtilities.runOnUIThread(() -> {

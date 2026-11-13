@@ -186,7 +186,8 @@ public class UserObject {
             if ((status.flags & 1) != 0 && status.until <= (int) (System.currentTimeMillis() / 1000)) {
                 return null;
             }
-            return status.document_id;
+            final long solegramId = com.solegram.messenger.SolegramBadges.filterEmoji(status.document_id); // Solegram: no imitations of its badges
+            return solegramId == 0 ? null : solegramId;
         }
         if (emojiStatus instanceof TLRPC.TL_emojiStatusCollectible) {
             final TLRPC.TL_emojiStatusCollectible status = (TLRPC.TL_emojiStatusCollectible) emojiStatus;

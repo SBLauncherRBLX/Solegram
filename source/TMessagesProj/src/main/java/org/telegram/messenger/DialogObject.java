@@ -418,7 +418,7 @@ public class DialogObject {
             if ((status.flags & 1) != 0 && status.until <= (int) (System.currentTimeMillis() / 1000)) {
                 return 0;
             }
-            return status.document_id;
+            return com.solegram.messenger.SolegramBadges.filterEmoji(status.document_id); // Solegram: no imitations of its badges
         } else if (emojiStatus instanceof TLRPC.TL_emojiStatusCollectible) {
             final TLRPC.TL_emojiStatusCollectible status = (TLRPC.TL_emojiStatusCollectible) emojiStatus;
             if ((status.flags & 1) != 0 && status.until <= (int) (System.currentTimeMillis() / 1000)) {
