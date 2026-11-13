@@ -24,24 +24,32 @@ import androidx.core.graphics.ColorUtils;
  * being darkened.
  *
  * The content is recorded into a render node (its child views as live references, so a scroll shows at once),
- * then drawn twice, through a light and a strong blur, each faded in by its own smooth ramp: a light blur first,
- * then the strong one right at the edge. A thin veil of the background colour stays only at the very edge, so the
- * status bar and the title stay readable on a busy picture.
+ * then drawn through a stack of blurs that get stronger towards the edge, each faded in by its own smooth ramp a
+ * little further out than the one before: the picture goes out of focus gradually, all the way to the edge of the
+ * screen, with no step where one blur meets the next. A thin veil of the background colour may stay at the very
+ * edge, so the status bar and the title stay readable on a busy picture.
  *
  * Android 12+ with a hardware canvas; elsewhere {@link #draw} returns false and the caller keeps its plain fade.
  */
 public class SolegramEdgeBlur {
 
-    private static final int STOPS = 8;
+    private static final int STOPS = 12;
 
-    private RenderNode content, light, strong;
+    /** The blurs of the stack (dp), weakest first, and where along the band (0 inner end .. 1 edge) each comes in. */
+    private static final float[] RADII = {2f, 4f, 8f, 13f, 20f};
+    private static final float[] RAMP_FROM = {0f, 0.14f, 0.3f, 0.48f, 0.66f};
+    private static final float[] RAMP_TO = {0.32f, 0.48f, 0.64f, 0.82f, 1f};
+
+    private RenderNode content;
+    private final RenderNode[] layers = new RenderNode[RADII.length];
+    private final float[] layerRadius = new float[RADII.length];
+    private final LinearGradient[] layerMasks = new LinearGradient[RADII.length];
     private final Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint veilPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private float lightRadius = -1, strongRadius = -1;
 
     private int shaderHeight, shaderVeilColor;
     private boolean shaderFromTop;
-    private LinearGradient lightMask, strongMask, veil;
+    private LinearGradient veil;
 
     public SolegramEdgeBlur() {
         maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
@@ -164,16 +172,18 @@ public class SolegramEdgeBlur {
     private boolean drawImpl(Canvas canvas, View[] contents, View root, int width, float top, int height, boolean fromTop, int background, int veilAlpha, float alpha) {
         if (content == null) {
             content = new RenderNode("SolegramEdgeBlurContent");
-            light = new RenderNode("SolegramEdgeBlurLight");
-            strong = new RenderNode("SolegramEdgeBlurStrong");
+            for (int i = 0; i < layers.length; i++) {
+                layers[i] = new RenderNode("SolegramEdgeBlur" + i);
+            }
         }
-        final float lr = dp(6), sr = dp(18);
-        if (lightRadius != lr || strongRadius != sr) {
-            lightRadius = lr;
-            strongRadius = sr;
-            light.setRenderEffect(RenderEffect.createBlurEffect(lr, lr, Shader.TileMode.CLAMP));
-            strong.setRenderEffect(RenderEffect.createBlurEffect(sr, sr, Shader.TileMode.CLAMP));
+        for (int i = 0; i < layers.length; i++) {
+            final float r = dp(RADII[i]);
+            if (layerRadius[i] != r) {
+                layerRadius[i] = r;
+                layers[i].setRenderEffect(RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP));
+            }
         }
+        final float sr = layerRadius[layers.length - 1];
 
         // the content around the band (with a margin, so the blur has something to take in at its edges)
         final int margin = (int) Math.ceil(sr * 2);
@@ -240,8 +250,9 @@ public class SolegramEdgeBlur {
         } finally {
             content.endRecording();
         }
-        record(light, width, nodeHeight);
-        record(strong, width, nodeHeight);
+        for (RenderNode layer : layers) {
+            record(layer, width, nodeHeight);
+        }
 
         checkShaders(height, fromTop, background, veilAlpha);
 
@@ -249,8 +260,9 @@ public class SolegramEdgeBlur {
         canvas.translate(0, bandTop);
         canvas.clipRect(0, 0, width, height);
         final int a = (int) (255 * Math.min(1f, alpha));
-        drawLayer(canvas, light, lightMask, width, height, nodeTop - bandTop, a);
-        drawLayer(canvas, strong, strongMask, width, height, nodeTop - bandTop, a);
+        for (int i = 0; i < layers.length; i++) {
+            drawLayer(canvas, layers[i], layerMasks[i], width, height, nodeTop - bandTop, a);
+        }
         if (veil != null) {
             veilPaint.setAlpha(a);
             canvas.drawRect(0, 0, width, height, veilPaint);
@@ -282,15 +294,16 @@ public class SolegramEdgeBlur {
     /** Smooth ramps (smoothstep, many stops) so no band edge shows. */
     private void checkShaders(int height, boolean fromTop, int background, int veilAlpha) {
         final int veilColor = veilAlpha <= 0 ? 0 : ColorUtils.setAlphaComponent(background, Math.min(255, veilAlpha));
-        if (lightMask != null && shaderHeight == height && shaderFromTop == fromTop && shaderVeilColor == veilColor) {
+        if (layerMasks[0] != null && shaderHeight == height && shaderFromTop == fromTop && shaderVeilColor == veilColor) {
             return;
         }
         shaderHeight = height;
         shaderFromTop = fromTop;
         shaderVeilColor = veilColor;
         // t: 0 at the inner end of the band, 1 at the screen's edge
-        lightMask = ramp(height, fromTop, 0f, 0.5f, Color.BLACK, 255);
-        strongMask = ramp(height, fromTop, 0.35f, 1f, Color.BLACK, 255);
+        for (int i = 0; i < layerMasks.length; i++) {
+            layerMasks[i] = ramp(height, fromTop, RAMP_FROM[i], RAMP_TO[i], Color.BLACK, 255);
+        }
         if (veilColor != 0) {
             veil = ramp(height, fromTop, 0.55f, 1f, background, Color.alpha(veilColor));
             veilPaint.setShader(veil);
