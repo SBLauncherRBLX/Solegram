@@ -1973,6 +1973,8 @@
     <string name="SG_IconJellyfish">Медуза</string>
     <string name="SG_IconDroid">Дроид</string>
     <string name="SG_IconNotebook">Тетрадка</string>
+    <string name="SG_IconHolo">Голограмма</string>
+    <string name="SG_IconHoloLight">Голограмма светлая</string>
     <string name="SG_IconsMaterial">Material You</string>
     <string name="SG_IconM3Sky">Небо</string>
     <string name="SG_IconM3Sage">Шалфей</string>

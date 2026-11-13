@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram holo launcher icon (dark): the mark as glossy white enamel with an oil-slick rim (branding/themed/holo.py) -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/sg_icon_bg_holo" />
+    <foreground android:drawable="@mipmap/sg_icon_fg_holo" />
+    <monochrome android:drawable="@drawable/sg_icon_fg_mono" />
+</adaptive-icon>

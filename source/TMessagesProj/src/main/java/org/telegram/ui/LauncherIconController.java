@@ -239,6 +239,8 @@ public class LauncherIconController {
         DROID("DroidIcon", R.mipmap.sg_icon_bg_droid, R.mipmap.sg_icon_fg_droid, R.string.SG_IconDroid, false, true),
         // the mark drawn in blue ballpoint on a squared school notebook page, hastily filled in
         NOTEBOOK("NotebookIcon", R.mipmap.sg_icon_bg_notebook, R.mipmap.sg_icon_fg_notebook, R.string.SG_IconNotebook, false, true),
+        HOLO("HoloIcon", R.mipmap.sg_icon_bg_holo, R.mipmap.sg_icon_fg_holo, R.string.SG_IconHolo, false, true),
+        HOLO_LIGHT("HoloLightIcon", R.mipmap.sg_icon_bg_holo_light, R.mipmap.sg_icon_fg_holo_light, R.string.SG_IconHoloLight, false, true),
         // Solegram 3.3: Material You - the mark in two tones of one hue on its tonal container (with the colour icons)
         MATERIAL_SKY("MaterialSkyIcon", R.drawable.sg_icon_bg_m3sky, R.drawable.sg_icon_fg_m3sky, R.string.SG_IconM3Sky, false, false, false),
         MATERIAL_SAGE("MaterialSageIcon", R.drawable.sg_icon_bg_m3sage, R.drawable.sg_icon_fg_m3sage, R.string.SG_IconM3Sage, false, false, false),
