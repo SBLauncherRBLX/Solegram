@@ -55,6 +55,8 @@ public class SimpleTextView extends View implements Drawable.Callback {
 
     private float layoutX, layoutY;
     private Layout layout;
+    /** Solegram: an effect drawn on the text (the name in a profile), or null. */
+    public com.solegram.messenger.SolegramNameEffect.Renderer sgNameEffect;
     private Layout firstLineLayout;
     private Layout fullLayout;
     private Layout partLayout;
@@ -1189,7 +1191,11 @@ public class SimpleTextView extends View implements Drawable.Callback {
             if (emojiStack != null) {
                 emojiStack.clearPositions();
             }
-            layout.draw(canvas);
+            if (sgNameEffect != null) {
+                sgNameEffect.draw(this, canvas, layout, textPaint); // Solegram: an effect on the name
+            } else {
+                layout.draw(canvas);
+            }
             canvas.restore();
 
             AnimatedEmojiSpan.drawAnimatedEmojis(canvas, layout, emojiStack, 0, null, 0, 0, 0, 1f, emojiStackColorFilter);
@@ -1201,7 +1207,11 @@ public class SimpleTextView extends View implements Drawable.Callback {
             if (emojiStack != null) {
                 emojiStack.clearPositions();
             }
-            layout.draw(canvas);
+            if (sgNameEffect != null) {
+                sgNameEffect.draw(this, canvas, layout, textPaint); // Solegram: an effect on the name
+            } else {
+                layout.draw(canvas);
+            }
             canvas.restore();
 
             AnimatedEmojiSpan.drawAnimatedEmojis(canvas, layout, emojiStack, 0, null, 0, 0, 0, 1f, emojiStackColorFilter);

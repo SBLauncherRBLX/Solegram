@@ -57,12 +57,30 @@ public final class SolegramNameEmojiShare {
     // region The mark
 
     public static String mark(long documentId) {
-        final StringBuilder sb = new StringBuilder(LENGTH);
+        return mark(documentId, 0);
+    }
+
+    /** The mark with the emoji's id and, after it, the name's effect (if any: four more selectors). */
+    public static String mark(long documentId, int effect) {
+        final StringBuilder sb = new StringBuilder(LENGTH + SolegramNameEffect.MARK_DIGITS);
         sb.append(START);
         for (int i = DIGITS - 1; i >= 0; i--) {
             sb.append((char) (0xFE00 + (int) ((documentId >>> (i * 4)) & 0xF)));
         }
+        sb.append(SolegramNameEffect.markDigits(effect));
         return sb.toString();
+    }
+
+    /** The name's effect in a bio's mark, 0 when there is none. */
+    public static int readEffect(String about) {
+        if (about == null) {
+            return 0;
+        }
+        final int at = about.lastIndexOf(START);
+        if (at < 0 || about.length() - at - 1 < DIGITS) {
+            return 0;
+        }
+        return SolegramNameEffect.readDigits(about, at + 1 + DIGITS);
     }
 
     /** The emoji id in a bio, 0 when there is no mark. */
@@ -95,7 +113,7 @@ public final class SolegramNameEmojiShare {
             final char c = about.charAt(i);
             if (c == START) {
                 int j = i + 1;
-                while (j < about.length() && about.charAt(j) >= 0xFE00 && about.charAt(j) <= 0xFE0F && j - i <= DIGITS) {
+                while (j < about.length() && about.charAt(j) >= 0xFE00 && about.charAt(j) <= 0xFE0F && j - i <= DIGITS + SolegramNameEffect.MARK_DIGITS) {
                     j++;
                 }
                 i = j - 1;
@@ -109,7 +127,8 @@ public final class SolegramNameEmojiShare {
     /** The own mark to put at the end of the bio, or "" when nothing is shared. */
     public static String ownMark() {
         final long id = SolegramNameEmoji.get();
-        return enabled() && id != 0 ? mark(id) : "";
+        final int effect = SolegramNameEffect.own();
+        return enabled() && (id != 0 || effect != 0) ? mark(id, effect) : "";
     }
 
     /** A bio the user wrote, with the mark put back when it fits the account's limit. */
@@ -120,7 +139,7 @@ public final class SolegramNameEmojiShare {
             return base;
         }
         final int limit = MessagesController.getInstance(account).getAboutLimit();
-        if (base.codePointCount(0, base.length()) + LENGTH > limit) {
+        if (base.codePointCount(0, base.length()) + mark.length() > limit) {
             return base;
         }
         return base + mark;
@@ -129,7 +148,7 @@ public final class SolegramNameEmojiShare {
     /** Whether the mark does not fit after this bio. */
     public static boolean tooLong(int account, String bio) {
         final String base = strip(bio == null ? "" : bio);
-        return base.codePointCount(0, base.length()) + LENGTH > MessagesController.getInstance(account).getAboutLimit();
+        return base.codePointCount(0, base.length()) + Math.max(LENGTH, ownMark().length()) > MessagesController.getInstance(account).getAboutLimit();
     }
     // endregion
 
@@ -174,6 +193,7 @@ public final class SolegramNameEmojiShare {
             return;
         }
         final long id = read(full.about);
+        SolegramNameEffect.onRead(user.id, readEffect(full.about));
         final Long was;
         synchronized (SolegramNameEmojiShare.class) {
             was = known().get(user.id);

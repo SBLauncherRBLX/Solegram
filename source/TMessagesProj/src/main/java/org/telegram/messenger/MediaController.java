@@ -146,6 +146,33 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
 
     public static native boolean cropOpusFile(String source, String destination, long startMs, long endMs);
 
+    /** Solegram: a voice message as 48 kHz mono samples (the voice effects), null when it cannot be read. */
+    public static native short[] sgDecodeOpus(String path);
+
+    /**
+     * Solegram: samples written as a voice message (48 kHz mono, Telegram's own encoder). Not while recording: the
+     * encoder is shared with the old recorder. Returns whether the file was written.
+     */
+    public synchronized boolean sgEncodeOpus(String path, short[] pcm, int length) {
+        if (startRecord(path, 48000) == 0) {
+            return false;
+        }
+        final java.nio.ByteBuffer frame = java.nio.ByteBuffer.allocateDirect(1920).order(java.nio.ByteOrder.nativeOrder());
+        int at = 0;
+        while (at < length) {
+            final int n = Math.min(960, length - at);
+            frame.clear();
+            for (int i = 0; i < n; i++) {
+                frame.putShort(pcm[at + i]);
+            }
+            frame.flip();
+            writeFrame(frame, n * 2);
+            at += n;
+        }
+        stopRecord();
+        return true;
+    }
+
     public static native boolean joinOpusFiles(String file1, String file2, String dest);
 
     public static native int isOpusFile(String path);

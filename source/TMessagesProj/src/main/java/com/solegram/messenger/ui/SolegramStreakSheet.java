@@ -214,6 +214,8 @@ public class SolegramStreakSheet extends BottomSheet {
         private float spin;
         private ValueAnimator spinAnimator;
 
+        private final SolegramFlameRenderer flame = new SolegramFlameRenderer();
+
         SunView(Context context) {
             super(context);
             setOnClickListener(v -> spin());
@@ -227,6 +229,7 @@ public class SolegramStreakSheet extends BottomSheet {
             if (spinAnimator != null) {
                 spinAnimator.cancel();
             }
+            flame.burst();
             spinAnimator = ValueAnimator.ofFloat(0, 1);
             spinAnimator.setDuration(420);
             spinAnimator.addUpdateListener(a -> {
@@ -239,18 +242,16 @@ public class SolegramStreakSheet extends BottomSheet {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            final float t = (SystemClock.elapsedRealtime() - born) / 1000f;
-            final int size = Math.min(getWidth(), getHeight()) - dp(14);
+            // the flame stands low in its square: the embers need room above it
+            final int size = (int) ((Math.min(getWidth(), getHeight()) - dp(14)) * 0.86f);
             if (size <= 0) {
                 return;
             }
-            final float cx = getWidth() / 2f, cy = getHeight() / 2f;
-            final float breath = (1f + 0.025f * (float) Math.sin(t * 1.9f)) * (1f + 0.12f * spin);
-            canvas.save();
-            canvas.scale(breath, breath, cx, cy);
-            canvas.drawBitmap(SolegramStreak.sun(color, days, size), cx - size / 2f, cy - size / 2f, paint);
-            canvas.restore();
-            invalidate();
+            final float cx = getWidth() / 2f, baseY = getHeight() / 2f + size / 2f + dp(4);
+            final float grow = 1f + 0.12f * spin;
+            if (flame.draw(canvas, cx, baseY, size, color, days, SolegramStreak.atRisk(account, dialogId), grow)) {
+                postInvalidateOnAnimation();
+            }
         }
     }
 

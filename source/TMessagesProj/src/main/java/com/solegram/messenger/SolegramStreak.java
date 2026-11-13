@@ -58,18 +58,21 @@ public final class SolegramStreak {
     public static final int MIN_DAYS = 3;
     /** First day of each level. */
     public static final int[] LEVEL_FROM = {3, 7, 30, 100, 365};
+    /** The flame of each level: its top, its bottom and its core. */
     public static final int[][] LEVEL_COLORS = {
-        {0xFFFFE27A, 0xFFFFA928},
-        {0xFFFFC04A, 0xFFFF6D1A},
-        {0xFFFF8F3F, 0xFFEC2F4F},
-        {0xFFFF7AD9, 0xFF8A4DFF},
-        {0xFF7CEBFF, 0xFFFFD36B, 0xFFFF6FD8},
+        {0xFFFFD45A, 0xFFFF9A1F, 0xFFFFF3B8},
+        {0xFFFF8A1F, 0xFFFF4A1A, 0xFFFFD866},
+        {0xFFFF5A2E, 0xFFD6143A, 0xFFFFB347},
+        {0xFFC84DFF, 0xFFFF4FB8, 0xFFFFD1F4},
+        {0xFF3D7BFF, 0xFF36E0FF, 0xFFFFFFFF},
     };
+    /** A streak at risk (nobody wrote today yet): the flame goes grey. */
+    private static final int[] AT_RISK_COLORS = {0xFFB4B9C2, 0xFF8A909B, 0xFFE4E7EC};
     public static final int[] LEVEL_NAMES = {
         R.string.SG_StreakLevel0, R.string.SG_StreakLevel1, R.string.SG_StreakLevel2, R.string.SG_StreakLevel3, R.string.SG_StreakLevel4,
     };
     /** Text colours, readable on both light and dark list backgrounds. */
-    private static final int[] LEVEL_TEXT = {0xFFF29A12, 0xFFF0661A, 0xFFE3324C, 0xFF9B4DF0, 0xFFE0569F};
+    private static final int[] LEVEL_TEXT = {0xFFF29A12, 0xFFF0661A, 0xFFE3324C, 0xFFC046E8, 0xFF2F8CFF};
 
     private static final long DAY_MS = 86_400_000L;
     private static final long RECHECK_MS = 20 * 60_000L;
@@ -356,8 +359,15 @@ public final class SolegramStreak {
 
     /** The sun's gradient for a colour choice; choice 0 follows the streak level. */
     public static int[] sunColors(int color, int days) {
+        final int[] f = flameColors(color, days);
+        return new int[] {f[0], f[1]};
+    }
+
+    /** The flame's top, bottom and core for a colour choice; choice 0 follows the streak level. */
+    public static int[] flameColors(int color, int days) {
         if (color > 0 && color < PALETTE.length) {
-            return new int[] {PALETTE[color][0], PALETTE[color][1]};
+            final int light = PALETTE[color][0], deep = PALETTE[color][1];
+            return new int[] {deep, androidx.core.graphics.ColorUtils.blendARGB(deep, light, 0.35f), androidx.core.graphics.ColorUtils.blendARGB(light, 0xFFFFFFFF, 0.45f)};
         }
         return LEVEL_COLORS[level(days)];
     }
@@ -375,29 +385,99 @@ public final class SolegramStreak {
 
     // ------------------------------------------------------------------ the sun
 
-    /** The Solegram sun (rays and both halves) painted in a gradient. */
+    // The flame of each level in a 100 x 100 box: it grows tongues as the streak grows (a round spark, one tongue,
+    // two, three), and its core follows; the last one has sparks round it.
+    private static final String[] FLAME = {
+        "M50 22 C58 36 76 48 76 68 C76 84 64 94 50 94 C36 94 24 84 24 68 C24 50 42 40 50 22 Z",
+        "M52 8 C60 26 80 40 80 64 C80 82 67 95 50 95 C33 95 20 82 20 64 C20 50 27 40 34 32 C35 42 40 48 45 50 C42 34 46 20 52 8 Z",
+        "M52 4 C60 22 72 30 76 44 C79 38 80 32 79 26 C88 38 88 52 86 64 C84 82 69 96 50 96 C31 96 16 82 16 64 C16 50 22 40 30 32 C31 42 36 48 42 50 C38 32 44 16 52 4 Z",
+        "M50 2 C57 18 64 28 66 42 C70 36 72 28 70 20 C82 32 88 48 86 64 C84 83 69 97 50 97 C31 97 16 83 14 64 C12 48 18 32 30 20 C28 28 30 36 34 42 C36 28 43 16 50 2 Z",
+    };
+    private static final String[] CORE = {
+        "M50 58 C55 66 62 72 62 80 C62 88 57 92 50 92 C43 92 38 88 38 80 C38 72 45 66 50 58 Z",
+        "M50 50 C56 60 65 66 65 77 C65 87 58 93 50 93 C42 93 35 87 35 77 C35 70 40 64 44 61 C45 66 47 68 49 68 C47 62 48 56 50 50 Z",
+        "M50 46 C57 57 67 64 67 76 C67 87 59 94 50 94 C41 94 33 87 33 76 C33 68 38 62 43 58 C44 64 46 67 48 67 C46 60 47 52 50 46 Z",
+        "M50 42 C56 52 60 58 61 64 C63 61 64 58 63 55 C68 62 69 70 68 77 C67 88 59 95 50 95 C41 95 33 88 32 77 C31 70 33 63 37 58 C37 62 38 65 40 67 C41 58 45 50 50 42 Z",
+    };
+    private static final android.graphics.Path[] flamePaths = new android.graphics.Path[FLAME.length], corePaths = new android.graphics.Path[CORE.length];
+
+    private static synchronized android.graphics.Path flamePath(int shape, boolean core) {
+        final android.graphics.Path[] cache = core ? corePaths : flamePaths;
+        if (cache[shape] == null) {
+            cache[shape] = androidx.core.graphics.PathParser.createPathFromPathData((core ? CORE : FLAME)[shape]);
+        }
+        return cache[shape];
+    }
+
+    /** A four-pointed spark round the eternal flame, in the 100 box. */
+    public static void spark(Canvas c, Paint p, float x, float y, float r) {
+        final android.graphics.Path path = new android.graphics.Path();
+        final float k = r * 0.15f;
+        path.moveTo(x, y - r);
+        path.cubicTo(x + k, y - k, x + k, y - k, x + r, y);
+        path.cubicTo(x + k, y + k, x + k, y + k, x, y + r);
+        path.cubicTo(x - k, y + k, x - k, y + k, x - r, y);
+        path.cubicTo(x - k, y - k, x - k, y - k, x, y - r);
+        path.close();
+        c.drawPath(path, p);
+    }
+
+    /** A flame's flicker for the time t (seconds): a sway and a stretch round the middle of its base. */
+    public static void flicker(Canvas canvas, float t, float baseX, float baseY, float grow) {
+        final float stretch = 1f + 0.045f * (float) Math.sin(t * 5.3f) + 0.02f * (float) Math.sin(t * 11.7f);
+        final float squeeze = 1f - 0.025f * (float) Math.sin(t * 5.3f + 0.6f);
+        final float sway = 0.05f * (float) Math.sin(t * 3.1f) + 0.02f * (float) Math.sin(t * 7.9f);
+        canvas.scale(squeeze * grow, stretch * grow, baseX, baseY);
+        canvas.skew(sway, 0);
+        canvas.translate(-sway * baseY, 0);
+    }
+
+    /** The streak's flame: its shape from the level, its colours from the level or the chosen colour. */
     public static Bitmap sun(int color, int days, int size) {
+        return flame(color, days, size, false);
+    }
+
+    public static Bitmap flame(int color, int days, int size, boolean atRisk) {
+        return flameLayer(color, days, size, atRisk, LAYER_FULL);
+    }
+
+    /** The whole flame, only its outer body, or only its core (the animated flame moves them apart). */
+    public static final int LAYER_FULL = 0, LAYER_BODY = 1, LAYER_CORE = 2;
+
+    public static int[] flameColors(int color, int days, boolean atRisk) {
+        return atRisk ? AT_RISK_COLORS : flameColors(color, days);
+    }
+
+    public static Bitmap flameLayer(int color, int days, int size, boolean atRisk, int layer) {
         size = Math.max(4, Math.min(size, 1024));
-        final int cacheKey = ((color > 0 ? 10 + color : level(days)) * 2048) + size;
+        final int level = level(days);
+        final int cacheKey = ((((atRisk ? 30 : color > 0 ? 10 + color : 0) * 8 + level) * 3 + layer) * 2048) + size;
         Bitmap b = suns.get(cacheKey);
         if (b != null && !b.isRecycled()) {
             return b;
         }
-        final Drawable d = ContextCompat.getDrawable(ApplicationLoader.applicationContext, R.drawable.notification);
+        final int[] colors = atRisk ? AT_RISK_COLORS : flameColors(color, days);
+        final int shape = Math.min(level, FLAME.length - 1);
         b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         final Canvas c = new Canvas(b);
-        final Paint g = new Paint(Paint.ANTI_ALIAS_FLAG);
-        g.setShader(new LinearGradient(0, 0, size * 0.35f, size, sunColors(color, days), null, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, size, size, g);
-        if (d != null) {
-            final Bitmap mask = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-            final Drawable m = d.mutate();
-            m.setBounds(0, 0, size, size);
-            m.draw(new Canvas(mask));
-            final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-            p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
-            c.drawBitmap(mask, 0, 0, p);
-            mask.recycle();
+        final float scale = size / 100f;
+        c.scale(scale, scale);
+        if (layer != LAYER_CORE) {
+            final Paint g = new Paint(Paint.ANTI_ALIAS_FLAG);
+            g.setShader(new LinearGradient(0, 0, 30, 100, colors[0], colors[1], Shader.TileMode.CLAMP));
+            c.drawPath(flamePath(shape, false), g);
+        }
+        if (layer != LAYER_BODY) {
+            final Paint core = new Paint(Paint.ANTI_ALIAS_FLAG);
+            core.setShader(new LinearGradient(0, 40, 0, 100, (colors[2] & 0x00FFFFFF) | 0xD9000000, colors[2], Shader.TileMode.CLAMP));
+            c.drawPath(flamePath(shape, true), core);
+        }
+        if (layer == LAYER_FULL && level >= 4 && !atRisk) {
+            final Paint sp = new Paint(Paint.ANTI_ALIAS_FLAG);
+            sp.setColor(0xFF6FD3FF);
+            spark(c, sp, 88, 14, 9);
+            spark(c, sp, 10, 30, 6);
+            spark(c, sp, 92, 86, 5);
         }
         suns.put(cacheKey, b);
         return b;
@@ -461,13 +541,13 @@ public final class SolegramStreak {
             final int alpha = dim ? 120 : 255;
             float left = x + dp(5);
             if (size > 0) {
-                bitmapPaint.setAlpha(alpha);
-                canvas.drawBitmap(sun(color, days, size), left, centerY - size / 2f, bitmapPaint);
+                bitmapPaint.setAlpha(dim ? 255 : alpha);
+                canvas.drawBitmap(flame(color, days, size, dim), left, centerY - size / 2f, bitmapPaint);
                 left += size + dp(2);
             }
             if (hasText()) {
-                textPaint.setColor(textColor(color, days));
-                textPaint.setAlpha(alpha);
+                textPaint.setColor(dim ? 0xFF8A909B : textColor(color, days));
+                textPaint.setAlpha(dim ? 255 : alpha);
                 canvas.drawText(text, left, y, textPaint);
             }
         }

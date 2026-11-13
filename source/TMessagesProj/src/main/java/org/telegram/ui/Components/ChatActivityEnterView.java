@@ -3212,6 +3212,18 @@ public class ChatActivityEnterView extends FrameLayout implements
                             } else if (!sendVoiceEnabled) {
                                 delegate.needShowMediaBanHint();
                             } else {
+                                if (com.solegram.messenger.SolegramConfig.voicePreview && !isInScheduleMode()) {
+                                    // Solegram: the recording waits to be heard (and given an effect); the send button sends it
+                                    if (sendButtonVisible) {
+                                        calledRecordRunnable = true;
+                                    }
+                                    MediaController.getInstance().toggleRecordingPause(voiceOnce);
+                                    delegate.needStartRecordAudio(0);
+                                    if (slideText != null) {
+                                        slideText.setEnabled(false);
+                                    }
+                                    return true;
+                                }
                                 if (AlertsCreator.needsPaidMessageAlert(currentAccount, dialog_id)) {
                                     if (sendButtonVisible) {
                                         calledRecordRunnable = true;
@@ -4182,10 +4194,156 @@ public class ChatActivityEnterView extends FrameLayout implements
         sizeNotifierLayout.addView(videoTimeHintView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 0, 0, 0, 52));
 
         audioTimelineView = new RecordedAudioPlayerView(getContext(), resourcesProvider);
-        recordedAudioPanel.addView(audioTimelineView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 32, Gravity.CENTER_VERTICAL | Gravity.LEFT, DEFAULT_HEIGHT, 0, 4, 0));
+        final boolean sgFx = com.solegram.messenger.SolegramConfig.voiceEffects;
+        recordedAudioPanel.addView(audioTimelineView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 32, Gravity.CENTER_VERTICAL | Gravity.LEFT, DEFAULT_HEIGHT, 0, sgFx ? 46 : 4, 0));
+        if (sgFx) {
+            // Solegram: voice effects for the recording before it is sent
+            sgVoiceFxButton = new ImageView(getContext());
+            sgVoiceFxButton.setScaleType(ImageView.ScaleType.CENTER);
+            sgVoiceFxButton.setImageResource(R.drawable.sg_line_magic_wand);
+            sgVoiceFxButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_messagePanelIcons), PorterDuff.Mode.SRC_IN));
+            sgVoiceFxButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
+            sgVoiceFxButton.setContentDescription(LocaleController.getString(R.string.SG_VoiceFx));
+            sgVoiceFxButton.setOnClickListener(v -> sgShowVoiceFx());
+            recordedAudioPanel.addView(sgVoiceFxButton, LayoutHelper.createFrame(40, 40, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 4, 0));
+        }
 
         updateFieldRight(lastAttachVisible);
     }
+
+    // region Solegram: voice effects
+
+    private ImageView sgVoiceFxButton;
+    private int sgVoiceFx;
+    private String sgVoiceOriginalPath;
+    private boolean sgVoiceFxBusy;
+
+    private void sgUpdateVoiceFxButton() {
+        if (sgVoiceFxButton == null) {
+            return;
+        }
+        final int color = sgVoiceFx != com.solegram.messenger.SolegramVoiceEffects.NONE
+            ? getThemedColor(Theme.key_chat_recordedVoicePlayPause) : getThemedColor(Theme.key_chat_messagePanelIcons);
+        sgVoiceFxButton.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
+        sgVoiceFxButton.setAlpha(sgVoiceFxBusy ? 0.4f : 1f);
+        sgVoiceFxButton.setEnabled(!sgVoiceFxBusy);
+    }
+
+    private void sgShowVoiceFx() {
+        if (sgVoiceFxBusy || audioToSend == null || sgVoiceOriginalPath == null || parentFragment == null) {
+            return;
+        }
+        final ItemOptions options = ItemOptions.makeOptions(parentFragment, sgVoiceFxButton);
+        for (int i = 0; i < com.solegram.messenger.SolegramVoiceEffects.COUNT; i++) {
+            final int fx = i;
+            final String name = LocaleController.getString(com.solegram.messenger.SolegramVoiceEffects.nameOf(fx));
+            options.add(com.solegram.messenger.SolegramVoiceEffects.iconOf(fx), fx == sgVoiceFx ? name + "  ✓" : name, () -> sgApplyVoiceFx(fx));
+        }
+        options.setGravity(Gravity.RIGHT).show();
+    }
+
+    private void sgApplyVoiceFx(int fx) {
+        if (fx == sgVoiceFx || sgVoiceFxBusy || audioToSend == null || sgVoiceOriginalPath == null) {
+            return;
+        }
+        final MessageObject playing = MediaController.getInstance().getPlayingMessageObject();
+        if (playing != null && playing == audioToSendMessageObject) {
+            MediaController.getInstance().cleanupPlayer(true, true);
+        }
+        if (audioTimelineView != null) {
+            audioTimelineView.setPlaying(false);
+        }
+        final String original = sgVoiceOriginalPath;
+        if (fx == com.solegram.messenger.SolegramVoiceEffects.NONE) {
+            sgVoiceFx = fx;
+            sgSetVoicePath(original, -1);
+            sgUpdateVoiceFxButton();
+            return;
+        }
+        sgVoiceFxBusy = true;
+        sgUpdateVoiceFxButton();
+        final String target = original + ".fx" + fx + ".ogg";
+        Utilities.globalQueue.postRunnable(() -> {
+            boolean ok = false;
+            double duration = -1;
+            try {
+                final File done = new File(target);
+                if (done.exists() && done.length() > 0) {
+                    ok = true;
+                } else {
+                    final short[] pcm = MediaController.sgDecodeOpus(original);
+                    if (pcm != null && pcm.length > 0) {
+                        final short[] out = com.solegram.messenger.SolegramVoiceEffects.apply(pcm, fx);
+                        ok = MediaController.getInstance().sgEncodeOpus(target, out, out.length);
+                        duration = out.length / 48000.0;
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            final boolean success = ok;
+            final double newDuration = duration;
+            AndroidUtilities.runOnUIThread(() -> {
+                sgVoiceFxBusy = false;
+                if (success && audioToSend != null && original.equals(sgVoiceOriginalPath)) {
+                    sgVoiceFx = fx;
+                    sgSetVoicePath(target, newDuration);
+                } else if (!success && parentFragment != null) {
+                    BulletinFactory.of(parentFragment).createSimpleBulletin(R.raw.error, LocaleController.getString(R.string.SG_VoiceFxFailed)).show();
+                }
+                sgUpdateVoiceFxButton();
+            });
+        });
+    }
+
+    /** The preview and the message to send take another file (an effect, or the original back). */
+    private void sgSetVoicePath(String path, double duration) {
+        if (audioToSend == null || path == null) {
+            return;
+        }
+        audioToSendPath = path;
+        final File file = new File(path);
+        audioToSend.size = (int) file.length();
+        byte[] waveform = null;
+        for (int a = 0; a < audioToSend.attributes.size(); a++) {
+            final TLRPC.DocumentAttribute attribute = audioToSend.attributes.get(a);
+            if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
+                attribute.waveform = MediaController.getWaveform(path);
+                if (duration > 0) {
+                    attribute.duration = duration;
+                } else {
+                    duration = attribute.duration;
+                }
+                waveform = attribute.waveform;
+                break;
+            }
+        }
+        if (audioToSendMessageObject != null) {
+            audioToSendMessageObject.messageOwner.attachPath = path;
+            audioToSendMessageObject = new MessageObject(UserConfig.selectedAccount, audioToSendMessageObject.messageOwner, false, true);
+        }
+        if (audioTimelineView != null) {
+            audioTimelineView.init(path, duration, waveform, 0f, 1f);
+        }
+        millisecondsRecorded = (long) (duration * 1000L);
+    }
+
+    /** The effect files of a recording that was thrown away. */
+    private void sgDropVoiceFxFiles() {
+        final String original = sgVoiceOriginalPath;
+        sgVoiceOriginalPath = null;
+        sgVoiceFx = com.solegram.messenger.SolegramVoiceEffects.NONE;
+        if (original == null) {
+            return;
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            for (int i = 1; i < com.solegram.messenger.SolegramVoiceEffects.COUNT; i++) {
+                new File(original + ".fx" + i + ".ogg").delete();
+            }
+            new File(original).delete();
+        });
+    }
+    // endregion
 
     private void resetRecordedState() {
         if (audioTimelineView != null) {
@@ -4207,6 +4365,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             }
             new File(audioToSendPath).delete();
         }
+        sgDropVoiceFxFiles();
         MediaController.getInstance().cleanRecording(true);
         MediaDataController.getInstance(currentAccount).pushDraftVoiceMessage(dialog_id, parentFragment != null && parentFragment.isTopic ? parentFragment.getTopicId() : 0, null);
         MediaController.getInstance().stopRecording(0, false, 0, false, 0);
@@ -13779,6 +13938,9 @@ public class ChatActivityEnterView extends FrameLayout implements
             } else {
                 audioToSend = (TLRPC.TL_document) args[1];
                 audioToSendPath = (String) args[2];
+                sgVoiceFx = com.solegram.messenger.SolegramVoiceEffects.NONE;
+                sgVoiceOriginalPath = audioToSendPath;
+                sgUpdateVoiceFxButton();
                 boolean fromDraft = args.length >= 4 && (boolean) args[3];
                 float left = args.length >= 5 ? (float) args[4] : 0.0f;
                 float right = args.length >= 6 ? (float) args[5] : 1.0f;

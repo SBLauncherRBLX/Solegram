@@ -244,6 +244,11 @@ public class ProfileActionsView extends View {
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         glassUsed = 0;
+        if (sgFallen) {
+            // Solegram: the buttons lie on the floor (the shake easter egg draws them)
+            hideUnusedGlass();
+            return;
+        }
         if (clipHeight >= 0f) {
             final float bottom = clipHeight - getY();
             if (bottom <= 0) {
@@ -527,7 +532,7 @@ public class ProfileActionsView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (currentHeight < dp(8)) {
+        if (currentHeight < dp(8) || sgFallen) {
             return false;
         }
 
@@ -1003,6 +1008,60 @@ public class ProfileActionsView extends View {
     public interface OnActionClickListener {
         void onClick(int key, float x, float y);
     }
+
+    // region Solegram: the shake easter egg takes the buttons off and draws them falling
+
+    private boolean sgFallen;
+
+    public void sgSetFallen(boolean fallen) {
+        if (sgFallen != fallen) {
+            sgFallen = fallen;
+            invalidate();
+        }
+    }
+
+    /** The buttons drawn now, left to right. */
+    public int sgVisibleCount() {
+        int n = 0;
+        for (Action a : actions) {
+            if (!a.isDeleted && !a.isDeleting && a.rect.width() > 0 && a.rect.height() > 0) {
+                n++;
+            }
+        }
+        return currentHeight < dp(8) ? 0 : n;
+    }
+
+    /** A picture of a button as it is (a soft plate, its icon and its name), and where it is in this view. */
+    @Nullable
+    public android.graphics.Bitmap sgSnapshot(int index, RectF outRect) {
+        int n = 0;
+        for (Action a : actions) {
+            if (a.isDeleted || a.isDeleting || a.rect.width() <= 0 || a.rect.height() <= 0) {
+                continue;
+            }
+            if (n++ != index) {
+                continue;
+            }
+            outRect.set(a.rect);
+            final int w = (int) Math.ceil(a.rect.width()), h = (int) Math.ceil(a.rect.height());
+            if (w <= 0 || h <= 0) {
+                return null;
+            }
+            final android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+            final Canvas c = new Canvas(bitmap);
+            c.translate(-a.rect.left, -a.rect.top);
+            final float r = getRoundRadius();
+            final Paint plate = new Paint(Paint.ANTI_ALIAS_FLAG);
+            final int base = color != 0 ? color : 0xFF808080;
+            plate.setColor(ColorUtils.blendARGB(base, isButtonColorLight() ? 0xFFFFFFFF : 0xFF000000, 0.12f));
+            plate.setAlpha(0xE6);
+            c.drawRoundRect(a.rect, r, r, plate);
+            drawAction(c, a, 1f, 1f);
+            return bitmap;
+        }
+        return null;
+    }
+    // endregion
 
     private class Action {
         int key;

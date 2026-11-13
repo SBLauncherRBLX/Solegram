@@ -278,6 +278,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_PREMIUM_NAGS = 4243;
     private static final int ID_PREMIUM_STICKERS = 4245;
     private static final int ID_MENTION_CARDS = 4246;
+    private static final int ID_NAME_EFFECT = 4247;
+    private static final int ID_VOICE_PREVIEW = 4248;
+    private static final int ID_VOICE_EFFECTS = 4249;
     private static final int ID_HIDE_GIFTS = 405;
     private static final int ID_PROXIMITY = 406;
     private static final int ID_NO_VIBRATION = 407;
@@ -535,6 +538,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_PREMIUM_NAGS, getString(R.string.SG_HidePremiumNags)).setChecked(SolegramConfig.hidePremiumNags));
         items.add(UItem.asCheck(ID_PREMIUM_STICKERS, getString(R.string.SG_PremiumStickersShare)).setChecked(com.solegram.messenger.SolegramPremiumStickers.enabled()));
         items.add(UItem.asCheck(ID_MENTION_CARDS, getString(R.string.SG_MentionCards)).setChecked(SolegramConfig.mentionCards));
+        items.add(UItem.asCheck(ID_VOICE_PREVIEW, getString(R.string.SG_VoicePreview)).setChecked(SolegramConfig.voicePreview));
+        items.add(UItem.asCheck(ID_VOICE_EFFECTS, getString(R.string.SG_VoiceFxSetting)).setChecked(SolegramConfig.voiceEffects));
         items.add(UItem.asCheck(ID_HIDE_GIFTS, getString(R.string.SG_HideGifts)).setChecked(SolegramConfig.hideGiftButtons));
         items.add(UItem.asShadow(null));
     }
@@ -1006,6 +1011,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_MAIN_SCREEN, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
         {PAGE_MAIN_SCREEN, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
         {PAGE_PREMIUM, ID_NAME_EMOJI, R.string.SG_NameEmoji, -1},
+        {PAGE_PREMIUM, ID_NAME_EFFECT, R.string.SG_NameEffect, -1},
         {PAGE_MAIN_SCREEN, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
         {PAGE_APPEARANCE, ID_SMOOTH_TRANSITIONS, R.string.SG_SmoothTransitions, -1},
         {PAGE_APPEARANCE, ID_PRESS_SCALE, R.string.SG_PressScale, -1},
@@ -1322,6 +1328,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
         items.add(tile(UItem.asButton(ID_NAME_EMOJI, R.drawable.msg2_smile_status, getString(R.string.SG_NameEmoji),
             getString(com.solegram.messenger.SolegramNameEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_PINK));
+        final int nameEffect = com.solegram.messenger.SolegramNameEffect.own();
+        items.add(tile(UItem.asButton(ID_NAME_EFFECT, R.drawable.msg2_animations, getString(R.string.SG_NameEffect),
+            getString(com.solegram.messenger.SolegramNameEffect.nameOf(com.solegram.messenger.SolegramNameEffect.kindOf(nameEffect)))), TILE_PURPLE));
         items.add(UItem.asButtonCheck(ID_NAME_EMOJI_SHARE, getString(R.string.SG_NameEmojiShare), getString(R.string.SG_NameEmojiShareInfo)).setChecked(SolegramConfig.nameEmojiShare));
         items.add(UItem.asButtonCheck(ID_CARD_SHOW_OTHERS, getString(R.string.SG_CardShowOthers), getString(R.string.SG_CardShowOthersInfo)).setChecked(SolegramConfig.profileCards));
         items.add(UItem.asButtonCheck(ID_ANIMATED_AVATARS, getString(R.string.SG_AnimatedAvatars), getString(R.string.SG_AnimatedAvatarsInfo)).setChecked(SolegramConfig.animatedAvatars));
@@ -2582,6 +2591,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     titleEmojiPicker = com.solegram.messenger.SolegramTitleEmoji.showPicker(this, view, 0, 0, null, null, null, () -> listView.adapter.update(true));
                 }
                 return;
+            case ID_NAME_EFFECT:
+                presentFragment(new SolegramNameEffectActivity());
+                return;
             case ID_NAME_EMOJI:
                 // the same picker; the emoji shows next to the own name and only on this device
                 if (titleEmojiPicker == null || !titleEmojiPicker.isShowing()) {
@@ -2864,6 +2876,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_PREMIUM_NAGS:
                 toggleCheck(view, "hidePremiumNags");
+                return;
+            case ID_VOICE_PREVIEW:
+                toggleCheck(view, "voicePreview");
+                return;
+            case ID_VOICE_EFFECTS:
+                toggleCheck(view, "voiceEffects");
                 return;
             case ID_MENTION_CARDS:
                 toggleCheck(view, "mentionCards");

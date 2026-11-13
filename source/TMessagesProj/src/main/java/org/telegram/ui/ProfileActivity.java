@@ -2460,8 +2460,31 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
     // endregion
 
+    private com.solegram.messenger.ui.SolegramProfileShake sgShake;
+
+    private void sgOnShake() {
+        if (fragmentView == null || isFinishing() || getParentLayout() != null && getParentLayout().getLastFragment() != this) {
+            return;
+        }
+        final java.util.ArrayList<View> buttons = new java.util.ArrayList<>();
+        if (actionBar != null) {
+            buttons.add(actionBar.getBackButton());
+            if (actionBar.menu != null) {
+                for (int i = 0; i < actionBar.menu.getChildCount(); i++) {
+                    buttons.add(actionBar.menu.getChildAt(i));
+                }
+            }
+        }
+        sgShake = com.solegram.messenger.ui.SolegramProfileShake.toggle(sgShake, (ViewGroup) fragmentView, actionsView, buttons);
+    }
+
     @Override
     public void onFragmentDestroy() {
+        com.solegram.messenger.SolegramGestures.setShakeOverride(null);
+        if (sgShake != null) {
+            sgShake.restoreNow();
+            sgShake = null;
+        }
         super.onFragmentDestroy();
         if (sgBanner != null) {
             sgBanner.onDetachedFromWindow();
@@ -5631,6 +5654,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             @Override
             protected void onDraw(Canvas canvas) {
                 final int wasRightDrawableX = getRightDrawableX();
+                // Solegram: the effect on the name (the own one, or as the user's bio says)
+                sgNameEffect = userId != 0 && !saved ? com.solegram.messenger.SolegramNameEffect.renderer(com.solegram.messenger.SolegramNameEffect.of(currentAccount, userId)) : null;
                 super.onDraw(canvas);
                 if (wasRightDrawableX != getRightDrawableX()) {
                     updateCollectibleHint();
@@ -9943,6 +9968,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onResume() {
+        // Solegram: a shake here drops the buttons (the easter egg), the shake shortcut waits outside the profile
+        com.solegram.messenger.SolegramGestures.setShakeOverride(this::sgOnShake);
         super.onResume();
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onResume();
@@ -9992,6 +10019,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onPause() {
+        com.solegram.messenger.SolegramGestures.setShakeOverride(null);
+        if (sgShake != null) {
+            sgShake.restoreNow();
+            sgShake = null;
+        }
         super.onPause();
         if (undoView != null) {
             undoView.hide(true, 0);

@@ -111,6 +111,52 @@ public class SolegramBadgeDrawable extends Drawable {
         return tickPath;
     }
 
+    private static Path toolsPath;
+
+    /** A wrench and a screwdriver crossed as an X (the tester's mark), as a filled shape, in a 1 x 1 box. */
+    static Path tools() {
+        if (toolsPath == null) {
+            // drawn at a size of 100 (the stroker is coarse on tiny paths), then brought to the unit box
+            final Paint sp = new Paint();
+            sp.setStyle(Paint.Style.STROKE);
+            sp.setStrokeCap(Paint.Cap.ROUND);
+            sp.setStrokeJoin(Paint.Join.ROUND);
+            // the wrench: a handle from bottom left to top right, a round head with an open jaw
+            final Path wrench = stroked(sp, 14f, 22f, 78f, 62f, 38f);
+            final Path head = new Path();
+            head.addCircle(69f, 31f, 17f, Path.Direction.CW);
+            wrench.op(head, Path.Op.UNION);
+            final Path jaw = new Path();
+            jaw.addRoundRect(new RectF(-6.5f, -10f, 6.5f, 10f), 2f, 2f, Path.Direction.CW);
+            final Matrix jm = new Matrix();
+            jm.setRotate(45f);
+            jm.postTranslate(78f, 22f);
+            jaw.transform(jm);
+            wrench.op(jaw, Path.Op.DIFFERENCE);
+            // a gap round the screwdriver where it crosses over the wrench
+            wrench.op(stroked(sp, 19f, 28f, 28f, 64f, 64f), Path.Op.DIFFERENCE);
+            // the screwdriver: a shaft from top left, a thick handle at bottom right
+            final Path driver = stroked(sp, 9f, 24f, 24f, 60f, 60f);
+            driver.op(stroked(sp, 20f, 64f, 64f, 80f, 80f), Path.Op.UNION);
+            wrench.op(driver, Path.Op.UNION);
+            final Matrix m = new Matrix();
+            m.setScale(0.01f, 0.01f);
+            wrench.transform(m);
+            toolsPath = wrench;
+        }
+        return toolsPath;
+    }
+
+    private static Path stroked(Paint sp, float width, float x1, float y1, float x2, float y2) {
+        final Path line = new Path();
+        line.moveTo(x1, y1);
+        line.lineTo(x2, y2);
+        sp.setStrokeWidth(width);
+        final Path out = new Path();
+        sp.getFillPath(line, out);
+        return out;
+    }
+
     /** The scalloped badge: a circle with nine soft waves round its edge, in a 1 x 1 box. */
     static Path cookie() {
         if (cookiePath == null) {
@@ -153,6 +199,14 @@ public class SolegramBadgeDrawable extends Drawable {
             matrix.setScale(m, m);
             matrix.postTranslate((s - m) / 2f, (s - m) / 2f + s * 0.01f);
             mark().transform(matrix, inner);
+        } else if (role == SolegramBadges.TESTER) {
+            // the developer's shape in violet, with crossed tools in it
+            matrix.setScale(s, s);
+            cookie().transform(matrix, path);
+            final float m = s * 0.6f;
+            matrix.setScale(m, m);
+            matrix.postTranslate((s - m) / 2f, (s - m) / 2f);
+            tools().transform(matrix, inner);
         } else {
             final float m = s * 0.92f;
             matrix.setScale(m, m);
@@ -174,7 +228,7 @@ public class SolegramBadgeDrawable extends Drawable {
         paint.setColor(colorOf(role));
         paint.setAlpha(alpha);
         canvas.drawPath(path, paint);
-        if (role == SolegramBadges.OFFICIAL || role == SolegramBadges.DEVELOPER) {
+        if (role == SolegramBadges.OFFICIAL || role == SolegramBadges.DEVELOPER || role == SolegramBadges.TESTER) {
             paint.setColor(0xFFFFFFFF);
             paint.setAlpha(alpha);
             canvas.drawPath(inner, paint);

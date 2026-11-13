@@ -311,6 +311,10 @@ public class SolegramConfig {
     public static boolean hidePremiumNags;
     /** A message that mentions someone (@name) shows their small profile card in the bubble. */
     public static boolean mentionCards;
+    /** A voice message is not sent when the button is let go: it waits to be heard (and given an effect). */
+    public static boolean voicePreview;
+    /** Voice effects in that preview. */
+    public static boolean voiceEffects;
     public static boolean hideGiftButtons;
     // endregion
 
@@ -588,6 +592,8 @@ public class SolegramConfig {
         hidePremiumSettings = p.getBoolean("hidePremiumSettings", false);
         hidePremiumNags = p.getBoolean("hidePremiumNags", true);
         mentionCards = p.getBoolean("mentionCards", true);
+        voicePreview = p.getBoolean("voicePreview", true);
+        voiceEffects = p.getBoolean("voiceEffects", true);
         hideGiftButtons = p.getBoolean("hideGiftButtons", false);
 
         proxyAuto = p.getBoolean("proxyAuto", false);
@@ -739,6 +745,8 @@ public class SolegramConfig {
         switch (key) {
             case "hidePremiumNags":
             case "mentionCards":
+            case "voicePreview":
+            case "voiceEffects":
             case "unifiedWallet":
             case "profileCards":
             case "ghostReadOnInteract":

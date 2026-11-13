@@ -2022,3 +2022,46 @@ JNIEXPORT void Java_org_telegram_utils_recorder_audio_AudioNoiseSuppressor_nDest
             (AudioNoiseSuppressorContext *) (intptr_t) handle
     );
 }
+
+// Solegram: a voice message as 48 kHz mono samples, for the voice effects (null when it cannot be read)
+JNIEXPORT jshortArray Java_org_telegram_messenger_MediaController_sgDecodeOpus(JNIEnv *env, jclass class, jstring path) {
+    const char *pathStr = (*env)->GetStringUTFChars(env, path, 0);
+    int error = 0;
+    OggOpusFile *file = op_open_file(pathStr, &error);
+    (*env)->ReleaseStringUTFChars(env, path, pathStr);
+    if (!file || error != 0) {
+        if (file) {
+            op_free(file);
+        }
+        return NULL;
+    }
+    ogg_int64_t total = op_pcm_total(file, -1);
+    // up to 20 minutes; a longer message is sent as it is
+    if (total <= 0 || total > 48000LL * 60 * 20) {
+        op_free(file);
+        return NULL;
+    }
+    opus_int16 *pcm = (opus_int16 *) malloc(sizeof(opus_int16) * (size_t) total);
+    if (!pcm) {
+        op_free(file);
+        return NULL;
+    }
+    opus_int16 buffer[5760 * 2];
+    ogg_int64_t written = 0;
+    while (written < total) {
+        int read = op_read_stereo(file, buffer, 5760 * 2);
+        if (read <= 0) {
+            break;
+        }
+        for (int i = 0; i < read && written < total; i++) {
+            pcm[written++] = (opus_int16) (((int) buffer[i * 2] + (int) buffer[i * 2 + 1]) / 2);
+        }
+    }
+    op_free(file);
+    jshortArray result = (*env)->NewShortArray(env, (jsize) written);
+    if (result) {
+        (*env)->SetShortArrayRegion(env, result, 0, (jsize) written, pcm);
+    }
+    free(pcm);
+    return result;
+}

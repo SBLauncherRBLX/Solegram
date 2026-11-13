@@ -82,6 +82,8 @@ public class SolegramProfileStreakView extends LinearLayout {
     private class SunView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
+        private final SolegramFlameRenderer flame = new SolegramFlameRenderer();
+
         SunView(Context context) {
             super(context);
         }
@@ -92,14 +94,8 @@ public class SolegramProfileStreakView extends LinearLayout {
             if (size <= 0 || days <= 0) {
                 return;
             }
-            final float t = SystemClock.elapsedRealtime() / 1000f;
-            canvas.save();
-            // a slow breath instead of a turn (the mark is not a round sun any more)
-            final float breath = 1f + 0.03f * (float) Math.sin(t * 1.9f);
-            canvas.scale(breath, breath, getWidth() / 2f, getHeight() / 2f);
-            canvas.drawBitmap(SolegramStreak.sun(color, days, size), (getWidth() - size) / 2f, (getHeight() - size) / 2f, paint);
-            canvas.restore();
-            if (isShown()) {
+            final int flameSize = (int) (size * 0.86f);
+            if (flame.draw(canvas, getWidth() / 2f, (getHeight() + flameSize) / 2f + size * 0.05f, flameSize, color, days, false, 1f) && isShown()) {
                 postInvalidateOnAnimation();
             }
         }

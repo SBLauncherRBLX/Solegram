@@ -66,6 +66,13 @@ public final class SolegramGestures implements SensorEventListener {
 
     private static SolegramGestures instance;
     private static Tester tester;
+    /** A screen that answers a shake itself (the profile's easter egg): the shake is its, not the shortcut's. */
+    private static Runnable shakeOverride;
+
+    public static void setShakeOverride(Runnable r) {
+        shakeOverride = r;
+        get().update(true);
+    }
 
     private SensorManager sensors;
     private boolean registered;
@@ -211,7 +218,7 @@ public final class SolegramGestures implements SensorEventListener {
     }
 
     private void update(boolean foreground) {
-        final boolean want = foreground && (tester != null || enabled() && anyAction());
+        final boolean want = foreground && (tester != null || shakeOverride != null || enabled() && anyAction());
         try {
             if (sensors == null) {
                 sensors = (SensorManager) ApplicationLoader.applicationContext.getSystemService(Context.SENSOR_SERVICE);
@@ -370,6 +377,10 @@ public final class SolegramGestures implements SensorEventListener {
         AndroidUtilities.runOnUIThread(() -> {
             if (tester != null) {
                 tester.onGesture(gesture);
+                return;
+            }
+            if (gesture == SHAKE && shakeOverride != null) {
+                shakeOverride.run();
                 return;
             }
             if (!enabled() || actionOf(gesture) == ACTION_NONE) {
