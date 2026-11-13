@@ -922,10 +922,39 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     /** Solegram: told when a menu of this bar opens in the screen's overlay and when it has closed. */
     public Runnable solegramOnMenuOverlayChanged;
 
+    /** Solegram: how much the title and subtitle fade while a menu opens under them (0: not at all). */
+    private float solegramTitleFade;
+
+    /**
+     * Solegram: a menu of this bar in an overlay drawn under the bar (a screen whose header is not one of its own
+     * views, as SoleWallet): the title would stay on top of the open menu, so it fades out as the menu grows.
+     */
+    @Override
+    public void solegramMenuProgress(float progress) {
+        final float fade = solegramMenuUnderBar() ? org.telegram.messenger.Utilities.clamp01(progress) : 0f;
+        if (Math.abs(fade - solegramTitleFade) > 0.002f) {
+            solegramTitleFade = fade;
+            invalidate();
+        }
+    }
+
+    private boolean solegramMenuUnderBar() {
+        final SimpleActionBarMenuOverlay overlay = openMenuOverlay;
+        if (overlay == null || !(getParent() instanceof ViewGroup)) {
+            return false;
+        }
+        final ViewGroup parent = (ViewGroup) getParent();
+        // the overlay drawn after the bar (in the same parent) is over it: nothing to do
+        return !(overlay.getParent() == parent && parent.indexOfChild(overlay) > parent.indexOfChild(this));
+    }
+
     @Override
     public void setMenuOverlay(SimpleActionBarMenuOverlay overlay, ActionBarMenuItem item) {
         openMenuOverlay = overlay;
         openMenuItem = item;
+        if (overlay == null && solegramTitleFade != 0f) {
+            solegramTitleFade = 0f;
+        }
         invalidate();
         if (solegramOnMenuOverlayChanged != null) {
             solegramOnMenuOverlayChanged.run();
@@ -1104,6 +1133,18 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
         if (parentFragment != null && parentFragment.getParentLayout() != null && parentFragment.getParentLayout().isActionBarInCrossfade()) {
             return false;
+        }
+        if (solegramTitleFade > 0f && (child == titleTextView[0] || child == titleTextView[1] || child == subtitleTextView
+                || child == additionalSubtitleTextView || child == titlesContainer)) {
+            // Solegram: the title gives way to a menu opening under the bar (solegramMenuProgress)
+            final int alpha = Math.round(255 * (1f - solegramTitleFade));
+            if (alpha <= 0) {
+                return false;
+            }
+            canvas.saveLayerAlpha(null, alpha);
+            final boolean drawn = super.drawChild(canvas, child, drawingTime);
+            canvas.restore();
+            return drawn;
         }
         if (drawBackButton && child == backButtonImageView) {
             return true;

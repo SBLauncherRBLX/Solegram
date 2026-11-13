@@ -595,6 +595,7 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
         computeContentRect(endRect);
 
         final float pw = menuW, ph = menuH, m = Utilities.clamp01(Math.max(pw, ph));
+        bar.solegramMenuProgress(m);
         shapeRect.set(
             lerp(startRect.left, endRect.left, pw),
             lerp(startRect.top, endRect.top, ph),

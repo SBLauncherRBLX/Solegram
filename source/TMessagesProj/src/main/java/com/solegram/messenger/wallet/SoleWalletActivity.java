@@ -1239,6 +1239,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     private void goalOptions(View anchor, SoleWallet.Goal g) {
         SoleWallet.touch();
         final ItemOptions o = ItemOptions.makeOptions(this, anchor);
+        o.setDrawScrim(false); // the row stays in the page, under the header (not drawn over the dim)
         if (g.saved < g.target) {
             o.add(R.drawable.msg_add, getString(R.string.SG_GoalsPut), () -> askAmount(g, true));
         }
@@ -1458,6 +1459,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             return;
         }
         final ItemOptions o = ItemOptions.makeOptions(this, card);
+        // the menu under the card, the card itself stays where it is (drawn over the dim it covered the header's
+        // buttons and the blur)
+        o.setDrawScrim(false);
         o.add(R.drawable.msg_contacts, getString(R.string.SG_WalletSendContact), this::pickContact);
         o.add(R.drawable.msg_qrcode, getString(R.string.SG_WalletSendCode), this::scanCode);
         // by the number on the recipient's card: anonymously

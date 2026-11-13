@@ -53,6 +53,10 @@ public interface MenuOverlayHost {
     @Nullable
     Theme.ResourcesProvider getMenuResourcesProvider();
 
+    /** Solegram: how far the open menu has grown (0..1), every frame while it shows. */
+    default void solegramMenuProgress(float progress) {
+    }
+
     /** The view the rects of {@link #getMenuItemGlassRect} are in. */
     default View getMenuHostView() {
         return (View) this;

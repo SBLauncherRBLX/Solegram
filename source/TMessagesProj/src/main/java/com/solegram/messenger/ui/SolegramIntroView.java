@@ -57,6 +57,15 @@ public class SolegramIntroView extends View {
         rayPaint.setStrokeCap(Paint.Cap.ROUND);
     }
 
+    /**
+     * The glow reaches past this view's bounds. Faded while the pages are swiped, the view was drawn into a layer
+     * of its own size and the glow was cut into a rectangle: its alpha goes on each drawing instead.
+     */
+    @Override
+    public boolean hasOverlappingRendering() {
+        return false;
+    }
+
     /** The pager's position: the page and how far it is swiped towards the next one. */
     public void setPage(float page) {
         this.page = Math.max(0f, Math.min(1f, page));
