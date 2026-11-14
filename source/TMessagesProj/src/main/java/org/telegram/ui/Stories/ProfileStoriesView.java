@@ -608,8 +608,12 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
                 paint.setStrokeWidth(AndroidUtilities.dp(2));
                 paint.setAlpha((int) (255 * segmentsAlpha));
                 boolean isForum = ChatObject.isForum(UserConfig.selectedAccount, dialogId);
+                final int sgPercent = com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT);
                 if (isForum) {
                     float r = rect2.height() * 0.32f;
+                    canvas.drawRoundRect(rect2, r, r, paint);
+                } else if (sgPercent < 100) {
+                    final float r = rect1.width() / 2f * sgPercent / 100f + Math.max(0, (rect2.width() - rect1.width()) / 2f);
                     canvas.drawRoundRect(rect2, r, r, paint);
                 } else {
                     canvas.drawCircle(rect2.centerX(), rect2.centerY(), rect2.width() / 2f, paint);
@@ -901,6 +905,14 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
 
     private void drawArc(Canvas canvas, RectF oval, float startAngle, float sweepAngle, boolean useCenter, Paint paint) {
         boolean isForum = ChatObject.isForum(UserConfig.selectedAccount, dialogId);
+        // Solegram: the ring round the avatar follows the avatar's shape (the small story circles stay round)
+        final int sgPercent = com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT);
+        if (!isForum && sgPercent < 100 && (oval == rect2 || oval == rect3) && rect1.width() > 0) {
+            final float r = rect1.width() / 2f * sgPercent / 100f + Math.max(0, (oval.width() - rect1.width()) / 2f);
+            final float from = sweepAngle >= 0 ? startAngle : startAngle + sweepAngle;
+            StoriesUtilities.sgDrawRoundSegment(canvas, oval, r, paint, from, from + Math.abs(sweepAngle));
+            return;
+        }
         if (isForum) {
             float r = oval.height() * 0.32f;
             if (Math.abs(sweepAngle) == 360) {

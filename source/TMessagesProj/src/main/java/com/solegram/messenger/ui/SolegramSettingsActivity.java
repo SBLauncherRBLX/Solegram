@@ -126,6 +126,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_NP_ACCENT_PLAYER = 714;
     private static final int ID_NP_ACCENT_THEME = 715;
     private static final int ID_NP_STYLE_TELEGRAM = 716;
+    private static final int ID_NP_STYLE_ROW = 717;
 
     // camera
     private static final int ID_CAMERA_FPS_AUTO = 801;
@@ -1512,12 +1513,18 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
 
         items.add(UItem.asHeader(getString(R.string.SG_ProfileMusicSection)));
+        items.add(UItem.asRadio2(ID_NP_STYLE_ROW, getString(R.string.SG_NowPlayingStyleRow), getString(R.string.SG_NowPlayingStyleRowInfo)).setChecked(look == SolegramNowPlayingView.STYLE_ROW));
         items.add(UItem.asRadio2(ID_NP_STYLE_COVER, getString(R.string.SG_NowPlayingStyleCover), getString(R.string.SG_NowPlayingStyleCoverInfo)).setChecked(look == SolegramNowPlayingView.STYLE_COVER));
         items.add(UItem.asRadio2(ID_NP_STYLE_GLASS, getString(R.string.SG_NowPlayingStyleGlass), getString(R.string.SG_NowPlayingStyleGlassInfo)).setChecked(look == SolegramNowPlayingView.STYLE_GLASS));
         items.add(UItem.asRadio2(ID_NP_STYLE_COMPACT, getString(R.string.SG_NowPlayingStyleCompact), getString(R.string.SG_NowPlayingStyleCompactInfo)).setChecked(look == SolegramNowPlayingView.STYLE_COMPACT));
         items.add(UItem.asRadio2(ID_NP_STYLE_TELEGRAM, getString(R.string.SG_ProfileMusicStyleTelegram), getString(R.string.SG_ProfileMusicStyleTelegramInfo)).setChecked(!card));
         items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicInfo)));
         if (!card) {
+            return;
+        }
+        if (look == SolegramNowPlayingView.STYLE_ROW) {
+            items.add(UItem.asCheck(ID_NP_PROGRESS, getString(R.string.SG_NowPlayingProgress)).setChecked(SolegramConfig.nowPlayingProgress));
+            items.add(UItem.asShadow(null));
             return;
         }
         items.add(UItem.asButtonCheck(ID_NP_VINYL, getString(R.string.SG_NowPlayingVinyl), getString(R.string.SG_NowPlayingVinylInfo)).setChecked(SolegramConfig.nowPlayingVinyl));
@@ -2293,6 +2300,11 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_NP_STYLE_GLASS:
             case ID_NP_STYLE_COMPACT:
                 SolegramConfig.prefs().edit().putInt("nowPlayingStyle", item.id - ID_NP_STYLE_COVER).putInt("profileMusicStyle", item.id - ID_NP_STYLE_COVER).apply();
+                SolegramConfig.reload();
+                musicLookChanged();
+                return;
+            case ID_NP_STYLE_ROW:
+                SolegramConfig.prefs().edit().putInt("nowPlayingStyle", SolegramNowPlayingView.STYLE_ROW).putInt("profileMusicStyle", SolegramNowPlayingView.STYLE_ROW).apply();
                 SolegramConfig.reload();
                 musicLookChanged();
                 return;

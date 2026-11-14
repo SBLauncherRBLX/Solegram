@@ -498,8 +498,12 @@ public class SolegramConfig {
         nowPlayingSpotify = p.getBoolean("nowPlayingSpotify", true);
         nowPlayingSoundCloud = p.getBoolean("nowPlayingSoundCloud", true);
         nowPlayingShareBio = p.getBoolean("nowPlayingShareBio", false);
-        nowPlayingStyle = clamp(p.getInt("nowPlayingStyle", 0), 0, 2);
-        profileMusicStyle = clamp(p.getInt("profileMusicStyle", nowPlayingStyle), 0, 3);
+        // Telegram's own look (a plain row, 4) by default; 0..2 Solegram's cards
+        nowPlayingStyle = p.getInt("nowPlayingStyle", 4);
+        if (nowPlayingStyle != 4) {
+            nowPlayingStyle = clamp(nowPlayingStyle, 0, 2);
+        }
+        profileMusicStyle = clamp(p.getInt("profileMusicStyle", nowPlayingStyle), 0, 4);
         nowPlayingVinyl = p.getBoolean("nowPlayingVinyl", false);
         nowPlayingProgress = p.getBoolean("nowPlayingProgress", true);
         nowPlayingEqualizer = p.getBoolean("nowPlayingEqualizer", true);

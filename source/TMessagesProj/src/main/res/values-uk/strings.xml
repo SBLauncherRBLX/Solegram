@@ -2169,6 +2169,8 @@
     <string name="SG_DevPanelPackNotFound">No emoji pack found by that link</string>
     <string name="SG_DevPanelNoStatus">They have no emoji status</string>
     <string name="SG_HidePremiumNags">No Premium nags</string>
+    <string name="SG_NowPlayingStyleRow">Telegram style</string>
+    <string name="SG_NowPlayingStyleRowInfo">A plain row, as an audio file in Telegram: a round cover that plays, the title, the artist and the length</string>
     <string name="SG_VoicePreview">Listen to voice messages before sending</string>
     <string name="SG_VoiceFxSetting">Voice effects for voice messages</string>
     <string name="SG_VoiceFx">Voice effect</string>

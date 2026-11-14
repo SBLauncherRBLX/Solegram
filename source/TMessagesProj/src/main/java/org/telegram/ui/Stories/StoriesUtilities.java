@@ -132,6 +132,9 @@ public class StoriesUtilities {
         int unreadState = 0;
         boolean showProgress = storiesController.isLoading(dialogId);
         boolean isForum = ChatObject.isForum(UserConfig.selectedAccount, dialogId) && !params.isDialogStoriesCell;
+        // Solegram: the ring follows the avatar's shape (its corners, grown by the ring's distance), not only a circle
+        sgAvatarPercent = isForum || params.isDialogStoriesCell ? 100 : com.solegram.messenger.SolegramUi.avatarPercent(avatarImage.solegramShape);
+        sgAvatarWidth = avatarImage.getImageWidth();
         if (params.drawHiddenStoriesAsSegments) {
             hasStories = storiesController.hasHiddenStories();
         }
@@ -663,11 +666,54 @@ public class StoriesUtilities {
 
     private static final RectF forumRect = new RectF();
 
+    // Solegram: the avatar being drawn (its roundness in percent, its width), for a ring of the same shape
+    private static int sgAvatarPercent = 100;
+    private static float sgAvatarWidth;
+
+    /** The ring's corner radius for the avatar's shape, or -1 for a circle. */
+    private static float sgRingRadius(RectF ring) {
+        if (sgAvatarPercent >= 100 || sgAvatarWidth <= 0) {
+            return -1;
+        }
+        final float grow = Math.max(0, (ring.width() - sgAvatarWidth) / 2f);
+        return sgAvatarWidth / 2f * sgAvatarPercent / 100f + grow;
+    }
+
+    private static final Path sgWedge = new Path();
+    private static final RectF sgWedgeOval = new RectF();
+
+    /** A segment of a rounded square ring between two angles: the whole ring, cut to the wedge between them. */
+    static void sgDrawRoundSegment(Canvas canvas, RectF rect, float r, Paint paint, float startAngle, float endAngle) {
+        if (endAngle - startAngle >= 359.5f) {
+            canvas.drawRoundRect(rect, r, r, paint);
+            return;
+        }
+        final float cx = rect.centerX(), cy = rect.centerY(), big = Math.max(rect.width(), rect.height());
+        sgWedgeOval.set(cx - big, cy - big, cx + big, cy + big);
+        sgWedge.rewind();
+        sgWedge.moveTo(cx, cy);
+        sgWedge.arcTo(sgWedgeOval, startAngle, endAngle - startAngle, false);
+        sgWedge.close();
+        canvas.save();
+        canvas.clipPath(sgWedge);
+        canvas.drawRoundRect(rect, r, r, paint);
+        canvas.restore();
+    }
+
     private static void drawCircleInternal(Canvas canvas, View view, AvatarStoryParams params, Paint paint, boolean isForum) {
         if (isForum) {
             forumRect.set(rectTmp);
             forumRect.inset(dp(0.5f), dp(0.5f));
             canvas.drawRoundRect(forumRect, dp(18), dp(18), paint);
+            return;
+        }
+        final float sgR = sgRingRadius(rectTmp);
+        if (sgR >= 0) {
+            if (params.progressToArc == 0) {
+                canvas.drawRoundRect(rectTmp, sgR, sgR, paint);
+            } else {
+                sgDrawRoundSegment(canvas, rectTmp, sgR, paint, params.progressToArc / 2f, 360 - params.progressToArc / 2f);
+            }
             return;
         }
         if (params.progressToArc == 0) {
@@ -703,6 +749,11 @@ public class StoriesUtilities {
             forumRoundRectPathMeasure.getSegment(length * percentFrom, length * percentTo, forumSegmentPath, true);
             forumSegmentPath.rLineTo(0, 0);
             canvas.drawPath(forumSegmentPath, paint);
+            return;
+        }
+        final float sgR = sgRingRadius(rectTmp);
+        if (sgR >= 0) {
+            sgDrawRoundSegment(canvas, rectTmp, sgR, paint, startAngle, endAngle);
             return;
         }
         if (params.useArcProgress) {

@@ -2474,7 +2474,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         final java.util.ArrayList<View> views = new java.util.ArrayList<>();
         final java.util.ArrayList<View> hide = new java.util.ArrayList<>();
         if (actionBar != null) {
-            views.add(actionBar.getBackButton());
+            // the back button stays where it is (a way out of the mess)
             if (actionBar.menu != null) {
                 for (int i = 0; i < actionBar.menu.getChildCount(); i++) {
                     views.add(actionBar.menu.getChildAt(i));

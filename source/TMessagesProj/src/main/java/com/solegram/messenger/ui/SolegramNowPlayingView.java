@@ -56,6 +56,8 @@ public class SolegramNowPlayingView extends View {
     public static final int STYLE_COVER = 0;
     public static final int STYLE_GLASS = 1;
     public static final int STYLE_COMPACT = 2;
+    /** Telegram's look: a plain list row (a round cover that plays, the title, the artist and length, a thin progress). */
+    public static final int STYLE_ROW = 4;
 
     private static final int SPOTIFY_GREEN = 0xFF1DB954;
     private static final int SOUNDCLOUD_ORANGE = 0xFFFF5500;
@@ -258,6 +260,9 @@ public class SolegramNowPlayingView extends View {
     // region layout
 
     private int wantedHeight() {
+        if (style() == STYLE_ROW) {
+            return dp(64);
+        }
         if (style() == STYLE_COMPACT) {
             return dp(COMPACT_CARD + 12);
         }
@@ -346,9 +351,121 @@ public class SolegramNowPlayingView extends View {
 
     // region drawing
 
+    private final Path rowPlay = new Path();
+    private final RectF rowCover = new RectF();
+    private final Matrix rowMatrix = new Matrix();
+    private BitmapShader rowShader;
+    private Bitmap rowShaderBitmap;
+    private final Paint rowPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+
+    /** Telegram's look: a list row as an audio file in Telegram shows, no card and no shadows. */
+    private void drawRow(Canvas canvas) {
+        final int w = getWidth(), h = getHeight();
+        final boolean rtl = LocaleController.isRTL;
+        final float size = dp(44);
+        final float coverLeft = rtl ? w - dp(16) - size : dp(16);
+        rowCover.set(coverLeft, (h - size) / 2f, coverLeft + size, (h + size) / 2f);
+        button.set(rowCover);
+        selector.setBounds(0, 0, w, h);
+        selector.draw(canvas);
+        final int alpha = (int) (255 * contentAlpha);
+        final int blue = color(Theme.key_featuredStickers_addButton);
+
+        // the round cover, which is the play button
+        if (track != null && track.art != null && !track.art.isRecycled()) {
+            if (rowShader == null || rowShaderBitmap != track.art) {
+                rowShaderBitmap = track.art;
+                rowShader = new BitmapShader(track.art, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            }
+            final float scale = Math.max(size / track.art.getWidth(), size / track.art.getHeight());
+            rowMatrix.setScale(scale, scale);
+            rowMatrix.postTranslate(rowCover.centerX() - track.art.getWidth() * scale / 2f, rowCover.centerY() - track.art.getHeight() * scale / 2f);
+            rowShader.setLocalMatrix(rowMatrix);
+            rowPaint.setShader(rowShader);
+            rowPaint.setAlpha(alpha);
+            canvas.drawCircle(rowCover.centerX(), rowCover.centerY(), size / 2f, rowPaint);
+            rowPaint.setShader(null);
+            rowPaint.setColor(0x59000000);
+            rowPaint.setAlpha((int) (0x59 * contentAlpha));
+            canvas.drawCircle(rowCover.centerX(), rowCover.centerY(), size / 2f, rowPaint);
+        } else {
+            rowPaint.setShader(null);
+            rowPaint.setColor(blue);
+            rowPaint.setAlpha(alpha);
+            canvas.drawCircle(rowCover.centerX(), rowCover.centerY(), size / 2f, rowPaint);
+        }
+        rowPaint.setColor(0xFFFFFFFF);
+        rowPaint.setAlpha(alpha);
+        final float cx = rowCover.centerX(), cy = rowCover.centerY();
+        if (playing()) {
+            final float bw = dp(3.5f), bh = dp(13), gap = dp(3.5f);
+            tmp.set(cx - gap / 2f - bw, cy - bh / 2f, cx - gap / 2f, cy + bh / 2f);
+            canvas.drawRoundRect(tmp, dp(1.2f), dp(1.2f), rowPaint);
+            tmp.set(cx + gap / 2f, cy - bh / 2f, cx + gap / 2f + bw, cy + bh / 2f);
+            canvas.drawRoundRect(tmp, dp(1.2f), dp(1.2f), rowPaint);
+        } else {
+            rowPlay.rewind();
+            final float t = dp(8);
+            rowPlay.moveTo(cx - t * 0.45f, cy - t * 0.8f);
+            rowPlay.lineTo(cx + t * 0.85f, cy);
+            rowPlay.lineTo(cx - t * 0.45f, cy + t * 0.8f);
+            rowPlay.close();
+            canvas.drawPath(rowPlay, rowPaint);
+        }
+
+        // the title, then the artist and the length
+        final float textLeft = rtl ? dp(16) : rowCover.right + dp(14);
+        final float textRight = rtl ? rowCover.left - dp(14) : w - dp(16);
+        final float textWidth = Math.max(dp(40), textRight - textLeft);
+        titlePaint.setTypeface(null);
+        titlePaint.setTextSize(dp(16));
+        titlePaint.setColor(color(Theme.key_windowBackgroundWhiteBlackText));
+        titlePaint.setAlpha(alpha);
+        artistPaint.setTextSize(dp(13));
+        artistPaint.setColor(color(Theme.key_windowBackgroundWhiteGrayText2));
+        artistPaint.setAlpha(alpha);
+        final String title = track != null ? track.title : emptyText != null ? emptyText.toString() : "";
+        String sub = track != null && !TextUtils.isEmpty(track.artist) ? track.artist : "";
+        if (track != null && track.duration > 0) {
+            final String length = AndroidUtilities.formatShortDuration((int) (track.duration / 1000));
+            sub = sub.isEmpty() ? length : sub + " · " + length;
+        }
+        final CharSequence t1 = TextUtils.ellipsize(title, titlePaint, textWidth, TextUtils.TruncateAt.END);
+        final CharSequence t2 = TextUtils.ellipsize(sub, artistPaint, textWidth, TextUtils.TruncateAt.END);
+        final float x1 = rtl ? textRight - titlePaint.measureText(t1, 0, t1.length()) : textLeft;
+        final float x2 = rtl ? textRight - artistPaint.measureText(t2, 0, t2.length()) : textLeft;
+        canvas.drawText(t1, 0, t1.length(), x1, h / 2f - dp(3), titlePaint);
+        canvas.drawText(t2, 0, t2.length(), x2, h / 2f + dp(16), artistPaint);
+        titlePaint.setTypeface(AndroidUtilities.bold());
+
+        // a thin line under it while it plays (or stands paused part way)
+        if (hasProgress()) {
+            long position = track.position;
+            if (track.playing && track.positionTime > 0) {
+                position += (long) ((android.os.SystemClock.elapsedRealtime() - track.positionTime) * track.speed);
+            }
+            final float target = Math.max(0f, Math.min(1f, position / (float) track.duration));
+            final float shown = shownProgress.set(target);
+            final float lineY = h - dp(5);
+            progressPaint.setStrokeWidth(dp(2));
+            progressPaint.setColor(Theme.multAlpha(blue, 0.18f));
+            canvas.drawLine(textLeft, lineY, textRight, lineY, progressPaint);
+            progressPaint.setColor(blue);
+            final float end = rtl ? textRight - (textRight - textLeft) * shown : textLeft + (textRight - textLeft) * shown;
+            canvas.drawLine(rtl ? textRight : textLeft, lineY, end, lineY, progressPaint);
+            if (track.playing) {
+                postInvalidateOnAnimation();
+            }
+        }
+    }
+
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         if (getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+        if (style() == STYLE_ROW) {
+            drawRow(canvas);
             return;
         }
         layoutParts();
