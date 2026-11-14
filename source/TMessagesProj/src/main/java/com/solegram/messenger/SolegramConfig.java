@@ -155,6 +155,10 @@ public class SolegramConfig {
     public static int nowPlayingStyle = 0;
     /** How profiles show their music: Solegram's card in one of its looks (0..2, as nowPlayingStyle) or 3, Telegram's line under the photo. */
     public static int profileMusicStyle = 0;
+    /** The music island's background: the cover blurred (true) or its colours. */
+    public static boolean nowPlayingBlurBackground = true;
+    /** The emoji spreading out from the cover on the own profile's music (0: none chosen). */
+    public static long profileMusicEmoji;
     /** The cover as a rounded square, or as a record that turns while the music plays. */
     public static boolean nowPlayingVinyl = false;
     /** The song's progress and time on the own card. */
@@ -504,6 +508,14 @@ public class SolegramConfig {
             nowPlayingStyle = clamp(nowPlayingStyle, 0, 2);
         }
         profileMusicStyle = clamp(p.getInt("profileMusicStyle", nowPlayingStyle), 0, 4);
+        if (profileMusicStyle == 1) {
+            profileMusicStyle = 4; // the glass card is gone: the island in Telegram's look
+        }
+        if (nowPlayingStyle == 1) {
+            nowPlayingStyle = 4;
+        }
+        nowPlayingBlurBackground = p.getBoolean("nowPlayingBlurBackground", true);
+        profileMusicEmoji = p.getLong("profileMusicEmoji", 0);
         nowPlayingVinyl = p.getBoolean("nowPlayingVinyl", false);
         nowPlayingProgress = p.getBoolean("nowPlayingProgress", true);
         nowPlayingEqualizer = p.getBoolean("nowPlayingEqualizer", true);
@@ -767,6 +779,7 @@ public class SolegramConfig {
             case "glassMenus":
             case "streaks":
             case "newPlayer":
+            case "nowPlayingBlurBackground":
             case "glassDialogs":
             case "glassSheets":
             case "messageDetails":

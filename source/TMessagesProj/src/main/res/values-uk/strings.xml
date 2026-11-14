@@ -2169,8 +2169,15 @@
     <string name="SG_DevPanelPackNotFound">No emoji pack found by that link</string>
     <string name="SG_DevPanelNoStatus">They have no emoji status</string>
     <string name="SG_HidePremiumNags">No Premium nags</string>
+    <string name="SG_NowPlayingBackground">Island background</string>
+    <string name="SG_NowPlayingBackgroundBlur">The cover, blurred</string>
+    <string name="SG_NowPlayingBackgroundColors">The cover\'s colours</string>
+    <string name="SG_NowPlayingPattern">Pattern round the cover</string>
+    <string name="SG_NowPlayingPatternPick">Emoji of the pattern</string>
+    <string name="SG_NowPlayingPatternReset">Remove the emoji</string>
+    <string name="SG_NowPlayingPatternInfo">The chosen emoji spreads out from the cover and takes the cover\'s colour. Other Solegram users see it if you have a profile card (it goes with the card the next time you save it); without a choice, your Telegram profile background emoji is used, or music notes.</string>
     <string name="SG_NowPlayingStyleRow">Telegram style</string>
-    <string name="SG_NowPlayingStyleRowInfo">A plain row, as an audio file in Telegram: a round cover that plays, the title, the artist and the length</string>
+    <string name="SG_NowPlayingStyleRowInfo">An island in the cover\'s colours or the blurred cover, with a pattern of an emoji round the cover</string>
     <string name="SG_VoicePreview">Listen to voice messages before sending</string>
     <string name="SG_VoiceFxSetting">Voice effects for voice messages</string>
     <string name="SG_VoiceFx">Voice effect</string>

@@ -1902,8 +1902,15 @@
     <string name="SG_DevPanelPackNotFound">Набор эмодзи по этой ссылке не найден</string>
     <string name="SG_DevPanelNoStatus">У них нет эмодзи-статуса</string>
     <string name="SG_HidePremiumNags">Без напоминаний о Premium</string>
+    <string name="SG_NowPlayingBackground">Фон островка</string>
+    <string name="SG_NowPlayingBackgroundBlur">Размытая обложка</string>
+    <string name="SG_NowPlayingBackgroundColors">Цвета обложки</string>
+    <string name="SG_NowPlayingPattern">Узор вокруг обложки</string>
+    <string name="SG_NowPlayingPatternPick">Эмодзи узора</string>
+    <string name="SG_NowPlayingPatternReset">Убрать эмодзи</string>
+    <string name="SG_NowPlayingPatternInfo">Выбранный эмодзи расходится узором от обложки и принимает её цвет. Другие пользователи Solegram видят его, если у вас есть карточка профиля (он уходит вместе с карточкой при следующем её сохранении); если не выбрать — берётся эмодзи фона профиля из Telegram или ноты.</string>
     <string name="SG_NowPlayingStyleRow">В стиле Telegram</string>
-    <string name="SG_NowPlayingStyleRowInfo">Простая строка, как аудиофайл в Telegram: круглая обложка-кнопка, название, исполнитель и длительность</string>
+    <string name="SG_NowPlayingStyleRowInfo">Островок в цветах обложки или с размытой обложкой, вокруг обложки — узор из эмодзи</string>
     <string name="SG_VoicePreview">Прослушивать голосовое перед отправкой</string>
     <string name="SG_VoiceFxSetting">Эффекты голоса в голосовых</string>
     <string name="SG_VoiceFx">Эффект голоса</string>

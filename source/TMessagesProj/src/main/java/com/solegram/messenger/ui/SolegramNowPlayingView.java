@@ -35,6 +35,8 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 
+import org.telegram.ui.Components.AnimatedEmojiDrawable;
+
 import com.solegram.messenger.SolegramConfig;
 import com.solegram.messenger.SolegramNowPlaying;
 
@@ -56,7 +58,10 @@ public class SolegramNowPlayingView extends View {
     public static final int STYLE_COVER = 0;
     public static final int STYLE_GLASS = 1;
     public static final int STYLE_COMPACT = 2;
-    /** Telegram's look: a plain list row (a round cover that plays, the title, the artist and length, a thin progress). */
+    /**
+     * Telegram's look: its own island (no glass), the background the cover's colours or the cover blurred, a pattern
+     * of the chosen emoji spreading out from the cover in the cover's colour, a round play button, a thin progress.
+     */
     public static final int STYLE_ROW = 4;
 
     private static final int SPOTIFY_GREEN = 0xFF1DB954;
@@ -116,6 +121,31 @@ public class SolegramNowPlayingView extends View {
     private CharSequence titleSource, titleShown, artistSource, artistShown;
     private float titleWidth = -1, artistWidth = -1;
     private float contentAlpha = 1f;
+    /** The island's coming in (0..1): it rises, grows and fades in the first time it shows a song. */
+    private float appear = 1f;
+    private ValueAnimator appearAnimator;
+    private boolean appeared;
+
+    private void animateAppear() {
+        if (appeared || style() != STYLE_ROW) {
+            appeared = true;
+            return;
+        }
+        appeared = true;
+        if (appearAnimator != null) {
+            appearAnimator.cancel();
+        }
+        appear = 0f;
+        appearAnimator = ValueAnimator.ofFloat(0f, 1f);
+        appearAnimator.addUpdateListener(a -> {
+            appear = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        appearAnimator.setDuration(520);
+        appearAnimator.setStartDelay(60);
+        appearAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        appearAnimator.start();
+    }
     private ValueAnimator fadeAnimator;
     // the progress line glides to a new place after a seek, and follows the song exactly while it plays
     private final AnimatedFloat shownProgress = new AnimatedFloat(this, 0, 380, CubicBezierInterpolator.EASE_OUT_QUINT);
@@ -147,6 +177,9 @@ public class SolegramNowPlayingView extends View {
         final int heightWas = wantedHeight();
         this.track = track;
         this.self = self;
+        if (track != null && isAttachedToWindow()) {
+            animateAppear();
+        }
         final boolean newSong = track == null || was == null || !TextUtils.equals(was.title, track.title) || !TextUtils.equals(was.artist, track.artist);
         if (track == null || track.art != washSource) {
             prepareWash(track != null ? track.art : null);
@@ -261,7 +294,7 @@ public class SolegramNowPlayingView extends View {
 
     private int wantedHeight() {
         if (style() == STYLE_ROW) {
-            return dp(64);
+            return dp(hasProgress() ? 104 : 96);
         }
         if (style() == STYLE_COMPACT) {
             return dp(COMPACT_CARD + 12);
@@ -358,20 +391,172 @@ public class SolegramNowPlayingView extends View {
     private Bitmap rowShaderBitmap;
     private final Paint rowPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
-    /** Telegram's look: a list row as an audio file in Telegram shows, no card and no shadows. */
+    // the emoji of the pattern round the cover (the profile owner's choice), tinted with the cover's colour
+    /** No emoji chosen anywhere: the pattern is music notes. */
+    public static final long DEFAULT_PATTERN_EMOJI = 0;
+    private Drawable patternNote;
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable patternEmoji;
+    private long patternEmojiId;
+    private int patternColor;
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (patternEmoji != null) {
+            patternEmoji.attach();
+        }
+        if (track != null) {
+            animateAppear();
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (patternEmoji != null) {
+            patternEmoji.detach();
+        }
+    }
+
+    /** The emoji spreading out from the cover (0: none). */
+    public void setPatternEmoji(long documentId) {
+        if (documentId == patternEmojiId) {
+            return;
+        }
+        patternEmojiId = documentId;
+        patternColor = 0;
+        if (documentId == 0) {
+            if (patternEmoji != null) {
+                patternEmoji.detach();
+                patternEmoji = null;
+            }
+        } else {
+            if (patternEmoji == null) {
+                patternEmoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(20), AnimatedEmojiDrawable.CACHE_TYPE_ALERT_PREVIEW_STATIC);
+                if (isAttachedToWindow()) {
+                    patternEmoji.attach();
+                }
+            }
+            patternEmoji.set(documentId, false);
+            patternColor = 0;
+        }
+        invalidate();
+    }
+
+    private final RectF patternText = new RectF();
+
+    /**
+     * Rings of the emoji spreading out from the cover over the whole island, fainter with distance; under the text
+     * they are fainter still, the cover and the button stay clear.
+     */
+    private void drawPattern(Canvas canvas, float cx, float cy, int color, int alpha) {
+        final Drawable pattern;
+        if (patternEmoji != null) {
+            if (patternColor != color) {
+                patternColor = color;
+                patternEmoji.setColor(color);
+            }
+            pattern = patternEmoji;
+        } else {
+            if (patternNote == null) {
+                patternNote = getContext().getResources().getDrawable(R.drawable.files_music).mutate();
+                patternColor = 0;
+            }
+            if (patternColor != color) {
+                patternColor = color;
+                patternNote.setColorFilter(new android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN));
+            }
+            pattern = patternNote;
+        }
+        final float step = dp(24), reach = card.width() + dp(40);
+        int ring = 0;
+        for (float radius = dp(44); radius < reach; radius += step, ring++) {
+            final int count = Math.max(6, (int) (2 * Math.PI * radius / dp(30)));
+            final float half = dp(Math.max(9f, 16f - ring * 1.1f)) / 2f;
+            final float fade = 0.5f * Math.max(0.12f, 1f - radius / (card.width() * 0.95f));
+            for (int k = 0; k < count; k++) {
+                final double a = Math.toRadians(ring * 17f + 360f * k / count);
+                final float x = cx + (float) Math.cos(a) * radius, y = cy + (float) Math.sin(a) * radius;
+                if (x + half < card.left || x - half > card.right || y + half < card.top || y - half > card.bottom) {
+                    continue;
+                }
+                if (!button.isEmpty() && Math.abs(x - button.centerX()) < button.width() / 2f + half && Math.abs(y - button.centerY()) < button.height() / 2f + half) {
+                    continue;
+                }
+                if (Math.abs(x - rowCover.centerX()) < rowCover.width() / 2f + half * 0.5f && Math.abs(y - rowCover.centerY()) < rowCover.height() / 2f + half * 0.5f) {
+                    continue;
+                }
+                float opacity = fade;
+                if (x > patternText.left - half && x < patternText.right + half && y > patternText.top - half && y < patternText.bottom + half) {
+                    opacity *= 0.35f;
+                }
+                pattern.setBounds((int) (x - half), (int) (y - half), (int) (x + half), (int) (y + half));
+                pattern.setAlpha((int) (alpha * opacity));
+                pattern.draw(canvas);
+            }
+        }
+        pattern.setAlpha(255);
+    }
+
+    /** Telegram's look: an island in the cover's colours (or the cover blurred), the pattern, a round play button. */
     private void drawRow(Canvas canvas) {
         final int w = getWidth(), h = getHeight();
         final boolean rtl = LocaleController.isRTL;
-        final float size = dp(44);
-        final float coverLeft = rtl ? w - dp(16) - size : dp(16);
-        rowCover.set(coverLeft, (h - size) / 2f, coverLeft + size, (h + size) / 2f);
-        button.set(rowCover);
-        selector.setBounds(0, 0, w, h);
-        selector.draw(canvas);
-        final int alpha = (int) (255 * contentAlpha);
-        final int blue = color(Theme.key_featuredStickers_addButton);
+        card.set(dp(12), dp(6), w - dp(12), h - dp(6));
+        final float radius = dp(18);
+        clip.rewind();
+        clip.addRoundRect(card, radius, radius, Path.Direction.CW);
+        selector.setBounds((int) card.left, (int) card.top, (int) card.right, (int) card.bottom);
+        final int alpha = (int) (255 * contentAlpha * appear);
+        final int base = track != null ? (track.color | 0xFF000000) : color(Theme.key_windowBackgroundWhiteGrayText);
 
-        // the round cover, which is the play button
+        canvas.save();
+        if (appear < 1f) {
+            final float s = 0.94f + 0.06f * appear;
+            canvas.scale(s, s, card.centerX(), card.centerY());
+            canvas.translate(0, dp(10) * (1f - appear));
+        }
+        canvas.clipPath(clip);
+        // the background: the cover blurred (darkened a little for the text), or a gradient of its colour
+        final boolean blur = SolegramConfig.nowPlayingBlurBackground && washShader != null && washBitmap != null;
+        if (blur) {
+            final float scale = Math.max(card.width() / washBitmap.getWidth(), card.height() / washBitmap.getHeight());
+            rowMatrix.setScale(scale, scale);
+            rowMatrix.postTranslate(card.centerX() - washBitmap.getWidth() * scale / 2f, card.centerY() - washBitmap.getHeight() * scale / 2f);
+            washShader.setLocalMatrix(rowMatrix);
+            rowPaint.setShader(washShader);
+            rowPaint.setAlpha((int) (255 * appear));
+            canvas.drawRect(card, rowPaint);
+            rowPaint.setShader(null);
+            rowPaint.setColor(ColorUtils.setAlphaComponent(ColorUtils.blendARGB(base, Color.BLACK, 0.6f), (int) (0x66 * appear)));
+            canvas.drawRect(card, rowPaint);
+        } else {
+            final int light = ColorUtils.blendARGB(base, Color.WHITE, 0.12f), deep = ColorUtils.blendARGB(base, Color.BLACK, 0.45f);
+            if (coverFill == null || coverFillTint != base || coverFillLeft != card.left || coverFillTop != card.top) {
+                coverFillTint = base;
+                coverFillLeft = card.left;
+                coverFillTop = card.top;
+                coverFill = new LinearGradient(card.left, card.top, card.right, card.bottom, light, deep, Shader.TileMode.CLAMP);
+            }
+            rowPaint.setShader(coverFill);
+            rowPaint.setAlpha((int) (255 * appear));
+            canvas.drawRect(card, rowPaint);
+            rowPaint.setShader(null);
+        }
+
+        // the cover and the pattern spreading out from it
+        final float size = dp(60);
+        final float coverLeft = rtl ? card.right - dp(14) - size : card.left + dp(14);
+        final float coverTop = card.top + (dp(84) - size) / 2f;
+        rowCover.set(coverLeft, coverTop, coverLeft + size, coverTop + size);
+        final float bsizePre = track != null ? dp(40) : 0;
+        final float bLeftPre = rtl ? card.left + dp(14) : card.right - dp(14) - bsizePre;
+        button.set(bLeftPre, rowCover.centerY() - bsizePre / 2f, bLeftPre + bsizePre, rowCover.centerY() + bsizePre / 2f);
+        patternText.set(rtl ? button.right + dp(12) : rowCover.right + dp(14), rowCover.centerY() - dp(22),
+            rtl ? rowCover.left - dp(14) : (bsizePre > 0 ? button.left - dp(12) : card.right - dp(14)), rowCover.centerY() + dp(22));
+        final int patternTint = ColorUtils.blendARGB(Color.WHITE, ColorUtils.blendARGB(base, Color.WHITE, 0.55f), 0.45f);
+        drawPattern(canvas, rowCover.centerX(), rowCover.centerY(), patternTint, alpha);
+        final float coverRadius = dp(12);
         if (track != null && track.art != null && !track.art.isRecycled()) {
             if (rowShader == null || rowShaderBitmap != track.art) {
                 rowShaderBitmap = track.art;
@@ -383,47 +568,60 @@ public class SolegramNowPlayingView extends View {
             rowShader.setLocalMatrix(rowMatrix);
             rowPaint.setShader(rowShader);
             rowPaint.setAlpha(alpha);
-            canvas.drawCircle(rowCover.centerX(), rowCover.centerY(), size / 2f, rowPaint);
+            canvas.drawRoundRect(rowCover, coverRadius, coverRadius, rowPaint);
             rowPaint.setShader(null);
-            rowPaint.setColor(0x59000000);
-            rowPaint.setAlpha((int) (0x59 * contentAlpha));
-            canvas.drawCircle(rowCover.centerX(), rowCover.centerY(), size / 2f, rowPaint);
         } else {
-            rowPaint.setShader(null);
-            rowPaint.setColor(blue);
-            rowPaint.setAlpha(alpha);
-            canvas.drawCircle(rowCover.centerX(), rowCover.centerY(), size / 2f, rowPaint);
+            rowPaint.setColor(0x33FFFFFF);
+            rowPaint.setAlpha((int) (0x33 * contentAlpha * appear));
+            canvas.drawRoundRect(rowCover, coverRadius, coverRadius, rowPaint);
+            if (noteDrawable == null) {
+                noteDrawable = getContext().getResources().getDrawable(R.drawable.files_music).mutate();
+            }
+            noteDrawable.setColorFilter(new android.graphics.PorterDuffColorFilter(0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN));
+            final int half = dp(14);
+            noteDrawable.setBounds((int) rowCover.centerX() - half, (int) rowCover.centerY() - half, (int) rowCover.centerX() + half, (int) rowCover.centerY() + half);
+            noteDrawable.setAlpha(alpha);
+            noteDrawable.draw(canvas);
         }
-        rowPaint.setColor(0xFFFFFFFF);
-        rowPaint.setAlpha(alpha);
-        final float cx = rowCover.centerX(), cy = rowCover.centerY();
-        if (playing()) {
-            final float bw = dp(3.5f), bh = dp(13), gap = dp(3.5f);
-            tmp.set(cx - gap / 2f - bw, cy - bh / 2f, cx - gap / 2f, cy + bh / 2f);
-            canvas.drawRoundRect(tmp, dp(1.2f), dp(1.2f), rowPaint);
-            tmp.set(cx + gap / 2f, cy - bh / 2f, cx + gap / 2f + bw, cy + bh / 2f);
-            canvas.drawRoundRect(tmp, dp(1.2f), dp(1.2f), rowPaint);
-        } else {
-            rowPlay.rewind();
-            final float t = dp(8);
-            rowPlay.moveTo(cx - t * 0.45f, cy - t * 0.8f);
-            rowPlay.lineTo(cx + t * 0.85f, cy);
-            rowPlay.lineTo(cx - t * 0.45f, cy + t * 0.8f);
-            rowPlay.close();
-            canvas.drawPath(rowPlay, rowPaint);
+
+        // the play button on the other side
+        final float bsize = track != null ? dp(40) : 0;
+        final float bLeft = rtl ? card.left + dp(14) : card.right - dp(14) - bsize;
+        button.set(bLeft, rowCover.centerY() - bsize / 2f, bLeft + bsize, rowCover.centerY() + bsize / 2f);
+        if (bsize > 0) {
+            rowPaint.setColor(0x33FFFFFF);
+            rowPaint.setAlpha((int) (0x38 * contentAlpha * appear));
+            canvas.drawCircle(button.centerX(), button.centerY(), bsize / 2f, rowPaint);
+            rowPaint.setColor(0xFFFFFFFF);
+            rowPaint.setAlpha(alpha);
+            final float cx = button.centerX(), cy = button.centerY();
+            if (playing()) {
+                final float bw = dp(3.5f), bh = dp(13), gap = dp(3.5f);
+                tmp.set(cx - gap / 2f - bw, cy - bh / 2f, cx - gap / 2f, cy + bh / 2f);
+                canvas.drawRoundRect(tmp, dp(1.2f), dp(1.2f), rowPaint);
+                tmp.set(cx + gap / 2f, cy - bh / 2f, cx + gap / 2f + bw, cy + bh / 2f);
+                canvas.drawRoundRect(tmp, dp(1.2f), dp(1.2f), rowPaint);
+            } else {
+                rowPlay.rewind();
+                final float t = dp(8);
+                rowPlay.moveTo(cx - t * 0.45f, cy - t * 0.8f);
+                rowPlay.lineTo(cx + t * 0.85f, cy);
+                rowPlay.lineTo(cx - t * 0.45f, cy + t * 0.8f);
+                rowPlay.close();
+                canvas.drawPath(rowPlay, rowPaint);
+            }
         }
 
         // the title, then the artist and the length
-        final float textLeft = rtl ? dp(16) : rowCover.right + dp(14);
-        final float textRight = rtl ? rowCover.left - dp(14) : w - dp(16);
+        final float textLeft = rtl ? button.right + dp(12) : rowCover.right + dp(14);
+        final float textRight = rtl ? rowCover.left - dp(14) : (bsize > 0 ? button.left - dp(12) : card.right - dp(14));
         final float textWidth = Math.max(dp(40), textRight - textLeft);
-        titlePaint.setTypeface(null);
         titlePaint.setTextSize(dp(16));
-        titlePaint.setColor(color(Theme.key_windowBackgroundWhiteBlackText));
+        titlePaint.setColor(0xFFFFFFFF);
         titlePaint.setAlpha(alpha);
-        artistPaint.setTextSize(dp(13));
-        artistPaint.setColor(color(Theme.key_windowBackgroundWhiteGrayText2));
-        artistPaint.setAlpha(alpha);
+        artistPaint.setTextSize(dp(14));
+        artistPaint.setColor(0xFFFFFFFF);
+        artistPaint.setAlpha((int) (alpha * 0.75f));
         final String title = track != null ? track.title : emptyText != null ? emptyText.toString() : "";
         String sub = track != null && !TextUtils.isEmpty(track.artist) ? track.artist : "";
         if (track != null && track.duration > 0) {
@@ -434,11 +632,10 @@ public class SolegramNowPlayingView extends View {
         final CharSequence t2 = TextUtils.ellipsize(sub, artistPaint, textWidth, TextUtils.TruncateAt.END);
         final float x1 = rtl ? textRight - titlePaint.measureText(t1, 0, t1.length()) : textLeft;
         final float x2 = rtl ? textRight - artistPaint.measureText(t2, 0, t2.length()) : textLeft;
-        canvas.drawText(t1, 0, t1.length(), x1, h / 2f - dp(3), titlePaint);
-        canvas.drawText(t2, 0, t2.length(), x2, h / 2f + dp(16), artistPaint);
-        titlePaint.setTypeface(AndroidUtilities.bold());
+        canvas.drawText(t1, 0, t1.length(), x1, rowCover.centerY() - dp(4), titlePaint);
+        canvas.drawText(t2, 0, t2.length(), x2, rowCover.centerY() + dp(16), artistPaint);
 
-        // a thin line under it while it plays (or stands paused part way)
+        // a thin line along the bottom while it plays (or stands paused part way)
         if (hasProgress()) {
             long position = track.position;
             if (track.playing && track.positionTime > 0) {
@@ -446,18 +643,27 @@ public class SolegramNowPlayingView extends View {
             }
             final float target = Math.max(0f, Math.min(1f, position / (float) track.duration));
             final float shown = shownProgress.set(target);
-            final float lineY = h - dp(5);
-            progressPaint.setStrokeWidth(dp(2));
-            progressPaint.setColor(Theme.multAlpha(blue, 0.18f));
-            canvas.drawLine(textLeft, lineY, textRight, lineY, progressPaint);
-            progressPaint.setColor(blue);
-            final float end = rtl ? textRight - (textRight - textLeft) * shown : textLeft + (textRight - textLeft) * shown;
-            canvas.drawLine(rtl ? textRight : textLeft, lineY, end, lineY, progressPaint);
+            final float lineY = card.bottom - dp(11);
+            final float l = card.left + dp(16), r = card.right - dp(16);
+            progressPaint.setStrokeWidth(dp(3));
+            progressPaint.setColor(0x40FFFFFF);
+            progressPaint.setAlpha((int) (0x40 * contentAlpha * appear));
+            canvas.drawLine(l, lineY, r, lineY, progressPaint);
+            progressPaint.setColor(0xFFFFFFFF);
+            progressPaint.setAlpha(alpha);
+            final float end = rtl ? r - (r - l) * shown : l + (r - l) * shown;
+            canvas.drawLine(rtl ? r : l, lineY, end, lineY, progressPaint);
             if (track.playing) {
                 postInvalidateOnAnimation();
             }
         }
+        selector.draw(canvas);
+        canvas.restore();
+        if (appear < 1f) {
+            postInvalidateOnAnimation();
+        }
     }
+
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {

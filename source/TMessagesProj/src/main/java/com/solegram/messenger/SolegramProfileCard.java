@@ -67,6 +67,8 @@ public final class SolegramProfileCard {
         public int streakColor;
         public long streakPartner;
         public long streakDay;
+        /** The emoji spreading out from the cover of the profile's music (0: none). */
+        public long musicEmoji;
 
         /** The pinned streak, unless it is more than a day older than its last check. */
         public boolean hasStreak() {
@@ -94,6 +96,9 @@ public final class SolegramProfileCard {
             sb.append("|d=").append(dim);
             if (!posts.isEmpty()) {
                 sb.append("|p=").append(TextUtils.join(",", posts));
+            }
+            if (musicEmoji != 0) {
+                sb.append("|me=").append(musicEmoji);
             }
             if (streakDays > 0) {
                 sb.append("|s=").append(streakDays).append('.').append(streakColor).append('.').append(streakPartner).append('.').append(streakDay);
@@ -153,6 +158,9 @@ public final class SolegramProfileCard {
                                     c.posts.add(n);
                                 }
                             }
+                            break;
+                        case "me":
+                            c.musicEmoji = Long.parseLong(v);
                             break;
                         case "s": {
                             final String[] f = v.split("\\.");
@@ -409,6 +417,7 @@ public final class SolegramProfileCard {
         edit.peer = mc.getInputPeer(-channel.id);
         edit.id = post.getId();
         final String caption = strip(post.messageOwner.message);
+        card.musicEmoji = SolegramConfig.profileMusicEmoji; // the music's pattern goes with the card
         final String mark = mark(card.encode());
         if (caption.length() + mark.length() > mc.maxCaptionLength) {
             done.run("CAPTION_TOO_LONG");

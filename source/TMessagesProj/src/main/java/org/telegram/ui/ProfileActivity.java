@@ -11022,6 +11022,26 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return music.track();
     }
 
+    /**
+     * The emoji spreading out from the music's cover: the own choice on the own profile; on others', the one their
+     * Solegram card carries, else their Telegram profile background emoji; else a music note.
+     */
+    private long sgMusicPatternEmoji() {
+        if (userId == 0) {
+            return 0;
+        }
+        if (userId == getUserConfig().getClientUserId() && com.solegram.messenger.SolegramConfig.profileMusicEmoji != 0) {
+            return com.solegram.messenger.SolegramConfig.profileMusicEmoji;
+        }
+        final com.solegram.messenger.SolegramProfileCard.Card card = com.solegram.messenger.SolegramProfileCard.get(userId);
+        if (card != null && card.musicEmoji != 0) {
+            return card.musicEmoji;
+        }
+        final TLRPC.User user = getMessagesController().getUser(userId);
+        final long background = user != null ? UserObject.getProfileEmojiId(user) : 0;
+        return background != 0 ? background : com.solegram.messenger.ui.SolegramNowPlayingView.DEFAULT_PATTERN_EMOJI;
+    }
+
     private void sgMusicChanged() {
         if (listView == null || listAdapter == null) {
             return;
@@ -11031,6 +11051,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             // the card follows the player: redrawn in place
             final RecyclerView.ViewHolder holder = listView.findViewHolderForAdapterPosition(sgNowPlayingRow);
             if (holder != null && holder.itemView instanceof com.solegram.messenger.ui.SolegramNowPlayingView) {
+                ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setPatternEmoji(sgMusicPatternEmoji());
                 ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(track, false);
                 return;
             }
@@ -14050,6 +14071,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             switch (holder.getItemViewType()) {
                 case VIEW_TYPE_SG_NOW_PLAYING:
+                    ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setPatternEmoji(sgMusicPatternEmoji());
                     ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setTrack(sgNowPlayingTrack(), false);
                     break;
                 case VIEW_TYPE_SG_POSTS:

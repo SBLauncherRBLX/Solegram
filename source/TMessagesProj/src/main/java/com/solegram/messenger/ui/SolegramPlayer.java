@@ -500,11 +500,30 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
     // ------------------------------------------------------------------ open / close
 
     private void animateIn() {
-        root.post(() -> {
-            content.setTranslationY(root.getHeight());
-            background.setAlpha(0f);
-            content.animate().translationY(0).setDuration(420).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
-            background.animate().alpha(1f).setDuration(300).start();
+        // hidden before the first frame (no flash of the player before it slides), then it comes up softly: the
+        // background fades in, the content rises a third of the way and grows a little, its rows follow one by one
+        content.setAlpha(0f);
+        background.setAlpha(0f);
+        root.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                root.getViewTreeObserver().removeOnPreDrawListener(this);
+                final float h = root.getHeight() > 0 ? root.getHeight() : AndroidUtilities.displaySize.y;
+                content.setTranslationY(h * 0.28f);
+                content.setScaleX(0.94f);
+                content.setScaleY(0.94f);
+                content.animate().translationY(0).alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(560).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                background.animate().alpha(1f).setDuration(380).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+                for (int i = 0; i < content.getChildCount(); i++) {
+                    final View child = content.getChildAt(i);
+                    child.setAlpha(0f);
+                    child.setTranslationY(dp(28));
+                    child.animate().alpha(1f).translationY(0).setStartDelay(90 + i * 40L).setDuration(460)
+                        .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                }
+                return true;
+            }
         });
     }
 
@@ -515,8 +534,10 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
             return;
         }
         closing = true;
-        content.animate().translationY(root.getHeight()).setDuration(280).setInterpolator(CubicBezierInterpolator.EASE_IN).start();
-        background.animate().alpha(0f).setDuration(280).setListener(new AnimatorListenerAdapter() {
+        // goes away as it came: sinks a little, shrinks and fades (not a hard drop)
+        content.animate().translationY(content.getTranslationY() + root.getHeight() * 0.22f).alpha(0f).scaleX(0.95f).scaleY(0.95f)
+            .setDuration(300).setInterpolator(CubicBezierInterpolator.EASE_BOTH).start();
+        background.animate().alpha(0f).setDuration(300).setListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 try {
