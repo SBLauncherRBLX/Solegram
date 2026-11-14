@@ -1902,6 +1902,7 @@
     <string name="SG_DevPanelPackNotFound">No emoji pack found by that link</string>
     <string name="SG_DevPanelNoStatus">They have no emoji status</string>
     <string name="SG_HidePremiumNags">No Premium nags</string>
+    <string name="SG_NowPlayingPatternProfile">Pattern of my music</string>
     <string name="SG_NowPlayingBackground">Island background</string>
     <string name="SG_NowPlayingBackgroundBlur">The cover, blurred</string>
     <string name="SG_NowPlayingBackgroundColors">The cover\'s colours</string>

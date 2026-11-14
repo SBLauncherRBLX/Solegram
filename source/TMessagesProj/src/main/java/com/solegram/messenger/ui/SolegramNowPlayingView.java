@@ -468,15 +468,17 @@ public class SolegramNowPlayingView extends View {
             }
             pattern = patternNote;
         }
-        final float step = dp(24), reach = card.width() + dp(40);
+        // positions in rings round the cover; the size and the opacity fall evenly from the left edge to the right
+        final float step = dp(22), reach = card.width() + dp(40);
         int ring = 0;
-        for (float radius = dp(44); radius < reach; radius += step, ring++) {
-            final int count = Math.max(6, (int) (2 * Math.PI * radius / dp(30)));
-            final float half = dp(Math.max(9f, 16f - ring * 1.1f)) / 2f;
-            final float fade = 0.5f * Math.max(0.12f, 1f - radius / (card.width() * 0.95f));
+        for (float radius = dp(42); radius < reach; radius += step, ring++) {
+            final int count = Math.max(6, (int) (2 * Math.PI * radius / dp(28)));
             for (int k = 0; k < count; k++) {
                 final double a = Math.toRadians(ring * 17f + 360f * k / count);
                 final float x = cx + (float) Math.cos(a) * radius, y = cy + (float) Math.sin(a) * radius;
+                final float t = Math.max(0f, Math.min(1f, (x - card.left) / card.width()));
+                final float tt = LocaleController.isRTL ? 1f - t : t;
+                final float half = dp(16f - 8f * tt) / 2f;
                 if (x + half < card.left || x - half > card.right || y + half < card.top || y - half > card.bottom) {
                     continue;
                 }
@@ -486,7 +488,7 @@ public class SolegramNowPlayingView extends View {
                 if (Math.abs(x - rowCover.centerX()) < rowCover.width() / 2f + half * 0.5f && Math.abs(y - rowCover.centerY()) < rowCover.height() / 2f + half * 0.5f) {
                     continue;
                 }
-                float opacity = fade;
+                float opacity = 0.5f - 0.44f * tt;
                 if (x > patternText.left - half && x < patternText.right + half && y > patternText.top - half && y < patternText.bottom + half) {
                     opacity *= 0.35f;
                 }

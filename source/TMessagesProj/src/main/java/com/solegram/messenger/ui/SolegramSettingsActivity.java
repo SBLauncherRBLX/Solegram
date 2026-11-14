@@ -1017,6 +1017,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_MAIN_SCREEN, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
         {PAGE_PREMIUM, ID_NAME_EMOJI, R.string.SG_NameEmoji, -1},
         {PAGE_PREMIUM, ID_NAME_EFFECT, R.string.SG_NameEffect, -1},
+        {PAGE_PREMIUM, ID_NP_PATTERN, R.string.SG_NowPlayingPatternProfile, -1},
         {PAGE_MAIN_SCREEN, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
         {PAGE_APPEARANCE, ID_SMOOTH_TRANSITIONS, R.string.SG_SmoothTransitions, -1},
         {PAGE_APPEARANCE, ID_PRESS_SCALE, R.string.SG_PressScale, -1},
@@ -1336,6 +1337,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         final int nameEffect = com.solegram.messenger.SolegramNameEffect.own();
         items.add(tile(UItem.asButton(ID_NAME_EFFECT, R.drawable.msg2_animations, getString(R.string.SG_NameEffect),
             getString(com.solegram.messenger.SolegramNameEffect.nameOf(com.solegram.messenger.SolegramNameEffect.kindOf(nameEffect)))), TILE_PURPLE));
+        items.add(tile(UItem.asButton(ID_NP_PATTERN, R.drawable.msg_filled_data_music, getString(R.string.SG_NowPlayingPatternProfile),
+            getString(SolegramConfig.profileMusicEmoji != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)), TILE_PINK));
         items.add(UItem.asButtonCheck(ID_NAME_EMOJI_SHARE, getString(R.string.SG_NameEmojiShare), getString(R.string.SG_NameEmojiShareInfo)).setChecked(SolegramConfig.nameEmojiShare));
         items.add(UItem.asButtonCheck(ID_CARD_SHOW_OTHERS, getString(R.string.SG_CardShowOthers), getString(R.string.SG_CardShowOthersInfo)).setChecked(SolegramConfig.profileCards));
         items.add(UItem.asButtonCheck(ID_ANIMATED_AVATARS, getString(R.string.SG_AnimatedAvatars), getString(R.string.SG_AnimatedAvatarsInfo)).setChecked(SolegramConfig.animatedAvatars));

@@ -11135,9 +11135,36 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             AndroidUtilities.addToClipboard(query);
             BulletinFactory.of(this).createCopyBulletin(getString(R.string.TextCopied)).show();
         });
+        if (userId == getUserConfig().getClientUserId()) {
+            // the own music: the emoji of its pattern, chosen right here
+            o.add(R.drawable.msg2_smile_status, getString(R.string.SG_NowPlayingPatternPick), () -> sgPickMusicEmoji(view));
+            if (com.solegram.messenger.SolegramConfig.profileMusicEmoji != 0) {
+                o.add(R.drawable.msg_reset, getString(R.string.SG_NowPlayingPatternReset), () -> sgSetMusicEmoji(0));
+            }
+        }
         o.add(R.drawable.msg_customize, getString(R.string.SG_ProfileMusicLook), () ->
             presentFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_MUSIC)));
         o.show();
+    }
+
+    private org.telegram.ui.SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow sgMusicEmojiPicker;
+
+    private void sgPickMusicEmoji(View anchor) {
+        if (sgMusicEmojiPicker != null && sgMusicEmojiPicker.isShowing()) {
+            return;
+        }
+        sgMusicEmojiPicker = com.solegram.messenger.SolegramTitleEmoji.showPicker(this, anchor, 0, 0, null, null, null,
+            com.solegram.messenger.SolegramConfig.profileMusicEmoji, id -> sgSetMusicEmoji(id == null ? 0 : id), null);
+    }
+
+    private void sgSetMusicEmoji(long id) {
+        com.solegram.messenger.SolegramConfig.putLong("profileMusicEmoji", id);
+        if (listView != null && sgNowPlayingRow >= 0) {
+            final RecyclerView.ViewHolder holder = listView.findViewHolderForAdapterPosition(sgNowPlayingRow);
+            if (holder != null && holder.itemView instanceof com.solegram.messenger.ui.SolegramNowPlayingView) {
+                ((com.solegram.messenger.ui.SolegramNowPlayingView) holder.itemView).setPatternEmoji(sgMusicPatternEmoji());
+            }
+        }
     }
     // endregion
 
