@@ -1716,8 +1716,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private void updateStoriesViewAlpha(float alpha) {
         final float factorSearch = Utilities.clamp(searchAnimationProgress * 2, 1f, 0f);
         // Solegram: the folded floating header hides the stories only where they would cover the tabs - folded into
-        // the title row; spread out under it they stay (hidden there, they left an empty band over the chats)
-        final float solegramShown = 1f - solegramCollapseFactor() * dialogStoriesCell.getCollapsedProgress();
+        // the title row; spread out under it they stay (hidden there, they left an empty band over the chats). How far
+        // they are folded is taken from the scroll, not from the strip's own (up to a second long) folding animation:
+        // with that one its title stayed half seen under the tabs for a while
+        final float solegramStoriesFolded = hasStories ? Utilities.clamp(-scrollYOffset / dp(DialogStoriesCell.HEIGHT_IN_DP), 1f, 0f) : 1f;
+        final float solegramShown = 1f - solegramCollapseFactor() * solegramStoriesFolded;
         dialogStoriesCell.setAlpha((1f - progressToActionMode) * alpha * progressToDialogStoriesCell * (1f - factorSearch) * solegramShown);
         float containersAlpha;
 
@@ -7428,6 +7431,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private float solegramTabsLift;
     /** How far the shown list was scrolled up to take the room the folded tabs left. */
     private int solegramListLift;
+    /** The part of {@link #solegramListLift} the list has really scrolled by (the scrolls are posted), and which list. */
+    private int solegramListLiftDone;
+    private RecyclerView solegramListLiftList;
 
     /** 0..1: how far the floating header has folded (title gone, folder tabs in its row). */
     private float solegramCollapseFactor() {
@@ -7454,7 +7460,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final int first = page.layoutManager.findFirstVisibleItemPosition();
         final View topChild = page.listView.getChildAt(topIndex);
         final int firstViewTop = topChild != null ? topChild.getTop() : 0;
-        final boolean underHeader = !(first <= topIndex && (firstViewTop - scrollYOffset + dp(5)) >= page.listView.getPaddingTop());
+        // the scroll the folding itself added is not the user's: the header unfolds as soon as the chats would come
+        // down to where the tabs were, not only once they are back at the top (a band was left empty till then)
+        final int liftDone = page.listView == solegramListLiftList ? solegramListLiftDone : 0;
+        // a few dp apart for folding and unfolding: a finger resting on the edge does not flip the tabs to and fro
+        final int edge = solegramCollapseAnimator.getValue() ? dp(5) : dp(14);
+        final boolean underHeader = !(first <= topIndex && (firstViewTop - scrollYOffset + liftDone + edge) >= page.listView.getPaddingTop());
         solegramCollapseAnimator.setValue(underHeader && solegramHasTabs(), true);
     }
 
@@ -7482,7 +7493,22 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             solegramListLift += step;
             final RecyclerView list = viewPages[0].listView;
             // not from inside a layout or a draw
-            list.post(() -> list.scrollBy(0, step));
+            list.post(() -> {
+                if (solegramListLiftList != list) {
+                    solegramListLiftList = list;
+                    solegramListLiftDone = 0;
+                }
+                // what the list really moved (at its top it cannot go all the way down), seen on one of its rows
+                final View row = list.getChildCount() > 0 ? list.getChildAt(0) : null;
+                final int position = row != null ? list.getChildAdapterPosition(row) : RecyclerView.NO_POSITION;
+                final int before = row != null ? row.getTop() : 0;
+                list.scrollBy(0, step);
+                final View same = position != RecyclerView.NO_POSITION && list.getLayoutManager() != null ? list.getLayoutManager().findViewByPosition(position) : null;
+                solegramListLiftDone += same != null ? before - same.getTop() : step;
+                if (solegramListLift == 0) {
+                    solegramListLiftDone = 0;
+                }
+            });
         }
     }
 
