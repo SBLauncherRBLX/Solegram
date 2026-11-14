@@ -35,10 +35,13 @@ public class SolegramEdgeBlur {
 
     private static final int STOPS = 12;
 
-    /** The blurs of the stack (dp), weakest first, and where along the band (0 inner end .. 1 edge) each comes in. */
-    private static final float[] RADII = {2f, 4f, 8f, 13f, 20f};
-    private static final float[] RAMP_FROM = {0f, 0.14f, 0.3f, 0.48f, 0.66f};
-    private static final float[] RAMP_TO = {0.32f, 0.48f, 0.64f, 0.82f, 1f};
+    /**
+     * The look of the profile's and the settings' header (Telegram's fade under a simple screen's bar): one even
+     * blur, as strong as that one (7 dp, scaled by the glass settings), over the whole band, fading out only over
+     * its last 32 dp at the inner end.
+     */
+    private static final float[] RADII = {7f};
+    private static final float FADE_DP = 32f;
 
     private RenderNode content;
     private final RenderNode[] layers = new RenderNode[RADII.length];
@@ -177,7 +180,8 @@ public class SolegramEdgeBlur {
             }
         }
         for (int i = 0; i < layers.length; i++) {
-            final float r = dp(RADII[i]);
+            // the radius as the glass capture gives it (its sigma at full size)
+            final float r = Math.max(0.5f, 0.57735f * org.telegram.messenger.AndroidUtilities.dpf2(RADII[i]) * com.solegram.messenger.SolegramGlass.blurScale() + 0.5f);
             if (layerRadius[i] != r) {
                 layerRadius[i] = r;
                 layers[i].setRenderEffect(RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP));
@@ -300,9 +304,11 @@ public class SolegramEdgeBlur {
         shaderHeight = height;
         shaderFromTop = fromTop;
         shaderVeilColor = veilColor;
-        // t: 0 at the inner end of the band, 1 at the screen's edge
+        // t: 0 at the inner end of the band, 1 at the screen's edge: the blur comes in over the inner 32 dp, then
+        // stays whole up to the edge
+        final float fadeTo = Math.min(1f, dp(FADE_DP) / (float) Math.max(1, height));
         for (int i = 0; i < layerMasks.length; i++) {
-            layerMasks[i] = ramp(height, fromTop, RAMP_FROM[i], RAMP_TO[i], Color.BLACK, 255);
+            layerMasks[i] = ramp(height, fromTop, 0f, fadeTo, Color.BLACK, 255);
         }
         if (veilColor != 0) {
             veil = ramp(height, fromTop, 0.55f, 1f, background, Color.alpha(veilColor));
