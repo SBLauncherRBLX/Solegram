@@ -447,10 +447,50 @@ public class SolegramNowPlayingView extends View {
 
     private final Paint patternTintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    // the scatter, in parts of the island's width and height, made once per song and island size
+    private static final int SCATTER_MAX = 90;
+    private final float[] scatterX = new float[SCATTER_MAX], scatterY = new float[SCATTER_MAX], scatterAngle = new float[SCATTER_MAX];
+    private int scatterCount;
+    private long scatterKey = Long.MIN_VALUE;
+
+    private void layoutScatter() {
+        final long seed = (track != null && track.title != null ? track.title.hashCode() : 7L) * 31L + patternEmojiId;
+        final long key = seed * 1_000_003L + (long) card.width() * 4099L + (long) card.height();
+        if (key == scatterKey) {
+            return;
+        }
+        scatterKey = key;
+        scatterCount = 0;
+        final java.util.Random random = new java.util.Random(seed);
+        final float w = card.width(), h = card.height();
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        // throw darts: a place is kept when it does not touch the ones already there (bigger room on the left)
+        for (int attempt = 0; attempt < 900 && scatterCount < SCATTER_MAX; attempt++) {
+            final float px = random.nextFloat(), py = random.nextFloat();
+            final float size = dp(17f - 9f * px);
+            boolean free = true;
+            for (int n = 0; n < scatterCount && free; n++) {
+                final float other = dp(17f - 9f * scatterX[n]);
+                final float dx = (px - scatterX[n]) * w, dy = (py - scatterY[n]) * h;
+                final float min = (size + other) / 2f * 1.45f;
+                free = dx * dx + dy * dy >= min * min;
+            }
+            if (free) {
+                scatterX[scatterCount] = px;
+                scatterY[scatterCount] = py;
+                scatterAngle[scatterCount] = -25f + random.nextFloat() * 50f;
+                scatterCount++;
+            }
+        }
+    }
+
     /**
-     * The emoji in straight rows over the island (every other row shifted by half a step), growing and brightening
-     * evenly from the left edge to the right; under the text fainter, the cover and the button kept clear. All of it
-     * is drawn in one layer and painted the background's colour, whatever colours the emoji has.
+     * The emoji scattered at random over the island (the same scatter for the same song: it does not jump), larger
+     * and brighter at the left, smaller and dimmer towards the right; under the text fainter, the cover and the
+     * button kept clear. All of it is drawn in one layer and painted the background's colour, whatever colours the
+     * emoji has.
      */
     private void drawPattern(Canvas canvas, float cx, float cy, int color, int alpha) {
         final Drawable pattern;
@@ -463,37 +503,27 @@ public class SolegramNowPlayingView extends View {
             pattern = patternNote;
         }
         final int layer = canvas.saveLayer(card, null);
-        // rows of the same height; along a row the step is the emoji's own size times 1.9, so the gaps look even
-        // although the emoji grow (small ones close together, large ones further apart)
-        final float stepY = dp(19);
-        int row = 0;
-        for (float y = card.top + dp(9); y < card.bottom + stepY / 2f; y += stepY, row++) {
-            boolean shift = row % 2 == 1;
-            float x = card.left + dp(6);
-            while (x < card.right + dp(16)) {
-                // 0 at the left edge, 1 at the right: smaller and darker to the left, larger and brighter to the right
-                final float t = Math.max(0f, Math.min(1f, (x - card.left) / card.width()));
-                final float tt = LocaleController.isRTL ? 1f - t : t;
-                final float size = dp(8f + 8f * tt), half = size / 2f;
-                if (shift) {
-                    // every other row starts half a step later
-                    x += size * 0.95f;
-                    shift = false;
-                    continue;
-                }
-                final boolean clear = !button.isEmpty() && Math.abs(x - button.centerX()) < button.width() / 2f + half && Math.abs(y - button.centerY()) < button.height() / 2f + half
-                    || Math.abs(x - rowCover.centerX()) < rowCover.width() / 2f + half * 0.5f && Math.abs(y - rowCover.centerY()) < rowCover.height() / 2f + half * 0.5f;
-                if (!clear) {
-                    float opacity = 0.08f + 0.42f * tt;
-                    if (x > patternText.left - half && x < patternText.right + half && y > patternText.top - half && y < patternText.bottom + half) {
-                        opacity *= 0.35f;
-                    }
-                    pattern.setBounds((int) (x - half), (int) (y - half), (int) (x + half), (int) (y + half));
-                    pattern.setAlpha((int) (alpha * opacity));
-                    pattern.draw(canvas);
-                }
-                x += size * 1.9f;
+        layoutScatter();
+        for (int n = 0; n < scatterCount; n++) {
+            final float x = card.left + scatterX[n] * card.width(), y = card.top + scatterY[n] * card.height();
+            final float t = scatterX[n];
+            // 0 at the left edge, 1 at the right: larger and brighter to the left, smaller and dimmer to the right
+            final float tt = LocaleController.isRTL ? 1f - t : t;
+            final float half = dp(17f - 9f * tt) / 2f;
+            if (!button.isEmpty() && Math.abs(x - button.centerX()) < button.width() / 2f + half && Math.abs(y - button.centerY()) < button.height() / 2f + half
+                || Math.abs(x - rowCover.centerX()) < rowCover.width() / 2f + half * 0.5f && Math.abs(y - rowCover.centerY()) < rowCover.height() / 2f + half * 0.5f) {
+                continue;
             }
+            float opacity = 0.5f - 0.42f * tt;
+            if (x > patternText.left - half && x < patternText.right + half && y > patternText.top - half && y < patternText.bottom + half) {
+                opacity *= 0.35f;
+            }
+            canvas.save();
+            canvas.rotate(scatterAngle[n], x, y);
+            pattern.setBounds((int) (x - half), (int) (y - half), (int) (x + half), (int) (y + half));
+            pattern.setAlpha((int) (alpha * opacity));
+            pattern.draw(canvas);
+            canvas.restore();
         }
         pattern.setAlpha(255);
         patternTintPaint.setColor(color);
