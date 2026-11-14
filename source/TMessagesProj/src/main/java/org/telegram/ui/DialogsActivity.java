@@ -7467,6 +7467,42 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final int edge = solegramCollapseAnimator.getValue() ? dp(5) : dp(14);
         final boolean underHeader = !(first <= topIndex && (firstViewTop - scrollYOffset + liftDone + edge) >= page.listView.getPaddingTop());
         solegramCollapseAnimator.setValue(underHeader && solegramHasTabs(), true);
+        solegramSnapStories(false);
+    }
+
+    private float solegramSnappedAt = Float.NaN;
+
+    /**
+     * The stories strip is either open or folded once the list is still - never left halfway (two titles at once and
+     * an empty band over the tabs). Telegram snaps it when a scroll ends; the scrolls of the folding header come
+     * after that, so here it is snapped again once they are over too.
+     * @param force check even if the strip has not moved since the last check
+     */
+    private void solegramSnapStories(boolean force) {
+        if (!solegramFloatingHeader || !hasStories || viewPages == null || viewPages[0] == null || viewPages[0].listView == null || viewPages[0].scroller == null) {
+            return;
+        }
+        final ViewPage page = viewPages[0];
+        final float folded = -scrollYOffset;
+        final int max = getMaxScrollYOffset();
+        if (folded < 1 || folded > max - 1) {
+            solegramSnappedAt = Float.NaN;
+            return;
+        }
+        if (!force && folded == solegramSnappedAt) {
+            return;
+        }
+        if (searching || searchAnimationProgress > 0 || progressToActionMode > 0 || storiesOverscroll != 0
+            || page.listView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE || page.scroller.isRunning()
+            || solegramCollapseAnimator.isAnimating() || (rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment())) {
+            return;
+        }
+        solegramSnappedAt = folded;
+        page.listView.post(() -> {
+            if (viewPages != null && viewPages[0] == page && page.listView.getScrollState() == RecyclerView.SCROLL_STATE_IDLE && !page.scroller.isRunning()) {
+                checkAutoscrollToStories(page);
+            }
+        });
     }
 
     private boolean solegramHasTabs() {
@@ -7499,15 +7535,28 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     solegramListLiftDone = 0;
                 }
                 // what the list really moved (at its top it cannot go all the way down), seen on one of its rows
+                int by = step;
+                if (by < 0 && list.getLayoutManager() != null) {
+                    // coming back down, the list stops where the stories are still folded: it never pulls them half
+                    // open (they stayed so, between the title and the tabs)
+                    final View firstRow = list.getLayoutManager().findViewByPosition(hasHiddenArchive() ? 1 : 0);
+                    if (firstRow != null) {
+                        final int room = list.getPaddingTop() - getMaxScrollYOffset() - firstRow.getTop();
+                        by = Math.max(by, -Math.max(0, room));
+                    }
+                }
                 final View row = list.getChildCount() > 0 ? list.getChildAt(0) : null;
                 final int position = row != null ? list.getChildAdapterPosition(row) : RecyclerView.NO_POSITION;
                 final int before = row != null ? row.getTop() : 0;
-                list.scrollBy(0, step);
+                if (by != 0) {
+                    list.scrollBy(0, by);
+                }
                 final View same = position != RecyclerView.NO_POSITION && list.getLayoutManager() != null ? list.getLayoutManager().findViewByPosition(position) : null;
-                solegramListLiftDone += same != null ? before - same.getTop() : step;
+                solegramListLiftDone += same != null ? before - same.getTop() : by;
                 if (solegramListLift == 0) {
                     solegramListLiftDone = 0;
                 }
+                solegramSnapStories(true);
             });
         }
     }
