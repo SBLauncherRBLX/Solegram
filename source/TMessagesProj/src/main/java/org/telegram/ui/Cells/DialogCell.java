@@ -4246,7 +4246,15 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
                 canvas.save();
                 canvas.translate(nameLeft + nameLayoutTranslateX, nameTop);
-                SpoilerEffect.layoutDrawMaybe(nameLayout, canvas);
+                // Solegram: the effect on the person's name (as their bio says)
+                final com.solegram.messenger.SolegramNameEffect.Renderer sgNameFx = currentDialogId > 0 && currentDialogFolderId == 0 && !isForumCell()
+                    && currentDialogId != UserConfig.getInstance(currentAccount).getClientUserId() && !(canvas instanceof org.telegram.ui.Components.SizeNotifierFrameLayout.SimplerCanvas)
+                    ? com.solegram.messenger.SolegramNameEffect.renderer(com.solegram.messenger.SolegramNameEffect.of(currentAccount, currentDialogId)) : null;
+                if (sgNameFx != null) {
+                    sgNameFx.draw(this, canvas, nameLayout, nameLayout.getPaint());
+                } else {
+                    SpoilerEffect.layoutDrawMaybe(nameLayout, canvas);
+                }
                 AnimatedEmojiSpan.drawAnimatedEmojis(canvas, nameLayout, animatedEmojiStackName, -.075f, null, 0, 0, 0, 1f, getAdaptiveEmojiColorFilter(0, nameLayout.getPaint().getColor()));
                 canvas.restore();
                 if (nameLayoutEllipsizeByGradient && !nameLayoutFits) {

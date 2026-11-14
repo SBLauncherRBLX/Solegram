@@ -66,16 +66,38 @@ public final class SolegramGestures implements SensorEventListener {
 
     private static SolegramGestures instance;
     private static Tester tester;
-    /** A screen that answers a shake itself (the profile's easter egg): the shake is its, not the shortcut's. */
-    private static Runnable shakeOverride;
+    /** A screen that answers a shake itself (the profile's easter egg): while it is on the screen the shake is its. */
+    public interface ShakeHandler {
+        /** Returns whether it took the shake (it is the screen being looked at). */
+        boolean onShake();
+    }
 
-    public static void setShakeOverride(Runnable r) {
-        shakeOverride = r;
+    private static final java.util.ArrayList<ShakeHandler> shakeHandlers = new java.util.ArrayList<>();
+
+    public static void addShakeHandler(ShakeHandler h) {
+        shakeHandlers.remove(h);
+        shakeHandlers.add(h);
         get().update(true);
     }
 
+    public static void removeShakeHandler(ShakeHandler h) {
+        if (shakeHandlers.remove(h)) {
+            get().update(true);
+        }
+    }
+
+    /** The newest handler on the screen takes a shake. */
+    private static boolean shakeTaken() {
+        for (int i = shakeHandlers.size() - 1; i >= 0; i--) {
+            if (shakeHandlers.get(i).onShake()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private SensorManager sensors;
-    private boolean registered;
+    private boolean registered, registeredGyro;
     private long cooldownUntil;
 
     // shake and chop: peaks of linear acceleration along an axis, with their signs
@@ -218,7 +240,7 @@ public final class SolegramGestures implements SensorEventListener {
     }
 
     private void update(boolean foreground) {
-        final boolean want = foreground && (tester != null || shakeOverride != null || enabled() && anyAction());
+        final boolean want = foreground && (tester != null || !shakeHandlers.isEmpty() || enabled() && anyAction());
         try {
             if (sensors == null) {
                 sensors = (SensorManager) ApplicationLoader.applicationContext.getSystemService(Context.SENSOR_SERVICE);
@@ -226,9 +248,15 @@ public final class SolegramGestures implements SensorEventListener {
             if (sensors == null) {
                 return;
             }
+            // only a shake to listen for (the profile's easter egg): the accelerometer alone, no gyroscope
+            final boolean wantGyro = want && (tester != null || enabled() && anyAction());
+            if (registered && wantGyro != registeredGyro) {
+                sensors.unregisterListener(this);
+                registered = false;
+            }
             if (want && !registered) {
                 final Sensor accel = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-                final Sensor gyro = sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+                final Sensor gyro = wantGyro ? sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE) : null;
                 if (accel != null) {
                     sensors.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME);
                 }
@@ -236,6 +264,7 @@ public final class SolegramGestures implements SensorEventListener {
                     sensors.registerListener(this, gyro, SensorManager.SENSOR_DELAY_GAME);
                 }
                 registered = accel != null || gyro != null;
+                registeredGyro = wantGyro;
                 reset();
             } else if (!want && registered) {
                 sensors.unregisterListener(this);
@@ -379,8 +408,7 @@ public final class SolegramGestures implements SensorEventListener {
                 tester.onGesture(gesture);
                 return;
             }
-            if (gesture == SHAKE && shakeOverride != null) {
-                shakeOverride.run();
+            if (gesture == SHAKE && shakeTaken()) {
                 return;
             }
             if (!enabled() || actionOf(gesture) == ACTION_NONE) {

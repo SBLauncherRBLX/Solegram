@@ -193,7 +193,10 @@ public final class SolegramNameEmojiShare {
             return;
         }
         final long id = read(full.about);
-        SolegramNameEffect.onRead(user.id, readEffect(full.about));
+        if (SolegramNameEffect.onRead(user.id, readEffect(full.about))) {
+            // the name's effect is new or gone: lists, headers and profiles draw it again
+            AndroidUtilities.runOnUIThread(() -> NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME));
+        }
         final Long was;
         synchronized (SolegramNameEmojiShare.class) {
             was = known().get(user.id);

@@ -19643,7 +19643,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             canvas.translate(nx, ny);
             oldAlpha = Theme.chat_namePaint.getAlpha();
             Theme.chat_namePaint.setAlpha((int) (oldAlpha * nameAlpha));
-            nameLayout.draw(canvas);
+            // Solegram: the effect on the sender's name (as their bio says)
+            final com.solegram.messenger.SolegramNameEffect.Renderer sgNameFx = currentUser != null && !currentMessageObject.isOutOwner()
+                ? com.solegram.messenger.SolegramNameEffect.renderer(com.solegram.messenger.SolegramNameEffect.of(currentAccount, currentUser.id)) : null;
+            if (sgNameFx != null) {
+                sgNameFx.draw(this, canvas, nameLayout, Theme.chat_namePaint);
+            } else {
+                nameLayout.draw(canvas);
+            }
             Theme.chat_namePaint.setAlpha(oldAlpha);
             canvas.restore();
 

@@ -165,11 +165,11 @@ public final class SolegramNameEffect {
     }
 
     /** Someone's bio was read: their effect (or that they have none) is noted. */
-    static void onRead(long userId, int effect) {
+    static boolean onRead(long userId, int effect) {
         synchronized (SolegramNameEffect.class) {
             final Integer was = known().get(userId);
             if (was == null && effect == 0 || was != null && was == effect) {
-                return;
+                return false;
             }
             known().put(userId, effect);
             try {
@@ -185,6 +185,7 @@ public final class SolegramNameEffect {
                 FileLog.e(e);
             }
         }
+        return true;
     }
 
     /** The effect on a user's name: the own one from the settings, others' as their bio says. */

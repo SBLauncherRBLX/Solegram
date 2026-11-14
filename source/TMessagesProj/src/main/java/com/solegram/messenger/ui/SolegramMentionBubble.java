@@ -485,7 +485,13 @@ public class SolegramMentionBubble {
         namePaint.setColor(textColor);
         canvas.save();
         canvas.translate(left + textX, top + nameY);
-        nameLayout.draw(canvas);
+        final com.solegram.messenger.SolegramNameEffect.Renderer nameFx = user != null
+            ? com.solegram.messenger.SolegramNameEffect.renderer(com.solegram.messenger.SolegramNameEffect.of(messageObject.currentAccount, user.id)) : null;
+        if (nameFx != null) {
+            nameFx.draw(parent, canvas, nameLayout, namePaint);
+        } else {
+            nameLayout.draw(canvas);
+        }
         canvas.restore();
         float x = left + textX + (nameLayout.getLineCount() > 0 ? nameLayout.getLineWidth(0) : 0) + dp(4);
         final float midY = top + nameY + nameLayout.getHeight() / 2f;

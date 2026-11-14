@@ -959,6 +959,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             value = sb;
         }
         titleTextView.setText(value);
+        // Solegram: the effect on the person's name (as their bio says)
+        titleTextView.sgNameEffect = parentFragment != null && parentFragment.getChatMode() == 0 && parentFragment.getDialogId() > 0
+            ? com.solegram.messenger.SolegramNameEffect.renderer(com.solegram.messenger.SolegramNameEffect.of(currentAccount, parentFragment.getDialogId())) : null;
         rightDrawableIsScam = false;
         // Solegram: the developer's, a tester's or the official channel's badge next to the name
         final int solegramRole = !scam && !fake && !verified && parentFragment != null
@@ -1017,7 +1020,11 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             }
             emojiStatusDrawable.setColor(getThemedColor(Theme.key_profile_verifiedBackground));
             titleTextView.setRightDrawable(emojiStatusDrawable);
-            rightDrawableIsScamOrVerified = false;
+            // Solegram: the emoji status is the other slot; a badge (Solegram's, verified, scam) in the second one stays,
+            // or the muted icon set next would take its place (the badge was lost in chats with an emoji status)
+            if (titleTextView.getRightDrawable2() == null) {
+                rightDrawableIsScamOrVerified = false;
+            }
             rightDrawableContentDescription = getString(R.string.AccDescrPremium);
         } else {
             titleTextView.setRightDrawable(null);

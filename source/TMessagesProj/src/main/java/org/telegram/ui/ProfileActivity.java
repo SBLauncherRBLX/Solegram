@@ -2462,25 +2462,40 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private com.solegram.messenger.ui.SolegramProfileShake sgShake;
 
-    private void sgOnShake() {
-        if (fragmentView == null || isFinishing() || getParentLayout() != null && getParentLayout().getLastFragment() != this) {
-            return;
+    private final com.solegram.messenger.SolegramGestures.ShakeHandler sgShakeHandler = this::sgOnShake;
+    private final android.graphics.Rect sgVisibleRect = new android.graphics.Rect();
+
+    /** A shake while this profile is on the screen (also as a tab of the main screen): the header falls, or comes back. */
+    private boolean sgOnShake() {
+        if (fragmentView == null || isFinishing() || !fragmentView.isShown() || fragmentView.getWindowVisibility() != View.VISIBLE
+            || !fragmentView.getGlobalVisibleRect(sgVisibleRect) || sgVisibleRect.width() < fragmentView.getWidth() / 2) {
+            return false;
         }
-        final java.util.ArrayList<View> buttons = new java.util.ArrayList<>();
+        final java.util.ArrayList<View> views = new java.util.ArrayList<>();
+        final java.util.ArrayList<View> hide = new java.util.ArrayList<>();
         if (actionBar != null) {
-            buttons.add(actionBar.getBackButton());
+            views.add(actionBar.getBackButton());
             if (actionBar.menu != null) {
                 for (int i = 0; i < actionBar.menu.getChildCount(); i++) {
-                    buttons.add(actionBar.menu.getChildAt(i));
+                    views.add(actionBar.menu.getChildAt(i));
                 }
             }
         }
-        sgShake = com.solegram.messenger.ui.SolegramProfileShake.toggle(sgShake, (ViewGroup) fragmentView, actionsView, buttons);
+        views.add(avatarContainer);
+        views.add(nameTextView);
+        views.add(onlineTextView);
+        views.add(ratingView);
+        hide.add(storyView);
+        hide.add(giftsView);
+        hide.add(animatedStatusView);
+        hide.add(avatarsViewPagerIndicatorView);
+        sgShake = com.solegram.messenger.ui.SolegramProfileShake.toggle(sgShake, (ViewGroup) fragmentView, actionsView, views, hide, actionsView);
+        return true;
     }
 
     @Override
     public void onFragmentDestroy() {
-        com.solegram.messenger.SolegramGestures.setShakeOverride(null);
+        com.solegram.messenger.SolegramGestures.removeShakeHandler(sgShakeHandler);
         if (sgShake != null) {
             sgShake.restoreNow();
             sgShake = null;
@@ -2675,6 +2690,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public View createView(Context context) {
+        com.solegram.messenger.SolegramGestures.addShakeHandler(sgShakeHandler); // also as a tab, which may not get onResume
         Theme.createProfileResources(context);
         Theme.createChatResources(context, false);
         BaseFragment lastFragment = parentLayout.getLastFragment();
@@ -9968,8 +9984,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onResume() {
-        // Solegram: a shake here drops the buttons (the easter egg), the shake shortcut waits outside the profile
-        com.solegram.messenger.SolegramGestures.setShakeOverride(this::sgOnShake);
+        // Solegram: a shake here drops the header (the easter egg), the shake shortcut waits outside the profile
+        com.solegram.messenger.SolegramGestures.addShakeHandler(sgShakeHandler);
         super.onResume();
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onResume();
@@ -10019,7 +10035,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onPause() {
-        com.solegram.messenger.SolegramGestures.setShakeOverride(null);
         if (sgShake != null) {
             sgShake.restoreNow();
             sgShake = null;
