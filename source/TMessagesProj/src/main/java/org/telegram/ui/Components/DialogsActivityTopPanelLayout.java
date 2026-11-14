@@ -47,6 +47,10 @@ public class DialogsActivityTopPanelLayout extends AnimatedLinearLayout implemen
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        // Solegram: nothing shown (no panels, or faded out) - the touch goes on to the chats under it
+        if (ev.getAction() == MotionEvent.ACTION_DOWN && (getAlpha() <= 0.02f || getMetadata().getTotalVisibility() <= 0.02f)) {
+            return false;
+        }
         return super.dispatchTouchEvent(ev)
             || ev.getAction() == MotionEvent.ACTION_DOWN && backgroundDrawable != null && backgroundDrawable.getBounds().contains((int) ev.getX(), (int) ev.getY());
     }

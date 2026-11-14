@@ -2159,6 +2159,15 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
     }
 
     @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        // Solegram: hidden (the folded floating header fades it out) it does not take the touches meant for the chats
+        if (getAlpha() <= 0.02f && ev.getAction() == MotionEvent.ACTION_DOWN) {
+            return false;
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (currentState == COLLAPSED_STATE) {
             int k = miniItems.size();
