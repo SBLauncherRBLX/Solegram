@@ -37,10 +37,10 @@ public class SolegramEdgeBlur {
 
     /**
      * The look of the profile's and the settings' header (Telegram's fade under a simple screen's bar): one even
-     * blur, as strong as that one (7 dp, scaled by the glass settings), over the whole band, fading out only over
+     * blur, as strong as that one looks (16 dp, scaled by the glass settings: the profile's is taken from a smaller copy, which softens it more), over the whole band, fading out only over
      * its last 32 dp at the inner end.
      */
-    private static final float[] RADII = {7f};
+    private static final float[] RADII = {16f};
     private static final float FADE_DP = 32f;
 
     private RenderNode content;

@@ -961,6 +961,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         titleTextView.setText(value);
         // Solegram: the effect on the person's name (as their bio says)
         titleTextView.sgNameEffect = parentFragment != null && parentFragment.getChatMode() == 0 && parentFragment.getDialogId() > 0
+            && parentFragment.getDialogId() != org.telegram.messenger.UserConfig.getInstance(currentAccount).getClientUserId() // not on Saved Messages
             ? com.solegram.messenger.SolegramNameEffect.renderer(com.solegram.messenger.SolegramNameEffect.of(currentAccount, parentFragment.getDialogId())) : null;
         rightDrawableIsScam = false;
         // Solegram: the developer's, a tester's or the official channel's badge next to the name

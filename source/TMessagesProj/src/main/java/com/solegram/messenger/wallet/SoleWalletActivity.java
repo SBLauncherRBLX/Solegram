@@ -302,7 +302,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         {R.string.SG_WalletTour5Title, R.string.SG_WalletTour5Text},
         {R.string.SG_WalletTour4Title, R.string.SG_WalletTour4Text},
     };
-    private static final int[] TOUR_ICONS = {0, R.drawable.msg_premium_liststar, R.drawable.msg_gift_premium, R.drawable.msg_qrcode, R.drawable.msg_secret};
+    private static final int[] TOUR_ICONS = {0, R.drawable.settings_stars, R.drawable.msg_gift_premium, R.drawable.msg_qrcode, R.drawable.msg_secret};
 
     /** The tour: pages that slide with the finger, their pictures moving at their own pace, dots that flow. */
     private void showIntro(int startPage) {
@@ -984,7 +984,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             return;
         }
         final TL_stars.StarsAmount amount = StarsController.getInstance(currentAccount).getBalance();
-        balanceView.setText(StarsIntroActivity.replaceStars("⭐ " + LocaleController.formatNumber(amount == null ? 0 : amount.amount, ' '), 1.25f));
+        // the star as tall as the big digits (its own size is for ordinary text)
+        balanceView.setText(StarsIntroActivity.replaceStars("⭐ " + LocaleController.formatNumber(amount == null ? 0 : amount.amount, ' '), 2.1f));
         balanceView.setTextColor(text());
         if (asideView != null) {
             // until Telegram has sent the balance, the goals are left as they are
@@ -1467,7 +1468,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         // by the number on the recipient's card: anonymously
         o.add(R.drawable.msg_payment_card, getString(R.string.SG_WalletSendCard), this::askCardNumber);
         // by a tap of the phones: the other phone (SoleWallet open) gives its contact, Telegram's own gift sheet sends
-        o.add(R.drawable.msg_premium_liststar, getString(R.string.SG_WalletSendTapStars), () -> tap(WalletTapProtocol.ITEM_STARS));
+        o.add(R.drawable.settings_stars, getString(R.string.SG_WalletSendTapStars), () -> tap(WalletTapProtocol.ITEM_STARS));
         o.add(R.drawable.msg_gift_premium, getString(R.string.SG_WalletSendTapGift), () -> tap(WalletTapProtocol.ITEM_GIFT));
         o.setGravity(Gravity.CENTER_HORIZONTAL);
         o.show();

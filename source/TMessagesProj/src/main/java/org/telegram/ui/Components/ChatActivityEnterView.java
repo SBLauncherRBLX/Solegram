@@ -3087,6 +3087,29 @@ public class ChatActivityEnterView extends FrameLayout implements
                                 delegate.needStartRecordVideo(1, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
                                 sendButton.setEffect(effectId = 0);
                             } else {
+                                if (audioToSend != null && sgVoiceFx != com.solegram.messenger.SolegramVoiceEffects.NONE && !isInVideoMode()) {
+                                    // Solegram: the paused recording has an effect: what goes is the file with the effect (the
+                                    // recorder would send its own, without it)
+                                    sendMessage();
+                                    recordingAudioVideo = false;
+                                    messageTransitionIsRunning = false;
+                                    updateRecordInterface(RECORD_STATE_SENDING, true);
+                                    return true;
+                                }
+                                if (com.solegram.messenger.SolegramConfig.voicePreview && !isInScheduleMode() && !isInVideoMode()
+                                    && audioToSend == null && !MediaController.getInstance().isRecordingPaused()) {
+                                    // Solegram: a locked recording too waits to be heard (and given an effect) first; the
+                                    // send button of the preview sends it
+                                    if (sendButtonVisible) {
+                                        calledRecordRunnable = true;
+                                    }
+                                    MediaController.getInstance().toggleRecordingPause(voiceOnce);
+                                    delegate.needStartRecordAudio(0);
+                                    if (slideText != null) {
+                                        slideText.setEnabled(false);
+                                    }
+                                    return true;
+                                }
                                 if (recordingAudioVideo && isInScheduleMode()) {
                                     AlertsCreator.createScheduleDatePickerDialog(parentActivity, parentFragment.getDialogId(), (notify, scheduleDate, scheduleRepeatPeriod) -> MediaController.getInstance().stopRecording(1, notify, scheduleDate, false, 0), () -> MediaController.getInstance().stopRecording(0, false, 0, false, 0), resourcesProvider);
                                 }
