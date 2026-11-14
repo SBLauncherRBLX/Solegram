@@ -2352,6 +2352,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
      * caption below the widget (none, or shown above it), a bubble, no reactions row under it. The widget gets the
      * band and the corner as its content safe area (RichWidgetBlock#setSafeArea).
      */
+    /** Solegram: a message that is only a profile card: its time sits over the card's corner, the frame is even. */
+    private boolean sgCardTimeOver() {
+        return sgMentionCard && sgMention.replacesText() && !isCompactIn()
+            && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall);
+    }
+
     private boolean widgetTimeOver() {
         return currentMessageObject != null && isWidgetMessage() && !isCompactIn()
             && (TextUtils.isEmpty(currentMessageObject.caption) || captionAbove)
@@ -8370,6 +8376,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
 
                     totalHeight += dp(2 + (!drawInstantView ? 4 : 0));
+                    if (sgCardTimeOver()) {
+                        totalHeight -= dp(3); // the same thin frame under the card as over it
+                    }
 
                     createInstantViewButton();
                 } else {
@@ -11440,7 +11449,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             backgroundWidth = maxChildWidth + dp(31);
             return;
         }
-        if (widgetTimeOver()) {
+        if (widgetTimeOver() || sgCardTimeOver()) {
             // The time goes over the widget's corner (docs/sdk-v1.md §5.12): no line of its own, nothing to widen.
             backgroundWidth = maxChildWidth + dp(31);
             return;
@@ -12281,13 +12290,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 timeLayout = null;
             }
             // An outgoing widget's time over its corner sits as a photo's: the ticks over media keep to layoutWidth.
-            if (mediaBackground || widgetTimeOver() && currentMessageObject.isOutOwner()) {
+            if (mediaBackground || widgetTimeOver() && currentMessageObject.isOutOwner() || sgCardTimeOver()) {
                 if (currentMessageObject.isOutOwner()) {
-                    timeX = layoutWidth - timeWidth - dp(42.0f);
+                    timeX = layoutWidth - timeWidth - dp(sgCardTimeOver() ? 48.0f : 42.0f);
                 } else if (isCompactIn()) {
                     timeX = getCompactRight() - timeWidth;
                 } else {
-                    timeX = backgroundWidth - dp(4) - timeWidth;
+                    timeX = backgroundWidth - dp(sgCardTimeOver() ? 14 : 4) - timeWidth;
                     if (currentMessageObject.isAnyKindOfSticker()) {
                         timeX = Math.max(dp(26), timeX);
                     }
@@ -13606,6 +13615,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     public float getPhotoBottom() {
+        if (sgCardTimeOver()) {
+            // the card's bottom: the time sits inside its corner
+            return linkPreviewY + sgMention.getMeasuredHeight() - dp(2);
+        }
         if (widgetTimeOver()) {
             // Not drawn yet: where layoutHeight puts it (the bubble's path ends 3 dp above, the widget 2 dp above that).
             return widgetBottom > 0 ? widgetBottom : layoutHeight - dp(5);
@@ -21480,7 +21493,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private boolean shouldDrawTimeOnMediaIgnoringCompact() {
-        if (widgetTimeOver()) return true;
+        if (widgetTimeOver() || sgCardTimeOver()) return true;
         return mediaBackground && (captionLayout == null || captionAbove) && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall || currentMessageObject != null && (currentMessageObject.isAnyKindOfSticker() || currentMessageObject.isRoundVideo())) || currentMessageObject != null && currentMessageObject.type == MessageObject.TYPE_PAID_MEDIA/* || isMedia && drawCommentButton && !isRepliesChat*/;
     }
 
