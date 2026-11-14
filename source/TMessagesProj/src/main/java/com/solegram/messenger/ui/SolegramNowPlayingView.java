@@ -449,7 +449,7 @@ public class SolegramNowPlayingView extends View {
 
     // the scatter, in parts of the island's width and height, made once per song and island size
     private static final int SCATTER_MAX = 90;
-    private final float[] scatterX = new float[SCATTER_MAX], scatterY = new float[SCATTER_MAX], scatterAngle = new float[SCATTER_MAX];
+    private final float[] scatterX = new float[SCATTER_MAX], scatterY = new float[SCATTER_MAX], scatterAngle = new float[SCATTER_MAX], scatterScale = new float[SCATTER_MAX];
     private int scatterCount;
     private long scatterKey = Long.MIN_VALUE;
 
@@ -469,18 +469,21 @@ public class SolegramNowPlayingView extends View {
         // throw darts: a place is kept when it does not touch the ones already there (bigger room on the left)
         for (int attempt = 0; attempt < 900 && scatterCount < SCATTER_MAX; attempt++) {
             final float px = random.nextFloat(), py = random.nextFloat();
-            final float size = dp(17f - 9f * px);
+            final float scale = 0.75f + random.nextFloat() * 0.5f;
+            final float size = dp(17f - 9f * px) * scale;
             boolean free = true;
             for (int n = 0; n < scatterCount && free; n++) {
-                final float other = dp(17f - 9f * scatterX[n]);
+                final float other = dp(17f - 9f * scatterX[n]) * scatterScale[n];
                 final float dx = (px - scatterX[n]) * w, dy = (py - scatterY[n]) * h;
-                final float min = (size + other) / 2f * 1.45f;
+                // more room round each: a looser, more scattered pattern
+                final float min = (size + other) / 2f * 2.1f;
                 free = dx * dx + dy * dy >= min * min;
             }
             if (free) {
                 scatterX[scatterCount] = px;
                 scatterY[scatterCount] = py;
-                scatterAngle[scatterCount] = -25f + random.nextFloat() * 50f;
+                scatterAngle[scatterCount] = -40f + random.nextFloat() * 80f;
+                scatterScale[scatterCount] = scale;
                 scatterCount++;
             }
         }
@@ -509,15 +512,13 @@ public class SolegramNowPlayingView extends View {
             final float t = scatterX[n];
             // 0 at the left edge, 1 at the right: larger and brighter to the left, smaller and dimmer to the right
             final float tt = LocaleController.isRTL ? 1f - t : t;
-            final float half = dp(17f - 9f * tt) / 2f;
+            final float half = dp(17f - 9f * tt) * scatterScale[n] / 2f;
             if (!button.isEmpty() && Math.abs(x - button.centerX()) < button.width() / 2f + half && Math.abs(y - button.centerY()) < button.height() / 2f + half
                 || Math.abs(x - rowCover.centerX()) < rowCover.width() / 2f + half * 0.5f && Math.abs(y - rowCover.centerY()) < rowCover.height() / 2f + half * 0.5f) {
                 continue;
             }
-            float opacity = 0.5f - 0.42f * tt;
-            if (x > patternText.left - half && x < patternText.right + half && y > patternText.top - half && y < patternText.bottom + half) {
-                opacity *= 0.35f;
-            }
+            // the same brightness from top to bottom: it only fades from left to right
+            final float opacity = 0.4f - 0.33f * tt;
             canvas.save();
             canvas.rotate(scatterAngle[n], x, y);
             pattern.setBounds((int) (x - half), (int) (y - half), (int) (x + half), (int) (y + half));
