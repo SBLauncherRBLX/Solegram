@@ -7424,6 +7424,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private float solegramShadowFactor = 1f;
     private float solegramTabsLift;
+    /** How far the shown list was scrolled up to take the room the folded tabs left. */
+    private int solegramListLift;
 
     /** 0..1: how far the floating header has folded (title gone, folder tabs in its row). */
     private float solegramCollapseFactor() {
@@ -7471,6 +7473,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             lift = collapse * Math.max(0, tabsCenter - rowCenter);
         }
         solegramTabsLift = lift;
+        // the shown list scrolls up as far as the tabs went (and back down as they come back): no empty row is left
+        // where the tabs were
+        final int step = Math.round(lift) - solegramListLift;
+        if (step != 0 && viewPages != null && viewPages[0] != null && viewPages[0].listView != null) {
+            solegramListLift += step;
+            final RecyclerView list = viewPages[0].listView;
+            // not from inside a layout or a draw
+            list.post(() -> list.scrollBy(0, step));
+        }
     }
 
     /**
