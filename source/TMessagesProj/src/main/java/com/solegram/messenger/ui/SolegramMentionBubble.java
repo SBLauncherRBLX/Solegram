@@ -74,6 +74,38 @@ public class SolegramMentionBubble {
     private static final HashSet<String> resolving = new HashSet<>();
     /** Users whose full info and Solegram card were already asked for. */
     private static final HashSet<Long> loadingFull = new HashSet<>();
+    /** The cards waiting for a username or a user's info, all redrawn as soon as it comes (not only the first one). */
+    private static final java.util.HashMap<String, ArrayList<java.lang.ref.WeakReference<SolegramMentionBubble>>> waiters = new java.util.HashMap<>();
+
+    private void waitFor(String key) {
+        ArrayList<java.lang.ref.WeakReference<SolegramMentionBubble>> list = waiters.get(key);
+        if (list == null) {
+            waiters.put(key, list = new ArrayList<>());
+        }
+        for (int i = list.size() - 1; i >= 0; i--) {
+            final SolegramMentionBubble b = list.get(i).get();
+            if (b == null) {
+                list.remove(i);
+            } else if (b == this) {
+                return;
+            }
+        }
+        list.add(new java.lang.ref.WeakReference<>(this));
+    }
+
+    /** Whatever waited for it draws again (each with the message it shows now). */
+    private static void arrived(String key) {
+        final ArrayList<java.lang.ref.WeakReference<SolegramMentionBubble>> list = waiters.remove(key);
+        if (list == null) {
+            return;
+        }
+        for (java.lang.ref.WeakReference<SolegramMentionBubble> ref : list) {
+            final SolegramMentionBubble b = ref.get();
+            if (b != null && b.messageObject != null) {
+                b.refresh(b.messageObject);
+            }
+        }
+    }
 
     private final ChatMessageCell parent;
     private final ImageReceiver avatarImage;
@@ -226,14 +258,16 @@ public class SolegramMentionBubble {
 
     private void resolve(int account, String name) {
         final String key = account + ":" + name.toLowerCase();
+        waitFor("u" + key);
         if (!resolving.add(key)) {
             return;
         }
-        final MessageObject waitingFor = messageObject;
         MessagesController.getInstance(account).getUserNameResolver().resolve(name, id ->
             AndroidUtilities.runOnUIThread(() -> {
                 if (id != null && id != 0) {
-                    refresh(waitingFor);
+                    arrived("u" + key);
+                } else {
+                    waiters.remove("u" + key);
                 }
             }));
     }
@@ -281,16 +315,20 @@ public class SolegramMentionBubble {
             if (card != null && card.hasBanner() && card.post != null) {
                 hasBannerImage = setBanner(card.post);
             }
+            final String fullKey = "f" + account + ":" + user.id;
+            if (full == null) {
+                waitFor(fullKey);
+            }
             if (loadingFull.add(user.id)) {
-                final MessageObject waitingFor = messageObject;
                 final TLRPC.User u = user;
                 if (full == null) {
                     controller.loadFullUser(u, 0, false, f -> AndroidUtilities.runOnUIThread(() -> {
-                        SolegramProfileCard.load(account, u.id, f, () -> refresh(waitingFor));
-                        refresh(waitingFor);
+                        SolegramProfileCard.load(account, u.id, f, () -> arrived(fullKey));
+                        arrived(fullKey);
                     }));
                 } else {
-                    SolegramProfileCard.load(account, u.id, full, () -> refresh(waitingFor));
+                    waitFor(fullKey);
+                    SolegramProfileCard.load(account, u.id, full, () -> arrived(fullKey));
                 }
             }
         }
@@ -495,15 +533,16 @@ public class SolegramMentionBubble {
         canvas.restore();
         float x = left + textX + (nameLayout.getLineCount() > 0 ? nameLayout.getLineWidth(0) : 0) + dp(4);
         final float midY = top + nameY + nameLayout.getHeight() / 2f;
-        if (badge != null) {
-            badge.setBounds((int) x, (int) (midY - dp(17) / 2f), (int) x + dp(17), (int) (midY + dp(17) / 2f));
-            badge.draw(canvas);
-            x += dp(21);
-        }
+        // the emoji status first, then the Solegram badge
         if (statusId != 0 && statusDrawable != null) {
             statusDrawable.setColor(Theme.getColor(Theme.key_chat_inPreviewInstantText, rp));
             statusDrawable.setBounds((int) x, (int) (midY - dp(10)), (int) x + dp(20), (int) (midY + dp(10)));
             statusDrawable.draw(canvas);
+            x += dp(24);
+        }
+        if (badge != null) {
+            badge.setBounds((int) x, (int) (midY - dp(17) / 2f), (int) x + dp(17), (int) (midY + dp(17) / 2f));
+            badge.draw(canvas);
         }
 
         subPaint.setColor(grayColor);

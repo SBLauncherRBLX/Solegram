@@ -684,6 +684,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private android.graphics.drawable.Drawable solegramBadge;
     private boolean drawBotVerified;
     private boolean drawPremium;
+    /** Solegram: a badge and, after it, the emoji status. */
+    private boolean sgStatusAfterBadge;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
@@ -1554,7 +1556,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             drawVerified = !forbidVerified && user.verified;
                             drawBotVerified = !forbidVerified && !UserObject.isUserSelf(user) && user.bot_verification_icon != 0;
                         }
-                        drawPremium = MessagesController.getInstance(currentAccount).isPremiumUser(user) && UserConfig.getInstance(currentAccount).clientUserId != user.id && user.id != 0;
+                        // Solegram: the emoji a Solegram user shares by the name shows here too (not only Premium's status)
+                        drawPremium = (MessagesController.getInstance(currentAccount).isPremiumUser(user) || user.emoji_status instanceof com.solegram.messenger.SolegramNameEmojiShare.SharedStatus)
+                            && UserConfig.getInstance(currentAccount).clientUserId != user.id && user.id != 0;
                         if (drawPremium) {
                             Long emojiStatusId = UserObject.getEmojiStatusDocumentId(user);
                             emojiStatus.center = LocaleController.isRTL;
@@ -2390,6 +2394,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         solegramBadge = !forbidVerified && !drawVerified && drawScam == 0 && currentDialogId != 0 && !isForumCell()
             && currentDialogId != UserConfig.getInstance(currentAccount).getClientUserId()
             ? com.solegram.messenger.ui.SolegramBadgeDrawable.forDialog(currentDialogId, Theme.dialogs_verifiedDrawable.getIntrinsicWidth()) : null;
+        // with a badge the emoji status stays too, after the badge
+        sgStatusAfterBadge = solegramBadge != null && drawPremium && emojiStatus.getDrawable() != null;
         if (solegramBadge != null) {
             drawVerified = true;
             drawPremium = false;
@@ -2417,7 +2423,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameLeft += w;
             }
         } else if (drawVerified) {
-            int w = dp(6) + Theme.dialogs_verifiedDrawable.getIntrinsicWidth();
+            int w = dp(6) + Theme.dialogs_verifiedDrawable.getIntrinsicWidth() + (sgStatusAfterBadge ? dp(4 + 22) : 0);
             nameWidth -= w;
             nameAdditionalsForChannelSubscriber += w;
             if (LocaleController.isRTL) {
@@ -4618,8 +4624,23 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     y -= dp(9);
                 }
                 if (solegramBadge != null) {
-                    setDrawableBounds(solegramBadge, nameMuteLeft - dp(1), y);
+                    // the emoji status first (drawn as the premium one is), the Solegram badge after it
+                    final float badgeX = sgStatusAfterBadge && emojiStatus != null ? nameMuteLeft - dp(2) + dp(22) + dp(3) : nameMuteLeft - dp(1);
+                    setDrawableBounds(solegramBadge, badgeX, y);
                     solegramBadge.draw(canvas);
+                    if (sgStatusAfterBadge && emojiStatus != null) {
+                        final float ex = nameMuteLeft - dp(2);
+                        final float ey = y - dp(5);
+                        if (rightFragmentOpenedProgress > 0) {
+                            emojiStatus.setBounds((int) ex, (int) ey, (int) ex + dp(22), (int) ey + dp(22));
+                            emojiStatus.draw(canvas);
+                        } else {
+                            emojiStatusView.setTranslationX(gtx + ex);
+                            emojiStatusView.setTranslationY(gty + ey);
+                            emojiStatusVisible = true;
+                        }
+                        emojiStatus.setColor(Theme.getColor(Theme.key_chats_verifiedBackground, resourcesProvider));
+                    }
                 } else {
                 setDrawableBounds(Theme.dialogs_verifiedDrawable, nameMuteLeft - dp(1), y);
                 setDrawableBounds(Theme.dialogs_verifiedCheckDrawable, nameMuteLeft - dp(1), y);

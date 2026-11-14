@@ -655,7 +655,8 @@ class ChatMessageLinkPreview {
         cell.giveawayMessageCell.draw(canvas, cell.namesOffset, linkX, cell.resourcesProvider);
         cell.giveawayResultsMessageCell.draw(canvas, cell.namesOffset, linkX, cell.resourcesProvider);
         if (cell.sgMentionCard) {
-            cell.sgMention.draw(canvas, linkX, startY, cell.currentMessageObject.isOutOwner());
+            // the card reaches closer to the bubble's edges than a link preview does: a thin frame round it
+            cell.sgMention.draw(canvas, linkX - AndroidUtilities.dp(6), startY, cell.currentMessageObject.isOutOwner());
         }
 
         if (cell.drawInstantView) {

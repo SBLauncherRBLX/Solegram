@@ -7281,7 +7281,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 } else if (messageObject.type == MessageObject.TYPE_ARTICLE) {
                     totalHeight = messageObject.richLayout.getHeight() + dp(19.5f) + namesOffset;
                 } else if (sgMentionCard && sgMention.replacesText()) {
-                    totalHeight = dp(11.5f) + namesOffset; // Solegram: the card instead of the text
+                    totalHeight = dp(5.5f) + namesOffset; // Solegram: the card instead of the text, close to the top
                 } else {
                     totalHeight = messageObject.textHeight() + dp(19.5f) + namesOffset;
                 }
@@ -7547,7 +7547,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     if (sgMentionCard) {
                         totalHeight += sgMention.getMeasuredHeight();
                         linkPreviewHeight += sgMention.getMeasuredHeight();
-                        maxChildWidth = Math.max(maxChildWidth, sgMention.getMeasuredWidth() + dp(6));
+                        maxChildWidth = Math.max(maxChildWidth, sgMention.getMeasuredWidth() - dp(6));
                     }
 
                     if (site_name != null) {
@@ -12382,7 +12382,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     textY += dp(44);
                 }
             } else if (sgMentionCard && sgMention.replacesText()) {
-                linkPreviewY = textY + dp(2);
+                linkPreviewY = textY - dp(4);
             } else {
                 linkPreviewY = textY + currentMessageObject.textHeight(transitionParams) + dp(10);
             }
@@ -13817,7 +13817,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 textY += dp(44);
             }
         } else if (sgMentionCard && sgMention.replacesText()) {
-            linkPreviewY = textY + dp(2);
+            linkPreviewY = textY - dp(4);
         } else {
             linkPreviewY = textY + currentMessageObject.textHeight(transitionParams) + dp(10);
         }

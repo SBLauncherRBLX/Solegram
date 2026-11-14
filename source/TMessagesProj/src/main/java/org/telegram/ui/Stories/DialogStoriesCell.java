@@ -1703,7 +1703,16 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
                 backgroundPaint.setColor(getThemedColor(Theme.key_actionBarDefaultArchived));
             }
             if (progressToCollapsed != 0) {
-                canvas.drawCircle(cx, cy, radius + dpf2(1.5f), backgroundPaint);
+                // Solegram: the backing round each folded avatar has the avatars' shape
+                final int sgPercent = com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT);
+                final float sgOuter = radius + dpf2(1.5f);
+                if (sgPercent >= 100) {
+                    canvas.drawCircle(cx, cy, sgOuter, backgroundPaint);
+                } else {
+                    final float r = radius * sgPercent / 100f + dpf2(1.5f);
+                    AndroidUtilities.rectTmp.set(cx - sgOuter, cy - sgOuter, cx + sgOuter, cy + sgOuter);
+                    canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, backgroundPaint);
+                }
             }
 
             canvas.save();

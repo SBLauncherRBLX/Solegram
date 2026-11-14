@@ -133,7 +133,8 @@ public class StoriesUtilities {
         boolean showProgress = storiesController.isLoading(dialogId);
         boolean isForum = ChatObject.isForum(UserConfig.selectedAccount, dialogId) && !params.isDialogStoriesCell;
         // Solegram: the ring follows the avatar's shape (its corners, grown by the ring's distance), not only a circle
-        sgAvatarPercent = isForum || params.isDialogStoriesCell ? 100 : com.solegram.messenger.SolegramUi.avatarPercent(avatarImage.solegramShape);
+        // the strip of stories at the top too: its avatars have the shape of the avatars outside chats
+        sgAvatarPercent = isForum ? 100 : com.solegram.messenger.SolegramUi.avatarPercent(params.isDialogStoriesCell ? com.solegram.messenger.SolegramUi.SHAPE_DEFAULT : avatarImage.solegramShape);
         sgAvatarWidth = avatarImage.getImageWidth();
         if (params.drawHiddenStoriesAsSegments) {
             hasStories = storiesController.hasHiddenStories();
