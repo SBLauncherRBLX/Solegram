@@ -686,6 +686,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private boolean drawPremium;
     /** Solegram: a badge and, after it, the emoji status. */
     private boolean sgStatusAfterBadge;
+    /** Solegram: the streak, drawn after everything by the name. */
+    private com.solegram.messenger.SolegramStreak.Span sgStreakSpan;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
@@ -2478,10 +2480,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameStringFinal = TextUtils.ellipsize(nameStringFinal, Theme.dialogs_namePaint[paintIndex], ellipsizeWidth, TextUtils.TruncateAt.END);
             }
             nameStringFinal = Emoji.replaceEmoji(nameStringFinal, Theme.dialogs_namePaint[paintIndex].getFontMetricsInt(), false);
-            if (sgStreak != null) {
-                nameStringFinal = com.solegram.messenger.SolegramStreak.append(nameStringFinal, sgStreak);
-                ellipsizeWidth += sgStreak.width(Theme.dialogs_namePaint[paintIndex]);
-            }
+            // the streak is drawn last, after the emoji status, the badge and the mute icon (onDraw); its room is kept
+            sgStreakSpan = sgStreak;
             // Solegram: a ghost after the name while the chat is ignored
             if (sgIgnored) {
                 final android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(nameStringFinal).append("  g");
@@ -4679,6 +4679,23 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
                 setDrawableBounds((drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable), nameMuteLeft, y);
                 (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).draw(canvas);
+            }
+
+            // Solegram: the streak, last of all by the name
+            if (sgStreakSpan != null && nameLayout != null && nameLayout.getLineCount() > 0 && !LocaleController.isRTL) {
+                float end = nameLeft + nameLayoutTranslateX + nameLayout.getLineRight(0);
+                if (drawVerified) {
+                    final int mark = solegramBadge != null ? solegramBadge.getIntrinsicWidth() : Theme.dialogs_verifiedDrawable.getIntrinsicWidth();
+                    end = Math.max(end, sgStatusAfterBadge ? nameMuteLeft - dp(2) + dp(25) + mark : nameMuteLeft - dp(1) + mark);
+                } else if (drawPremium) {
+                    end = Math.max(end, nameMuteLeft - dp(2) + dp(22));
+                } else if (drawScam != 0) {
+                    end = Math.max(end, nameMuteLeft + (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).getIntrinsicWidth());
+                } else if (dialogMuted || drawUnmute || isHiddenInCommunity || dialogMutedProgress > 0) {
+                    end = Math.max(end, nameMuteLeft + Theme.dialogs_muteDrawable.getIntrinsicWidth());
+                }
+                final int baseline = nameTop + nameLayout.getLineBaseline(0);
+                sgStreakSpan.draw(canvas, " ", 0, 1, end - dp(3), nameTop, baseline, nameTop + nameLayout.getHeight(), Theme.dialogs_namePaint[paintIndex]);
             }
 
             if (drawReorder || reorderIconProgress != 0) {

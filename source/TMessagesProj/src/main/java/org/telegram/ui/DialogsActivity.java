@@ -1715,7 +1715,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private void updateStoriesViewAlpha(float alpha) {
         final float factorSearch = Utilities.clamp(searchAnimationProgress * 2, 1f, 0f);
-        final float solegramShown = 1f - solegramCollapseFactor();
+        // Solegram: the folded floating header hides the stories only where they would cover the tabs - folded into
+        // the title row; spread out under it they stay (hidden there, they left an empty band over the chats)
+        final float solegramShown = 1f - solegramCollapseFactor() * dialogStoriesCell.getCollapsedProgress();
         dialogStoriesCell.setAlpha((1f - progressToActionMode) * alpha * progressToDialogStoriesCell * (1f - factorSearch) * solegramShown);
         float containersAlpha;
 

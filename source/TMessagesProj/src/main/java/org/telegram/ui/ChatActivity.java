@@ -20415,7 +20415,11 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (threadMessageId > 0) {
                     final TLRPC.User user = getMessagesController().getUser(threadMessageId);
-                    avatarContainer.setTitle(com.solegram.messenger.SolegramStreak.withBadge(currentAccount, user.id, AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(user)))), user.scam, user.fake, user.verified, user.premium, user.emoji_status, animated);
+                    avatarContainer.setTitle(AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(user))), user.scam, user.fake, user.verified, user.premium, user.emoji_status, animated);
+                    // Solegram: the streak last, after the emoji status and the badge
+                    avatarContainer.getTitleTextView().sgTrailing = com.solegram.messenger.SolegramStreak.span(currentAccount, user.id);
+                    avatarContainer.getTitleTextView().requestLayout();
+                    avatarContainer.getTitleTextView().invalidate();
                     sgUpdateStreakItem();
                 } else {
                     TLRPC.Chat chat = getMessagesController().getChat(-threadMessageId);

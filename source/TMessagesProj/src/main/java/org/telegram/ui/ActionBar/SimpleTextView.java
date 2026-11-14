@@ -57,6 +57,12 @@ public class SimpleTextView extends View implements Drawable.Callback {
     private Layout layout;
     /** Solegram: an effect drawn on the text (the name in a profile), or null. */
     public com.solegram.messenger.SolegramNameEffect.Renderer sgNameEffect;
+    /** Solegram: drawn last, after the right drawables (the streak after the emoji status and the badge), or null. */
+    public android.text.style.ReplacementSpan sgTrailing;
+
+    private int sgTrailingWidth() {
+        return sgTrailing == null || textPaint == null ? 0 : sgTrailing.getSize(textPaint, " ", 0, 1, null);
+    }
     private Layout firstLineLayout;
     private Layout fullLayout;
     private Layout partLayout;
@@ -813,6 +819,9 @@ public class SimpleTextView extends View implements Drawable.Callback {
                     width -= rightDrawableWidth;
                     width -= drawablePadding;
                 }
+                if (sgTrailing != null) {
+                    width -= sgTrailingWidth();
+                }
             }
             if (replacedText != null && replacedDrawable != null) {
                 if ((replacingDrawableTextIndex = text.toString().indexOf(replacedText)) < 0) {
@@ -934,6 +943,29 @@ public class SimpleTextView extends View implements Drawable.Callback {
             rightDrawable2.setBounds(x, y, x + dw, y + dh);
             rightDrawable2.draw(canvas);
             totalWidth += drawablePadding + dw;
+        }
+        if (sgTrailing != null && layout != null && layout.getLineCount() > 0 && !rightDrawableHidden) {
+            // Solegram: after the text and both right drawables
+            int x = textOffsetX + textWidth + (int) -scrollingOffset;
+            if (rightDrawable != null && !rightDrawableOutside && !rightDrawableInside) {
+                x += drawablePadding + (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
+            }
+            if (rightDrawable2 != null && !rightDrawableOutside && !rightDrawableInside) {
+                x += drawablePadding + (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
+            }
+            if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL ||
+                    (gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT) {
+                x += offsetX;
+            }
+            final int top;
+            if ((gravity & Gravity.VERTICAL_GRAVITY_MASK) == Gravity.CENTER_VERTICAL) {
+                top = (getMeasuredHeight() - textHeight) / 2;
+            } else {
+                top = getPaddingTop();
+            }
+            final int baseline = top + layout.getLineBaseline(0);
+            sgTrailing.draw(canvas, " ", 0, 1, x, top, baseline, top + textHeight, textPaint);
+            totalWidth += sgTrailingWidth();
         }
         int nextScrollX = totalWidth + dp(DIST_BETWEEN_SCROLLING_TEXT);
 
