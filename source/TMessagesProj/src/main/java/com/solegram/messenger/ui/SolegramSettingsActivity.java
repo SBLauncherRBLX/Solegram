@@ -116,17 +116,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
 
     // music in the profile
-    private static final int ID_NP_STYLE_COVER = 706;
-    private static final int ID_NP_STYLE_GLASS = 707;
-    private static final int ID_NP_STYLE_COMPACT = 708;
-    private static final int ID_NP_VINYL = 709;
     private static final int ID_NP_PROGRESS = 711;
-    private static final int ID_NP_EQUALIZER = 712;
-    private static final int ID_NP_ACCENT_COVER = 713;
     private static final int ID_NP_ACCENT_PLAYER = 714;
-    private static final int ID_NP_ACCENT_THEME = 715;
-    private static final int ID_NP_STYLE_TELEGRAM = 716;
-    private static final int ID_NP_STYLE_ROW = 717;
     private static final int ID_NP_BG_BLUR = 718;
     private static final int ID_NP_BG_COLORS = 719;
     private static final int ID_NP_PATTERN = 720;
@@ -1082,8 +1073,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_CHATS, ID_LOCAL_REPEATS, R.string.SG_LocalRepeats, -1},
         {PAGE_CHATS, ID_SAVE_STORIES, R.string.SG_SaveStories, -1},
         {PAGE_CHATS, ID_SKIP_SILENCE, R.string.SG_SkipSilence, -1},
-        {PAGE_MUSIC, ID_NP_STYLE_COVER, R.string.SG_ProfileMusicSection, 4},
-        {PAGE_MUSIC, ID_NP_VINYL, R.string.SG_NowPlayingVinyl, 4},
+        {PAGE_MUSIC, ID_NP_BG_BLUR, R.string.SG_ProfileMusicSection, 4},
+        {PAGE_MUSIC, ID_NP_PATTERN, R.string.SG_NowPlayingPattern, 4},
         {PAGE_MAIN_SCREEN, 0, R.string.SG_MainScreen, -1},
         {PAGE_MAIN_SCREEN, ID_REMEMBER_FOLDER, R.string.SG_RememberFolder, -1},
         {PAGE_MAIN_SCREEN, ID_MARK_ALL_READ, R.string.SG_MarkAllReadInMenu, -1},
@@ -1482,9 +1473,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_MUSIC_TAB, R.drawable.files_music, getString(R.string.SG_MusicTab), getString(com.solegram.messenger.SolegramTabs.current().contains(com.solegram.messenger.SolegramTabs.MUSIC) ? R.string.SG_TabInBar : R.string.SG_TabNotInBar)), TILE_PINK));
         items.add(UItem.asShadow(null));
         // music on the profile (Telegram's own): Solegram's card, as a profile shows it
-        final int look = SolegramConfig.profileMusicStyle;
-        final boolean card = look != SolegramProfileMusic.STYLE_TELEGRAM;
-        if (card) {
+        // one look: the island in Telegram's style
+        {
             if (nowPlayingPreview == null) {
                 nowPlayingPreview = new SolegramNowPlayingView(getContext(), getResourceProvider());
                 nowPlayingPreview.setPinned(true);
@@ -1520,40 +1510,19 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicPreviewInfo)));
         }
 
-        items.add(UItem.asHeader(getString(R.string.SG_ProfileMusicSection)));
-        items.add(UItem.asRadio2(ID_NP_STYLE_ROW, getString(R.string.SG_NowPlayingStyleRow), getString(R.string.SG_NowPlayingStyleRowInfo)).setChecked(look == SolegramNowPlayingView.STYLE_ROW));
-        items.add(UItem.asRadio2(ID_NP_STYLE_COVER, getString(R.string.SG_NowPlayingStyleCover), getString(R.string.SG_NowPlayingStyleCoverInfo)).setChecked(look == SolegramNowPlayingView.STYLE_COVER));
-        items.add(UItem.asRadio2(ID_NP_STYLE_COMPACT, getString(R.string.SG_NowPlayingStyleCompact), getString(R.string.SG_NowPlayingStyleCompactInfo)).setChecked(look == SolegramNowPlayingView.STYLE_COMPACT));
-        items.add(UItem.asRadio2(ID_NP_STYLE_TELEGRAM, getString(R.string.SG_ProfileMusicStyleTelegram), getString(R.string.SG_ProfileMusicStyleTelegramInfo)).setChecked(!card));
+        // its background, the emoji round the cover, the progress
+        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingBackground)));
+        items.add(UItem.asRadio(ID_NP_BG_BLUR, getString(R.string.SG_NowPlayingBackgroundBlur)).setChecked(SolegramConfig.nowPlayingBlurBackground));
+        items.add(UItem.asRadio(ID_NP_BG_COLORS, getString(R.string.SG_NowPlayingBackgroundColors)).setChecked(!SolegramConfig.nowPlayingBlurBackground));
         items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicInfo)));
-        if (!card) {
-            return;
+        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPattern)));
+        items.add(UItem.asButton(ID_NP_PATTERN, R.drawable.msg2_smile_status, getString(R.string.SG_NowPlayingPatternPick),
+            getString(SolegramConfig.profileMusicEmoji != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)));
+        if (SolegramConfig.profileMusicEmoji != 0) {
+            items.add(UItem.asButton(ID_NP_PATTERN_RESET, R.drawable.msg_reset, getString(R.string.SG_NowPlayingPatternReset)));
         }
-        if (look == SolegramNowPlayingView.STYLE_ROW) {
-            // the island: its background, the emoji round the cover, the progress
-            items.add(UItem.asHeader(getString(R.string.SG_NowPlayingBackground)));
-            items.add(UItem.asRadio(ID_NP_BG_BLUR, getString(R.string.SG_NowPlayingBackgroundBlur)).setChecked(SolegramConfig.nowPlayingBlurBackground));
-            items.add(UItem.asRadio(ID_NP_BG_COLORS, getString(R.string.SG_NowPlayingBackgroundColors)).setChecked(!SolegramConfig.nowPlayingBlurBackground));
-            items.add(UItem.asShadow(null));
-            items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPattern)));
-            items.add(UItem.asButton(ID_NP_PATTERN, R.drawable.msg2_smile_status, getString(R.string.SG_NowPlayingPatternPick),
-                getString(SolegramConfig.profileMusicEmoji != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)));
-            if (SolegramConfig.profileMusicEmoji != 0) {
-                items.add(UItem.asButton(ID_NP_PATTERN_RESET, R.drawable.msg_reset, getString(R.string.SG_NowPlayingPatternReset)));
-            }
-            items.add(UItem.asCheck(ID_NP_PROGRESS, getString(R.string.SG_NowPlayingProgress)).setChecked(SolegramConfig.nowPlayingProgress));
-            items.add(UItem.asShadow(getString(R.string.SG_NowPlayingPatternInfo)));
-            return;
-        }
-        items.add(UItem.asButtonCheck(ID_NP_VINYL, getString(R.string.SG_NowPlayingVinyl), getString(R.string.SG_NowPlayingVinylInfo)).setChecked(SolegramConfig.nowPlayingVinyl));
         items.add(UItem.asCheck(ID_NP_PROGRESS, getString(R.string.SG_NowPlayingProgress)).setChecked(SolegramConfig.nowPlayingProgress));
-        items.add(UItem.asCheck(ID_NP_EQUALIZER, getString(R.string.SG_NowPlayingEqualizer)).setChecked(SolegramConfig.nowPlayingEqualizer));
-        items.add(UItem.asShadow(null));
-        final int accent = SolegramConfig.nowPlayingAccent;
-        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingAccent)));
-        items.add(UItem.asRadio(ID_NP_ACCENT_COVER, getString(R.string.SG_NowPlayingAccentCover)).setChecked(accent == 0));
-        items.add(UItem.asRadio(ID_NP_ACCENT_THEME, getString(R.string.SG_NowPlayingAccentTheme)).setChecked(accent != 0));
-        items.add(UItem.asShadow(null));
+        items.add(UItem.asShadow(getString(R.string.SG_NowPlayingPatternInfo)));
     }
 
     /** The music on the own profile for the preview (its cover is loaded, it plays here), else a sample. */
@@ -2314,12 +2283,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
 
             // music on the profile
-            case ID_NP_STYLE_COVER:
-            case ID_NP_STYLE_COMPACT:
-                SolegramConfig.prefs().edit().putInt("nowPlayingStyle", item.id - ID_NP_STYLE_COVER).putInt("profileMusicStyle", item.id - ID_NP_STYLE_COVER).apply();
-                SolegramConfig.reload();
-                musicLookChanged();
-                return;
             case ID_NP_BG_BLUR:
             case ID_NP_BG_COLORS:
                 SolegramConfig.prefs().edit().putBoolean("nowPlayingBlurBackground", item.id == ID_NP_BG_BLUR).apply();
@@ -2344,30 +2307,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 }
                 musicLookChanged();
                 return;
-            case ID_NP_STYLE_ROW:
-                SolegramConfig.prefs().edit().putInt("nowPlayingStyle", SolegramNowPlayingView.STYLE_ROW).putInt("profileMusicStyle", SolegramNowPlayingView.STYLE_ROW).apply();
-                SolegramConfig.reload();
-                musicLookChanged();
-                return;
-            case ID_NP_STYLE_TELEGRAM:
-                SolegramConfig.putInt("profileMusicStyle", SolegramProfileMusic.STYLE_TELEGRAM);
-                musicLookChanged();
-                return;
-            case ID_NP_ACCENT_COVER:
-            case ID_NP_ACCENT_THEME:
-                SolegramConfig.putInt("nowPlayingAccent", item.id - ID_NP_ACCENT_COVER);
-                musicLookChanged();
-                return;
-            case ID_NP_VINYL:
-                toggleCheck(view, "nowPlayingVinyl");
-                musicLookChanged();
-                return;
             case ID_NP_PROGRESS:
                 toggleCheck(view, "nowPlayingProgress");
-                musicLookChanged();
-                return;
-            case ID_NP_EQUALIZER:
-                toggleCheck(view, "nowPlayingEqualizer");
                 musicLookChanged();
                 return;
             // camera

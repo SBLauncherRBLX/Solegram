@@ -1053,6 +1053,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     /** Solegram: the profile card of someone the message mentions, where a link preview would be. */
     public final com.solegram.messenger.ui.SolegramMentionBubble sgMention = new com.solegram.messenger.ui.SolegramMentionBubble(this);
     public boolean sgMentionCard;
+    /** Where a message that is only a profile card has the card: the bubble's top edge (3 dp) and a 6 dp frame. */
+    private static final int SG_CARD_TOP = 9;
     public final GiveawayResultsMessageCell giveawayResultsMessageCell = new GiveawayResultsMessageCell(this);
 
     private boolean playedDice;
@@ -2352,12 +2354,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
      * caption below the widget (none, or shown above it), a bubble, no reactions row under it. The widget gets the
      * band and the corner as its content safe area (RichWidgetBlock#setSafeArea).
      */
-    /** Solegram: a message that is only a profile card: its time sits over the card's corner, the frame is even. */
-    private boolean sgCardTimeOver() {
-        return sgMentionCard && sgMention.replacesText() && !isCompactIn()
-            && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall);
-    }
-
     private boolean widgetTimeOver() {
         return currentMessageObject != null && isWidgetMessage() && !isCompactIn()
             && (TextUtils.isEmpty(currentMessageObject.caption) || captionAbove)
@@ -7287,7 +7283,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 } else if (messageObject.type == MessageObject.TYPE_ARTICLE) {
                     totalHeight = messageObject.richLayout.getHeight() + dp(19.5f) + namesOffset;
                 } else if (sgMentionCard && sgMention.replacesText()) {
-                    totalHeight = dp(5.5f) + namesOffset; // Solegram: the card instead of the text, close to the top
+                    // Solegram: the card instead of the text, 6 dp under the bubble's top edge (the bubble is drawn 3 dp
+                    // below the cell's top); under the card a row for the time (the card's height and 12 dp for the
+                    // preview's paddings come on top of this later)
+                    totalHeight = dp(SG_CARD_TOP + 25 - 12) + namesOffset;
                 } else {
                     totalHeight = messageObject.textHeight() + dp(19.5f) + namesOffset;
                 }
@@ -8376,9 +8375,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     }
 
                     totalHeight += dp(2 + (!drawInstantView ? 4 : 0));
-                    if (sgCardTimeOver()) {
-                        totalHeight -= dp(3); // the same thin frame under the card as over it
-                    }
 
                     createInstantViewButton();
                 } else {
@@ -11449,7 +11445,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             backgroundWidth = maxChildWidth + dp(31);
             return;
         }
-        if (widgetTimeOver() || sgCardTimeOver()) {
+        if (sgMentionCard && sgMention.replacesText()) {
+            // Solegram: a message that is only a profile card: the card and an even frame round it; the time has its
+            // own row under the card (that height is in totalHeight), nothing to widen for it
+            backgroundWidth = maxChildWidth + dp(31);
+            return;
+        }
+        if (widgetTimeOver()) {
             // The time goes over the widget's corner (docs/sdk-v1.md §5.12): no line of its own, nothing to widen.
             backgroundWidth = maxChildWidth + dp(31);
             return;
@@ -12290,13 +12292,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 timeLayout = null;
             }
             // An outgoing widget's time over its corner sits as a photo's: the ticks over media keep to layoutWidth.
-            if (mediaBackground || widgetTimeOver() && currentMessageObject.isOutOwner() || sgCardTimeOver()) {
+            if (mediaBackground || widgetTimeOver() && currentMessageObject.isOutOwner()) {
                 if (currentMessageObject.isOutOwner()) {
-                    timeX = layoutWidth - timeWidth - dp(sgCardTimeOver() ? 48.0f : 42.0f);
+                    timeX = layoutWidth - timeWidth - dp(42.0f);
                 } else if (isCompactIn()) {
                     timeX = getCompactRight() - timeWidth;
                 } else {
-                    timeX = backgroundWidth - dp(sgCardTimeOver() ? 14 : 4) - timeWidth;
+                    timeX = backgroundWidth - dp(4) - timeWidth;
                     if (currentMessageObject.isAnyKindOfSticker()) {
                         timeX = Math.max(dp(26), timeX);
                     }
@@ -12391,7 +12393,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     textY += dp(44);
                 }
             } else if (sgMentionCard && sgMention.replacesText()) {
-                linkPreviewY = textY - dp(4);
+                linkPreviewY = dp(SG_CARD_TOP) + namesOffset;
             } else {
                 linkPreviewY = textY + currentMessageObject.textHeight(transitionParams) + dp(10);
             }
@@ -13615,10 +13617,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     public float getPhotoBottom() {
-        if (sgCardTimeOver()) {
-            // the card's bottom: the time sits inside its corner
-            return linkPreviewY + sgMention.getMeasuredHeight() - dp(2);
-        }
         if (widgetTimeOver()) {
             // Not drawn yet: where layoutHeight puts it (the bubble's path ends 3 dp above, the widget 2 dp above that).
             return widgetBottom > 0 ? widgetBottom : layoutHeight - dp(5);
@@ -13830,7 +13828,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 textY += dp(44);
             }
         } else if (sgMentionCard && sgMention.replacesText()) {
-            linkPreviewY = textY - dp(4);
+            linkPreviewY = dp(SG_CARD_TOP) + namesOffset;
         } else {
             linkPreviewY = textY + currentMessageObject.textHeight(transitionParams) + dp(10);
         }
@@ -21493,7 +21491,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private boolean shouldDrawTimeOnMediaIgnoringCompact() {
-        if (widgetTimeOver() || sgCardTimeOver()) return true;
+        if (widgetTimeOver()) return true;
         return mediaBackground && (captionLayout == null || captionAbove) && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall || currentMessageObject != null && (currentMessageObject.isAnyKindOfSticker() || currentMessageObject.isRoundVideo())) || currentMessageObject != null && currentMessageObject.type == MessageObject.TYPE_PAID_MEDIA/* || isMedia && drawCommentButton && !isRepliesChat*/;
     }
 

@@ -947,7 +947,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // Solegram floating header: the list goes on under the title once the stories and the search field
                 // have folded away; while they are out, it stays below them as before
                 final int headerBottom = -(int) getY() + getActionBarTop() + getActionBarFullHeight();
-                if (!doNotClip && (!solegramFloatingHeader || headerBottom > actionBar.getY() + actionBar.getMeasuredHeight() + 1)) {
+                // (only the stories can be out: with none - a chat picker - the list always goes under the title, else
+                // it was cut off a few pixels under the title and the blur over it ended in a hard edge, as a plate)
+                final boolean solegramStoriesOut = hasStories || animateToHasStories || storiesOverscroll != 0;
+                if (!doNotClip && (!solegramFloatingHeader || solegramStoriesOut && headerBottom > actionBar.getY() + actionBar.getMeasuredHeight() + 1)) {
                     canvas.clipRect(0, headerBottom, getMeasuredWidth(), getMeasuredHeight());
                 }
                 if (slideFragmentProgress != 1f) {

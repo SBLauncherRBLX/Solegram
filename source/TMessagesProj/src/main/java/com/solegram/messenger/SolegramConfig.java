@@ -502,18 +502,9 @@ public class SolegramConfig {
         nowPlayingSpotify = p.getBoolean("nowPlayingSpotify", true);
         nowPlayingSoundCloud = p.getBoolean("nowPlayingSoundCloud", true);
         nowPlayingShareBio = p.getBoolean("nowPlayingShareBio", false);
-        // Telegram's own look (a plain row, 4) by default; 0..2 Solegram's cards
-        nowPlayingStyle = p.getInt("nowPlayingStyle", 4);
-        if (nowPlayingStyle != 4) {
-            nowPlayingStyle = clamp(nowPlayingStyle, 0, 2);
-        }
-        profileMusicStyle = clamp(p.getInt("profileMusicStyle", nowPlayingStyle), 0, 4);
-        if (profileMusicStyle == 1) {
-            profileMusicStyle = 4; // the glass card is gone: the island in Telegram's look
-        }
-        if (nowPlayingStyle == 1) {
-            nowPlayingStyle = 4;
-        }
+        // one look only: the island in Telegram's style (4); the other cards and Telegram's plain line are gone
+        nowPlayingStyle = 4;
+        profileMusicStyle = 4;
         nowPlayingBlurBackground = p.getBoolean("nowPlayingBlurBackground", true);
         profileMusicEmoji = p.getLong("profileMusicEmoji", 0);
         nowPlayingVinyl = p.getBoolean("nowPlayingVinyl", false);

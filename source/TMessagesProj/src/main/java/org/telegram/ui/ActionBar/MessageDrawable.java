@@ -87,6 +87,11 @@ public class MessageDrawable extends Drawable {
 
     public static final int TYPE_TEXT = 0;
     public static final int TYPE_MEDIA = 1;
+
+    /** Solegram: whether the bubble is drawn 8 dp in from its tail side (a text bubble), not 2 dp as a media one. */
+    public boolean sgHasTailInset() {
+        return currentType != TYPE_MEDIA;
+    }
     public static final int TYPE_PREVIEW = 2;
 
     Drawable transitionDrawable;
