@@ -698,6 +698,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                 videoEncoder.pause();
             }
         } else if (videoEncoder != null) {
+            sgClose(true);
             videoEncoder.resume();
             hideCamera(false);
             if (videoPlayer != null) {
@@ -1001,6 +1002,11 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         }
         if (state == 4) {
             if (videoEncoder != null && recordedTime > 800) {
+                // Solegram: sent from the pause: the editor's mask, filter and voice go with it
+                if (videoEditedInfo != null) {
+                    sgPendingPath = sgApplyTo(videoEditedInfo);
+                }
+                sgClose(false);
                 videoEncoder.stopRecording(VideoRecorder.ENCODER_SEND_SEND, new SendOptions(notify, scheduleDate, scheduleRepeatPeriod, ttl, effectId, stars));
                 return;
             }
@@ -3155,12 +3161,14 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                         videoEditedInfo.framerate = editedFramerate();
                         videoEditedInfo.resultWidth = videoEditedInfo.originalWidth = 360;
                         videoEditedInfo.resultHeight = videoEditedInfo.originalHeight = 360;
-                        videoEditedInfo.originalPath = videoFile.getAbsolutePath();
+                        videoEditedInfo.originalPath = sgPendingPath != null ? sgPendingPath : videoFile.getAbsolutePath();
+                        final String sgSendPath = sgPendingPath != null ? sgPendingPath : videoFile.getAbsolutePath();
+                        sgPendingPath = null;
                         final VideoEditedInfo info = videoEditedInfo;
                         if (send == ENCODER_SEND_SEND) {
                             if (delegate.isInScheduleMode()) {
                                 AlertsCreator.createScheduleDatePickerDialog(delegate.getParentActivity(), delegate.getDialogId(), (notify, scheduleDate, scheduleRepeatPeriod) -> {
-                                    MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, 0, 0, videoFile.getAbsolutePath(), 0, true, 0, 0, 0);
+                                    MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, 0, 0, sgSendPath, 0, true, 0, 0, 0);
                                     if (sendOptions != null) {
                                         entry.ttl = sendOptions.ttl;
                                         entry.effectId = sendOptions.effectId;
@@ -3171,7 +3179,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                                     startAnimation(false, false);
                                 }, resourcesProvider);
                             } else {
-                                MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, 0, 0, videoFile.getAbsolutePath(), 0, true, 0, 0, 0);
+                                MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, 0, 0, sgSendPath, 0, true, 0, 0, 0);
                                 if (sendOptions != null) {
                                     entry.ttl = sendOptions.ttl;
                                     entry.effectId = sendOptions.effectId;
@@ -3985,6 +3993,8 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
     private int sgMask, sgFilter, sgVoice;
     private String sgSourcePath;
     private String sgVoicePath;
+    /** the file with the voice effect, sent once the paused recording is stopped */
+    private String sgPendingPath;
     private com.solegram.messenger.SolegramRoundFx.FaceTrack sgTrack;
     private java.util.concurrent.atomic.AtomicBoolean sgCancel;
     private float sgShift;

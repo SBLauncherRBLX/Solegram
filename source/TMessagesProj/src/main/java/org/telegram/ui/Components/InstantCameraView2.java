@@ -555,16 +555,22 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
         RoundVideoSession.State state = stateInfo.getState();
         if (state == RoundVideoSession.State.PREVIEWING) {
             applyExternalTrim();
+            sgTrimStartMs = session.getStateInfo().getTrimStartMs();
         } else if (state != RoundVideoSession.State.RECORDING) {
             return;
+        } else {
+            sgTrimStartMs = 0;
         }
-        finishRequested = session.finish(!muted);
+        // the sound goes with a voice effect even if the preview was muted
+        finishRequested = session.finish(!muted || sgEditor != null && sgEditor.getVoice() != com.solegram.messenger.SolegramVoiceEffects.NONE);
     }
 
     @Override
     public void cancel(boolean byGesture) {
         // Refused once the result was delivered: the recording is being sent.
         if (session == null || !session.cancel()) return;
+        sgCloseEditor();
+        updateTranslationY();
         pendingSend = null;
         postRecordStopped(byGesture ? 0 : 6);
         if (upload != null) upload.release(true);
@@ -727,6 +733,12 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
             }
             lastVisibleDurationMs = Math.max(lastVisibleDurationMs, info.getRecordedDurationMs());
             if (info.getState() == RoundVideoSession.State.RECORDING) {
+                if (previous == RoundVideoSession.State.PREVIEWING || previous == RoundVideoSession.State.RESUMING) {
+                    // recording goes on: the editor closes, the camera's buttons come back
+                    sgCloseEditor();
+                    updateTranslationY();
+                    buttonsLayout.animate().alpha(1f).setDuration(180).start();
+                }
                 stopHeavyOperations();
                 hideInitialPlaceholder();
                 setRecordingUiFrameClockActive(true);
@@ -824,6 +836,9 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
             );
             float duration = Math.max(1L, durationMs);
             dispatchTrimRange(trimStartMs / duration, trimEndMs / duration);
+            // Solegram: the editor under the circle; the camera's buttons go away
+            buttonsLayout.animate().alpha(0f).setDuration(180).start();
+            sgEditor().open(previewFile);
         }
 
         @Override
@@ -937,19 +952,24 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
         );
         entry.ttl = options.ttl;
         entry.effectId = options.effectId;
-        delegate.sendMedia(
-                entry,
-                info,
-                options.notify,
-                options.scheduleDate,
-                options.scheduleRepeatPeriod,
-                false,
-                options.stars
-        );
-        if (upload != null) upload.release(false);
-        upload = null;
-        MediaController.getInstance().requestRecordAudioFocus(false);
+        sgSend(entry, info, sgTrimStartMs, () -> {
+            delegate.sendMedia(
+                    entry,
+                    info,
+                    options.notify,
+                    options.scheduleDate,
+                    options.scheduleRepeatPeriod,
+                    false,
+                    options.stars
+            );
+            if (upload != null) upload.release(false);
+            upload = null;
+            MediaController.getInstance().requestRecordAudioFocus(false);
+        });
     }
+
+    /** Solegram: where the sent video starts in the recording (it was trimmed), for the mask. */
+    private long sgTrimStartMs;
 
     private VideoEditedInfo createVideoEditedInfo(
             @NonNull File file,
@@ -1161,8 +1181,106 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
     }
 
     private void updateTranslationY() {
-        cameraContainer.setTranslationY(animationTranslationY + panTranslationY);
+        cameraContainer.setTranslationY(animationTranslationY + panTranslationY + (sgEditor != null ? sgEditor.getShift() : 0));
     }
+
+    // region Solegram: the round video editor
+
+    private com.solegram.messenger.ui.SolegramRoundEditorHost sgEditor;
+
+    private com.solegram.messenger.ui.SolegramRoundEditorHost sgEditor() {
+        if (sgEditor == null) {
+            sgEditor = new com.solegram.messenger.ui.SolegramRoundEditorHost(this, previewContainer, cameraContainer, textureView, resourcesProvider,
+                new com.solegram.messenger.ui.SolegramRoundEditorHost.Player() {
+                    @Override
+                    public long positionMs() {
+                        return session != null ? session.sgPreviewPositionMs() : -1;
+                    }
+
+                    @Override
+                    public void play(File file) {
+                        if (session != null && session.sgPlayPreviewFile(file)) {
+                            muted = false;
+                            muteImageView.animate().cancel();
+                            muteImageView.setAlpha(0f);
+                        }
+                    }
+                }, shift -> updateTranslationY());
+        }
+        return sgEditor;
+    }
+
+    @Override
+    public void sgToggleEditor() {
+        if (sgEditor != null) {
+            sgEditor.toggle();
+        }
+    }
+
+    @Override
+    public boolean sgEditorOpen() {
+        return sgEditor != null && sgEditor.isOpen();
+    }
+
+    private void sgCloseEditor() {
+        if (sgEditor != null) {
+            sgEditor.close(true);
+        }
+    }
+
+    /**
+     * Sends with the editor's mask, filter and voice: they go into the conversion of the video (and its sound is
+     * written again first, for a voice effect); without them, as Telegram sends it.
+     */
+    private void sgSend(MediaController.PhotoEntry entry, VideoEditedInfo info, long trimStartMs, Runnable send) {
+        final com.solegram.messenger.ui.SolegramRoundEditorHost editor = sgEditor;
+        if (editor == null || !editor.isActive()) {
+            send.run();
+            return;
+        }
+        boolean convert = editor.applyTo(info, Math.max(0, trimStartMs) * 1000L);
+        final int voice = editor.getVoice();
+        editor.close(true);
+        updateTranslationY();
+        if (voice == com.solegram.messenger.SolegramVoiceEffects.NONE) {
+            if (convert) {
+                sgPrepareConvert(info);
+            }
+            send.run();
+            return;
+        }
+        final File src = new File(entry.path);
+        final File dst = new File(src.getParentFile(), "sg_round_" + System.currentTimeMillis() + "_" + voice + ".mp4");
+        new Thread(() -> {
+            final boolean ok = com.solegram.messenger.SolegramRoundFx.replaceAudio(src.getAbsolutePath(), dst.getAbsolutePath(), voice, null);
+            AndroidUtilities.runOnUIThread(() -> {
+                if (ok) {
+                    entry.path = dst.getAbsolutePath();
+                    info.originalPath = dst.getAbsolutePath();
+                    info.sgForceConvert = true;
+                }
+                if (ok || info.needConvert()) {
+                    sgPrepareConvert(info);
+                }
+                send.run();
+            });
+        }, "SolegramRoundSend").start();
+    }
+
+    /** The video is converted: what was uploaded while recording is not it. */
+    private void sgPrepareConvert(VideoEditedInfo info) {
+        info.file = null;
+        info.encryptedFile = null;
+        info.key = null;
+        info.iv = null;
+        info.bitrate = SolegramCamera.bitrateFor(1000000, info.framerate);
+        if (upload != null) {
+            upload.release(true);
+            upload = null;
+        }
+    }
+
+    // endregion
 
     private void showInitialPlaceholder() {
         if (drawInitialPlaceholder) return;

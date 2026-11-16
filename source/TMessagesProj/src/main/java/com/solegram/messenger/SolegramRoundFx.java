@@ -682,11 +682,18 @@ public final class SolegramRoundFx {
         private final Pose pose = new Pose();
         private Bitmap bitmap;
         private Canvas canvas;
+        /** where the sent video starts in the recording the face was found in (it was trimmed) */
+        private final long offsetUs;
 
         public Overlay(FaceTrack track, int mask, SolegramRoundMasks.Sprites sprites) {
+            this(track, mask, sprites, 0);
+        }
+
+        public Overlay(FaceTrack track, int mask, SolegramRoundMasks.Sprites sprites, long offsetUs) {
             this.track = track;
             this.mask = mask;
             this.sprites = sprites;
+            this.offsetUs = offsetUs;
         }
 
         public Bitmap frame(long timeUs, int w, int h) {
@@ -698,9 +705,9 @@ public final class SolegramRoundFx {
                 canvas = new Canvas(bitmap);
             }
             bitmap.eraseColor(0);
-            track.pose(timeUs, pose);
+            track.pose(timeUs + offsetUs, pose);
             if (pose.alpha > 0.02f) {
-                SolegramRoundMasks.draw(canvas, mask, pose, w, h, timeUs / 1000, sprites);
+                SolegramRoundMasks.draw(canvas, mask, pose, w, h, (timeUs + offsetUs) / 1000, sprites);
             }
             return bitmap;
         }

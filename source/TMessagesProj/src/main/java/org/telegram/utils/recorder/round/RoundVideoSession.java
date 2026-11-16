@@ -703,6 +703,28 @@ public final class RoundVideoSession {
         return true;
     }
 
+    /** Solegram: the preview's playing position, ms (-1 without a preview). */
+    @MainThread
+    public long sgPreviewPositionMs() {
+        return state == State.PREVIEWING && player != null ? player.getCurrentPosition() : -1;
+    }
+
+    /**
+     * Solegram: the preview plays another file of the same recording (its sound through a voice effect) from where
+     * it was, with sound.
+     */
+    @MainThread
+    public boolean sgPlayPreviewFile(@NonNull File file) {
+        requireMainThread();
+        if (state != State.PREVIEWING || player == null) return false;
+        final long position = player.getCurrentPosition();
+        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)), position);
+        player.prepare();
+        player.setVolume(1f);
+        if (previewPlaying) player.play();
+        return true;
+    }
+
     /** Mutes or restores audio only for local recorded-video preview playback. */
     @MainThread
     public boolean setPreviewMuted(boolean muted) {

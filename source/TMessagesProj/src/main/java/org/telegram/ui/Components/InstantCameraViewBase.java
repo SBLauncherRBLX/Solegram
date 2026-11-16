@@ -43,6 +43,15 @@ public abstract class InstantCameraViewBase extends FrameLayout {
         super(context);
     }
 
+    /** Solegram: shows or hides the round video editor under the recorded circle. */
+    public void sgToggleEditor() {
+    }
+
+    /** Solegram: whether the round video editor's panel is shown. */
+    public boolean sgEditorOpen() {
+        return false;
+    }
+
     /** Creates the currently selected round-video implementation. */
     public static InstantCameraViewBase create(
             Context context,

@@ -3085,9 +3085,11 @@ public class ChatActivityEnterView extends FrameLayout implements
                                     return true;
                                 }
                                 if (sgRoundPreview()) {
-                                    // Solegram: to the editor, not sent: the panel waits for the recorded video
-                                    delegate.needStartRecordVideo(3, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
-                                    getParent().requestDisallowInterceptTouchEvent(true);
+                                    // Solegram: to the editor, not sent: paused for a check, as Telegram's own pause
+                                    if (slideText != null) {
+                                        slideText.setEnabled(false);
+                                    }
+                                    delegate.toggleVideoRecordingPause();
                                     return true;
                                 }
                                 delegate.needStartRecordVideo(1, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
@@ -3237,8 +3239,12 @@ public class ChatActivityEnterView extends FrameLayout implements
                                 }
                                 CameraController.getInstance().cancelOnInitRunnable(onFinishInitCameraRunnable);
                                 if (sgRoundPreview()) {
-                                    // Solegram: the round video waits in the editor (trim, masks, filters, voice) first
-                                    delegate.needStartRecordVideo(3, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
+                                    // Solegram: the round video waits in the editor (trim, masks, filters, voice) first:
+                                    // paused for a check, as Telegram's own pause button does
+                                    if (slideText != null) {
+                                        slideText.setEnabled(false);
+                                    }
+                                    delegate.toggleVideoRecordingPause();
                                     return true;
                                 }
                                 delegate.needStartRecordVideo(1, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
@@ -4265,14 +4271,14 @@ public class ChatActivityEnterView extends FrameLayout implements
 
     /** Solegram: a released (or locked and sent) round video opens in the editor before it goes. */
     private boolean sgRoundPreview() {
-        return com.solegram.messenger.SolegramConfig.roundEditor && !isInScheduleMode();
+        return com.solegram.messenger.SolegramConfig.roundEditor && !isInScheduleMode() && !delegate.isVideoRecordingPaused();
     }
 
     private void sgShowVoiceFx() {
         if (videoToSendMessageObject != null) {
             // a round video: the button shows or hides the editor under the circle
-            if (parentFragment != null && parentFragment.instantCameraView instanceof InstantCameraView) {
-                final InstantCameraView camera = (InstantCameraView) parentFragment.instantCameraView;
+            if (parentFragment != null && parentFragment.instantCameraView != null) {
+                final InstantCameraViewBase camera = parentFragment.instantCameraView;
                 camera.sgToggleEditor();
                 sgVoiceFxButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(camera.sgEditorOpen()
                     ? Theme.key_chat_recordedVoicePlayPause : Theme.key_chat_messagePanelIcons), PorterDuff.Mode.SRC_IN));
