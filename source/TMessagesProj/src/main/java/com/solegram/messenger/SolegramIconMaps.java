@@ -362,6 +362,14 @@ final class SolegramIconMaps {
             R.drawable.chats_pin, R.drawable.sg_ph_chats_pin,
             R.drawable.chats_unpin, R.drawable.sg_ph_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_ph_tabs_link_24,
+            // Solegram: the voice effects
+            R.drawable.sg_fx_chipmunk, R.drawable.sg_ph_fx_chipmunk,
+            R.drawable.sg_fx_deep, R.drawable.sg_ph_fx_deep,
+            R.drawable.sg_fx_echo, R.drawable.sg_ph_fx_echo,
+            R.drawable.sg_fx_radio, R.drawable.sg_ph_fx_radio,
+            R.drawable.sg_fx_hall, R.drawable.sg_ph_fx_hall,
+            R.drawable.sg_fx_alien, R.drawable.sg_ph_fx_alien,
+            R.drawable.sg_fx_underwater, R.drawable.sg_ph_fx_underwater,
         };
     }
 
@@ -721,6 +729,14 @@ final class SolegramIconMaps {
             R.drawable.chats_pin, R.drawable.sg_hg_chats_pin,
             R.drawable.chats_unpin, R.drawable.sg_hg_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_hg_tabs_link_24,
+            // Solegram: the voice effects
+            R.drawable.sg_fx_chipmunk, R.drawable.sg_hg_fx_chipmunk,
+            R.drawable.sg_fx_deep, R.drawable.sg_hg_fx_deep,
+            R.drawable.sg_fx_echo, R.drawable.sg_hg_fx_echo,
+            R.drawable.sg_fx_radio, R.drawable.sg_hg_fx_radio,
+            R.drawable.sg_fx_hall, R.drawable.sg_hg_fx_hall,
+            R.drawable.sg_fx_alien, R.drawable.sg_hg_fx_alien,
+            R.drawable.sg_fx_underwater, R.drawable.sg_hg_fx_underwater,
         };
     }
 
@@ -1080,6 +1096,14 @@ final class SolegramIconMaps {
             R.drawable.chats_pin, R.drawable.sg_mc_chats_pin,
             R.drawable.chats_unpin, R.drawable.sg_mc_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_mc_tabs_link_24,
+            // Solegram: the voice effects
+            R.drawable.sg_fx_chipmunk, R.drawable.sg_mc_fx_chipmunk,
+            R.drawable.sg_fx_deep, R.drawable.sg_mc_fx_deep,
+            R.drawable.sg_fx_echo, R.drawable.sg_mc_fx_echo,
+            R.drawable.sg_fx_radio, R.drawable.sg_mc_fx_radio,
+            R.drawable.sg_fx_hall, R.drawable.sg_mc_fx_hall,
+            R.drawable.sg_fx_alien, R.drawable.sg_mc_fx_alien,
+            R.drawable.sg_fx_underwater, R.drawable.sg_mc_fx_underwater,
         };
     }
 
@@ -1435,6 +1459,14 @@ final class SolegramIconMaps {
             R.drawable.chats_pin, R.drawable.sg_mj_chats_pin,
             R.drawable.chats_unpin, R.drawable.sg_mj_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_mj_tabs_link_24,
+            // Solegram: the voice effects
+            R.drawable.sg_fx_chipmunk, R.drawable.sg_mj_fx_chipmunk,
+            R.drawable.sg_fx_deep, R.drawable.sg_mj_fx_deep,
+            R.drawable.sg_fx_echo, R.drawable.sg_mj_fx_echo,
+            R.drawable.sg_fx_radio, R.drawable.sg_mj_fx_radio,
+            R.drawable.sg_fx_hall, R.drawable.sg_mj_fx_hall,
+            R.drawable.sg_fx_alien, R.drawable.sg_mj_fx_alien,
+            R.drawable.sg_fx_underwater, R.drawable.sg_mj_fx_underwater,
         };
     }
 
@@ -1785,6 +1817,14 @@ final class SolegramIconMaps {
             R.drawable.chats_pin, R.drawable.sg_sl_chats_pin,
             R.drawable.chats_unpin, R.drawable.sg_sl_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_sl_tabs_link_24,
+            // Solegram: the voice effects
+            R.drawable.sg_fx_chipmunk, R.drawable.sg_sl_fx_chipmunk,
+            R.drawable.sg_fx_deep, R.drawable.sg_sl_fx_deep,
+            R.drawable.sg_fx_echo, R.drawable.sg_sl_fx_echo,
+            R.drawable.sg_fx_radio, R.drawable.sg_sl_fx_radio,
+            R.drawable.sg_fx_hall, R.drawable.sg_sl_fx_hall,
+            R.drawable.sg_fx_alien, R.drawable.sg_sl_fx_alien,
+            R.drawable.sg_fx_underwater, R.drawable.sg_sl_fx_underwater,
         };
     }
 

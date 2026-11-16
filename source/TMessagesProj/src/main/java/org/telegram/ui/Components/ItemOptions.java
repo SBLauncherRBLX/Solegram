@@ -1621,10 +1621,10 @@ public class ItemOptions {
         if (blurForMenu && scrimBlur3SourceBitmap != null) {
             setGapBackgroundColor(Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuItem, resourcesProvider), 0.06f));
             bindGapBackgroundColor(ThemeBind.multAlpha(Theme.key_actionBarDefaultSubmenuItem, 0.06f));
-            // Solegram: live glass over the screen under the menu's window (Telegram's picture stays without it); over
-            // Telegram's blurred backdrop it is frosted like the backdrop round it, refracting at the rim
+            // Solegram: live liquid glass over the screen under the menu's window, as every menu has it (over Telegram's
+            // blurred backdrop it refracts that backdrop); Telegram's picture stays without it
             BlurredBackgroundDrawable bg = new com.solegram.messenger.ui.SolegramLiveGlass.Factory(scrimBlur3SourceBitmap,
-                    blur ? com.solegram.messenger.ui.SolegramLiveGlass.FROSTED : com.solegram.messenger.ui.SolegramLiveGlass.CLEAR)
+                    com.solegram.messenger.ui.SolegramLiveGlass.CLEAR)
                 .create(layout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourcesProvider))
                 .setPadding(dp(8))
@@ -1635,18 +1635,6 @@ public class ItemOptions {
             layout.setBackground(bg);
         }
 
-        if (blur) {
-            // Solegram: over Telegram's blurred backdrop the menus are frosted like it (their rim still refracts)
-            if (layout instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
-                ((ActionBarPopupWindow.ActionBarPopupWindowLayout) layout).solegramGlassRecipe = com.solegram.messenger.ui.SolegramLiveGlass.FROSTED;
-            } else {
-                for (int i = 0; i < layout.getChildCount(); i++) {
-                    if (layout.getChildAt(i) instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
-                        ((ActionBarPopupWindow.ActionBarPopupWindowLayout) layout.getChildAt(i)).solegramGlassRecipe = com.solegram.messenger.ui.SolegramLiveGlass.FROSTED;
-                    }
-                }
-            }
-        }
         actionBarPopupWindow.setScaleOut(scaleOut);
         if (!solegramCascade && scrimView != null && !allowMoveScrim && animateToWidth == 0 && scrimView.isAttachedToWindow()) {
             // Solegram: the menu flows out of the view it is for (a whole cell: out of its edge next to the menu)

@@ -648,7 +648,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             args.putBoolean("needFinishFragment", false);
             presentFragment(new CallLogActivity(args));
         });
-        o.setBlur(true);
+        // Solegram: no blur or dim behind the menu: its liquid glass refracts the screen itself
+        o.setBlur(false);
+        o.setDimAlpha(0);
         o.translate(0, -dp(4));
         o.setGravity(Gravity.LEFT);
         final ShapeDrawable bg = Theme.createRoundRectDrawable(dp(28), getThemedColor(Theme.key_windowBackgroundWhite));
@@ -675,7 +677,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.callTabsVisibleToggled);
             });
         }
-        o.setBlur(true);
+        // Solegram: no blur or dim behind the menu: its liquid glass refracts the screen itself
+        o.setBlur(false);
+        o.setDimAlpha(0);
         o.translate(0, -dp(4));
         final ShapeDrawable bg = Theme.createRoundRectDrawable(dp(28), getThemedColor(Theme.key_windowBackgroundWhite));
         bg.getPaint().setShadowLayer(dp(6), 0, dp(1), Theme.multAlpha(0xFF000000, 0.15f));
@@ -734,7 +738,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             });
             o.addView(folderItem, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         }
-//        o.setBlur(true);
+//        o.setBlur(true); (Telegram's)
+        o.setDimAlpha(0); // Solegram: as the other tab menus, the screen stays as it is under the glass
         o.translate(-dp(8), -dp(4));
         o.setMaxHeight(dp(400));
         final ShapeDrawable bg = Theme.createRoundRectDrawable(dp(28), getThemedColor(Theme.key_windowBackgroundWhite));
@@ -868,7 +873,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         }
 
         if (accountNumbers.size() > 0) {
-            if (o.getItemsCount() > 0) o.addGap();
+            // Solegram: no grey gap band between "Add account" and the accounts
             for (int acc : accountNumbers) {
                 final int account = acc;
                 final View btn = accountView(acc, currentAccount == acc);
@@ -883,7 +888,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             }
         }
 
-        o.setBlur(true);
+        // Solegram: no blur or dim behind the menu: its liquid glass refracts the screen itself
+        o.setBlur(false);
+        o.setDimAlpha(0);
         o.translate(0, -dp(4));
         final ShapeDrawable bg = Theme.createRoundRectDrawable(dp(28), getThemedColor(Theme.key_windowBackgroundWhite));
         bg.getPaint().setShadowLayer(dp(6), 0, dp(1), Theme.multAlpha(0xFF000000, 0.15f));
@@ -914,7 +921,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                     selectedPaint.setStyle(Paint.Style.STROKE);
                     selectedPaint.setStrokeWidth(dp(1.33f));
                     selectedPaint.setColor(getThemedColor(Theme.key_featuredStickers_addButton));
-                    canvas.drawCircle(getWidth() / 2.0f, getHeight() / 2.0f, dp(16), selectedPaint);
+                    // Solegram: the ring follows the avatar's shape (the avatar corners option), not always a circle
+                    final float half = dp(16);
+                    final float r = half * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f;
+                    final float cx = getWidth() / 2.0f, cy = getHeight() / 2.0f;
+                    canvas.drawRoundRect(cx - half, cy - half, cx + half, cy + half, r, r, selectedPaint);
                 }
                 super.dispatchDraw(canvas);
             }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solegram: a voice effect icon of the icon pack -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.058" android:scaleY="1.058" android:translateX="0" android:translateY="0">
+        <path android:pathData="M12.125 5.75H12m.25 0a.25.25 0 1 1-.5 0a.25.25 0 0 1 .5 0M9 9v10m-4 0V9m14 0v10m-4 0V9" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+        <path android:pathData="M2.648 9h18.704a.658.658 0 0 0 .353-1.205l-6.435-4.23C13.683 2.522 12.89 2 12 2s-1.683.522-3.27 1.565l-6.435 4.23A.657.657 0 0 0 2.648 9m17.704 10.586l.688.707c.706.726 1.06 1.09.935 1.398c-.124.309-.624.309-1.623.309H3.648c-1 0-1.5 0-1.623-.309c-.125-.308.229-.672.935-1.398l.688-.707c.281-.29.422-.434.6-.51c.18-.076.378-.076.776-.076h13.952c.398 0 .597 0 .775.076c.18.076.32.22.6.51" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    </group>
+</vector>

@@ -37,15 +37,16 @@ public final class SolegramVoiceEffects {
 
     public static int iconOf(int effect) {
         switch (effect) {
-            case CHIPMUNK: return R.drawable.msg_emoji_activities;
-            case DEEP: return R.drawable.msg_voice_speaker;
+            // icons that say what each effect does; the icon pack draws them in its own style (SolegramIconMaps)
+            case CHIPMUNK: return R.drawable.sg_fx_chipmunk;        // a helium balloon: a high voice
+            case DEEP: return R.drawable.sg_fx_deep;                // a quiet speaker: a low voice
             case ROBOT: return R.drawable.msg_bot;
-            case ECHO: return R.drawable.msg_noise_on;
-            case RADIO: return R.drawable.msg_voice_phone;
-            case HALL: return R.drawable.msg_channel;
-            case ALIEN: return R.drawable.msg_emoji_objects;
-            case UNDERWATER: return R.drawable.msg_emoji_travel;
-            default: return R.drawable.msg_voice_unmuted;
+            case ECHO: return R.drawable.sg_fx_echo;                // an echo in the mountains
+            case RADIO: return R.drawable.sg_fx_radio;
+            case HALL: return R.drawable.sg_fx_hall;                // a big hall's reverb
+            case ALIEN: return R.drawable.sg_fx_alien;
+            case UNDERWATER: return R.drawable.sg_fx_underwater;    // a fish
+            default: return R.drawable.msg_voice_unmuted;           // the voice as recorded
         }
     }
 
