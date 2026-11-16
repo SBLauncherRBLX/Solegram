@@ -1597,9 +1597,9 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 final com.solegram.messenger.ui.SolegramSquircle.Shape shape = boundProps.squircleShape;
                 final boolean squircle = boundProps.squircle && !shape.isEmpty();
                 if (squircle) {
-                    liquidGlassEffect.setSquircle(shape.a0, shape.h0, shape.beta, shape.gamma);
+                    liquidGlassEffect.setSquircle(shape.a0, shape.h0, shape.beta, shape.gamma, shape.rx, shape.ry, shape.exponent);
                 } else {
-                    liquidGlassEffect.setSquircle(0, 0, 0, 0);
+                    liquidGlassEffect.setSquircle(0, 0, 0, 0, 0, 0, 2);
                 }
                 liquidGlassEffect.update(
                     body.width(), body.height(),

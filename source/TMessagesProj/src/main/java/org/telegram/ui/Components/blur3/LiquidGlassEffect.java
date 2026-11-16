@@ -45,6 +45,7 @@ public class LiquidGlassEffect {
             shader.setFloatUniform("dispersion", 0);
             shader.setFloatUniform("rim", 0);
             shader.setFloatUniform("squircle", 0, 0, 0, 0);
+            shader.setFloatUniform("squircle_r", 1, 1, 2);
         }
         node.setRenderEffect(effect = RenderEffect.createRuntimeShaderEffect(shader, "img"));
     }
@@ -92,14 +93,17 @@ public class LiquidGlassEffect {
     }
 
     // Solegram: the iOS-like shape (SolegramSquircle.Shape, in the pixels of the screen); a0 = 0 for a rounded rect
-    private float squircleA0, squircleH0, squircleBeta, squircleGamma;
+    private float squircleA0, squircleH0, squircleBeta, squircleGamma, squircleRx, squircleRy, squircleN = 2;
     private boolean squircleChanged;
 
-    public void setSquircle(float a0, float h0, float beta, float gamma) {
+    public void setSquircle(float a0, float h0, float beta, float gamma, float rx, float ry, float exponent) {
         if (!extended) {
             a0 = h0 = beta = gamma = 0; // Telegram's shader knows only the rounded rect
         }
-        if (squircleA0 != a0 || squircleH0 != h0 || squircleBeta != beta || squircleGamma != gamma) {
+        if (squircleA0 != a0 || squircleH0 != h0 || squircleBeta != beta || squircleGamma != gamma || squircleN != exponent || squircleRx != rx || squircleRy != ry) {
+            squircleN = exponent;
+            squircleRx = rx;
+            squircleRy = ry;
             squircleA0 = a0;
             squircleH0 = h0;
             squircleBeta = beta;
@@ -201,6 +205,7 @@ public class LiquidGlassEffect {
                 shader.setFloatUniform("dispersion", dispersion);
                 shader.setFloatUniform("rim", rim);
                 shader.setFloatUniform("squircle", squircleA0 * scale, squircleH0 * scale, squircleBeta, squircleGamma);
+                shader.setFloatUniform("squircle_r", Math.max(squircleRx * scale, 0.01f), Math.max(squircleRy * scale, 0.01f), squircleN);
             }
             if (shader == arrowShader) {
                 shader.setFloatUniform("arrow", arrowHeight * scale, arrowTipRadius * scale, arrowFilletRadius * scale, arrowStripe * scale);

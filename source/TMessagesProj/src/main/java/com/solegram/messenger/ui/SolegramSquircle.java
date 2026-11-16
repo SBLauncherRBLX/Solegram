@@ -17,10 +17,16 @@ import org.telegram.messenger.AndroidUtilities;
  */
 public final class SolegramSquircle {
 
-    /** The corners' superellipse exponent (2 is a circle). */
-    public static final float EXPONENT = 2.5f;
+    /**
+     * Pills: the ends are not half circles but stretched along the length (the curve starts earlier on the long sides
+     * and runs smoothly into them), as iOS draws its capsules.
+     */
+    public static final float PILL_STRETCH = 1.3f;
+    public static final float PILL_EXPONENT = 2.3f;
+    /** Other shapes: corners that run a little more smoothly into the sides than a circle's quarter. */
+    public static final float CORNER_EXPONENT = 2.1f;
     /** A superellipse corner looks smaller than a circle of the same radius: it is this much larger to look the same. */
-    private static final float RADIUS_SCALE = 1.2f;
+    private static final float RADIUS_SCALE = 1.15f;
 
     private SolegramSquircle() {
     }
@@ -33,10 +39,14 @@ public final class SolegramSquircle {
     public static final class Shape {
         /** Half the size of the base (before the sides are puffed out). */
         public float a0, h0;
-        /** The base's corner radius. */
+        /** The corners' radii along x and along y. */
+        public float rx, ry;
+        /** The smaller of the two radii. */
         public float radius;
         /** How much the top and bottom (beta) and the left and right (gamma) are puffed out, relative to the base. */
         public float beta, gamma;
+        /** The corners' superellipse exponent (2: an ellipse's quarter). */
+        public float exponent = 2;
 
         public boolean isEmpty() {
             return a0 <= 0 || h0 <= 0;
@@ -45,39 +55,41 @@ public final class SolegramSquircle {
         public void set(float width, float height, float cornerRadius) {
             final float a = width / 2f, h = height / 2f;
             if (a <= 0 || h <= 0) {
-                a0 = h0 = radius = beta = gamma = 0;
+                a0 = h0 = rx = ry = radius = beta = gamma = 0;
                 return;
             }
-            // the longer a side, the more it is puffed out, but never more than a hair (2.2dp) or a bit of the other side
-            final float max = AndroidUtilities.dpf2(2.2f);
-            final float bulgeY = Math.min(max, Math.min(width * 0.01f, height * 0.05f));
-            final float bulgeX = Math.min(max, Math.min(height * 0.01f, width * 0.05f));
+            // the sides are just a little puffed out (more read as a bent shape on a long element)
+            final float max = AndroidUtilities.dpf2(0.7f);
+            final float bulgeY = Math.min(max, Math.min(width * 0.004f, height * 0.015f));
+            final float bulgeX = Math.min(max, Math.min(height * 0.004f, width * 0.015f));
             a0 = a - bulgeX;
             h0 = h - bulgeY;
             beta = bulgeY / h0;
             gamma = bulgeX / a0;
-            radius = Math.max(0, Math.min(cornerRadius * RADIUS_SCALE, Math.min(a0, h0)));
-        }
-    }
-
-    private static final int MAX_STEPS = 24;
-    private static final float[][] CORNERS = new float[MAX_STEPS + 1][];
-
-    /** A quarter of the superellipse in {@code steps} steps: cos(t)^(2/n), sin(t)^(2/n) pairs, from the side to the top. */
-    private static float[] corner(int steps) {
-        float[] c = CORNERS[steps];
-        if (c == null) {
-            c = new float[(steps + 1) * 2];
-            final double e = 2.0 / EXPONENT;
-            for (int i = 0; i <= steps; i++) {
-                final double t = Math.PI / 2 * i / steps;
-                c[i * 2] = (float) Math.pow(Math.max(0, Math.cos(t)), e);
-                c[i * 2 + 1] = (float) Math.pow(Math.max(0, Math.sin(t)), e);
+            final float half = Math.min(a0, h0);
+            if (cornerRadius >= Math.min(a, h) - 0.5f || cornerRadius * RADIUS_SCALE >= half) {
+                // a pill: the ends stretched along its length
+                // a short pill keeps round ends (a capsule's): the stretch and the fuller shoulders come with its length
+                final float ratio = Math.max(a0, h0) / half;
+                final float k = Math.max(0f, Math.min(1f, (ratio - 1.3f) / 1.7f));
+                final float along = Math.min(half * (1f + (PILL_STRETCH - 1f) * k), Math.max(a0, h0));
+                if (a0 >= h0) {
+                    rx = along;
+                    ry = h0;
+                } else {
+                    rx = a0;
+                    ry = along;
+                }
+                exponent = 2f + (PILL_EXPONENT - 2f) * k;
+            } else {
+                rx = ry = Math.max(0, cornerRadius * RADIUS_SCALE);
+                exponent = CORNER_EXPONENT;
             }
-            CORNERS[steps] = c;
+            radius = Math.min(rx, ry);
         }
-        return c;
     }
+
+    private static final int MAX_STEPS = 32;
 
     /** Adds the shape of the rect (left, top, right, bottom) with the corner radius to the path, clockwise. */
     public static void addTo(Path path, float left, float top, float right, float bottom, float cornerRadius, Shape shape) {
@@ -86,10 +98,17 @@ public final class SolegramSquircle {
             return;
         }
         final float cx = (left + right) / 2f, cy = (top + bottom) / 2f;
-        final float r = shape.radius;
-        final int steps = Math.max(6, Math.min(MAX_STEPS, Math.round(r / AndroidUtilities.dpf2(1.5f))));
-        final float[] c = corner(steps);
-        final float ix = shape.a0 - r, iy = shape.h0 - r;
+        final float rx = shape.rx, ry = shape.ry;
+        final int steps = Math.max(6, Math.min(MAX_STEPS, Math.round(Math.max(rx, ry) / AndroidUtilities.dpf2(1.5f))));
+        final float[] c = new float[(steps + 1) * 2];
+        // a quarter of the superellipse: cos(t)^(2/n), sin(t)^(2/n), from the vertical side to the horizontal one
+        final double e = 2.0 / shape.exponent;
+        for (int i = 0; i <= steps; i++) {
+            final double t = Math.PI / 2 * i / steps;
+            c[i * 2] = (float) Math.pow(Math.max(0, Math.cos(t)), e);
+            c[i * 2 + 1] = (float) Math.pow(Math.max(0, Math.sin(t)), e);
+        }
+        final float ix = shape.a0 - rx, iy = shape.h0 - ry;
         // the straight parts of the base become arcs once puffed out: a few points along them
         final int sideStepsX = shape.beta > 0 ? Math.max(1, Math.min(16, Math.round(ix * 2 / AndroidUtilities.dpf2(12)))) : 1;
         final int sideStepsY = shape.gamma > 0 ? Math.max(1, Math.min(16, Math.round(iy * 2 / AndroidUtilities.dpf2(12)))) : 1;
@@ -100,7 +119,6 @@ public final class SolegramSquircle {
             final float sy = q == 0 || q == 1 ? 1 : -1;
             // the side before this corner
             if (q == 0 || q == 2) {
-                // a vertical side, from the other end to this corner's start
                 for (int i = 0; i < sideStepsY; i++) {
                     final float y = -sy * iy + 2 * sy * iy * i / sideStepsY;
                     first = point(path, first, cx, cy, sx * shape.a0, y, shape);
@@ -114,8 +132,8 @@ public final class SolegramSquircle {
             // the corner: from the vertical side to the horizontal one (q 0, 2) or the other way round (q 1, 3)
             for (int i = 0; i <= steps; i++) {
                 final int k = q == 0 || q == 2 ? i : steps - i;
-                final float x = sx * (ix + r * c[k * 2]);
-                final float y = sy * (iy + r * c[k * 2 + 1]);
+                final float x = sx * (ix + rx * c[k * 2]);
+                final float y = sy * (iy + ry * c[k * 2 + 1]);
                 first = point(path, first, cx, cy, x, y, shape);
             }
         }

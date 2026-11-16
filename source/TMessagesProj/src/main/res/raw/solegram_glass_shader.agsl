@@ -15,24 +15,14 @@ uniform float rim;
 // the iOS-like shape (SolegramSquircle): half the base's size and how much its sides are puffed out (beta: top and
 // bottom, gamma: left and right); x = 0 for a plain rounded rect
 uniform float4 squircle;
-
-const float SQ_N = 2.5;
+// the corners: their radii along x and y, and their superellipse exponent (2: an ellipse's quarter)
+uniform float3 squircle_r;
 
 half sdfRect(half2 p, half4 r) {
   r.xy = (p.x > 0.0) ? r.xy : r.zw;
   r.x  = (p.y > 0.0) ? r.x  : r.y;
   half2 q = abs(p) - size + r.x;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r.x;
-}
-
-// the length of q in the superellipse norm: the corner of the base
-float sqNorm(float2 q) {
-  float m = max(q.x, q.y);
-  if (m <= 0.0) {
-    return 0.0;
-  }
-  float2 u = max(q / m, float2(0.0001));
-  return m * pow(pow(u.x, SQ_N) + pow(u.y, SQ_N), 1.0 / SQ_N);
 }
 
 float sdfShape(float2 p, half4 r) {
@@ -48,9 +38,25 @@ float sdfShape(float2 p, half4 r) {
     float tx = min(b.x / squircle.x, 1.0);
     b.y = a.y / (1.0 + squircle.z * (1.0 - tx * tx));
   }
-  float rr = float(r.x);
-  float2 q = b - squircle.xy + rr;
-  return sqNorm(max(q, float2(0.0))) + min(max(q.x, q.y), 0.0) - rr;
+  float2 rad = squircle_r.xy;
+  float n = squircle_r.z;
+  // from the corner's centre; the straight sides are where one of q is not past it
+  float2 q = b - (squircle.xy - rad);
+  float straight = max(q.x - rad.x, q.y - rad.y);
+  float2 u = max(q, float2(0.0)) / rad;
+  float m = max(u.x, u.y);
+  if (m <= 0.0) {
+    return straight;
+  }
+  // the corner: the superellipse's level, over its gradient for a distance in pixels
+  float2 v = max(u / m, float2(0.0001));
+  bool isRound = n <= 2.001;
+  float2 vn = isRound ? v * v : pow(v, float2(n));
+  float s = vn.x + vn.y;
+  float level = m * (isRound ? sqrt(s) : pow(s, 1.0 / n));
+  float2 g = (isRound ? v : pow(v, float2(n - 1.0))) / (isRound ? sqrt(s) : pow(s, (n - 1.0) / n)) / rad;
+  float corner = (level - 1.0) / max(length(g), 0.00001);
+  return max(corner, straight);
 }
 
 half4 srcOver(half4 src, half4 dst) {
