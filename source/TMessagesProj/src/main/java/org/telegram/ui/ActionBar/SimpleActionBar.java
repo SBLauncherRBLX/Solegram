@@ -1669,10 +1669,16 @@ public class SimpleActionBar extends FrameLayout implements FactorAnimator.Targe
             final int width = MeasureSpec.getSize(widthMeasureSpec);
             final int height = MeasureSpec.getSize(heightMeasureSpec);
             final int available = Math.max(0, width - sideInset * 2);
+            // Solegram: the title as large as the other screens' (ActionBar: 20, 18 in landscape or over a subtitle)
+            final boolean landscape = !AndroidUtilities.isTablet() && getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+            final int titleSize = hasSubtitle() || landscape ? 18 : 20;
             for (SimpleTextView view : titleViews) {
                 if (view != null && view.getVisibility() != GONE) {
+                    if (view.getTextPaint().getTextSize() != dp(titleSize)) {
+                        view.setTextSize(titleSize);
+                    }
                     view.measure(MeasureSpec.makeMeasureSpec(available, MeasureSpec.AT_MOST),
-                        MeasureSpec.makeMeasureSpec(dp(24) + view.getPaddingTop() + view.getPaddingBottom(), MeasureSpec.AT_MOST));
+                        MeasureSpec.makeMeasureSpec(dp(28) + view.getPaddingTop() + view.getPaddingBottom(), MeasureSpec.AT_MOST));
                 }
             }
             if (hasSubtitle()) {
