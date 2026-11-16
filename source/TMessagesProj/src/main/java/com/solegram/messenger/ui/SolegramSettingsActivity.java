@@ -557,11 +557,13 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         }
         SolegramConfig.putInt("settingsIconStyle", style);
         refreshIcons();
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "settingsIconStyle");
     }
 
     private void setIconPack(int pack) {
         SolegramConfig.putInt("iconPack", pack);
         refreshIcons();
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "iconPack");
         if (iconPackPicker != null) {
             iconPackPicker.setSelected(pack); // the check and the rim on the new pack, in whichever list shows it
         }
@@ -574,6 +576,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             ((LaunchActivity) getParentActivity()).rebuildAllFragments(false);
         }
         if (listView != null && listView.adapter != null) {
+            // the rows anew first: the style's two choices take their new checks
+            listView.adapter.update(false);
             final androidx.recyclerview.widget.RecyclerView.LayoutManager layoutManager = listView.getLayoutManager();
             final android.os.Parcelable state = layoutManager != null ? layoutManager.onSaveInstanceState() : null;
             listView.setAdapter(listView.adapter);

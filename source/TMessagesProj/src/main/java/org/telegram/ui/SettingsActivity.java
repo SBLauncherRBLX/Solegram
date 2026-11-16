@@ -212,7 +212,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             .createObserversGroup(this)
             .add(NotificationCenter.updateInterfaces)
             .add(NotificationCenter.starBalanceUpdated)
-            .add(NotificationCenter.newSuggestionsAvailable);
+            .add(NotificationCenter.newSuggestionsAvailable)
+            .add(NotificationCenter.solegramSettingsChanged);
 
         if (arguments != null) {
             hasMainTabs = arguments.getBoolean("hasMainTabs", false);
@@ -513,6 +514,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         } else if (id == NotificationCenter.newSuggestionsAvailable) {
             if (listView != null) {
                 listView.adapter.update(true);
+            }
+        } else if (id == NotificationCenter.solegramSettingsChanged) {
+            // Solegram: another settings icon style or icon pack - the tab stays alive under the main tabs, so its rows
+            // are drawn again here (the same rows: a diff would keep their old icons)
+            final Object key = args.length > 0 ? args[0] : null;
+            if (listView != null && ("settingsIconStyle".equals(key) || "iconPack".equals(key))) {
+                listView.getRecycledViewPool().clear();
+                listView.adapter.notifyDataSetChanged();
             }
         }
     }
