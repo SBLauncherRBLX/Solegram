@@ -2249,5 +2249,6 @@
     <string name="SG_RoundFilterRetro">Ретро</string>
     <string name="SG_RoundFilterDream">Мечта</string>
     <string name="SG_RoundFilterDrama">Драма</string>
+    <string name="SG_RoundFxFailed">Не удалось применить эффекты — кружок отправлен без них</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -531,6 +531,14 @@ public class SolegramAiSheet extends BottomSheet {
         if (enter == null) {
             return;
         }
+        // the reply goes as a reply to the message it was made for (quoted above the field), not as a loose message
+        if (message != null && message.getId() > 0 && !message.isSponsored()) {
+            try {
+                chat.showFieldPanelForReply(message);
+            } catch (Throwable e) {
+                org.telegram.messenger.FileLog.e(e);
+            }
+        }
         enter.setFieldText(reply);
         if (enter.getEditField() != null) {
             enter.getEditField().setSelection(enter.getEditField().length());

@@ -195,7 +195,7 @@ public final class SolegramRoundEditorHost {
         }
         panel.setVoiceBusy(effect);
         final File src = source;
-        final File dst = new File(src.getParentFile(), "sg_round_preview_" + System.currentTimeMillis() + "_" + effect + ".mp4");
+        final File dst = new File(org.telegram.messenger.FileLoader.getDirectory(org.telegram.messenger.FileLoader.MEDIA_DIR_CACHE), "sg_round_preview_" + System.currentTimeMillis() + "_" + effect + ".mp4");
         final AtomicBoolean cancelled = cancel;
         new Thread(() -> {
             final boolean ok = SolegramRoundFx.replaceAudio(src.getAbsolutePath(), dst.getAbsolutePath(), effect, cancelled);
@@ -283,6 +283,16 @@ public final class SolegramRoundEditorHost {
 
     public boolean isOpen() {
         return panel != null && panel.getVisibility() == View.VISIBLE;
+    }
+
+    /** The chosen filter. */
+    public int getFilter() {
+        return filter;
+    }
+
+    /** The chosen voice effect (its preview was made). */
+    public int getSelectedVoice() {
+        return voice;
     }
 
     /** Whether the sound must be changed in the sent video. */

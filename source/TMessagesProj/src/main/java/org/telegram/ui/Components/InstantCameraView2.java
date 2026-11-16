@@ -329,6 +329,7 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
 
     @Override
     public void destroy(boolean async) {
+        sgStopVoice();
         setRecordingUiFrameClockActive(false);
         cancelCameraFlipAnimation();
         if (zoomResetAnimator != null) zoomResetAnimator.cancel();
@@ -1058,6 +1059,17 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
                 || stateInfo.getState() != RoundVideoSession.State.PREVIEWING) {
             return;
         }
+        if (sgVoicePlayer != null) {
+            // Solegram: the sound with the voice effect plays apart from the preview: that one is muted or not
+            muted = !muted;
+            try {
+                sgVoicePlayer.setVolume(muted ? 0f : 1f, muted ? 0f : 1f);
+            } catch (Throwable ignore) {
+            }
+            muteImageView.animate().cancel();
+            muteImageView.animate().alpha(muted ? 1f : 0f).setDuration(180L).start();
+            return;
+        }
         muted = !muted;
         session.setPreviewMuted(muted);
         if (videoEditedInfo != null) videoEditedInfo.muted = muted;
@@ -1189,11 +1201,7 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
                 new com.solegram.messenger.ui.SolegramRoundEditorHost.Player() {
                     @Override
                     public void play(File file) {
-                        if (session != null && session.sgPlayPreviewFile(file)) {
-                            muted = false;
-                            muteImageView.animate().cancel();
-                            muteImageView.setAlpha(0f);
-                        }
+                        sgPlayVoice(file);
                     }
                 }, shift -> {
                     updateTranslationY();
@@ -1228,8 +1236,86 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
     }
 
     private void sgCloseEditor() {
+        sgStopVoice();
         if (sgEditor != null) {
             sgEditor.close(true);
+        }
+    }
+
+    // the sound with the voice effect plays next to the preview (the recorder's own player is left alone: swapping
+    // its file could make the whole recording fail), kept in step with it
+    private android.media.MediaPlayer sgVoicePlayer;
+
+    private final Runnable sgVoiceSync = new Runnable() {
+        @Override
+        public void run() {
+            final android.media.MediaPlayer mp = sgVoicePlayer;
+            if (mp == null || session == null) {
+                return;
+            }
+            try {
+                final long position = session.sgPreviewPositionMs();
+                final boolean playing = stateInfo != null && stateInfo.isPreviewPlaying();
+                if (!playing || position < 0) {
+                    if (mp.isPlaying()) {
+                        mp.pause();
+                    }
+                } else {
+                    if (!mp.isPlaying()) {
+                        mp.seekTo((int) position);
+                        mp.start();
+                    } else if (Math.abs(mp.getCurrentPosition() - position) > 180) {
+                        mp.seekTo((int) position);
+                    }
+                }
+            } catch (Throwable ignore) {
+            }
+            AndroidUtilities.runOnUIThread(this, 200);
+        }
+    };
+
+    private void sgPlayVoice(File file) {
+        sgStopVoice();
+        if (session == null) {
+            return;
+        }
+        final File preview = session.getPreviewFile();
+        if (file == null || preview != null && file.getAbsolutePath().equals(preview.getAbsolutePath())) {
+            // the voice as it was: the preview's own sound
+            muted = false;
+            session.setPreviewMuted(false);
+            muteImageView.animate().cancel();
+            muteImageView.setAlpha(0f);
+            return;
+        }
+        try {
+            final android.media.MediaPlayer mp = new android.media.MediaPlayer();
+            mp.setDataSource(file.getAbsolutePath());
+            mp.prepare();
+            mp.setLooping(false);
+            session.setPreviewMuted(true);
+            muted = false;
+            muteImageView.animate().cancel();
+            muteImageView.setAlpha(0f);
+            sgVoicePlayer = mp;
+            AndroidUtilities.runOnUIThread(sgVoiceSync);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    private void sgStopVoice() {
+        AndroidUtilities.cancelRunOnUIThread(sgVoiceSync);
+        if (sgVoicePlayer != null) {
+            try {
+                sgVoicePlayer.stop();
+            } catch (Throwable ignore) {
+            }
+            try {
+                sgVoicePlayer.release();
+            } catch (Throwable ignore) {
+            }
+            sgVoicePlayer = null;
         }
     }
 
@@ -1239,50 +1325,54 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
      */
     private void sgSend(MediaController.PhotoEntry entry, VideoEditedInfo info, Runnable send) {
         final com.solegram.messenger.ui.SolegramRoundEditorHost editor = sgEditor;
+        sgStopVoice();
         if (editor == null || !editor.isActive()) {
             send.run();
             return;
         }
-        boolean convert = editor.applyTo(info);
-        final int voice = editor.getVoice();
+        final int filter = editor.getFilter();
+        final int voice = editor.getSelectedVoice();
         editor.close(true);
         updateTranslationY();
-        if (voice == com.solegram.messenger.SolegramVoiceEffects.NONE) {
-            if (convert) {
-                sgPrepareConvert(info);
-            }
+        if (filter == com.solegram.messenger.SolegramRoundFx.F_NONE && voice == com.solegram.messenger.SolegramVoiceEffects.NONE) {
             send.run();
             return;
         }
+        // the effects are baked into a finished file here; Telegram then sends that file as it is
+        final org.telegram.ui.ActionBar.AlertDialog progress = new org.telegram.ui.ActionBar.AlertDialog(getContext(), org.telegram.ui.ActionBar.AlertDialog.ALERT_TYPE_SPINNER, resourcesProvider);
+        progress.setCanCancel(false);
+        progress.showDelayed(250);
         final File src = new File(entry.path);
-        final File dst = new File(src.getParentFile(), "sg_round_" + System.currentTimeMillis() + "_" + voice + ".mp4");
+        // not next to the recorder's own files: it clears its folder when it closes, before the upload is done
+        final File dst = new File(org.telegram.messenger.FileLoader.getDirectory(org.telegram.messenger.FileLoader.MEDIA_DIR_CACHE), "sg_round_" + System.currentTimeMillis() + ".mp4");
         new Thread(() -> {
-            final boolean ok = com.solegram.messenger.SolegramRoundFx.replaceAudio(src.getAbsolutePath(), dst.getAbsolutePath(), voice, null);
+            final boolean ok = com.solegram.messenger.SolegramRoundRender.render(src.getAbsolutePath(), dst.getAbsolutePath(), filter, voice, null);
             AndroidUtilities.runOnUIThread(() -> {
-                if (ok) {
+                try {
+                    progress.dismiss();
+                } catch (Throwable ignore) {
+                }
+                if (ok && dst.length() > 0) {
                     entry.path = dst.getAbsolutePath();
                     info.originalPath = dst.getAbsolutePath();
-                    info.sgForceConvert = true;
-                }
-                if (ok || info.needConvert()) {
-                    sgPrepareConvert(info);
+                    info.file = null;
+                    info.encryptedFile = null;
+                    info.key = null;
+                    info.iv = null;
+                    info.estimatedSize = dst.length();
+                    info.filterState = null;
+                    info.sgForceConvert = false;
+                    if (upload != null) {
+                        upload.release(true);
+                        upload = null;
+                    }
+                } else {
+                    dst.delete();
+                    BulletinFactory.of(this, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.SG_RoundFxFailed)).show();
                 }
                 send.run();
             });
         }, "SolegramRoundSend").start();
-    }
-
-    /** The video is converted: what was uploaded while recording is not it. */
-    private void sgPrepareConvert(VideoEditedInfo info) {
-        info.file = null;
-        info.encryptedFile = null;
-        info.key = null;
-        info.iv = null;
-        info.bitrate = SolegramCamera.bitrateFor(1000000, info.framerate);
-        if (upload != null) {
-            upload.release(true);
-            upload = null;
-        }
     }
 
     // endregion

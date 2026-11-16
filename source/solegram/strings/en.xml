@@ -1995,4 +1995,5 @@
     <string name="SG_RoundFilterRetro">Retro</string>
     <string name="SG_RoundFilterDream">Dream</string>
     <string name="SG_RoundFilterDrama">Drama</string>
+    <string name="SG_RoundFxFailed">Could not apply the effects: the round video was sent without them</string>
 </resources>

@@ -122,32 +122,92 @@ public final class SolegramRoundFx {
      * frames at the same times), the sound is decoded, changed and encoded again (AAC, mono).
      */
     public static boolean replaceAudio(String src, String dst, int effect, AtomicBoolean cancel) {
-        MediaExtractor video = null, audio = null;
-        MediaCodec decoder = null, encoder = null;
+        final SolegramRoundRender.AudioData sound = encodeAudio(src, effect, cancel);
+        if (sound == null || sound.format == null) {
+            return false;
+        }
+        MediaExtractor video = null;
         MediaMuxer muxer = null;
         try {
             video = new MediaExtractor();
             video.setDataSource(src);
-            int vTrack = -1, aTrack = -1;
+            int vTrack = -1;
             for (int i = 0; i < video.getTrackCount(); i++) {
                 final String mime = video.getTrackFormat(i).getString(MediaFormat.KEY_MIME);
-                if (mime == null) {
-                    continue;
-                }
-                if (mime.startsWith("video/") && vTrack < 0) {
+                if (mime != null && mime.startsWith("video/")) {
                     vTrack = i;
-                } else if (mime.startsWith("audio/") && aTrack < 0) {
-                    aTrack = i;
+                    break;
                 }
             }
-            if (vTrack < 0 || aTrack < 0) {
+            if (vTrack < 0) {
                 return false;
             }
             final MediaFormat videoFormat = video.getTrackFormat(vTrack);
+            // the picture copied, the new sound next to it
+            muxer = new MediaMuxer(dst, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            if (Build.VERSION.SDK_INT >= 23 && videoFormat.containsKey(MediaFormat.KEY_ROTATION)) {
+                muxer.setOrientationHint(videoFormat.getInteger(MediaFormat.KEY_ROTATION));
+            }
+            final int vOut = muxer.addTrack(videoFormat);
+            final int aOut = muxer.addTrack(sound.format);
+            muxer.start();
+            video.selectTrack(vTrack);
+            final int max = videoFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE) ? videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) : 0;
+            final ByteBuffer sample = ByteBuffer.allocateDirect(Math.max(max, 1024 * 1024));
+            final MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            while (true) {
+                if (cancel != null && cancel.get()) {
+                    return false;
+                }
+                sample.clear();
+                final int size = video.readSampleData(sample, 0);
+                if (size < 0) {
+                    break;
+                }
+                info.set(0, size, video.getSampleTime(), (video.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0 ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0);
+                muxer.writeSampleData(vOut, sample, info);
+                video.advance();
+            }
+            for (int i = 0; i < sound.data.size(); i++) {
+                final byte[] bytes = sound.data.get(i);
+                final long[] meta = sound.info.get(i);
+                info.set(0, bytes.length, meta[0], (int) (meta[1] & ~MediaCodec.BUFFER_FLAG_END_OF_STREAM));
+                muxer.writeSampleData(aOut, ByteBuffer.wrap(bytes), info);
+            }
+            muxer.stop();
+            return true;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        } finally {
+            try { if (muxer != null) muxer.release(); } catch (Throwable ignore) {}
+            try { if (video != null) video.release(); } catch (Throwable ignore) {}
+        }
+    }
 
-            // the sound, as 16-bit mono samples
+    /**
+     * The video's sound through a voice effect, encoded again (AAC, mono), ready for a muxer; null when it could not
+     * be done.
+     */
+    public static SolegramRoundRender.AudioData encodeAudio(String src, int effect, AtomicBoolean cancel) {
+        MediaExtractor audio = null;
+        MediaCodec decoder = null, encoder = null;
+        try {
             audio = new MediaExtractor();
             audio.setDataSource(src);
+            int aTrack = -1;
+            for (int i = 0; i < audio.getTrackCount(); i++) {
+                final String mime = audio.getTrackFormat(i).getString(MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("audio/")) {
+                    aTrack = i;
+                    break;
+                }
+            }
+            if (aTrack < 0) {
+                return null;
+            }
+
+            // the sound, as 16-bit mono samples
             audio.selectTrack(aTrack);
             final MediaFormat audioFormat = audio.getTrackFormat(aTrack);
             int rate = audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE);
@@ -161,7 +221,7 @@ public final class SolegramRoundFx {
             boolean inputDone = false, outputDone = false;
             while (!outputDone) {
                 if (cancel != null && cancel.get()) {
-                    return false;
+                    return null;
                 }
                 if (!inputDone) {
                     final int in = decoder.dequeueInputBuffer(10000);
@@ -235,7 +295,7 @@ public final class SolegramRoundFx {
             outputDone = false;
             while (!outputDone) {
                 if (cancel != null && cancel.get()) {
-                    return false;
+                    return null;
                 }
                 if (!inputDone) {
                     final int in = encoder.dequeueInputBuffer(10000);
@@ -275,49 +335,20 @@ public final class SolegramRoundFx {
             encoder.release();
             encoder = null;
             if (encodedFormat == null) {
-                return false;
+                return null;
             }
 
-            // the picture copied, the new sound next to it
-            muxer = new MediaMuxer(dst, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            if (Build.VERSION.SDK_INT >= 23 && videoFormat.containsKey(MediaFormat.KEY_ROTATION)) {
-                muxer.setOrientationHint(videoFormat.getInteger(MediaFormat.KEY_ROTATION));
-            }
-            final int vOut = muxer.addTrack(videoFormat);
-            final int aOut = muxer.addTrack(encodedFormat);
-            muxer.start();
-            video.selectTrack(vTrack);
-            int max = videoFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE) ? videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) : 0;
-            final ByteBuffer sample = ByteBuffer.allocateDirect(Math.max(max, 1024 * 1024));
-            while (true) {
-                if (cancel != null && cancel.get()) {
-                    return false;
-                }
-                sample.clear();
-                final int size = video.readSampleData(sample, 0);
-                if (size < 0) {
-                    break;
-                }
-                info.set(0, size, video.getSampleTime(), (video.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0 ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0);
-                muxer.writeSampleData(vOut, sample, info);
-                video.advance();
-            }
-            for (int i = 0; i < audioData.size(); i++) {
-                final byte[] bytes = audioData.get(i);
-                final long[] meta = audioInfo.get(i);
-                info.set(0, bytes.length, meta[0], (int) (meta[1] & ~MediaCodec.BUFFER_FLAG_END_OF_STREAM));
-                muxer.writeSampleData(aOut, ByteBuffer.wrap(bytes), info);
-            }
-            muxer.stop();
-            return true;
+            final SolegramRoundRender.AudioData out = new SolegramRoundRender.AudioData();
+            out.format = encodedFormat;
+            out.data.addAll(audioData);
+            out.info.addAll(audioInfo);
+            return out;
         } catch (Throwable e) {
             FileLog.e(e);
-            return false;
+            return null;
         } finally {
             try { if (decoder != null) decoder.release(); } catch (Throwable ignore) {}
             try { if (encoder != null) encoder.release(); } catch (Throwable ignore) {}
-            try { if (muxer != null) muxer.release(); } catch (Throwable ignore) {}
-            try { if (video != null) video.release(); } catch (Throwable ignore) {}
             try { if (audio != null) audio.release(); } catch (Throwable ignore) {}
         }
     }
