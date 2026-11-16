@@ -1205,9 +1205,24 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
                             muteImageView.setAlpha(0f);
                         }
                     }
-                }, shift -> updateTranslationY());
+                }, shift -> {
+                    updateTranslationY();
+                    if (sgOnEditorChanged != null) {
+                        sgOnEditorChanged.run();
+                    }
+                });
+            sgEditor.setOnChanged(() -> {
+                if (sgOnEditorChanged != null) {
+                    sgOnEditorChanged.run();
+                }
+            });
         }
         return sgEditor;
+    }
+
+    @Override
+    public View sgEditorPanel() {
+        return sgEditor != null ? sgEditor.getPanel() : null;
     }
 
     @Override

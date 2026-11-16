@@ -328,23 +328,52 @@ public final class SolegramRoundFx {
 
     // region Face tracking
 
-    /** Where the face is in a frame: the middle between the eyes, the distance between them, the head's tilt. */
+    /**
+     * Where the face is in a frame. The face's own space: the eyes 100 units apart on the x axis, the y axis down the
+     * face; the nose and the mouth are given in it (as found, else at the usual places).
+     */
     public static final class Pose {
-        /** 0..1 of the frame's width and height */
+        /** the middle between the eyes, 0..1 of the frame's width and height */
         public float x, y;
-        /** the distance between the eyes, as a part of the frame's width */
+        /** the distance between the eyes, as a part of the frame's width (as seen: smaller when the head turns) */
         public float eye;
         /** radians, the line of the eyes against the horizontal */
         public float roll;
+        /** radians, how far the head is turned to a side (only its size is used: 0 looking straight) */
+        public float yaw;
+        /** the base of the nose and the middle of the mouth, in the face's space */
+        public float noseX, noseY = 66, mouthY = 108;
+        /** 0..1: how open the mouth is */
+        public float mouthOpen;
         /** 0..1: how sure we are the face is there (masks fade with it) */
         public float alpha;
 
         void set(Pose p) {
-            x = p.x; y = p.y; eye = p.eye; roll = p.roll; alpha = p.alpha;
+            x = p.x; y = p.y; eye = p.eye; roll = p.roll; yaw = p.yaw;
+            noseX = p.noseX; noseY = p.noseY; mouthY = p.mouthY; mouthOpen = p.mouthOpen; alpha = p.alpha;
+        }
+
+        void lerp(Pose a, Pose b, float t) {
+            x = a.x + (b.x - a.x) * t;
+            y = a.y + (b.y - a.y) * t;
+            eye = a.eye + (b.eye - a.eye) * t;
+            roll = a.roll + angleDiff(b.roll, a.roll) * t;
+            yaw = a.yaw + (b.yaw - a.yaw) * t;
+            noseX = a.noseX + (b.noseX - a.noseX) * t;
+            noseY = a.noseY + (b.noseY - a.noseY) * t;
+            mouthY = a.mouthY + (b.mouthY - a.mouthY) * t;
+            mouthOpen = a.mouthOpen + (b.mouthOpen - a.mouthOpen) * t;
         }
     }
 
-    /** The face through the whole video: a pose about ten times a second, smoothed. */
+    private static float angleDiff(float a, float b) {
+        float d = a - b;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        return d;
+    }
+
+    /** The face through the whole video: a pose about eighteen times a second, smoothed without delay. */
     public static final class FaceTrack {
         final long[] time;
         final Pose[] poses;
@@ -375,36 +404,49 @@ public final class SolegramRoundFx {
             if (count == 0) {
                 return;
             }
-            int hi = 0;
-            while (hi < count && time[hi] < us) {
-                hi++;
+            // binary search: called for every drawn frame
+            int lo = 0, hi = count;
+            while (lo < hi) {
+                final int mid = (lo + hi) >>> 1;
+                if (time[mid] < us) {
+                    lo = mid + 1;
+                } else {
+                    hi = mid;
+                }
             }
-            if (hi == 0) {
+            if (lo == 0) {
                 out.set(poses[0]);
                 return;
             }
-            if (hi >= count) {
+            if (lo >= count) {
                 out.set(poses[count - 1]);
                 return;
             }
-            final Pose a = poses[hi - 1], b = poses[hi];
-            final float t = (us - time[hi - 1]) / (float) Math.max(1, time[hi] - time[hi - 1]);
+            final Pose a = poses[lo - 1], b = poses[lo];
+            final float t = (us - time[lo - 1]) / (float) Math.max(1, time[lo] - time[lo - 1]);
             if (a.alpha <= 0 && b.alpha <= 0) {
                 return;
             }
-            final Pose from = a.alpha > 0 ? a : b, to = b.alpha > 0 ? b : a;
-            out.x = from.x + (to.x - from.x) * t;
-            out.y = from.y + (to.y - from.y) * t;
-            out.eye = from.eye + (to.eye - from.eye) * t;
-            float d = to.roll - from.roll;
-            out.roll = from.roll + d * t;
+            if (a.alpha <= 0) {
+                out.set(b);
+            } else if (b.alpha <= 0) {
+                out.set(a);
+            } else {
+                out.lerp(a, b, t);
+            }
             out.alpha = a.alpha + (b.alpha - a.alpha) * t;
         }
     }
 
+    /** About eighteen samples a second: enough for a turning head, the rest is filled in between. */
+    private static final long SAMPLE_US = 55000;
+    /** The detector looks at a smaller copy of the frame (as fast, the face is big in a round video). */
+    private static final int DETECT_SIZE = 256;
+
     /**
-     * Finds the face in every tenth of a second of the video (Google's face detector, else Android's own). Slow
-     * (decodes the whole video): call it off the main thread.
+     * Finds the face through the whole video (Google's face detector with its landmarks, else Android's own), then
+     * fills short gaps and smooths the shaking of the found points with a window round each moment (it looks as much
+     * ahead as back: no delay behind the head). Slow (decodes the whole video): call it off the main thread.
      */
     public static FaceTrack trackFaces(Context context, String path, AtomicBoolean cancel) {
         final ArrayList<Long> times = new ArrayList<>();
@@ -419,7 +461,7 @@ public final class SolegramRoundFx {
                     .setLandmarkType(com.google.android.gms.vision.face.FaceDetector.ALL_LANDMARKS)
                     .setMode(com.google.android.gms.vision.face.FaceDetector.FAST_MODE)
                     .setProminentFaceOnly(true)
-                    .setMinFaceSize(0.15f)
+                    .setMinFaceSize(0.12f)
                     .build();
                 if (!gms.isOperational()) {
                     gms.release();
@@ -466,7 +508,6 @@ public final class SolegramRoundFx {
             boolean inputDone = false, outputDone = false;
             long lastSample = -1000000;
             byte[] nv21 = null;
-            final Pose last = new Pose();
             while (!outputDone) {
                 if (cancel != null && cancel.get()) {
                     return null;
@@ -487,7 +528,7 @@ public final class SolegramRoundFx {
                 }
                 final int out = decoder.dequeueOutputBuffer(info, 10000);
                 if (out >= 0) {
-                    if (info.size > 0 && info.presentationTimeUs - lastSample >= 95000) {
+                    if (info.size > 0 && info.presentationTimeUs - lastSample >= SAMPLE_US) {
                         Image image = null;
                         try {
                             image = decoder.getOutputImage(out);
@@ -527,38 +568,26 @@ public final class SolegramRoundFx {
                         }
                         if (yb != null && w > 16 && h > 16 && (long) (top + h - 1) * stride + (long) (left + w) * pixel <= yb.capacity()) {
                             lastSample = info.presentationTimeUs;
-                            if (nv21 == null || nv21.length != w * h * 3 / 2) {
-                                nv21 = new byte[w * h * 3 / 2];
-                                java.util.Arrays.fill(nv21, w * h, nv21.length, (byte) 128);
+                            // a smaller copy for the detector (every step-th pixel)
+                            final int step = Math.max(1, Math.max(w, h) / DETECT_SIZE);
+                            final int dw = (w / step) & ~1, dh = (h / step) & ~1;
+                            if (nv21 == null || nv21.length != dw * dh * 3 / 2) {
+                                nv21 = new byte[dw * dh * 3 / 2];
+                                java.util.Arrays.fill(nv21, dw * dh, nv21.length, (byte) 128);
                             }
-                            for (int row = 0; row < h; row++) {
-                                final int base = (row + top) * stride + left * pixel;
-                                if (pixel == 1) {
+                            for (int row = 0; row < dh; row++) {
+                                final int base = (row * step + top) * stride + left * pixel;
+                                if (pixel == 1 && step == 1) {
                                     yb.position(base);
-                                    yb.get(nv21, row * w, w);
+                                    yb.get(nv21, row * dw, dw);
                                 } else {
-                                    for (int col = 0; col < w; col++) {
-                                        nv21[row * w + col] = yb.get(base + col * pixel);
+                                    for (int col = 0; col < dw; col++) {
+                                        nv21[row * dw + col] = yb.get(base + col * step * pixel);
                                     }
                                 }
                             }
-                            final Pose pose = detect(gms, nv21, w, h);
+                            final Pose pose = detect(gms, nv21, dw, dh);
                             rotate(pose, rotation);
-                            if (pose.alpha > 0) {
-                                if (last.alpha > 0) {
-                                    // a light smoothing: the found points shake a little from frame to frame
-                                    pose.x = last.x + (pose.x - last.x) * 0.7f;
-                                    pose.y = last.y + (pose.y - last.y) * 0.7f;
-                                    pose.eye = last.eye + (pose.eye - last.eye) * 0.6f;
-                                    pose.roll = last.roll + (pose.roll - last.roll) * 0.6f;
-                                }
-                                last.set(pose);
-                            } else if (last.alpha > 0) {
-                                // a missed frame keeps the last place, fading
-                                pose.set(last);
-                                pose.alpha = last.alpha * 0.5f;
-                                last.alpha = pose.alpha < 0.2f ? 0 : pose.alpha;
-                            }
                             times.add(info.presentationTimeUs);
                             poses.add(pose);
                         }
@@ -579,7 +608,99 @@ public final class SolegramRoundFx {
             try { if (extractor != null) extractor.release(); } catch (Throwable ignore) {}
             try { if (gms != null) gms.release(); } catch (Throwable ignore) {}
         }
+        clean(times, poses);
         return new FaceTrack(times, poses);
+    }
+
+    /**
+     * Fills the gaps where the face was missed for a moment (between the poses round them), lets it fade where it
+     * was really gone, and smooths the shaking with weights round each sample, as many ahead as back.
+     */
+    private static void clean(ArrayList<Long> times, ArrayList<Pose> poses) {
+        final int n = poses.size();
+        if (n == 0) {
+            return;
+        }
+        final boolean[] found = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            found[i] = poses.get(i).alpha > 0;
+        }
+        // gaps
+        for (int i = 0; i < n; i++) {
+            if (found[i]) {
+                continue;
+            }
+            int p = i - 1, q = i + 1;
+            while (p >= 0 && !found[p]) p--;
+            while (q < n && !found[q]) q++;
+            final Pose out = poses.get(i);
+            final long t = times.get(i);
+            if (p >= 0 && q < n && times.get(q) - times.get(p) <= 700000) {
+                out.lerp(poses.get(p), poses.get(q), (t - times.get(p)) / (float) Math.max(1, times.get(q) - times.get(p)));
+                out.alpha = 1f;
+            } else {
+                final int near = p < 0 ? q : q >= n ? p : (t - times.get(p) <= times.get(q) - t ? p : q);
+                if (near >= 0 && near < n) {
+                    final long dt = Math.abs(times.get(near) - t);
+                    out.set(poses.get(near));
+                    out.alpha = Math.max(0f, 1f - dt / 260000f);
+                }
+            }
+        }
+        // smoothing: a window of ±3 samples (about ±170 ms), weights 1 2 3 4 3 2 1, only where the face is
+        final Pose[] src = new Pose[n];
+        for (int i = 0; i < n; i++) {
+            src[i] = new Pose();
+            src[i].set(poses.get(i));
+        }
+        final float[] weights = {1, 2, 3, 4, 3, 2, 1};
+        for (int i = 0; i < n; i++) {
+            if (src[i].alpha <= 0) {
+                continue;
+            }
+            float sw = 0, x = 0, y = 0, eye = 0, roll = 0, yaw = 0, nx = 0, ny = 0, my = 0, mo = 0;
+            final float r0 = src[i].roll;
+            for (int k = -3; k <= 3; k++) {
+                final int j = i + k;
+                if (j < 0 || j >= n || src[j].alpha <= 0) {
+                    continue;
+                }
+                // the mouth opens fast: a narrower window for it
+                final float w = weights[k + 3] * src[j].alpha;
+                sw += w;
+                x += src[j].x * w;
+                y += src[j].y * w;
+                eye += src[j].eye * w;
+                roll += (r0 + angleDiff(src[j].roll, r0)) * w;
+                yaw += src[j].yaw * w;
+                nx += src[j].noseX * w;
+                ny += src[j].noseY * w;
+                my += src[j].mouthY * w;
+            }
+            float mw = 0;
+            for (int k = -1; k <= 1; k++) {
+                final int j = i + k;
+                if (j < 0 || j >= n || src[j].alpha <= 0) {
+                    continue;
+                }
+                final float w = k == 0 ? 2 : 1;
+                mw += w;
+                mo += src[j].mouthOpen * w;
+            }
+            if (sw <= 0) {
+                continue;
+            }
+            final Pose p = poses.get(i);
+            p.x = x / sw;
+            p.y = y / sw;
+            p.eye = eye / sw;
+            p.roll = roll / sw;
+            p.yaw = yaw / sw;
+            p.noseX = nx / sw;
+            p.noseY = ny / sw;
+            p.mouthY = my / sw;
+            p.mouthOpen = mw > 0 ? mo / mw : p.mouthOpen;
+        }
     }
 
     private static Pose detect(com.google.android.gms.vision.face.FaceDetector gms, byte[] nv21, int w, int h) {
@@ -597,12 +718,15 @@ public final class SolegramRoundFx {
                     }
                 }
                 if (best != null) {
-                    PointF a = null, b = null;
+                    PointF a = null, b = null, nose = null, mouthL = null, mouthR = null, mouthB = null;
                     for (com.google.android.gms.vision.face.Landmark l : best.getLandmarks()) {
-                        if (l.getType() == com.google.android.gms.vision.face.Landmark.LEFT_EYE) {
-                            a = l.getPosition();
-                        } else if (l.getType() == com.google.android.gms.vision.face.Landmark.RIGHT_EYE) {
-                            b = l.getPosition();
+                        switch (l.getType()) {
+                            case com.google.android.gms.vision.face.Landmark.LEFT_EYE: a = l.getPosition(); break;
+                            case com.google.android.gms.vision.face.Landmark.RIGHT_EYE: b = l.getPosition(); break;
+                            case com.google.android.gms.vision.face.Landmark.NOSE_BASE: nose = l.getPosition(); break;
+                            case com.google.android.gms.vision.face.Landmark.LEFT_MOUTH: mouthL = l.getPosition(); break;
+                            case com.google.android.gms.vision.face.Landmark.RIGHT_MOUTH: mouthR = l.getPosition(); break;
+                            case com.google.android.gms.vision.face.Landmark.BOTTOM_MOUTH: mouthB = l.getPosition(); break;
                         }
                     }
                     final PointF p = best.getPosition();
@@ -616,10 +740,35 @@ public final class SolegramRoundFx {
                         a = b;
                         b = t;
                     }
-                    pose.x = (a.x + b.x) / 2f / w;
-                    pose.y = (a.y + b.y) / 2f / h;
-                    pose.eye = (float) Math.hypot(b.x - a.x, b.y - a.y) / w;
-                    pose.roll = (float) Math.atan2(b.y - a.y, b.x - a.x);
+                    final float mx = (a.x + b.x) / 2f, my = (a.y + b.y) / 2f;
+                    final float dist = Math.max(1f, (float) Math.hypot(b.x - a.x, b.y - a.y));
+                    final float roll = (float) Math.atan2(b.y - a.y, b.x - a.x);
+                    final float yaw = (float) Math.toRadians(Math.min(70, Math.abs(best.getEulerY())));
+                    pose.x = mx / w;
+                    pose.y = my / h;
+                    pose.eye = dist / w;
+                    pose.roll = roll;
+                    pose.yaw = yaw;
+                    // the landmarks in the face's space (the eyes 100 apart; across the face unshrunk by the turn)
+                    final float cos = (float) Math.cos(-roll), sin = (float) Math.sin(-roll);
+                    final float unit = dist / 100f;
+                    final float across = (float) Math.max(0.5, Math.cos(yaw));
+                    if (nose != null) {
+                        final float dx = nose.x - mx, dy = nose.y - my;
+                        pose.noseX = (dx * cos - dy * sin) / unit * across;
+                        pose.noseY = clamp((dx * sin + dy * cos) / unit, 45, 95);
+                    }
+                    if (mouthL != null && mouthR != null) {
+                        final float cx = (mouthL.x + mouthR.x) / 2f - mx, cy = (mouthL.y + mouthR.y) / 2f - my;
+                        final float cornersY = (cx * sin + cy * cos) / unit;
+                        pose.mouthY = clamp(cornersY, pose.noseY + 20, 150);
+                        if (mouthB != null) {
+                            final float bx = mouthB.x - mx, by = mouthB.y - my;
+                            final float lowerY = (bx * sin + by * cos) / unit;
+                            // the lower lip's distance under the corners: about 14 closed, 35 and more wide open
+                            pose.mouthOpen = clamp((lowerY - cornersY - 16f) / 22f, 0, 1);
+                        }
+                    }
                     pose.alpha = 1f;
                     return pose;
                 }
@@ -652,6 +801,10 @@ public final class SolegramRoundFx {
             FileLog.e(e);
         }
         return pose;
+    }
+
+    private static float clamp(float v, float min, float max) {
+        return Math.max(min, Math.min(max, v));
     }
 
     /** From the decoded frame to the frame as it is shown, for a video stored turned. */

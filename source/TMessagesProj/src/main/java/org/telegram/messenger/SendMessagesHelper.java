@@ -3612,6 +3612,14 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
 
         req.peer = getMessagesController().getInputPeer(messageObject.getDialogId());
+        // Solegram: Premium emoji without Premium travel in the invisible mark in an edit too
+        if (message != null && entities != null) {
+            final ArrayList<TLRPC.MessageEntity> sgEntities = new ArrayList<>();
+            message = com.solegram.messenger.SolegramPremiumStickers.prepareEdit(currentAccount, message, entities, sgEntities,
+                messageObject.messageOwner != null && messageObject.messageOwner.media != null
+                    && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaEmpty) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage));
+            entities = sgEntities;
+        }
         if (message != null) {
             req.message = message;
             req.flags |= 2048;

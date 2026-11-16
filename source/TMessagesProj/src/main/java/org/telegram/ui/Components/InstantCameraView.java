@@ -4040,6 +4040,11 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         });
         sgPanel.setSelected(sgMask, sgFilter, sgVoice);
         sgPanel.setMasksState(false, false);
+        sgPanel.onChanged = () -> {
+            if (sgOnEditorChanged != null) {
+                sgOnEditorChanged.run();
+            }
+        };
         addView(sgPanel, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 8, 0, 8, 8));
         sgPanel.setAlpha(0f);
         sgPanel.setTranslationY(dp(24));
@@ -4268,6 +4273,11 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
 
     public boolean sgEditorOpen() {
         return sgPanel != null && sgPanel.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    public View sgEditorPanel() {
+        return sgPanel != null && sgPanel.getVisibility() == VISIBLE && sgPanel.getAlpha() > 0.01f ? sgPanel : null;
     }
 
     // endregion

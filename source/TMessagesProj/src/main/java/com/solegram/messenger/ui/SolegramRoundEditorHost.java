@@ -72,6 +72,26 @@ public final class SolegramRoundEditorHost {
     private float shift;
     private ValueAnimator shiftAnimator;
     private int voiceRequest;
+    /** told when the panel changes (the input's glass refracts it) */
+    private Runnable onChanged;
+
+    public void setOnChanged(Runnable onChanged) {
+        this.onChanged = onChanged;
+        if (panel != null) {
+            panel.onChanged = onChanged;
+        }
+    }
+
+    /** The panel while it is shown, else null. */
+    public View getPanel() {
+        return panel != null && panel.getVisibility() == View.VISIBLE && panel.getAlpha() > 0.01f ? panel : null;
+    }
+
+    private void notifyChanged() {
+        if (onChanged != null) {
+            onChanged.run();
+        }
+    }
 
     /**
      * @param root          the recorder's view: the panel goes to its bottom (above its bottom padding)
@@ -140,10 +160,12 @@ public final class SolegramRoundEditorHost {
         });
         panel.setSelected(mask, filter, voice);
         panel.setMasksState(false, false);
+        panel.onChanged = onChanged;
         root.addView(panel, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 8, 0, 8, 8));
         panel.setAlpha(0f);
         panel.setTranslationY(dp(24));
-        panel.animate().alpha(1f).translationY(0).setDuration(320).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        panel.animate().alpha(1f).translationY(0).setDuration(320).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
+            .setUpdateListener(a -> notifyChanged()).start();
         panel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updateShift(true));
 
         // a frame of the video for the filters' buttons
@@ -283,9 +305,13 @@ public final class SolegramRoundEditorHost {
         final View p = panel;
         if (show) {
             p.setVisibility(View.VISIBLE);
-            p.animate().alpha(1f).translationY(0).setDuration(260).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).withEndAction(null).start();
+            p.animate().alpha(1f).translationY(0).setDuration(260).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).withEndAction(null)
+                .setUpdateListener(a -> notifyChanged()).start();
         } else {
-            p.animate().alpha(0f).translationY(dp(24)).setDuration(200).withEndAction(() -> p.setVisibility(View.GONE)).start();
+            p.animate().alpha(0f).translationY(dp(24)).setDuration(200).setUpdateListener(a -> notifyChanged()).withEndAction(() -> {
+                p.setVisibility(View.GONE);
+                notifyChanged();
+            }).start();
         }
         AndroidUtilities.runOnUIThread(() -> updateShift(true), show ? 0 : 210);
     }
@@ -335,10 +361,11 @@ public final class SolegramRoundEditorHost {
         if (panel != null) {
             final View p = panel;
             panel = null;
-            p.animate().alpha(0f).translationY(dp(24)).setDuration(200).withEndAction(() -> {
+            p.animate().alpha(0f).translationY(dp(24)).setDuration(200).setUpdateListener(a -> notifyChanged()).withEndAction(() -> {
                 if (p.getParent() instanceof ViewGroup) {
                     ((ViewGroup) p.getParent()).removeView(p);
                 }
+                notifyChanged();
             }).start();
         }
         if (overlay != null) {

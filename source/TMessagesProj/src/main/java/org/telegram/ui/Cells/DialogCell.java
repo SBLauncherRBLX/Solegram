@@ -1558,7 +1558,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             drawVerified = !forbidVerified && user.verified;
                             drawBotVerified = !forbidVerified && !UserObject.isUserSelf(user) && user.bot_verification_icon != 0;
                         }
-                        // Solegram: the emoji a Solegram user shares by the name shows here too (not only Premium's status)
+                        // Solegram: the emoji a Solegram user shares by the name shows here too (not only Premium's status);
+                        // their profile is read in the background if it was not lately
+                        com.solegram.messenger.SolegramNameEmojiShare.want(currentAccount, user);
                         drawPremium = (MessagesController.getInstance(currentAccount).isPremiumUser(user) || user.emoji_status instanceof com.solegram.messenger.SolegramNameEmojiShare.SharedStatus)
                             && UserConfig.getInstance(currentAccount).clientUserId != user.id && user.id != 0;
                         if (drawPremium) {

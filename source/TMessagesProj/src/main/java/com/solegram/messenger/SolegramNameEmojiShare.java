@@ -217,6 +217,61 @@ public final class SolegramNameEmojiShare {
         });
     }
 
+    // users whose profile was asked for, and when (the mark is only in the profile's bio)
+    private static final LongSparseArray<Long> asked = new LongSparseArray<>();
+    private static final java.util.ArrayDeque<Object[]> queue = new java.util.ArrayDeque<>();
+    private static boolean pumping;
+    private static final long ASK_AGAIN_MS = 6 * 60 * 60 * 1000L;
+
+    /**
+     * Someone is shown (in the chat list): if their profile was not looked at lately, it is loaded quietly in the
+     * background, one every second or so, to read the emoji their Solegram shares. Without it the emoji showed only
+     * after their profile or chat had been opened once.
+     */
+    public static void want(int account, TLRPC.User user) {
+        if (!enabled() || user == null || user.self || user.bot || user.id == 0 || user.deleted || UserConfig.getInstance(account).getClientUserId() == user.id) {
+            return;
+        }
+        final long now = System.currentTimeMillis();
+        synchronized (SolegramNameEmojiShare.class) {
+            final Long at = asked.get(user.id);
+            if (at != null && now - at < ASK_AGAIN_MS) {
+                return;
+            }
+            asked.put(user.id, now);
+            if (queue.size() >= 60) {
+                return;
+            }
+            queue.add(new Object[]{account, user.id});
+        }
+        AndroidUtilities.runOnUIThread(SolegramNameEmojiShare::pump);
+    }
+
+    private static void pump() {
+        if (pumping) {
+            return;
+        }
+        final Object[] next;
+        synchronized (SolegramNameEmojiShare.class) {
+            next = queue.poll();
+        }
+        if (next == null) {
+            return;
+        }
+        pumping = true;
+        final int account = (Integer) next[0];
+        final TLRPC.User user = MessagesController.getInstance(account).getUser((Long) next[1]);
+        if (user != null && MessagesController.getInstance(account).getUserFull(user.id) == null) {
+            MessagesController.getInstance(account).loadFullUser(user, 0, false);
+        } else if (user != null) {
+            onUserFull(account, user, MessagesController.getInstance(account).getUserFull(user.id));
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            pumping = false;
+            pump();
+        }, 1200);
+    }
+
     /** Draws someone with the emoji their Solegram shares (unless they have a real status); any user object. */
     public static void apply(TLRPC.User user) {
         if (user == null || user.self) {

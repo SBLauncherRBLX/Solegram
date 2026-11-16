@@ -43,6 +43,14 @@ public abstract class InstantCameraViewBase extends FrameLayout {
         super(context);
     }
 
+    /** Solegram: told when the editor's panel changes (the glass round the input refracts it). */
+    public Runnable sgOnEditorChanged;
+
+    /** Solegram: the round video editor's panel while it is shown (the input's glass refracts it), else null. */
+    public android.view.View sgEditorPanel() {
+        return null;
+    }
+
     /** Solegram: shows or hides the round video editor under the recorded circle. */
     public void sgToggleEditor() {
     }

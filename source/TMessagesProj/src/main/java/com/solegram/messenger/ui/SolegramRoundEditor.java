@@ -153,6 +153,29 @@ public final class SolegramRoundEditor {
         private int busyVoice = -1;
         private boolean masksReady, masksNoFace;
         private Bitmap thumb;
+        /** told when the panel looks different (the glass that refracts it takes a new picture) */
+        public Runnable onChanged;
+        private boolean changePosted;
+
+        /** The panel was drawn anew or moved: the glass round it is told once on the next frame. */
+        public void changed() {
+            if (onChanged == null || changePosted) {
+                return;
+            }
+            changePosted = true;
+            postOnAnimation(() -> {
+                changePosted = false;
+                if (onChanged != null) {
+                    onChanged.run();
+                }
+            });
+        }
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            super.dispatchDraw(canvas);
+            changed();
+        }
 
         public Panel(Context context, Theme.ResourcesProvider resourcesProvider, Callback callback) {
             super(context);
@@ -387,6 +410,7 @@ public final class SolegramRoundEditor {
 
             @Override
             protected void onDraw(Canvas canvas) {
+                changed();
                 final float cx = getWidth() / 2f, cy = dp(8) + dp(26);
                 final float r = dp(24);
                 final int accent = color(Theme.key_featuredStickers_addButton);

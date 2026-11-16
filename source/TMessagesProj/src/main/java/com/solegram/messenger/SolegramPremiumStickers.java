@@ -264,31 +264,54 @@ public final class SolegramPremiumStickers {
         if (p == null || !enabled() || UserConfig.getInstance(account).isPremium() || p.entities == null || p.entities.isEmpty()) {
             return;
         }
-        if (p.message == null || p.document != null || p.photo != null) {
-            return;
+        if (p.document == null && p.photo == null && p.message != null) {
+            p.message = encodeEmoji(p.message, p.entities, 4096);
+        } else if ((p.document != null || p.photo != null) && p.caption != null) {
+            // a photo's or a file's caption carries them the same way (it was left out, so they were lost there)
+            p.caption = encodeEmoji(p.caption, p.entities, org.telegram.messenger.MessagesController.getInstance(account).captionLengthLimitDefault);
         }
+    }
+
+    /**
+     * An edited text from an account without Premium: the same mark (the edit would drop the Premium emoji, and the
+     * mark of the first version is gone with the old text). The given entities stay as they are (the message shown
+     * here keeps its emoji); the ones to send are returned in out.
+     */
+    public static String prepareEdit(int account, String text, ArrayList<TLRPC.MessageEntity> entities, ArrayList<TLRPC.MessageEntity> out, boolean caption) {
+        out.clear();
+        if (entities != null) {
+            out.addAll(entities);
+        }
+        if (text == null || !enabled() || UserConfig.getInstance(account).isPremium() || out.isEmpty()) {
+            return text;
+        }
+        return encodeEmoji(text, out, caption ? org.telegram.messenger.MessagesController.getInstance(account).captionLengthLimitDefault : 4096);
+    }
+
+    /**
+     * The text with its Premium emoji written into the mark at its end; those entities are taken out of the list.
+     * Unchanged (and the entities kept) when there are none or the mark would not fit in the limit.
+     */
+    private static String encodeEmoji(String text, ArrayList<TLRPC.MessageEntity> entities, int limit) {
         final StringBuilder mark = new StringBuilder();
-        final java.util.Iterator<TLRPC.MessageEntity> it = p.entities.iterator();
-        while (it.hasNext()) {
-            final TLRPC.MessageEntity e = it.next();
+        final ArrayList<TLRPC.MessageEntity> moved = new ArrayList<>();
+        for (TLRPC.MessageEntity e : entities) {
             if (e instanceof TLRPC.TL_messageEntityCustomEmoji) {
                 final long id = ((TLRPC.TL_messageEntityCustomEmoji) e).document_id;
-                if (e.offset < 0 || e.offset > 0xFFFF || e.length <= 0 || e.length > 0xFF || id == 0) {
+                if (e.offset < 0 || e.offset > 0xFFFF || e.length <= 0 || e.length > 0xFF || id == 0 || e.offset + e.length > text.length()) {
                     continue;
                 }
                 put4(mark, e.offset);
                 put2(mark, e.length);
                 put(mark, id);
-                it.remove();
+                moved.add(e);
             }
         }
-        if (mark.length() == 0) {
-            return;
+        if (moved.isEmpty() || text.length() + 2 + mark.length() > limit) {
+            return text; // no room: Telegram drops them as it always did
         }
-        if (p.message.length() + 2 + mark.length() > 4096) {
-            return; // no room: Telegram drops them as it always did
-        }
-        p.message = p.message + EMOJI_START + (char) (0xFE00 + VERSION) + mark;
+        entities.removeAll(moved);
+        return text + EMOJI_START + (char) (0xFE00 + VERSION) + mark;
     }
 
     private static void put4(StringBuilder sb, int v) {

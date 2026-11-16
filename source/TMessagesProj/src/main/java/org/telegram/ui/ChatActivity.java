@@ -11312,6 +11312,7 @@ public class ChatActivity extends BaseFragment implements
         );
         instantCameraView.setClipToPadding(false);
         instantCameraView.setButtonsBackground(glassBackgroundDrawableFactory, blurredBackgroundColorProvider);
+        instantCameraView.sgOnEditorChanged = () -> invalidateBlurCaptures(0);
 
         int index = contentView.indexOfChild(chatInputViewsContainer);
         if (index < 0) {
@@ -18221,6 +18222,16 @@ public class ChatActivity extends BaseFragment implements
 
             if (messagesSearchListView != null) {
                 Blur3Utils.captureRelativeParent(messagesSearchListView, blurCanvas, position, messagesSearchListView, this, searchListAlpha);
+            }
+
+            // Solegram: the round video editor's panel over the list: the glass of the input (the button that goes
+            // on recording) refracts it too
+            if (instantCameraView != null && instantCameraView.getVisibility() == View.VISIBLE) {
+                final View sgPanel = instantCameraView.sgEditorPanel();
+                if (sgPanel != null) {
+                    Blur3Utils.captureRelativeParent((c, p) -> sgPanel.draw(c), blurCanvas, position, sgPanel, this,
+                        (int) (255 * Math.min(1f, sgPanel.getAlpha() * instantCameraView.getAlpha())));
+                }
             }
 
             if (searchViewPager != null && searchViewPager.getVisibility() == View.VISIBLE) {
