@@ -1002,7 +1002,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         }
         if (state == 4) {
             if (videoEncoder != null && recordedTime > 800) {
-                // Solegram: sent from the pause: the editor's mask, filter and voice go with it
+                // Solegram: sent from the pause: the editor's filter and voice go with it
                 if (videoEditedInfo != null) {
                     sgPendingPath = sgApplyTo(videoEditedInfo);
                 }
@@ -1018,7 +1018,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                 videoEditedInfo.startTime = -1;
                 videoEditedInfo.endTime = -1;
             }
-            // Solegram: the editor's mask, filter and voice go with the video
+            // Solegram: the editor's filter and voice go with the video
             final String sgPath = sgApplyTo(videoEditedInfo);
             if (videoEditedInfo.needConvert()) {
                 file = null;
@@ -3985,17 +3985,15 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         }
     }
 
-    // region Solegram: the round video editor (masks, filters, voice)
+    // region Solegram: the round video editor (filters, voice)
 
     private com.solegram.messenger.ui.SolegramRoundEditor.Panel sgPanel;
     private com.solegram.messenger.ui.SolegramRoundEditor.Overlay sgOverlayView;
-    private final com.solegram.messenger.ui.SolegramRoundMasks.Sprites sgSprites = new com.solegram.messenger.ui.SolegramRoundMasks.Sprites();
-    private int sgMask, sgFilter, sgVoice;
+    private int sgFilter, sgVoice;
     private String sgSourcePath;
     private String sgVoicePath;
     /** the file with the voice effect, sent once the paused recording is stopped */
     private String sgPendingPath;
-    private com.solegram.messenger.SolegramRoundFx.FaceTrack sgTrack;
     private java.util.concurrent.atomic.AtomicBoolean sgCancel;
     private float sgShift;
     private ValueAnimator sgShiftAnimator;
@@ -4008,25 +4006,14 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         }
         sgClose(true);
         sgSourcePath = file.getAbsolutePath();
-        sgMask = com.solegram.messenger.ui.SolegramRoundMasks.NONE;
         sgFilter = com.solegram.messenger.SolegramRoundFx.F_NONE;
         sgVoice = com.solegram.messenger.SolegramVoiceEffects.NONE;
-        sgTrack = null;
+        sgCancel = new java.util.concurrent.atomic.AtomicBoolean();
 
-        sgOverlayView = new com.solegram.messenger.ui.SolegramRoundEditor.Overlay(getContext(), sgSprites);
-        sgOverlayView.setClock(() -> videoPlayer != null ? videoPlayer.getCurrentPosition() : -1);
+        sgOverlayView = new com.solegram.messenger.ui.SolegramRoundEditor.Overlay(getContext());
         cameraContainer.addView(sgOverlayView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         sgPanel = new com.solegram.messenger.ui.SolegramRoundEditor.Panel(getContext(), resourcesProvider, new com.solegram.messenger.ui.SolegramRoundEditor.Callback() {
-            @Override
-            public void onMask(int mask) {
-                sgMask = mask;
-                sgSprites.prepare(mask);
-                if (sgOverlayView != null) {
-                    sgOverlayView.setMask(mask, sgTrack);
-                }
-            }
-
             @Override
             public void onFilter(int filter) {
                 sgFilter = filter;
@@ -4038,8 +4025,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                 sgSetVoice(effect);
             }
         });
-        sgPanel.setSelected(sgMask, sgFilter, sgVoice);
-        sgPanel.setMasksState(false, false);
+        sgPanel.setSelected(sgFilter, sgVoice);
         sgPanel.onChanged = () -> {
             if (sgOnEditorChanged != null) {
                 sgOnEditorChanged.run();
@@ -4063,24 +4049,6 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                 }
             }
         }, 450);
-
-        // the face, for the masks
-        final java.util.concurrent.atomic.AtomicBoolean cancel = sgCancel = new java.util.concurrent.atomic.AtomicBoolean();
-        final String path = sgSourcePath;
-        final Context context = getContext().getApplicationContext();
-        new Thread(() -> {
-            final com.solegram.messenger.SolegramRoundFx.FaceTrack track = com.solegram.messenger.SolegramRoundFx.trackFaces(context, path, cancel);
-            AndroidUtilities.runOnUIThread(() -> {
-                if (cancel.get() || sgPanel == null || track == null) {
-                    return;
-                }
-                sgTrack = track;
-                sgPanel.setMasksState(true, !track.hasFace());
-                if (sgOverlayView != null) {
-                    sgOverlayView.setMask(sgMask, track);
-                }
-            });
-        }, "SolegramRoundFaces").start();
     }
 
     /** Moves the circle up as far as needed for the panel under it (not off the top). */
@@ -4139,7 +4107,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         if (effect == com.solegram.messenger.SolegramVoiceEffects.NONE) {
             sgVoice = effect;
             sgDeleteVoiceFile();
-            sgPanel.setSelected(sgMask, sgFilter, sgVoice);
+            sgPanel.setSelected(sgFilter, sgVoice);
             sgReplacePlayerSource(sgSourcePath);
             return;
         }
@@ -4163,7 +4131,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                 sgDeleteVoiceFile();
                 sgVoice = effect;
                 sgVoicePath = dst.getAbsolutePath();
-                sgPanel.setSelected(sgMask, sgFilter, sgVoice);
+                sgPanel.setSelected(sgFilter, sgVoice);
                 sgReplacePlayerSource(sgVoicePath);
             });
         }, "SolegramRoundVoice").start();
@@ -4193,7 +4161,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
     }
 
     /**
-     * Puts the chosen mask, filter and voice into what is sent; returns the file to send instead of the recorded one
+     * Puts the chosen filter and voice into what is sent; returns the file to send instead of the recorded one
      * (the one with the voice effect), or null.
      */
     private String sgApplyTo(VideoEditedInfo info) {
@@ -4201,10 +4169,6 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
             return null;
         }
         info.filterState = com.solegram.messenger.SolegramRoundFx.filterState(sgFilter);
-        if (sgMask != com.solegram.messenger.ui.SolegramRoundMasks.NONE && sgTrack != null && sgTrack.hasFace()) {
-            sgSprites.prepare(sgMask);
-            info.sgOverlay = new com.solegram.messenger.SolegramRoundFx.Overlay(sgTrack, sgMask, sgSprites);
-        }
         if (sgVoicePath != null && new File(sgVoicePath).exists()) {
             info.sgForceConvert = true;
             info.originalPath = sgVoicePath;
@@ -4246,9 +4210,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
             textureView.setLayerPaint(null);
         }
         sgFilter = com.solegram.messenger.SolegramRoundFx.F_NONE;
-        sgMask = com.solegram.messenger.ui.SolegramRoundMasks.NONE;
         sgVoice = com.solegram.messenger.SolegramVoiceEffects.NONE;
-        sgTrack = null;
         sgSourcePath = null;
         if (sgShift != 0) {
             sgUpdateShift(true);

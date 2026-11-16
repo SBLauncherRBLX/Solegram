@@ -177,6 +177,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         actionBar.setBackButtonDrawable(new BackDrawable(false));
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle("SoleWallet");
+        // the title in the middle of the top, as Telegram's Settings and the profile have it
+        actionBar.setCenterTitleAndGlass(true);
+        actionBar.doNotDrawCenterGlass = true;
         // no bar on top at all: a clear header, the page blurs out of focus under it (see the root below)
         actionBar.setBackgroundColor(Color.TRANSPARENT);
         actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);

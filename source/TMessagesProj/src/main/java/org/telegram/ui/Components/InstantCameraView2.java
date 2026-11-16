@@ -555,11 +555,8 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
         RoundVideoSession.State state = stateInfo.getState();
         if (state == RoundVideoSession.State.PREVIEWING) {
             applyExternalTrim();
-            sgTrimStartMs = session.getStateInfo().getTrimStartMs();
         } else if (state != RoundVideoSession.State.RECORDING) {
             return;
-        } else {
-            sgTrimStartMs = 0;
         }
         // the sound goes with a voice effect even if the preview was muted
         finishRequested = session.finish(!muted || sgEditor != null && sgEditor.getVoice() != com.solegram.messenger.SolegramVoiceEffects.NONE);
@@ -952,7 +949,7 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
         );
         entry.ttl = options.ttl;
         entry.effectId = options.effectId;
-        sgSend(entry, info, sgTrimStartMs, () -> {
+        sgSend(entry, info, () -> {
             delegate.sendMedia(
                     entry,
                     info,
@@ -968,8 +965,6 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
         });
     }
 
-    /** Solegram: where the sent video starts in the recording (it was trimmed), for the mask. */
-    private long sgTrimStartMs;
 
     private VideoEditedInfo createVideoEditedInfo(
             @NonNull File file,
@@ -1193,11 +1188,6 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
             sgEditor = new com.solegram.messenger.ui.SolegramRoundEditorHost(this, previewContainer, cameraContainer, textureView, resourcesProvider,
                 new com.solegram.messenger.ui.SolegramRoundEditorHost.Player() {
                     @Override
-                    public long positionMs() {
-                        return session != null ? session.sgPreviewPositionMs() : -1;
-                    }
-
-                    @Override
                     public void play(File file) {
                         if (session != null && session.sgPlayPreviewFile(file)) {
                             muted = false;
@@ -1244,16 +1234,16 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
     }
 
     /**
-     * Sends with the editor's mask, filter and voice: they go into the conversion of the video (and its sound is
-     * written again first, for a voice effect); without them, as Telegram sends it.
+     * Sends with the editor's filter and voice: they go into the conversion of the video (and its sound is written
+     * again first, for a voice effect); without them, as Telegram sends it.
      */
-    private void sgSend(MediaController.PhotoEntry entry, VideoEditedInfo info, long trimStartMs, Runnable send) {
+    private void sgSend(MediaController.PhotoEntry entry, VideoEditedInfo info, Runnable send) {
         final com.solegram.messenger.ui.SolegramRoundEditorHost editor = sgEditor;
         if (editor == null || !editor.isActive()) {
             send.run();
             return;
         }
-        boolean convert = editor.applyTo(info, Math.max(0, trimStartMs) * 1000L);
+        boolean convert = editor.applyTo(info);
         final int voice = editor.getVoice();
         editor.close(true);
         updateTranslationY();

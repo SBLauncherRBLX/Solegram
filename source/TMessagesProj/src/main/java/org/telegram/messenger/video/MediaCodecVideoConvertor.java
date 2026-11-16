@@ -1758,8 +1758,6 @@ public class MediaCodecVideoConvertor {
         boolean isSticker;
         CollageLayout collage;
         ArrayList<VideoEditedInfo.Part> collageParts;
-        /** Solegram: a round video's mask (SolegramRoundFx.Overlay) */
-        Object sgOverlay;
 
         private ConvertVideoParams() {
 
@@ -1815,7 +1813,6 @@ public class MediaCodecVideoConvertor {
             params.isSticker = info.isSticker;
             params.collage = info.collage;
             params.collageParts = info.collageParts;
-            params.sgOverlay = info.sgOverlay;
             return params;
         }
     }

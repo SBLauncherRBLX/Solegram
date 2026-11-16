@@ -703,12 +703,6 @@ public final class RoundVideoSession {
         return true;
     }
 
-    /** Solegram: the preview's playing position, ms (-1 without a preview). */
-    @MainThread
-    public long sgPreviewPositionMs() {
-        return state == State.PREVIEWING && player != null ? player.getCurrentPosition() : -1;
-    }
-
     /**
      * Solegram: the preview plays another file of the same recording (its sound through a voice effect) from where
      * it was, with sound.

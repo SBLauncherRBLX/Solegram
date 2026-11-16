@@ -308,7 +308,6 @@ public class TextureRenderer {
     ) {
         isPhoto = photo;
         collageParts = params.collageParts;
-        sgOverlay = params.sgOverlay instanceof com.solegram.messenger.SolegramRoundFx.Overlay ? (com.solegram.messenger.SolegramRoundFx.Overlay) params.sgOverlay : null;
 
         float[] texData = {
                 0.f, 0.f,
@@ -748,47 +747,9 @@ public class TextureRenderer {
                 drawEntity(mediaEntities.get(a), mediaEntities.get(a).color, time);
             }
         }
-        sgDrawOverlay(time);
         GLES20.glFinish();
     }
 
-    /** Solegram: a round video's face mask, over the whole frame, for this frame's time. */
-    private final com.solegram.messenger.SolegramRoundFx.Overlay sgOverlay;
-    private int[] sgOverlayTexture;
-
-    private void sgDrawOverlay(long timeNs) {
-        if (sgOverlay == null || simpleShaderProgram == 0) {
-            return;
-        }
-        final android.graphics.Bitmap frame;
-        try {
-            frame = sgOverlay.frame(timeNs / 1000, transformedWidth, transformedHeight);
-        } catch (Throwable e) {
-            FileLog.e(e);
-            return;
-        }
-        if (frame == null) {
-            return;
-        }
-        if (sgOverlayTexture == null) {
-            sgOverlayTexture = new int[1];
-            GLES20.glGenTextures(1, sgOverlayTexture, 0);
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, sgOverlayTexture[0]);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-        }
-        GLES20.glUseProgram(simpleShaderProgram);
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glUniform1i(simpleSourceImageHandle, 0);
-        GLES20.glEnableVertexAttribArray(simpleInputTexCoordHandle);
-        GLES20.glVertexAttribPointer(simpleInputTexCoordHandle, 2, GLES20.GL_FLOAT, false, 8, textureBuffer);
-        GLES20.glEnableVertexAttribArray(simplePositionHandle);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, sgOverlayTexture[0]);
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, frame, 0);
-        drawTexture(false, sgOverlayTexture[0]);
-    }
 
     private void drawEntity(VideoEditedInfo.MediaEntity entity, int textColor, long time) {
         if (entity.lottieNative != null) {
@@ -1170,7 +1131,7 @@ public class TextureRenderer {
                 }
             }
         }
-        if (filterShaders != null || imagePath != null || paintPath != null || messagePath != null || mediaEntities != null || isCollage() || sgOverlay != null) {
+        if (filterShaders != null || imagePath != null || paintPath != null || messagePath != null || mediaEntities != null || isCollage()) {
             int vertexShader = FilterShaders.loadShader(GLES20.GL_VERTEX_SHADER, FilterShaders.simpleVertexShaderCode);
             int fragmentShader = FilterShaders.loadShader(GLES20.GL_FRAGMENT_SHADER, FilterShaders.simpleFragmentShaderCode);
             if (vertexShader != 0 && fragmentShader != 0) {

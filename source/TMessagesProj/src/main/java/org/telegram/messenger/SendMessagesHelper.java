@@ -8355,6 +8355,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             newMsgObj.local_id = newMsgObj.id = res.id;
                             newMsgObj.date = res.date;
                             newMsgObj.entities = com.solegram.messenger.SolegramPremiumStickers.keepEmoji(newMsgObj.entities, res.entities); // Solegram: the Premium emoji from the mark stay
+                            if (newMsgObj.entities != null && !newMsgObj.entities.isEmpty()) {
+                                newMsgObj.flags |= TLRPC.MESSAGE_FLAG_HAS_ENTITIES; // Solegram: saved with the message
+                            }
                             newMsgObj.out = res.out;
                             if ((res.flags & 33554432) != 0) {
                                 newMsgObj.ttl_period = res.ttl_period;
@@ -8507,6 +8510,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                     msgObj.messageOwner.flags |= 33554432;
                                 }
                                 msgObj.messageOwner.entities = com.solegram.messenger.SolegramPremiumStickers.keepEmoji(msgObj.messageOwner.entities, message.entities); // Solegram
+                                if (msgObj.messageOwner.entities != null && !msgObj.messageOwner.entities.isEmpty()) {
+                                    msgObj.messageOwner.flags |= TLRPC.MESSAGE_FLAG_HAS_ENTITIES; // Solegram: saved with the message
+                                }
                                 msgObj.messageOwner.quick_reply_shortcut_id = message.quick_reply_shortcut_id;
                                 if (msgObj.messageOwner.quick_reply_shortcut_id != 0) {
                                     msgObj.messageOwner.flags |= 1073741824;
@@ -11335,7 +11341,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             }
                             TLRPC.TL_document document = null;
                             String parentObject = null;
-                            if (!isEncrypted && info.ttl == 0 && !forceDisableCheckSentMedia && (videoEditedInfo == null || videoEditedInfo.filterState == null && videoEditedInfo.paintPath == null && videoEditedInfo.mediaEntities == null && videoEditedInfo.cropState == null && videoEditedInfo.sgOverlay == null && !videoEditedInfo.sgForceConvert)) {
+                            if (!isEncrypted && info.ttl == 0 && !forceDisableCheckSentMedia && (videoEditedInfo == null || videoEditedInfo.filterState == null && videoEditedInfo.paintPath == null && videoEditedInfo.mediaEntities == null && videoEditedInfo.cropState == null && !videoEditedInfo.sgForceConvert)) {
                                 Object[] sentData = accountInstance.getMessagesStorage().getSentFile(originalPath, !isEncrypted ? MessagesStorage.SENT_FILE_TYPE_VIDEO : MessagesStorage.SENT_FILE_TYPE_VIDEO_ENCRYPTED);
                                 if (sentData != null && sentData[0] instanceof TLRPC.TL_document) {
                                     document = (TLRPC.TL_document) sentData[0];
@@ -12177,7 +12183,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 }
                 TLRPC.TL_document document = null;
                 String parentObject = null;
-                if (!isEncrypted && ttl == 0 && (videoEditedInfo == null || videoEditedInfo.filterState == null && videoEditedInfo.paintPath == null && videoEditedInfo.mediaEntities == null && videoEditedInfo.cropState == null && videoEditedInfo.sgOverlay == null && !videoEditedInfo.sgForceConvert)) {
+                if (!isEncrypted && ttl == 0 && (videoEditedInfo == null || videoEditedInfo.filterState == null && videoEditedInfo.paintPath == null && videoEditedInfo.mediaEntities == null && videoEditedInfo.cropState == null && !videoEditedInfo.sgForceConvert)) {
                     Object[] sentData = accountInstance.getMessagesStorage().getSentFile(originalPath, !isEncrypted ? MessagesStorage.SENT_FILE_TYPE_VIDEO : MessagesStorage.SENT_FILE_TYPE_VIDEO_ENCRYPTED);
                     if (sentData != null && sentData[0] instanceof TLRPC.TL_document) {
                         document = (TLRPC.TL_document) sentData[0];

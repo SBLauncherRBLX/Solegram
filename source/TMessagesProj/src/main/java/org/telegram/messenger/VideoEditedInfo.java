@@ -710,13 +710,11 @@ public class VideoEditedInfo {
         return false;
     }
 
-    /** Solegram: a mask drawn over each frame while the video is converted (not saved with the info). */
-    public transient Object sgOverlay;
     /** Solegram: the video must be converted (its sound was changed: what was uploaded while recording is not it). */
     public transient boolean sgForceConvert;
 
     public boolean needConvert() {
-        if (sgForceConvert || sgOverlay != null) {
+        if (sgForceConvert) {
             return true;
         }
         if (isStory) {

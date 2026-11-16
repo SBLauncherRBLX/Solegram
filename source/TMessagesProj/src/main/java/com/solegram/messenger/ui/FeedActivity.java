@@ -166,8 +166,10 @@ public class FeedActivity extends BaseFragment implements NotificationCenter.Not
     public ActionBar createActionBar(Context context) {
         final ActionBar actionBar = super.createActionBar(context);
         actionBar.setUseContainerForTitles();
-        actionBar.getTitlesContainer().setTranslationX(dp(4));
         actionBar.setAddToContainer(false);
+        // the title in the middle of the top, as Telegram's Settings and the profile have it
+        actionBar.setCenterTitleAndGlass(true);
+        actionBar.doNotDrawCenterGlass = true;
         return actionBar;
     }
 

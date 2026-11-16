@@ -406,6 +406,11 @@ public final class SolegramPremiumStickers {
                 message.entities.add(e);
             }
         }
+        // the entities are saved with the message only with this flag: without it the local copy kept the text
+        // without the mark and without the emoji, and the chat (read from that copy) showed the plain ones
+        if (!message.entities.isEmpty()) {
+            message.flags |= TLRPC.MESSAGE_FLAG_HAS_ENTITIES;
+        }
     }
     // endregion
 }

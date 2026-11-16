@@ -34,16 +34,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.telegram.messenger.AndroidUtilities.dp;
 
 /**
- * The round video editor inside a recorder (Telegram's new one): the panel under the circle, the mask over the
- * playing preview, the filter on it, the voice effect on its sound; and what of it goes into the sent video.
+ * The round video editor inside a recorder (Telegram's new one): the panel under the circle, the filter on the
+ * playing preview, the voice effect on its sound; and what of it goes into the sent video.
  */
 public final class SolegramRoundEditorHost {
 
     /** The recorder's preview player. */
     public interface Player {
-        /** The playing position, ms (-1 when nothing plays). */
-        long positionMs();
-
         /** Plays another file from the same moment, with sound (to hear the voice effect). */
         void play(File file);
     }
@@ -60,14 +57,12 @@ public final class SolegramRoundEditorHost {
     private final Theme.ResourcesProvider resourcesProvider;
     private final Player player;
     private final ShiftListener shiftListener;
-    private final SolegramRoundMasks.Sprites sprites = new SolegramRoundMasks.Sprites();
 
     private SolegramRoundEditor.Panel panel;
     private SolegramRoundEditor.Overlay overlay;
-    private int mask, filter, voice;
+    private int filter, voice;
     private File source;
     private File voiceFile;
-    private SolegramRoundFx.FaceTrack track;
     private AtomicBoolean cancel;
     private float shift;
     private ValueAnimator shiftAnimator;
@@ -95,7 +90,7 @@ public final class SolegramRoundEditorHost {
 
     /**
      * @param root          the recorder's view: the panel goes to its bottom (above its bottom padding)
-     * @param previewParent where the preview's picture is: the mask's layer goes over it, as big as it
+     * @param previewParent where the preview's picture is: the filter's vignette goes over it, as big as it
      * @param circle        the circle that moves up for the panel
      */
     public SolegramRoundEditorHost(FrameLayout root, ViewGroup previewParent, View circle, TextureView texture,
@@ -128,25 +123,14 @@ public final class SolegramRoundEditorHost {
             return;
         }
         source = file;
-        mask = SolegramRoundMasks.NONE;
         filter = SolegramRoundFx.F_NONE;
         voice = SolegramVoiceEffects.NONE;
-        track = null;
+        cancel = new AtomicBoolean();
 
-        overlay = new SolegramRoundEditor.Overlay(root.getContext(), sprites);
-        overlay.setClock(player::positionMs);
+        overlay = new SolegramRoundEditor.Overlay(root.getContext());
         previewParent.addView(overlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         panel = new SolegramRoundEditor.Panel(root.getContext(), resourcesProvider, new SolegramRoundEditor.Callback() {
-            @Override
-            public void onMask(int value) {
-                mask = value;
-                sprites.prepare(value);
-                if (overlay != null) {
-                    overlay.setMask(value, track);
-                }
-            }
-
             @Override
             public void onFilter(int value) {
                 filter = value;
@@ -158,8 +142,7 @@ public final class SolegramRoundEditorHost {
                 setVoice(value);
             }
         });
-        panel.setSelected(mask, filter, voice);
-        panel.setMasksState(false, false);
+        panel.setSelected(filter, voice);
         panel.onChanged = onChanged;
         root.addView(panel, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 8, 0, 8, 8));
         panel.setAlpha(0f);
@@ -181,24 +164,6 @@ public final class SolegramRoundEditorHost {
                 }
             }
         }, 500);
-
-        // the face, for the masks
-        final AtomicBoolean cancelled = cancel = new AtomicBoolean();
-        final String path = file.getAbsolutePath();
-        final android.content.Context context = root.getContext().getApplicationContext();
-        new Thread(() -> {
-            final SolegramRoundFx.FaceTrack found = SolegramRoundFx.trackFaces(context, path, cancelled);
-            AndroidUtilities.runOnUIThread(() -> {
-                if (cancelled.get() || panel != forPanel || found == null) {
-                    return;
-                }
-                track = found;
-                panel.setMasksState(true, !found.hasFace());
-                if (overlay != null) {
-                    overlay.setMask(mask, found);
-                }
-            });
-        }, "SolegramRoundFaces").start();
     }
 
     private void applyFilterPreview() {
@@ -224,7 +189,7 @@ public final class SolegramRoundEditorHost {
         if (effect == SolegramVoiceEffects.NONE) {
             voice = effect;
             deleteVoiceFile();
-            panel.setSelected(mask, filter, voice);
+            panel.setSelected(filter, voice);
             player.play(source);
             return;
         }
@@ -248,7 +213,7 @@ public final class SolegramRoundEditorHost {
                 deleteVoiceFile();
                 voice = effect;
                 voiceFile = dst;
-                panel.setSelected(mask, filter, voice);
+                panel.setSelected(filter, voice);
                 player.play(dst);
             });
         }, "SolegramRoundVoice").start();
@@ -325,25 +290,13 @@ public final class SolegramRoundEditorHost {
         return voiceFile != null ? voice : SolegramVoiceEffects.NONE;
     }
 
-    /**
-     * Puts the filter and the mask into what is sent (the video starts offsetUs into the recording, if trimmed);
-     * returns whether anything was put in (the video must then be converted).
-     */
-    public boolean applyTo(VideoEditedInfo info, long offsetUs) {
+    /** Puts the filter into what is sent; returns whether it was put in (the video must then be converted). */
+    public boolean applyTo(VideoEditedInfo info) {
         if (info == null || source == null) {
             return false;
         }
-        boolean any = false;
         info.filterState = SolegramRoundFx.filterState(filter);
-        if (info.filterState != null) {
-            any = true;
-        }
-        if (mask != SolegramRoundMasks.NONE && track != null && track.hasFace()) {
-            sprites.prepare(mask);
-            info.sgOverlay = new SolegramRoundFx.Overlay(track, mask, sprites, offsetUs);
-            any = true;
-        }
-        return any;
+        return info.filterState != null;
     }
 
     /** The editor goes away (the video was sent, thrown away, or recording goes on). */
@@ -378,9 +331,7 @@ public final class SolegramRoundEditorHost {
             texture.setLayerPaint(null);
         }
         filter = SolegramRoundFx.F_NONE;
-        mask = SolegramRoundMasks.NONE;
         voice = SolegramVoiceEffects.NONE;
-        track = null;
         source = null;
         if (shift != 0) {
             updateShift(true);
