@@ -4800,15 +4800,25 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             public void draw(@NonNull Canvas canvas, float left, float top, float right, float bottom) {
                 canvas.save();
                 canvas.clipRect(left, top, right, bottom);
-                drawCaptionBlur(canvas, blur, 0xFF262626, 0x33000000, false, true, true);
-                canvas.drawColor(0x26000000);
+                if (sgLiquidGlass()) {
+                    // Solegram: the photo under the panel only lightly softened: the liquid glass refracts it as it
+                    // does everywhere else (the frosted look was the heavy blur)
+                    drawCaptionBlur(canvas, blur, 0xFF262626, 0x14000000, false, true, true, true);
+                } else {
+                    drawCaptionBlur(canvas, blur, 0xFF262626, 0x33000000, false, true, true);
+                    canvas.drawColor(0x26000000);
+                }
                 canvas.restore();
             }
         };
         glassAttachedViews = new ReferenceList<>();
         iBlur3BlurredDrawables = new ReferenceList<>();
         iBlur3FactoryFrostedLiquidGlass = new BlurredBackgroundDrawableViewFactory(blurredBackgroundSource);
-        // iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(true);
+        // Solegram: the caption field, the send button and the other buttons in Solegram's liquid glass
+        if (sgLiquidGlass()) {
+            iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(true);
+            iBlur3FactoryFrostedLiquidGlass.setOutset(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? dp(8) : dp(48));
+        }
         iBlur3FactoryFrostedLiquidGlass.setSourceRootView(new ViewPositionWatcher(containerView), containerView);
         iBlur3FactoryFrostedLiquidGlass.setLinkedViewsRef(glassAttachedViews);
 
@@ -22005,6 +22015,11 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private RenderNode renderNodeGlassed;
     private final Blur3HashImpl renderNodeHashBuilder = new Blur3HashImpl();
     private final LongSparseArray<RenderNode> matrixRenderNodes = new LongSparseArray<>();
+
+    /** Solegram: liquid glass in the viewer when the glass is on (and the light blur under it can be made). */
+    private boolean sgLiquidGlass() {
+        return com.solegram.messenger.SolegramConfig.glassOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+    }
 
     public boolean BLUR_RENDERNODE() {
         return !textureViewSkipRender

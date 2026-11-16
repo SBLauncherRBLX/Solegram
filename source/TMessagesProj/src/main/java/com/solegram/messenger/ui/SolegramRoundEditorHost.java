@@ -119,6 +119,7 @@ public final class SolegramRoundEditorHost {
     /** The recording is shown for a check: the editor opens for it. */
     public void open(File file) {
         close(true);
+        releaseLook();
         if (!enabled() || file == null || !file.exists()) {
             return;
         }
@@ -311,6 +312,14 @@ public final class SolegramRoundEditorHost {
 
     /** The editor goes away (the video was sent, thrown away, or recording goes on). */
     public void close(boolean deleteFiles) {
+        close(deleteFiles, false);
+    }
+
+    /**
+     * The panel goes away; with keepLook the circle keeps its filter, vignette and place (it is being sent: it flies
+     * into the chat looking as the sent video does) until {@link #releaseLook()}.
+     */
+    public void close(boolean deleteFiles, boolean keepLook) {
         if (cancel != null) {
             cancel.set(true);
             cancel = null;
@@ -331,6 +340,22 @@ public final class SolegramRoundEditorHost {
                 notifyChanged();
             }).start();
         }
+        voice = SolegramVoiceEffects.NONE;
+        source = null;
+        if (keepLook) {
+            lookKept = true;
+            return;
+        }
+        releaseLook();
+        if (shift != 0) {
+            updateShift(true);
+        }
+    }
+
+    private boolean lookKept;
+
+    /** The circle back to the plain picture (the recorder hides it, or a new recording starts). */
+    public void releaseLook() {
         if (overlay != null) {
             if (overlay.getParent() instanceof ViewGroup) {
                 ((ViewGroup) overlay.getParent()).removeView(overlay);
@@ -341,10 +366,12 @@ public final class SolegramRoundEditorHost {
             texture.setLayerPaint(null);
         }
         filter = SolegramRoundFx.F_NONE;
-        voice = SolegramVoiceEffects.NONE;
-        source = null;
-        if (shift != 0) {
-            updateShift(true);
+        if (lookKept) {
+            lookKept = false;
+            if (shiftAnimator != null) {
+                shiftAnimator.cancel();
+            }
+            shift = 0;
         }
     }
 }

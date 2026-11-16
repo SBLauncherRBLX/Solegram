@@ -594,6 +594,9 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
 
     @Override
     public void hideCamera(boolean async) {
+        if (sgEditor != null) {
+            sgEditor.releaseLook();
+        }
         destroy(async);
         cameraContainer.setTranslationX(0f);
         animationTranslationY = 0f;
@@ -1332,8 +1335,8 @@ public final class InstantCameraView2 extends InstantCameraViewBase {
         }
         final int filter = editor.getFilter();
         final int voice = editor.getSelectedVoice();
-        editor.close(true);
-        updateTranslationY();
+        // the circle keeps the effect's look while it is made and while it flies into the chat
+        editor.close(true, true);
         if (filter == com.solegram.messenger.SolegramRoundFx.F_NONE && voice == com.solegram.messenger.SolegramVoiceEffects.NONE) {
             send.run();
             return;
