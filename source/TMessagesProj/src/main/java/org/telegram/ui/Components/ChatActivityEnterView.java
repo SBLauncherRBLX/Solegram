@@ -4254,6 +4254,17 @@ public class ChatActivityEnterView extends FrameLayout implements
     // region Solegram: voice effects
 
     private ImageView sgVoiceFxButton;
+
+    /**
+     * The effects button goes at once when the recorded panel leaves: it sits where the attach button comes back,
+     * and fading with the panel it lay over that button for a moment. The panel shows it again when it opens.
+     */
+    private void sgHideVoiceFxButton() {
+        if (sgVoiceFxButton != null) {
+            sgVoiceFxButton.animate().cancel();
+            sgVoiceFxButton.setVisibility(GONE);
+        }
+    }
     private int sgVoiceFx;
     private String sgVoiceOriginalPath;
     private boolean sgVoiceFxBusy;
@@ -7375,6 +7386,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
         // Solegram: the iOS-style bar's round buttons come back with the emoji button and the mic, not after the panel
         solegramVoiceLeaving = recordedAudioPanel != null && recordedAudioPanel.getVisibility() == VISIBLE;
+        sgHideVoiceFxButton();
 
         audioToSendPath = null;
         audioToSend = null;
@@ -7609,6 +7621,7 @@ public class ChatActivityEnterView extends FrameLayout implements
     }
 
     private void hideRecordedAudioPanelInternal() {
+        sgHideVoiceFxButton();
         audioToSendPath = null;
         audioToSend = null;
         audioToSendMessageObject = null;

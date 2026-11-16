@@ -1507,9 +1507,8 @@ public class FilterTabsView extends FrameLayout {
 
             final float add = additionalTabWidth / 2f;
 
-            final int selectorHeight = solegramTall ? dp(36) : dp(28);
-            final int y = height / 2 - selectorHeight / 2;
-            selectorDrawable.setBounds((int) (indicatorX - dp(TAB_INTERNAL_PADDING) - add), y, (int) (indicatorX + indicatorWidth + dp(TAB_INTERNAL_PADDING) + add), y + selectorHeight);
+            final int y = height / 2 - dp(14);
+            selectorDrawable.setBounds((int) (indicatorX - dp(TAB_INTERNAL_PADDING) - add), y, (int) (indicatorX + indicatorWidth + dp(TAB_INTERNAL_PADDING) + add), y + dp(28));
             selectorDrawable.setAlpha(31);
             selectorDrawable.draw(canvas);
             canvas.restore();
@@ -1521,28 +1520,9 @@ public class FilterTabsView extends FrameLayout {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        solegramUpdateClip(w, h);
-    }
-
-    private void solegramUpdateClip(int w, int h) {
         clipPath.rewind();
-        final int inset = solegramTall ? dp(4) : dp(9);
-        final float radius = solegramTall ? dp(21) : dp(16);
-        clipPath.addRoundRect(inset, inset, w - inset, h - inset, radius, radius, Path.Direction.CW);
-    }
-
-    // Solegram: the tabs' glass as tall as the buttons' bubble next to them (the floating header)
-    private boolean solegramTall;
-
-    public void solegramSetTall(boolean tall) {
-        if (solegramTall == tall) {
-            return;
-        }
-        solegramTall = tall;
-        final float rad = tall ? AndroidUtilities.dpf2(18) : AndroidUtilities.dpf2(14);
-        selectorDrawable.setCornerRadii(new float[]{rad, rad, rad, rad, rad, rad, rad, rad});
-        solegramUpdateClip(getWidth(), getHeight());
-        invalidate();
+        clipPath.addRoundRect(dp(9), dp(9), w - dp(9), h - dp(9),
+            dp(16), dp(16), Path.Direction.CW);
     }
 
     @Override

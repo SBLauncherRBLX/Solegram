@@ -5225,10 +5225,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             filterTabsViewBackground.setRadius(dp(18));
             filterTabsViewBackground.setPadding(dp(6.666f));
             if (solegramFloatingHeader) {
-                // as tall as the bubble of the buttons beside them (46dp): the 50dp frame keeps 2dp round the glass
-                filterTabsViewBackground.setRadius(dp(23));
-                filterTabsViewBackground.setPadding(dp(2));
-                filterTabsView.solegramSetTall(true);
                 // the folder tabs float in the header over the faded list: a shadow round them read as a dark box
                 filterTabsViewBackground.setShadowAlpha(0f);
                 contentView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
