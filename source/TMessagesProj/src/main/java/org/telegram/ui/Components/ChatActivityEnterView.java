@@ -3084,6 +3084,12 @@ public class ChatActivityEnterView extends FrameLayout implements
                                     });
                                     return true;
                                 }
+                                if (sgRoundPreview()) {
+                                    // Solegram: to the editor, not sent: the panel waits for the recorded video
+                                    delegate.needStartRecordVideo(3, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
+                                    getParent().requestDisallowInterceptTouchEvent(true);
+                                    return true;
+                                }
                                 delegate.needStartRecordVideo(1, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
                                 sendButton.setEffect(effectId = 0);
                             } else {
@@ -3230,6 +3236,11 @@ public class ChatActivityEnterView extends FrameLayout implements
                                     return true;
                                 }
                                 CameraController.getInstance().cancelOnInitRunnable(onFinishInitCameraRunnable);
+                                if (sgRoundPreview()) {
+                                    // Solegram: the round video waits in the editor (trim, masks, filters, voice) first
+                                    delegate.needStartRecordVideo(3, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
+                                    return true;
+                                }
                                 delegate.needStartRecordVideo(1, true, 0, 0, voiceOnce ? 0x7FFFFFFF : 0, effectId, 0);
                                 sendButton.setEffect(effectId = 0);
                             } else if (!sendVoiceEnabled) {
@@ -4219,7 +4230,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         audioTimelineView = new RecordedAudioPlayerView(getContext(), resourcesProvider);
         final boolean sgFx = com.solegram.messenger.SolegramConfig.voiceEffects;
         recordedAudioPanel.addView(audioTimelineView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 32, Gravity.CENTER_VERTICAL | Gravity.LEFT, DEFAULT_HEIGHT, 0, sgFx ? 46 : 4, 0));
-        if (sgFx) {
+        if (sgFx || com.solegram.messenger.SolegramConfig.roundEditor) {
             // Solegram: voice effects for the recording before it is sent
             sgVoiceFxButton = new ImageView(getContext());
             sgVoiceFxButton.setScaleType(ImageView.ScaleType.CENTER);
@@ -4252,7 +4263,22 @@ public class ChatActivityEnterView extends FrameLayout implements
         sgVoiceFxButton.setEnabled(!sgVoiceFxBusy);
     }
 
+    /** Solegram: a released (or locked and sent) round video opens in the editor before it goes. */
+    private boolean sgRoundPreview() {
+        return com.solegram.messenger.SolegramConfig.roundEditor && !isInScheduleMode();
+    }
+
     private void sgShowVoiceFx() {
+        if (videoToSendMessageObject != null) {
+            // a round video: the button shows or hides the editor under the circle
+            if (parentFragment != null && parentFragment.instantCameraView instanceof InstantCameraView) {
+                final InstantCameraView camera = (InstantCameraView) parentFragment.instantCameraView;
+                camera.sgToggleEditor();
+                sgVoiceFxButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(camera.sgEditorOpen()
+                    ? Theme.key_chat_recordedVoicePlayPause : Theme.key_chat_messagePanelIcons), PorterDuff.Mode.SRC_IN));
+            }
+            return;
+        }
         if (sgVoiceFxBusy || audioToSend == null || sgVoiceOriginalPath == null || parentFragment == null) {
             return;
         }
@@ -13950,6 +13976,20 @@ public class ChatActivityEnterView extends FrameLayout implements
                 millisecondsRecorded = videoToSendMessageObject.estimatedDuration;
 
                 if (videoTimelineView != null) {
+                    // Solegram: the editor's button at the end of the timeline
+                    final boolean sgEditor = com.solegram.messenger.SolegramConfig.roundEditor && sgVoiceFxButton != null;
+                    if (sgVoiceFxButton != null) {
+                        sgVoiceFxButton.setVisibility(sgEditor ? VISIBLE : GONE);
+                        if (sgEditor) {
+                            sgVoiceFxButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_recordedVoicePlayPause), PorterDuff.Mode.SRC_IN));
+                            sgVoiceFxButton.setAlpha(1f);
+                            sgVoiceFxButton.setEnabled(true);
+                        }
+                    }
+                    if (videoTimelineView.getLayoutParams() instanceof MarginLayoutParams) {
+                        ((MarginLayoutParams) videoTimelineView.getLayoutParams()).rightMargin = dp(sgEditor ? 48 : 8);
+                        videoTimelineView.requestLayout();
+                    }
                     videoTimelineView.setVideoPath(audioToSendPath);
                     videoTimelineView.setKeyframes(keyframes);
                     videoTimelineView.setVisibility(VISIBLE);
@@ -13963,6 +14003,9 @@ public class ChatActivityEnterView extends FrameLayout implements
                 audioToSendPath = (String) args[2];
                 sgVoiceFx = com.solegram.messenger.SolegramVoiceEffects.NONE;
                 sgVoiceOriginalPath = audioToSendPath;
+                if (sgVoiceFxButton != null) {
+                    sgVoiceFxButton.setVisibility(com.solegram.messenger.SolegramConfig.voiceEffects ? VISIBLE : GONE);
+                }
                 sgUpdateVoiceFxButton();
                 boolean fromDraft = args.length >= 4 && (boolean) args[3];
                 float left = args.length >= 5 ? (float) args[4] : 0.0f;

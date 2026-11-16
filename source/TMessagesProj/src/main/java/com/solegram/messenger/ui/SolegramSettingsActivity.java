@@ -277,6 +277,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_NAME_EFFECT = 4247;
     private static final int ID_VOICE_PREVIEW = 4248;
     private static final int ID_VOICE_EFFECTS = 4249;
+    private static final int ID_ROUND_EDITOR = 4251;
     private static final int ID_HIDE_GIFTS = 405;
     private static final int ID_PROXIMITY = 406;
     private static final int ID_NO_VIBRATION = 407;
@@ -536,6 +537,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_MENTION_CARDS, getString(R.string.SG_MentionCards)).setChecked(SolegramConfig.mentionCards));
         items.add(UItem.asCheck(ID_VOICE_PREVIEW, getString(R.string.SG_VoicePreview)).setChecked(SolegramConfig.voicePreview));
         items.add(UItem.asCheck(ID_VOICE_EFFECTS, getString(R.string.SG_VoiceFxSetting)).setChecked(SolegramConfig.voiceEffects));
+        items.add(UItem.asCheck(ID_ROUND_EDITOR, getString(R.string.SG_RoundEditorSetting)).setChecked(SolegramConfig.roundEditor));
         items.add(UItem.asCheck(ID_HIDE_GIFTS, getString(R.string.SG_HideGifts)).setChecked(SolegramConfig.hideGiftButtons));
         items.add(UItem.asShadow(null));
     }
@@ -2876,6 +2878,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_VOICE_EFFECTS:
                 toggleCheck(view, "voiceEffects");
+                return;
+            case ID_ROUND_EDITOR:
+                toggleCheck(view, "roundEditor");
                 return;
             case ID_MENTION_CARDS:
                 toggleCheck(view, "mentionCards");

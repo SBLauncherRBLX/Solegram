@@ -319,6 +319,8 @@ public class SolegramConfig {
     public static boolean voicePreview;
     /** Voice effects in that preview. */
     public static boolean voiceEffects;
+    /** Round videos open in an editor before sending: trim, face masks, filters, voice effects. */
+    public static boolean roundEditor;
     public static boolean hideGiftButtons;
     // endregion
 
@@ -601,6 +603,7 @@ public class SolegramConfig {
         mentionCards = p.getBoolean("mentionCards", true);
         voicePreview = p.getBoolean("voicePreview", true);
         voiceEffects = p.getBoolean("voiceEffects", true);
+        roundEditor = p.getBoolean("roundEditor", true);
         hideGiftButtons = p.getBoolean("hideGiftButtons", false);
 
         proxyAuto = p.getBoolean("proxyAuto", false);
@@ -754,6 +757,7 @@ public class SolegramConfig {
             case "mentionCards":
             case "voicePreview":
             case "voiceEffects":
+            case "roundEditor":
             case "unifiedWallet":
             case "profileCards":
             case "ghostReadOnInteract":

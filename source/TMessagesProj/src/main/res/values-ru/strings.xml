@@ -2237,5 +2237,32 @@
     <string name="SG_IgnoreTurnedOff">Игнор выключен: всё, что они написали, снова видно</string>
     <string name="SG_PremiumStickersShare">Премиум-стикеры и эмодзи для пользователей Solegram</string>
     <string name="SG_GesturesShort">Встряхнуть, перевернуть или повернуть телефон</string>
+    <string name="SG_RoundEditorSetting">Редактировать кружки перед отправкой</string>
+    <string name="SG_RoundTabMasks">Маски</string>
+    <string name="SG_RoundTabFilters">Фильтры</string>
+    <string name="SG_RoundTabVoice">Голос</string>
+    <string name="SG_RoundNone">Нет</string>
+    <string name="SG_RoundFindingFace">Ищем лицо…</string>
+    <string name="SG_RoundNoFace">В этом кружке не нашлось лица</string>
+    <string name="SG_RoundFilterVivid">Ярко</string>
+    <string name="SG_RoundFilterWarm">Тепло</string>
+    <string name="SG_RoundFilterCool">Холод</string>
+    <string name="SG_RoundFilterMono">Ч/Б</string>
+    <string name="SG_RoundFilterNoir">Нуар</string>
+    <string name="SG_RoundFilterRetro">Ретро</string>
+    <string name="SG_RoundFilterDream">Мечта</string>
+    <string name="SG_RoundFilterDrama">Драма</string>
+    <string name="SG_RoundMaskDog">Щенок</string>
+    <string name="SG_RoundMaskCat">Котик</string>
+    <string name="SG_RoundMaskBunny">Зайка</string>
+    <string name="SG_RoundMaskGlasses">Очки</string>
+    <string name="SG_RoundMaskHearts">Влюблён</string>
+    <string name="SG_RoundMaskCrown">Корона</string>
+    <string name="SG_RoundMaskDevil">Чертёнок</string>
+    <string name="SG_RoundMaskHalo">Ангел</string>
+    <string name="SG_RoundMaskFlowers">Цветы</string>
+    <string name="SG_RoundMaskClown">Клоун</string>
+    <string name="SG_RoundMaskMustache">Усы</string>
+    <string name="SG_RoundMaskStars">Звёзды</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -957,8 +957,9 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
     }
 
     private void updateTranslationY() {
-        textureOverlayView.setTranslationY(animationTranslationY + panTranslationY);
-        cameraContainer.setTranslationY(animationTranslationY + panTranslationY);
+        textureOverlayView.setTranslationY(animationTranslationY + panTranslationY + sgShift);
+        cameraContainer.setTranslationY(animationTranslationY + panTranslationY + sgShift);
+        muteImageView.setTranslationY(sgShift);
     }
 
     public RectF getCameraRect() {
@@ -990,6 +991,9 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
         if (textureView == null) {
             return;
         }
+        if (state != 4) {
+            sgClose(true);
+        }
         stopProgressTimer();
         if (videoPlayer != null) {
             videoPlayer.releasePlayer(true);
@@ -1008,6 +1012,8 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
                 videoEditedInfo.startTime = -1;
                 videoEditedInfo.endTime = -1;
             }
+            // Solegram: the editor's mask, filter and voice go with the video
+            final String sgPath = sgApplyTo(videoEditedInfo);
             if (videoEditedInfo.needConvert()) {
                 file = null;
                 encryptedFile = null;
@@ -1033,10 +1039,11 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
             videoEditedInfo.encryptedFile = encryptedFile;
             videoEditedInfo.key = key;
             videoEditedInfo.iv = iv;
-            MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, 0, 0, cameraFile.getAbsolutePath(), 0, true, 0, 0, 0);
+            MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, 0, 0, sgPath != null ? sgPath : cameraFile.getAbsolutePath(), 0, true, 0, 0, 0);
             entry.ttl = ttl;
             entry.effectId = effectId;
             delegate.sendMedia(entry, videoEditedInfo, notify, scheduleDate, scheduleRepeatPeriod, false, stars);
+            sgClose(false);
             if (scheduleDate != 0) {
                 startAnimation(false, false);
             }
@@ -1093,6 +1100,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
     }
 
     public void cancel(boolean byGesture) {
+        sgClose(true);
         stopProgressTimer();
         if (videoPlayer != null) {
             videoPlayer.releasePlayer(true);
@@ -2942,6 +2950,7 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
             videoPlayer.play();
             videoPlayer.setMute(true);
             startProgressTimer();
+            InstantCameraView.this.sgOnPreview(file);
 
             AnimatorSet animatorSet = new AnimatorSet();
             animatorSet.playTogether(
@@ -3967,4 +3976,289 @@ public class InstantCameraView extends InstantCameraViewBase implements Notifica
             return false;
         }
     }
+
+    // region Solegram: the round video editor (masks, filters, voice)
+
+    private com.solegram.messenger.ui.SolegramRoundEditor.Panel sgPanel;
+    private com.solegram.messenger.ui.SolegramRoundEditor.Overlay sgOverlayView;
+    private final com.solegram.messenger.ui.SolegramRoundMasks.Sprites sgSprites = new com.solegram.messenger.ui.SolegramRoundMasks.Sprites();
+    private int sgMask, sgFilter, sgVoice;
+    private String sgSourcePath;
+    private String sgVoicePath;
+    private com.solegram.messenger.SolegramRoundFx.FaceTrack sgTrack;
+    private java.util.concurrent.atomic.AtomicBoolean sgCancel;
+    private float sgShift;
+    private ValueAnimator sgShiftAnimator;
+    private int sgVoiceRequest;
+
+    /** The recorded video plays for a check before sending: the editor opens under it. */
+    private void sgOnPreview(File file) {
+        if (!com.solegram.messenger.SolegramConfig.roundEditor || file == null || !file.exists()) {
+            return;
+        }
+        sgClose(true);
+        sgSourcePath = file.getAbsolutePath();
+        sgMask = com.solegram.messenger.ui.SolegramRoundMasks.NONE;
+        sgFilter = com.solegram.messenger.SolegramRoundFx.F_NONE;
+        sgVoice = com.solegram.messenger.SolegramVoiceEffects.NONE;
+        sgTrack = null;
+
+        sgOverlayView = new com.solegram.messenger.ui.SolegramRoundEditor.Overlay(getContext(), sgSprites);
+        sgOverlayView.setClock(() -> videoPlayer != null ? videoPlayer.getCurrentPosition() : -1);
+        cameraContainer.addView(sgOverlayView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        sgPanel = new com.solegram.messenger.ui.SolegramRoundEditor.Panel(getContext(), resourcesProvider, new com.solegram.messenger.ui.SolegramRoundEditor.Callback() {
+            @Override
+            public void onMask(int mask) {
+                sgMask = mask;
+                sgSprites.prepare(mask);
+                if (sgOverlayView != null) {
+                    sgOverlayView.setMask(mask, sgTrack);
+                }
+            }
+
+            @Override
+            public void onFilter(int filter) {
+                sgFilter = filter;
+                sgApplyFilterPreview();
+            }
+
+            @Override
+            public void onVoice(int effect) {
+                sgSetVoice(effect);
+            }
+        });
+        sgPanel.setSelected(sgMask, sgFilter, sgVoice);
+        sgPanel.setMasksState(false, false);
+        addView(sgPanel, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 8, 0, 8, 8));
+        sgPanel.setAlpha(0f);
+        sgPanel.setTranslationY(dp(24));
+        sgPanel.animate().alpha(1f).translationY(0).setDuration(320).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        sgPanel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> sgUpdateShift(true));
+
+        // a frame of the video for the filters' buttons
+        AndroidUtilities.runOnUIThread(() -> {
+            if (sgPanel != null && textureView != null) {
+                try {
+                    final Bitmap frame = textureView.getBitmap(dp(56), dp(56));
+                    if (frame != null) {
+                        sgPanel.setThumbnail(frame);
+                    }
+                } catch (Throwable ignore) {
+                }
+            }
+        }, 450);
+
+        // the face, for the masks
+        final java.util.concurrent.atomic.AtomicBoolean cancel = sgCancel = new java.util.concurrent.atomic.AtomicBoolean();
+        final String path = sgSourcePath;
+        final Context context = getContext().getApplicationContext();
+        new Thread(() -> {
+            final com.solegram.messenger.SolegramRoundFx.FaceTrack track = com.solegram.messenger.SolegramRoundFx.trackFaces(context, path, cancel);
+            AndroidUtilities.runOnUIThread(() -> {
+                if (cancel.get() || sgPanel == null || track == null) {
+                    return;
+                }
+                sgTrack = track;
+                sgPanel.setMasksState(true, !track.hasFace());
+                if (sgOverlayView != null) {
+                    sgOverlayView.setMask(sgMask, track);
+                }
+            });
+        }, "SolegramRoundFaces").start();
+    }
+
+    /** Moves the circle up as far as needed for the panel under it (not off the top). */
+    private void sgUpdateShift(boolean animated) {
+        float target = 0;
+        if (sgPanel != null && sgPanel.getHeight() > 0 && sgPanel.getVisibility() == VISIBLE) {
+            final int area = getHeight() - getPaddingBottom();
+            final float circleBottom = area / 2f + textureViewSize / 2f;
+            final float panelTop = sgPanel.getTop();
+            final float need = circleBottom + dp(12) - panelTop;
+            final float room = area / 2f - textureViewSize / 2f - dp(8);
+            target = -Math.max(0, Math.min(need, room));
+        }
+        if (target == sgShift && (sgShiftAnimator == null || !sgShiftAnimator.isRunning())) {
+            return;
+        }
+        if (sgShiftAnimator != null) {
+            sgShiftAnimator.cancel();
+        }
+        if (!animated) {
+            sgShift = target;
+            updateTranslationY();
+            return;
+        }
+        sgShiftAnimator = ValueAnimator.ofFloat(sgShift, target);
+        sgShiftAnimator.addUpdateListener(a -> {
+            sgShift = (float) a.getAnimatedValue();
+            updateTranslationY();
+        });
+        sgShiftAnimator.setDuration(320);
+        sgShiftAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        sgShiftAnimator.start();
+    }
+
+    private void sgApplyFilterPreview() {
+        if (textureView != null) {
+            if (sgFilter == com.solegram.messenger.SolegramRoundFx.F_NONE) {
+                textureView.setLayerPaint(null);
+            } else {
+                final Paint p = new Paint();
+                p.setColorFilter(new android.graphics.ColorMatrixColorFilter(com.solegram.messenger.SolegramRoundFx.previewMatrix(sgFilter)));
+                textureView.setLayerPaint(p);
+            }
+        }
+        if (sgOverlayView != null) {
+            sgOverlayView.setVignette(com.solegram.messenger.SolegramRoundFx.previewVignette(sgFilter));
+        }
+    }
+
+    /** The sound through a voice effect: the video is written again with it, then plays with sound. */
+    private void sgSetVoice(int effect) {
+        if (sgPanel == null || sgSourcePath == null || effect == sgVoice) {
+            return;
+        }
+        final int request = ++sgVoiceRequest;
+        if (effect == com.solegram.messenger.SolegramVoiceEffects.NONE) {
+            sgVoice = effect;
+            sgDeleteVoiceFile();
+            sgPanel.setSelected(sgMask, sgFilter, sgVoice);
+            sgReplacePlayerSource(sgSourcePath);
+            return;
+        }
+        sgPanel.setVoiceBusy(effect);
+        final String src = sgSourcePath;
+        final File dst = new File(new File(src).getParentFile(), "sg_round_" + System.currentTimeMillis() + "_" + effect + ".mp4");
+        final java.util.concurrent.atomic.AtomicBoolean cancel = sgCancel;
+        new Thread(() -> {
+            final boolean ok = com.solegram.messenger.SolegramRoundFx.replaceAudio(src, dst.getAbsolutePath(), effect, cancel);
+            AndroidUtilities.runOnUIThread(() -> {
+                if (sgPanel == null || request != sgVoiceRequest || cancel == null || cancel.get()) {
+                    dst.delete();
+                    return;
+                }
+                sgPanel.setVoiceBusy(-1);
+                if (!ok) {
+                    dst.delete();
+                    BulletinFactory.of(this, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.SG_VoiceFxFailed)).show();
+                    return;
+                }
+                sgDeleteVoiceFile();
+                sgVoice = effect;
+                sgVoicePath = dst.getAbsolutePath();
+                sgPanel.setSelected(sgMask, sgFilter, sgVoice);
+                sgReplacePlayerSource(sgVoicePath);
+            });
+        }, "SolegramRoundVoice").start();
+    }
+
+    /** The preview plays another file from the same moment, with its sound on (to hear the effect). */
+    private void sgReplacePlayerSource(String path) {
+        if (videoPlayer == null || textureView == null) {
+            return;
+        }
+        final long position = videoPlayer.getCurrentPosition();
+        videoPlayer.preparePlayer(Uri.fromFile(new File(path)), "other");
+        videoPlayer.seekTo(Math.max(0, position));
+        videoPlayer.play();
+        videoPlayer.setMute(false);
+        muteImageView.setAlpha(0f);
+    }
+
+    private void sgDeleteVoiceFile() {
+        if (sgVoicePath != null) {
+            try {
+                new File(sgVoicePath).delete();
+            } catch (Throwable ignore) {
+            }
+            sgVoicePath = null;
+        }
+    }
+
+    /**
+     * Puts the chosen mask, filter and voice into what is sent; returns the file to send instead of the recorded one
+     * (the one with the voice effect), or null.
+     */
+    private String sgApplyTo(VideoEditedInfo info) {
+        if (info == null || sgSourcePath == null) {
+            return null;
+        }
+        info.filterState = com.solegram.messenger.SolegramRoundFx.filterState(sgFilter);
+        if (sgMask != com.solegram.messenger.ui.SolegramRoundMasks.NONE && sgTrack != null && sgTrack.hasFace()) {
+            sgSprites.prepare(sgMask);
+            info.sgOverlay = new com.solegram.messenger.SolegramRoundFx.Overlay(sgTrack, sgMask, sgSprites);
+        }
+        if (sgVoicePath != null && new File(sgVoicePath).exists()) {
+            info.sgForceConvert = true;
+            info.originalPath = sgVoicePath;
+            final String path = sgVoicePath;
+            sgVoicePath = null; // it is the video being sent now: not deleted with the editor
+            return path;
+        }
+        return null;
+    }
+
+    /** The editor goes away (the video was sent or thrown away). */
+    private void sgClose(boolean deleteFiles) {
+        if (sgCancel != null) {
+            sgCancel.set(true);
+            sgCancel = null;
+        }
+        sgVoiceRequest++;
+        if (deleteFiles) {
+            sgDeleteVoiceFile();
+        } else {
+            sgVoicePath = null;
+        }
+        if (sgPanel != null) {
+            final View panel = sgPanel;
+            sgPanel = null;
+            panel.animate().alpha(0f).translationY(dp(24)).setDuration(200).withEndAction(() -> {
+                if (panel.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) panel.getParent()).removeView(panel);
+                }
+            }).start();
+        }
+        if (sgOverlayView != null) {
+            if (sgOverlayView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) sgOverlayView.getParent()).removeView(sgOverlayView);
+            }
+            sgOverlayView = null;
+        }
+        if (textureView != null && sgFilter != com.solegram.messenger.SolegramRoundFx.F_NONE) {
+            textureView.setLayerPaint(null);
+        }
+        sgFilter = com.solegram.messenger.SolegramRoundFx.F_NONE;
+        sgMask = com.solegram.messenger.ui.SolegramRoundMasks.NONE;
+        sgVoice = com.solegram.messenger.SolegramVoiceEffects.NONE;
+        sgTrack = null;
+        sgSourcePath = null;
+        if (sgShift != 0) {
+            sgUpdateShift(true);
+        }
+    }
+
+    /** The editor's button next to the recording: shows or hides the panel. */
+    public void sgToggleEditor() {
+        if (sgPanel == null) {
+            return;
+        }
+        final boolean show = sgPanel.getVisibility() != VISIBLE || sgPanel.getAlpha() < 0.5f;
+        if (show) {
+            sgPanel.setVisibility(VISIBLE);
+            sgPanel.animate().alpha(1f).translationY(0).setDuration(260).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).withEndAction(null).start();
+        } else {
+            final View panel = sgPanel;
+            panel.animate().alpha(0f).translationY(dp(24)).setDuration(200).withEndAction(() -> panel.setVisibility(GONE)).start();
+        }
+        AndroidUtilities.runOnUIThread(() -> sgUpdateShift(true), show ? 0 : 210);
+    }
+
+    public boolean sgEditorOpen() {
+        return sgPanel != null && sgPanel.getVisibility() == VISIBLE;
+    }
+
+    // endregion
 }
