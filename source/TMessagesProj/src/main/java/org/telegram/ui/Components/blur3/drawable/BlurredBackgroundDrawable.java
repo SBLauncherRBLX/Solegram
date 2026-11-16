@@ -408,6 +408,20 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
             return; // Solegram: something else draws the outline over it (the liquid menu's rim)
         }
         final Rect r = boundProps.boundsWithPadding;
+        if (boundProps.squircle) {
+            final int top = Theme.multAlpha(strokeColorTop, alpha), bottom = Theme.multAlpha(strokeColorBottom, alpha);
+            if (Color.alpha(top) != 0) {
+                solegramPaintStrokeTop.setColor(top);
+                solegramPaintStrokeTop.setStrokeWidth(boundProps.strokeWidthTop);
+                solegramDrawShapeStroke(canvas, r, boundProps.strokeWidthTop, true, solegramPaintStrokeTop);
+            }
+            if (Color.alpha(bottom) != 0) {
+                solegramPaintStrokeBottom.setColor(bottom);
+                solegramPaintStrokeBottom.setStrokeWidth(boundProps.strokeWidthBottom);
+                solegramDrawShapeStroke(canvas, r, boundProps.strokeWidthBottom, false, solegramPaintStrokeBottom);
+            }
+            return;
+        }
         if (!boundProps.hasArrow()) {
             // Solegram: the outline drawn along the shape, as before 13.2 (Telegram's baked rim is stretched from a
             // small mask and came out jagged and uneven)
@@ -453,6 +467,11 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
 
         final Path path = new Path();
         boolean radiiAreSame = true;
+        // Solegram: the iOS-like shape (SolegramSquircle) of floating glass rounded at every corner
+        boolean squircle;
+        boolean squircleAllowed = true;
+        boolean squircleSetting;
+        final com.solegram.messenger.ui.SolegramSquircle.Shape squircleShape = new com.solegram.messenger.ui.SolegramSquircle.Shape();
         final Rect boundsWithPadding = new Rect();
 
         int arrowSide = ARROW_NONE;
@@ -481,8 +500,18 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
             body.set(boundsWithPadding);
 
             path.rewind();
+            squircleSetting = com.solegram.messenger.ui.SolegramSquircle.enabled();
+            final int sw = boundsWithPadding.width(), sh = boundsWithPadding.height();
+            // round buttons stay circles, as on iOS
+            final boolean circle = Math.abs(sw - sh) <= Math.max(sw, sh) * 0.1f && radii[0] >= Math.min(sw, sh) / 2f - 1;
+            squircle = squircleSetting && squircleAllowed && !hasArrow() && radiiAreSame && radii[0] >= dp(6)
+                && sw > 0 && sh > 0 && !circle;
             if (hasArrow()) {
                 buildArrowPath();
+            } else if (squircle) {
+                com.solegram.messenger.ui.SolegramSquircle.addTo(path,
+                    boundsWithPadding.left, boundsWithPadding.top, boundsWithPadding.right, boundsWithPadding.bottom,
+                    radii[0], squircleShape);
             } else {
                 path.addRoundRect(
                     boundsWithPadding.left,
@@ -624,7 +653,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
         }
 
         void drawShadows(Canvas canvas, Paint paint, boolean useInAppKeyboardOptimization) {
-            if (useInAppKeyboardOptimization && !hasArrow()) {
+            if (useInAppKeyboardOptimization && !hasArrow() && !squircle) {
                 final float bottom = MathUtils.clamp(boundsWithPadding.top + radii[0] * 2,
                         boundsWithPadding.top, boundsWithPadding.bottom);
 
@@ -639,7 +668,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
         }
 
         void draw(Canvas canvas, Paint paint) {
-            if (radiiAreSame && !hasArrow()) {
+            if (radiiAreSame && !hasArrow() && !squircle) {
                 canvas.drawRoundRect(
                     boundsWithPadding.left,
                     boundsWithPadding.top,
@@ -680,6 +709,11 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 final RectF body = boundProps.body;
                 outline.setRoundRect((int) body.left, (int) body.top, (int) body.right, (int) body.bottom, boundProps.radii[0]);
             }
+            return;
+        }
+        if (boundProps.squircle && Build.VERSION.SDK_INT >= 33) {
+            // Solegram: since Android 13 any outline clips, so the views clip to the glass's own shape
+            outline.setPath(boundProps.path);
             return;
         }
         BlurredBackgroundDrawable.getOutline(outline, boundProps.boundsWithPadding, boundProps.radii);
@@ -723,6 +757,12 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
 
     public void enableInAppKeyboardOptimization() {
         inAppKeyboardOptimization = true;
+        if (boundProps.squircleAllowed) {
+            // a panel of the keyboard: it keeps its plain shape
+            boundProps.squircleAllowed = false;
+            boundProps.build();
+            onBoundPropsChanged();
+        }
     }
 
     private float shadowLayerRadius;
@@ -755,6 +795,33 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
     {
         solegramPaintStrokeTop.setStyle(Paint.Style.STROKE);
         solegramPaintStrokeBottom.setStyle(Paint.Style.STROKE);
+    }
+
+    private final Path solegramStrokePath = new Path();
+    private final Matrix solegramStrokeMatrix = new Matrix();
+
+    /**
+     * The outline of the iOS-like shape, drawn as {@link #drawStroke} draws it for a rounded rect: the shape a bit
+     * wider and moved in by half the stroke, so the line lies just inside the edge and thins out down the sides.
+     */
+    private void solegramDrawShapeStroke(Canvas canvas, Rect r, float strokeWidth, boolean isTop, Paint paint) {
+        final float w = r.width();
+        if (w <= 0 || strokeWidth <= 0) {
+            return;
+        }
+        final float half = strokeWidth / 2f;
+        solegramStrokeMatrix.setScale((w + 2 * half) / w, 1f, r.exactCenterX(), 0);
+        solegramStrokeMatrix.postTranslate(0, isTop ? half : -half);
+        boundProps.path.transform(solegramStrokeMatrix, solegramStrokePath);
+        final float band = boundProps.radii[0] * 2;
+        canvas.save();
+        final boolean visible = isTop
+            ? canvas.clipRect(r.left - half, r.top, r.right + half, MathUtils.clamp(r.top + band, r.top, r.bottom))
+            : canvas.clipRect(r.left - half, MathUtils.clamp(r.bottom - band, r.top, r.bottom), r.right + half, r.bottom);
+        if (visible) {
+            canvas.drawPath(solegramStrokePath, paint);
+        }
+        canvas.restore();
     }
 
     // the outline as Solegram drew it before Telegram 13.2: a stroke along the top and one along the bottom
@@ -1055,6 +1122,11 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
     public void draw(@NonNull Canvas canvas) {
         checkThemeColors();
         checkGlassSettings();
+        if (boundProps.squircleSetting != com.solegram.messenger.ui.SolegramSquircle.enabled()) {
+            // the shape switch in the glass settings changed: the shape is made again
+            boundProps.build();
+            onBoundPropsChanged();
+        }
         if (boundProps.boundsWithPadding.isEmpty()) {
             return;
         }
@@ -1420,7 +1492,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
         void setClipToOutline(boolean clipToOutline) {
             this.clipToOutline = clipToOutline;
             // the arrow's path is not an outline every Android clips by: the canvas clips it
-            renderNode.setClipToOutline(clipToOutline && !boundProps.hasArrow());
+            renderNode.setClipToOutline(clipToOutline && !boundProps.hasArrow() && !boundProps.squircle);
         }
 
         @Override
@@ -1463,7 +1535,7 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 renderNodeFill.setPosition(0, 0, b.width(), b.height());
                 renderNode.setPosition(0, 0, b.width(), b.height());
                 renderNode.setOutline(outline);
-                renderNode.setClipToOutline(clipToOutline && !boundProps.hasArrow());
+                renderNode.setClipToOutline(clipToOutline && !boundProps.hasArrow() && !boundProps.squircle);
                 invalidated = true;
             }
         }
@@ -1522,10 +1594,18 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
                 } else {
                     liquidGlassEffect.clearArrow();
                 }
+                final com.solegram.messenger.ui.SolegramSquircle.Shape shape = boundProps.squircleShape;
+                final boolean squircle = boundProps.squircle && !shape.isEmpty();
+                if (squircle) {
+                    liquidGlassEffect.setSquircle(shape.a0, shape.h0, shape.beta, shape.gamma);
+                } else {
+                    liquidGlassEffect.setSquircle(0, 0, 0, 0);
+                }
                 liquidGlassEffect.update(
                     body.width(), body.height(),
                     body.left - b.left, body.top - b.top,
-                    boundProps.shaderRadii[0], boundProps.shaderRadii[2], boundProps.shaderRadii[4], boundProps.shaderRadii[6],
+                    squircle ? shape.radius : boundProps.shaderRadii[0], squircle ? shape.radius : boundProps.shaderRadii[2],
+                    squircle ? shape.radius : boundProps.shaderRadii[4], squircle ? shape.radius : boundProps.shaderRadii[6],
                     thickness,
                     boundProps.liquidIntensity,
                     boundProps.liquidIndex,
@@ -1590,7 +1670,8 @@ public class BlurredBackgroundDrawable extends GlassDrawable implements Theme.Co
 
             final Rect b = boundProps.boundsWithPadding;
             canvas.save();
-            if (boundProps.hasArrow()) {
+            if (boundProps.hasArrow() || boundProps.squircle && clipToOutline) {
+                // the canvas clips a shape the render node's outline cannot (before Android 13)
                 canvas.clipPath(boundProps.path);
             }
             canvas.translate(b.left, b.top);

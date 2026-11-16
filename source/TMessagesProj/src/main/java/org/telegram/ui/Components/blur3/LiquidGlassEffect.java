@@ -44,6 +44,7 @@ public class LiquidGlassEffect {
         if (extended) {
             shader.setFloatUniform("dispersion", 0);
             shader.setFloatUniform("rim", 0);
+            shader.setFloatUniform("squircle", 0, 0, 0, 0);
         }
         node.setRenderEffect(effect = RenderEffect.createRuntimeShaderEffect(shader, "img"));
     }
@@ -88,6 +89,23 @@ public class LiquidGlassEffect {
 
     public void clearArrow() {
         setArrow(0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    // Solegram: the iOS-like shape (SolegramSquircle.Shape, in the pixels of the screen); a0 = 0 for a rounded rect
+    private float squircleA0, squircleH0, squircleBeta, squircleGamma;
+    private boolean squircleChanged;
+
+    public void setSquircle(float a0, float h0, float beta, float gamma) {
+        if (!extended) {
+            a0 = h0 = beta = gamma = 0; // Telegram's shader knows only the rounded rect
+        }
+        if (squircleA0 != a0 || squircleH0 != h0 || squircleBeta != beta || squircleGamma != gamma) {
+            squircleA0 = a0;
+            squircleH0 = h0;
+            squircleBeta = beta;
+            squircleGamma = gamma;
+            squircleChanged = true;
+        }
     }
 
     /**
@@ -141,9 +159,11 @@ public class LiquidGlassEffect {
             this.foregroundColor != foregroundColor ||
             Math.abs(this.dispersion - dispersion) > 0.001f ||
             Math.abs(this.rim - rim) > 0.001f ||
-            arrowChanged
+            arrowChanged ||
+            squircleChanged
         ) {
             arrowChanged = false;
+            squircleChanged = false;
             if (arrowHeight > 0) {
                 if (arrowShader == null) {
                     arrowShader = new RuntimeShader(AndroidUtilities.readRes(R.raw.liquid_glass_arrow_shader));
@@ -180,6 +200,7 @@ public class LiquidGlassEffect {
             if (extended && shader == plainShader) {
                 shader.setFloatUniform("dispersion", dispersion);
                 shader.setFloatUniform("rim", rim);
+                shader.setFloatUniform("squircle", squircleA0 * scale, squircleH0 * scale, squircleBeta, squircleGamma);
             }
             if (shader == arrowShader) {
                 shader.setFloatUniform("arrow", arrowHeight * scale, arrowTipRadius * scale, arrowFilletRadius * scale, arrowStripe * scale);

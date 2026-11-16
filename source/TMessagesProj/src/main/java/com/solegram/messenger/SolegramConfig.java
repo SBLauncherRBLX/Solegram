@@ -68,6 +68,8 @@ public class SolegramConfig {
     public static int glassTint;
     public static int glassTintAmount = 25;
     public static boolean glassShadow = true;
+    // floating glass in the iOS-like shape (SolegramSquircle)
+    public static boolean glassSquircle = true;
     public static boolean glassVibrancy = false;
     /** Window blur (Android 12+) behind popup menus, dialogs and bottom sheets. */
     public static boolean glassMenus = true;
@@ -448,6 +450,7 @@ public class SolegramConfig {
         glassTint = clamp(p.getInt("glassTint", 0), 0, SolegramGlass.TINT_COLORS.length - 1);
         glassTintAmount = clamp(p.getInt("glassTintAmount", 25), 0, 60);
         glassShadow = p.getBoolean("glassShadow", true);
+        glassSquircle = p.getBoolean("glassSquircle", true);
         glassVibrancy = p.getBoolean("glassVibrancy", false);
         glassMenus = p.getBoolean("glassMenus", true);
         streaks = p.getBoolean("streaks", true);
@@ -771,6 +774,7 @@ public class SolegramConfig {
             case "updateWifiOnly":
             case "showUserId":
             case "glassShadow":
+            case "glassSquircle":
             case "glassMenus":
             case "streaks":
             case "newPlayer":
@@ -955,6 +959,7 @@ public class SolegramConfig {
             .putInt("glassTint", 0)
             .putInt("glassTintAmount", 25)
             .putBoolean("glassShadow", true)
+            .putBoolean("glassSquircle", true)
             .putBoolean("liquidControls", true)
             .putBoolean("floatingHeader", true)
             .putBoolean("glassHeaderButtons", true)

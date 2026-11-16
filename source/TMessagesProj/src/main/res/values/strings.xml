@@ -11882,6 +11882,8 @@
     <string name="SG_GlassBlur">Blur under glass</string>
     <string name="SG_GlassHighlight">Edge highlight</string>
     <string name="SG_GlassShadow">Shadow under glass</string>
+    <string name="SG_GlassSquircle">iOS-style shape</string>
+    <string name="SG_GlassSquircleInfo">Glass pills, buttons and menus with smooth corners and slightly rounded sides</string>
     <string name="SG_GlassVibrancy">Vivid colours</string>
     <string name="SG_GlassVibrancyInfo">Boosts the colours of content under liquid glass</string>
     <string name="SG_GlassTint">Tint</string>

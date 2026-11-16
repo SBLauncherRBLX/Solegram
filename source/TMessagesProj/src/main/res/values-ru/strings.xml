@@ -467,6 +467,8 @@
     <string name="SG_GlassBlur">Размытие под стеклом</string>
     <string name="SG_GlassHighlight">Яркость обводки</string>
     <string name="SG_GlassShadow">Тень под стеклом</string>
+    <string name="SG_GlassSquircle">Форма как в iOS</string>
+    <string name="SG_GlassSquircleInfo">Пилюли, кнопки и меню из стекла с плавными углами и чуть выпуклыми краями</string>
     <string name="SG_GlassVibrancy">Насыщенные цвета</string>
     <string name="SG_GlassVibrancyInfo">Усиливает цвета содержимого под жидким стеклом</string>
     <string name="SG_GlassTint">Оттенок</string>

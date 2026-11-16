@@ -12,12 +12,45 @@ uniform float refract_intensity;
 uniform float4 foreground_color_premultiplied;
 uniform float dispersion;
 uniform float rim;
+// the iOS-like shape (SolegramSquircle): half the base's size and how much its sides are puffed out (beta: top and
+// bottom, gamma: left and right); x = 0 for a plain rounded rect
+uniform float4 squircle;
+
+const float SQ_N = 2.5;
 
 half sdfRect(half2 p, half4 r) {
   r.xy = (p.x > 0.0) ? r.xy : r.zw;
   r.x  = (p.y > 0.0) ? r.x  : r.y;
   half2 q = abs(p) - size + r.x;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r.x;
+}
+
+// the length of q in the superellipse norm: the corner of the base
+float sqNorm(float2 q) {
+  float m = max(q.x, q.y);
+  if (m <= 0.0) {
+    return 0.0;
+  }
+  float2 u = max(q / m, float2(0.0001));
+  return m * pow(pow(u.x, SQ_N) + pow(u.y, SQ_N), 1.0 / SQ_N);
+}
+
+float sdfShape(float2 p, half4 r) {
+  if (squircle.x <= 0.0) {
+    return sdfRect(half2(p), r);
+  }
+  // back from the puffed-out shape to the base (the stretch is small: a few steps are exact enough)
+  float2 a = abs(p);
+  float2 b = a;
+  for (int i = 0; i < 3; i++) {
+    float ty = min(b.y / squircle.y, 1.0);
+    b.x = a.x / (1.0 + squircle.w * (1.0 - ty * ty));
+    float tx = min(b.x / squircle.x, 1.0);
+    b.y = a.y / (1.0 + squircle.z * (1.0 - tx * tx));
+  }
+  float rr = float(r.x);
+  float2 q = b - squircle.xy + rr;
+  return sqNorm(max(q, float2(0.0))) + min(max(q.x, q.y), 0.0) - rr;
 }
 
 half4 srcOver(half4 src, half4 dst) {
@@ -27,16 +60,19 @@ half4 srcOver(half4 src, half4 dst) {
 }
 
 half4 main(in float2 fragCoord) {
-  half2 p = fragCoord - center;
-  half sdRaw = sdfRect(p, radius);
+  float2 pf = fragCoord - center;
+  half2 p = pf;
+  half sdRaw = sdfShape(pf, radius);
   // past the edge the lens goes on as at the edge: the outline clips it, but a downsampled glass is upscaled over it
   half sd = min(sdRaw, 0.0);
   float2 uv = fragCoord;
   float2 offset = float2(0.0);
   half edge = 0.0;
+  half sdX = 0.0;
+  half sdY = 0.0;
   {
-    half sdX = sdfRect(p + half2(1.0, 0.0), radius);
-    half sdY = sdfRect(p + half2(0.0, 1.0), radius);
+    sdX = sdfShape(pf + float2(1.0, 0.0), radius);
+    sdY = sdfShape(pf + float2(0.0, 1.0), radius);
 
     half n_cos = max(thickness + sd, 0.0) / thickness;
     half n_cos2 = n_cos * n_cos;
@@ -71,7 +107,7 @@ half4 main(in float2 fragCoord) {
     // light from the top left, as on real glass: the edges facing it and the opposite ones shine, the flanks
     // much less; a crisp line right on the outline gives the glass its edge, a soft glow across the bevel its
     // thickness, and a faint shade along the far inner edge its depth (it used to be one even glow all round)
-    half2 n2 = half2(sdfRect(p + half2(1.0, 0.0), radius) - sd, sdfRect(p + half2(0.0, 1.0), radius) - sd);
+    half2 n2 = half2(sdX - sd, sdY - sd);
     half nl = length(n2);
     n2 = nl > 0.0001 ? n2 / nl : half2(0.0, -1.0);
     half facing = dot(n2, half2(-0.7071, -0.7071));

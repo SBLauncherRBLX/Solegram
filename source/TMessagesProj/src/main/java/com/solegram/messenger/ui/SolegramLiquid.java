@@ -898,8 +898,16 @@ public final class SolegramLiquid {
                 if (m == 1 && !cutIn) {
                     // a single drop: exact rounded rect, no tracing
                     final float r = comp[4];
-                    path.addRoundRect(comp[0] - comp[2] - r, comp[1] - comp[3] - r,
-                            comp[0] + comp[2] + r, comp[1] + comp[3] + r, r, r, Path.Direction.CW);
+                    final float dw = 2 * (comp[2] + r), dh = 2 * (comp[3] + r);
+                    final boolean circle = Math.abs(dw - dh) <= Math.max(dw, dh) * 0.1f && r >= Math.min(dw, dh) / 2f - 1;
+                    if (SolegramSquircle.enabled() && r >= AndroidUtilities.dp(6) && !circle) {
+                        // the iOS-like shape of the glass it turns into (BlurredBackgroundDrawable)
+                        SolegramSquircle.addTo(path, comp[0] - comp[2] - r, comp[1] - comp[3] - r,
+                                comp[0] + comp[2] + r, comp[1] + comp[3] + r, r, squircleShape);
+                    } else {
+                        path.addRoundRect(comp[0] - comp[2] - r, comp[1] - comp[3] - r,
+                                comp[0] + comp[2] + r, comp[1] + comp[3] + r, r, r, Path.Direction.CW);
+                    }
                     continue;
                 }
                 final float p2 = k * 0.5f + AndroidUtilities.dp(4);
@@ -908,6 +916,7 @@ public final class SolegramLiquid {
         }
 
         private float[] comp = new float[P * 8];
+        private final SolegramSquircle.Shape squircleShape = new SolegramSquircle.Shape();
         private int[] parent = new int[8];
 
         private int find(int i) {

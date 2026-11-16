@@ -278,6 +278,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_VOICE_PREVIEW = 4248;
     private static final int ID_VOICE_EFFECTS = 4249;
     private static final int ID_ROUND_EDITOR = 4251;
+    private static final int ID_GLASS_SQUIRCLE = 4252;
     private static final int ID_HIDE_GIFTS = 405;
     private static final int ID_PROXIMITY = 406;
     private static final int ID_NO_VIBRATION = 407;
@@ -617,6 +618,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             glassSlider(items, R.string.SG_GlassBlur, "glassBlur", 0, 300, SolegramConfig.glassBlur, v -> v + "%");
             glassSlider(items, R.string.SG_GlassHighlight, "glassHighlight", 0, 300, SolegramConfig.glassHighlight, v -> v == 0 ? getString(R.string.SG_Off) : v + "%");
             items.add(UItem.asButtonCheck(ID_GLASS_PREVIEW_LOOK, getString(R.string.SG_GlassPreviewLook), getString(R.string.SG_GlassPreviewLookInfo)).setChecked(SolegramConfig.glassPreviewLook));
+            items.add(UItem.asButtonCheck(ID_GLASS_SQUIRCLE, getString(R.string.SG_GlassSquircle), getString(R.string.SG_GlassSquircleInfo)).setChecked(SolegramConfig.glassSquircle));
             items.add(UItem.asCheck(ID_GLASS_SHADOW, getString(R.string.SG_GlassShadow)).setChecked(SolegramConfig.glassShadow));
             if (liquid) {
                 items.add(UItem.asButtonCheck(ID_GLASS_VIBRANCY, getString(R.string.SG_GlassVibrancy), getString(R.string.SG_GlassVibrancyInfo)).setChecked(SolegramConfig.glassVibrancy));
@@ -1030,6 +1032,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_GLASS, ID_GLASS_CALL, R.string.SG_GlassCallScreen, -1},
         {PAGE_GLASS, ID_GLASS_TINT, R.string.SG_GlassTintColor, -1},
         {PAGE_GLASS, ID_GLASS_SHADOW, R.string.SG_GlassShadow, -1},
+        {PAGE_GLASS, ID_GLASS_SQUIRCLE, R.string.SG_GlassSquircle, -1},
         {PAGE_CHATS, 0, R.string.SG_Chats, -1},
         {PAGE_CHATS, ID_DOUBLE_TAP, R.string.SG_DoubleTap, -1},
         {PAGE_CHATS, ID_IOS_INPUT_BAR, R.string.SG_IosInputBar, -1},
@@ -2614,6 +2617,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                     glassPreview.refresh();
                 }
                 restartBulletin();
+                return;
+            case ID_GLASS_SQUIRCLE:
+                // every glass checks the switch when it draws and makes its shape again
+                toggleCheck(view, "glassSquircle");
+                if (glassPreview != null) {
+                    glassPreview.refresh();
+                }
+                redrawEverything();
                 return;
             case ID_GLASS_SHADOW:
                 toggleCheck(view, "glassShadow");
