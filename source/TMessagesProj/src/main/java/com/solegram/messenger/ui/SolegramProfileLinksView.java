@@ -53,8 +53,7 @@ import java.util.List;
 
 /**
  * Profile links as buttons: a capsule per link with the platform's mark in its colour and the platform's name,
- * wrapping onto more rows. With liquid glass on, the capsules are glass (a light fill, a rim lit from above,
- * a soft shadow); otherwise plain soft capsules. Tap opens, long press copies; on the own profile a last,
+ * wrapping onto more rows. Flat soft capsules, a whisper of each link's brand colour, no shadow or rim. Tap opens, long press copies; on the own profile a last,
  * neutral capsule (a pencil, no brand circle) opens the editor. Everything is measured when the links change,
  * nothing is made while drawing.
  */
@@ -266,7 +265,8 @@ public class SolegramProfileLinksView extends View {
     private void updateLook() {
         final int bg = Theme.getColor(backgroundKey, resourcesProvider);
         final boolean nowDark = ColorUtils.calculateLuminance(bg) < 0.5;
-        final boolean nowGlass = Build.VERSION.SDK_INT >= 33 && LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS);
+        // flat capsules everywhere: no lifted glass look (shadow and lit rim) even with liquid glass on
+        final boolean nowGlass = false;
         if (nowDark != dark || nowGlass != glass || !shadowSet) {
             for (Chip c : chips) {
                 c.rim = null;
