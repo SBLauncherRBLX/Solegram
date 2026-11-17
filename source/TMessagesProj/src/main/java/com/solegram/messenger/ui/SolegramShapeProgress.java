@@ -308,8 +308,24 @@ public final class SolegramShapeProgress {
      * 0..1 rounds it back into the circle as the download ends.
      */
     public void drawButton(Canvas canvas, float cx, float cy, float radius, int trackColor, int sectorColor, float shapeAmount) {
+        drawButton(canvas, cx, cy, radius, trackColor, sectorColor, shapeAmount, true);
+    }
+
+    /** The current shape alone, with {@code paint} (a cut-out round a badge, say); {@code advance}: step the animation. */
+    public void drawShape(Canvas canvas, float cx, float cy, float radius, Paint paint, float shapeAmount, boolean advance) {
         amount = Math.max(0, Math.min(1, shapeAmount));
-        tick();
+        if (advance) {
+            tick();
+        }
+        shapePath(cx, cy, radius * (1 + 0.05f * (float) Math.sin(pop * Math.PI) * amount));
+        canvas.drawPath(path, paint);
+    }
+
+    public void drawButton(Canvas canvas, float cx, float cy, float radius, int trackColor, int sectorColor, float shapeAmount, boolean advance) {
+        amount = Math.max(0, Math.min(1, shapeAmount));
+        if (advance) {
+            tick();
+        }
         final float R = radius * (1 + 0.05f * (float) Math.sin(pop * Math.PI) * amount);
         shapePath(cx, cy, R);
         fill.setColor(trackColor);

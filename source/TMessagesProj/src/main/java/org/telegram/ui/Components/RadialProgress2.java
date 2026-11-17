@@ -36,6 +36,10 @@ public class RadialProgress2 {
     private com.solegram.messenger.ui.SolegramShapeProgress bud;
     private float budAmount;
     private long budTime;
+    // the same for the small badge of a file (the download in the corner of its icon)
+    private com.solegram.messenger.ui.SolegramShapeProgress miniBud;
+    private float miniBudAmount;
+    private long miniBudTime;
 
     private static boolean isLoadingIcon(int icon) {
         return icon == MediaActionDrawable.ICON_CANCEL || icon == MediaActionDrawable.ICON_CANCEL_FILL
@@ -576,11 +580,45 @@ public class RadialProgress2 {
                 alpha = 1.0f;
             }
 
+            // Solegram: the badge as the bud while its file loads
+            final boolean canMiniBud = com.solegram.messenger.ui.SolegramShapeProgress.enabled() && drawMiniIcon && circleCrossfadeColorKey < 0;
+            final boolean miniLoading = isLoadingIcon(miniMediaActionDrawable.getCurrentIcon())
+                || miniMediaActionDrawable.getCurrentIcon() == MediaActionDrawable.ICON_NONE && isLoadingIcon(miniMediaActionDrawable.getNextIcon());
+            final long miniNow = android.os.SystemClock.elapsedRealtime();
+            final float miniDt = miniBudTime == 0 ? 0.016f : Math.min(0.05f, (miniNow - miniBudTime) / 1000f);
+            miniBudTime = miniNow;
+            final float miniTarget = canMiniBud && miniLoading ? 1f : 0f;
+            if (miniBudAmount != miniTarget) {
+                miniBudAmount = miniTarget > miniBudAmount ? Math.min(miniTarget, miniBudAmount + miniDt / 0.25f) : Math.max(miniTarget, miniBudAmount - miniDt / 0.3f);
+            }
+            final boolean miniBudOn = canMiniBud && miniBudAmount > 0;
+            miniMediaActionDrawable.solegramHideArc = miniBudOn;
+            if (miniBudOn) {
+                if (miniBud == null) {
+                    miniBud = new com.solegram.messenger.ui.SolegramShapeProgress();
+                }
+                final float loaded = miniMediaActionDrawable.getAnimatedProgress();
+                miniBud.setIndeterminate(loaded <= 0.001f);
+                miniBud.setProgress(loaded);
+                if (parent != null) {
+                    parent.invalidate();
+                }
+            }
+
             if (miniDrawCanvas != null) {
-                miniDrawCanvas.drawCircle(AndroidUtilities.dp(18 + size + offset), AndroidUtilities.dp(18 + size + offset), AndroidUtilities.dp(halfSize + 1) * alpha * miniIconScale, Theme.checkboxSquare_eraserPaint);
+                if (miniBudOn) {
+                    // the gap round the badge follows its shape
+                    miniBud.drawShape(miniDrawCanvas, AndroidUtilities.dp(18 + size + offset), AndroidUtilities.dp(18 + size + offset), AndroidUtilities.dp(halfSize + 1) * alpha * miniIconScale, Theme.checkboxSquare_eraserPaint, miniBudAmount, true);
+                } else {
+                    miniDrawCanvas.drawCircle(AndroidUtilities.dp(18 + size + offset), AndroidUtilities.dp(18 + size + offset), AndroidUtilities.dp(halfSize + 1) * alpha * miniIconScale, Theme.checkboxSquare_eraserPaint);
+                }
             } else {
                 miniProgressBackgroundPaint.setColor(progressColor);
-                canvas.drawCircle(cx, cy, AndroidUtilities.dp(12), miniProgressBackgroundPaint);
+                if (miniBudOn) {
+                    miniBud.drawShape(canvas, cx, cy, AndroidUtilities.dp(12), miniProgressBackgroundPaint, miniBudAmount, true);
+                } else {
+                    canvas.drawCircle(cx, cy, AndroidUtilities.dp(12), miniProgressBackgroundPaint);
+                }
             }
 
             if (miniDrawCanvas != null) {
@@ -593,7 +631,14 @@ public class RadialProgress2 {
                 canvas.scale(miniIconScale, miniIconScale, cx, cy);
             }
 
-            canvas.drawCircle(cx, cy, AndroidUtilities.dp(halfSize) * alpha + AndroidUtilities.dp(1) * (1.0f - circleCheckProgress), circleMiniPaint);
+            if (miniBudOn) {
+                final int miniIconColor = iconColorKey >= 0 ? getThemedColor(iconColorKey) : iconColor;
+                final int sector = Theme.multAlpha(miniIconColor, 0.34f * miniBudAmount * (circleMiniPaint.getAlpha() / 255f));
+                miniBud.drawButton(canvas, cx, cy, AndroidUtilities.dp(halfSize) * alpha + AndroidUtilities.dp(1) * (1.0f - circleCheckProgress),
+                    circleMiniPaint.getColor(), sector, miniBudAmount, false);
+            } else {
+                canvas.drawCircle(cx, cy, AndroidUtilities.dp(halfSize) * alpha + AndroidUtilities.dp(1) * (1.0f - circleCheckProgress), circleMiniPaint);
+            }
             if (drawMiniIcon) {
                 miniMediaActionDrawable.setBounds((int) (cx - AndroidUtilities.dp(halfSize) * alpha), (int) (cy - AndroidUtilities.dp(halfSize) * alpha), (int) (cx + AndroidUtilities.dp(halfSize) * alpha), (int) (cy + AndroidUtilities.dp(halfSize) * alpha));
                 miniMediaActionDrawable.draw(canvas);
