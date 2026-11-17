@@ -108,7 +108,7 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
 
     private int bgStyle = prefs().getInt("bg", BG_COVER);
     private int coverStyle = prefs().getInt("cover", COVER_SQUARE);
-    private int progressStyle = prefs().getInt("progress", SolegramCometProgress.STYLE_COMET);
+    private int progressStyle = prefs().getInt("progress", SolegramCometProgress.STYLE_WAVE);
     private boolean lyricsFirst = prefs().getBoolean("lyricsFirst", false);
 
     private void saveLook() {
@@ -804,7 +804,7 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
             coverStyle = i;
             cover.invalidate();
         });
-        chipRow(column, R.string.SG_PlayerProgress, new int[]{R.string.SG_PlayerProgressComet, R.string.SG_PlayerProgressLine}, () -> progressStyle, i -> {
+        chipRow(column, R.string.SG_PlayerProgress, new int[]{R.string.SG_PlayerProgressComet, R.string.SG_PlayerProgressLine, R.string.SG_PlayerProgressWave}, () -> progressStyle, i -> {
             progressStyle = i;
             progress.setStyle(i);
         });

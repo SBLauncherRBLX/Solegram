@@ -13832,5 +13832,6 @@
     <string name="SG_ThemeBackgroundColorInfo">«A»: the background follows the main colour. A light background is used in the light theme, a dark one in the dark theme; black suits AMOLED screens.</string>
     <string name="SG_ShapeProgress">“Bud” loading indicator</string>
     <string name="SG_ShapeProgressInfo">Loading as Material 3 shapes that flow into one another; a percentage fills them as a sector.</string>
+    <string name="SG_PlayerProgressWave">Wave</string>
     <!-- SOLEGRAM END -->
 </resources>

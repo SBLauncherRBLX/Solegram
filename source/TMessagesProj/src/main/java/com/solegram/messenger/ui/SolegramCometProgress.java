@@ -25,11 +25,13 @@ import org.telegram.messenger.AndroidUtilities;
 
 /**
  * The player's progress line with a comet: while the track plays a bright tail grows behind the playhead, and on
- * pause it fades and pulls back into the head. Dragging seeks. Style LINE draws a plain line instead.
+ * pause it fades and pulls back into the head. Dragging seeks. Style LINE draws a plain line instead; style WAVE
+ * draws the played part as a calm wave that sways while the track plays and lies straight on pause, up to a thin
+ * upright head (Material 3 style).
  */
 public class SolegramCometProgress extends View {
 
-    public static final int STYLE_COMET = 0, STYLE_LINE = 1;
+    public static final int STYLE_COMET = 0, STYLE_LINE = 1, STYLE_WAVE = 2;
 
     public interface Delegate {
         void onSeek(float progress, boolean done);
@@ -58,6 +60,11 @@ public class SolegramCometProgress extends View {
     private boolean dragging;
     private float dragProgress;
     private long lastFrame;
+    // the wave: how much it sways (0 on pause) and where it is along the line
+    private float waveAmount;
+    private float wavePhase;
+    private final Path wavePath = new Path();
+    private final android.graphics.RectF headRect = new android.graphics.RectF();
 
     public SolegramCometProgress(Context context) {
         super(context);
@@ -163,6 +170,64 @@ public class SolegramCometProgress extends View {
         cone.setShader(null);
     }
 
+    /** The played part as a wave up to a gap and an upright head; the rest a faint straight line. */
+    private void drawWave(Canvas canvas, float pad, float w, float x, float cy, float dt) {
+        final float eased = waveAmount * waveAmount * (3 - 2 * waveAmount);
+        // the wave runs forward while it plays and slows to a stop as it lies down
+        wavePhase += dp(34) * dt / 1000f * eased;
+        final float wavelength = dp(30);
+        if (wavePhase > wavelength * 1000) {
+            wavePhase -= wavelength * 1000;
+        }
+        final float amp = dp(2.4f) * eased * (1 - press);
+        final float stroke = dp(3.5f) + dp(1) * press;
+        final float gap = dp(6);
+
+        track.setStrokeWidth(stroke);
+        if (x + gap < pad + w) {
+            track.setColor(ColorUtils.setAlphaComponent(color, 0x3D));
+            canvas.drawLine(x + gap, cy, pad + w, cy, track);
+            if (buffered > progress && pad + w * buffered > x + gap) {
+                track.setColor(ColorUtils.setAlphaComponent(color, 0x2A));
+                canvas.drawLine(x + gap, cy, pad + w * buffered, cy, track);
+            }
+        }
+
+        final float end = x - gap;
+        if (end > pad) {
+            fill.setShader(null);
+            fill.setColor(color);
+            fill.setStrokeWidth(stroke);
+            fill.setStyle(Paint.Style.STROKE);
+            fill.setStrokeJoin(Paint.Join.ROUND);
+            wavePath.rewind();
+            final float step = dp(1.5f);
+            final float flatEnd = dp(14), flatStart = dp(10);
+            for (float px = pad; ; px += step) {
+                final float at = Math.min(px, end);
+                // flat where it meets the start and the head, so both ends sit on the line
+                final float fade = Math.min(1, (end - at) / flatEnd) * Math.min(1, (at - pad) / flatStart);
+                final float y = cy + (float) Math.sin((at - wavePhase) / wavelength * Math.PI * 2) * amp * fade;
+                if (at == pad) {
+                    wavePath.moveTo(at, y);
+                } else {
+                    wavePath.lineTo(at, y);
+                }
+                if (at >= end) {
+                    break;
+                }
+            }
+            canvas.drawPath(wavePath, fill);
+            fill.setStyle(Paint.Style.FILL);
+        }
+
+        // the head: a thin upright bar, taller and wider while dragged
+        final float hh = dp(15) + dp(7) * press, hw = dp(3.5f) + dp(1.5f) * press;
+        head.setColor(color);
+        headRect.set(x - hw / 2f, cy - hh / 2f, x + hw / 2f, cy + hh / 2f);
+        canvas.drawRoundRect(headRect, hw / 2f, hw / 2f, head);
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         final long now = SystemClock.elapsedRealtime();
@@ -187,6 +252,22 @@ public class SolegramCometProgress extends View {
         final float cy = getHeight() / 2f;
         final float w = getWidth() - pad * 2;
         final float x = pad + w * progress;
+
+        if (style == STYLE_WAVE) {
+            final float targetWave = playing && !dragging ? 1f : 0f;
+            if (waveAmount != targetWave) {
+                waveAmount = targetWave > waveAmount ? Math.min(1, waveAmount + dt / 400f) : Math.max(0, waveAmount - dt / 500f);
+                animating = true;
+            }
+            drawWave(canvas, pad, w, x, cy, dt);
+            if (animating || waveAmount > 0) {
+                postInvalidateOnAnimation();
+            } else {
+                lastFrame = 0;
+            }
+            return;
+        }
+
         final float line = dp(5.5f) + dp(1.5f) * press;
 
         final float eased = 1f - (1f - tailAmount) * (1f - tailAmount);
