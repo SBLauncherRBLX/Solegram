@@ -279,6 +279,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_VOICE_EFFECTS = 4249;
     private static final int ID_ROUND_EDITOR = 4251;
     private static final int ID_GLASS_SQUIRCLE = 4252;
+    private static final int ID_SHAPE_PROGRESS = 4253;
     private static final int ID_HIDE_GIFTS = 405;
     private static final int ID_PROXIMITY = 406;
     private static final int ID_NO_VIBRATION = 407;
@@ -527,6 +528,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asButtonCheck(ID_ANIMATE_LISTS, getString(R.string.SG_AnimateLists), getString(R.string.SG_AnimateListsInfo)).setChecked(SolegramConfig.animateLists));
         items.add(UItem.asButtonCheck(ID_NEUTRAL_OVERSCROLL, getString(R.string.SG_NeutralOverscroll), getString(R.string.SG_NeutralOverscrollInfo)).setChecked(SolegramConfig.neutralOverscroll));
         items.add(UItem.asButtonCheck(ID_TYPING_ANIMATION, getString(R.string.SG_TypingAnimation), getString(R.string.SG_TypingAnimationInfo)).setChecked(SolegramConfig.typingAnimation));
+        items.add(UItem.asButtonCheck(ID_SHAPE_PROGRESS, getString(R.string.SG_ShapeProgress), getString(R.string.SG_ShapeProgressInfo)).setChecked(SolegramConfig.shapeProgress));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_HideAndDeclutter)));
@@ -1023,6 +1025,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_APPEARANCE, ID_ANIMATE_LISTS, R.string.SG_AnimateLists, -1},
         {PAGE_APPEARANCE, ID_NEUTRAL_OVERSCROLL, R.string.SG_NeutralOverscroll, -1},
         {PAGE_APPEARANCE, ID_TYPING_ANIMATION, R.string.SG_TypingAnimation, -1},
+        {PAGE_APPEARANCE, ID_SHAPE_PROGRESS, R.string.SG_ShapeProgress, -1},
         {PAGE_APPEARANCE, ID_HIDE_STORIES, R.string.SG_HideStories, -1},
         {PAGE_APPEARANCE, ID_HIDE_EMOJI_STATUS, R.string.SG_HideEmojiStatus, -1},
         {PAGE_APPEARANCE, ID_HIDE_PREMIUM, R.string.SG_HidePremium, -1},
@@ -2484,6 +2487,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_TYPING_ANIMATION:
                 toggleCheck(view, "typingAnimation");
+                return;
+            case ID_SHAPE_PROGRESS:
+                toggleCheck(view, "shapeProgress");
                 return;
             case ID_NEUTRAL_OVERSCROLL:
                 toggleCheck(view, "neutralOverscroll");

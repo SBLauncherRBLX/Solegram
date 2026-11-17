@@ -203,6 +203,11 @@ public class MediaActionDrawable extends Drawable {
         return nextIcon;
     }
 
+    /** Solegram: the icon it is turning into. */
+    public int getNextIcon() {
+        return nextIcon;
+    }
+
     public int getPreviousIcon() {
         return currentIcon;
     }
@@ -228,6 +233,14 @@ public class MediaActionDrawable extends Drawable {
     public float getProgress() {
         return downloadProgress;
     }
+
+    /** Solegram: the progress as drawn (eased towards {@link #getProgress()}). */
+    public float getAnimatedProgress() {
+        return animatedDownloadProgress;
+    }
+
+    /** Solegram: the button around draws the progress itself (the "bud" indicator), so the arc is left out. */
+    public boolean solegramHideArc;
 
     public static float getCircleValue(float value) {
         while (value > 360) {
@@ -555,7 +568,7 @@ public class MediaActionDrawable extends Drawable {
                 canvas.save();
                 canvas.scale(progressScale, progressScale, progressScaleX, progressScaleY);
             }
-            if ((currentIcon == ICON_CANCEL || currentIcon == ICON_CANCEL_FILL || currentIcon == ICON_NONE && (nextIcon == ICON_CANCEL_FILL || nextIcon == ICON_CANCEL)) && alpha != 0) {
+            if ((currentIcon == ICON_CANCEL || currentIcon == ICON_CANCEL_FILL || currentIcon == ICON_NONE && (nextIcon == ICON_CANCEL_FILL || nextIcon == ICON_CANCEL)) && alpha != 0 && !solegramHideArc) {
                 float rad = Math.max(4, 360 * animatedDownloadProgress);
                 int diff = AndroidUtilities.dp(isMini ? 2 : 4);
                 rect.set(bounds.left + diff, bounds.top + diff, bounds.right - diff, bounds.bottom - diff);
@@ -580,7 +593,7 @@ public class MediaActionDrawable extends Drawable {
                 alpha = 255;
             }
 
-            if (alpha != 0) {
+            if (alpha != 0 && !solegramHideArc) {
                 applyShaderMatrix(false);
                 paint.setAlpha((int) (alpha * overrideAlpha));
                 float rad = Math.max(4, 360 * animatedDownloadProgress);

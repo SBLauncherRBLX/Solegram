@@ -265,8 +265,29 @@ public class RadialProgressView extends View implements Theme.Colorable {
         }
     }
 
+    // Solegram: the "bud" indicator (M3 shapes, filled as a sector) instead of the arc, unless it turns into a circle
+    private com.solegram.messenger.ui.SolegramShapeProgress shapeProgress;
+
+    private boolean drawShape(Canvas canvas, float cx, float cy) {
+        if (!com.solegram.messenger.ui.SolegramShapeProgress.enabled() || toCircle || toCircleProgress != 0) {
+            return false;
+        }
+        if (shapeProgress == null) {
+            shapeProgress = new com.solegram.messenger.ui.SolegramShapeProgress();
+        }
+        shapeProgress.setIndeterminate(noProgress);
+        shapeProgress.setProgress(animatedProgress);
+        shapeProgress.draw(canvas, cx, cy, com.solegram.messenger.ui.SolegramShapeProgress.sizeFor(size), progressPaint.getColor());
+        drawingCircleLenght = currentCircleLength;
+        updateAnimation();
+        return true;
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
+        if (drawShape(canvas, getMeasuredWidth() / 2f, getMeasuredHeight() / 2f)) {
+            return;
+        }
         int x = (getMeasuredWidth() - size) / 2;
         int y = (getMeasuredHeight() - size) / 2;
         cicleRect.set(x, y, x + size, y + size);
@@ -275,6 +296,9 @@ public class RadialProgressView extends View implements Theme.Colorable {
     }
 
     public void draw(Canvas canvas, float cx, float cy) {
+        if (drawShape(canvas, cx, cy)) {
+            return;
+        }
         cicleRect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy +  size / 2f);
         canvas.drawArc(cicleRect, radOffset, drawingCircleLenght = currentCircleLength, false, progressPaint);
         updateAnimation();

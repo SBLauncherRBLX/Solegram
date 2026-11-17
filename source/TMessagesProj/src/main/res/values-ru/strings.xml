@@ -2415,5 +2415,7 @@
     <string name="SG_ThemeAnyColor">Любой цвет</string>
     <string name="SG_ThemeBackgroundColor">Фон</string>
     <string name="SG_ThemeBackgroundColorInfo">«A» — фон подберётся под основной цвет. Светлый фон применяется в светлой теме, тёмный — в тёмной, чёрный подходит для AMOLED-экранов.</string>
+    <string name="SG_ShapeProgress">Индикатор «Бутон»</string>
+    <string name="SG_ShapeProgressInfo">Загрузка в виде форм Material 3, которые перетекают друг в друга; процент заполняется сектором.</string>
     <!-- SOLEGRAM END -->
 </resources>

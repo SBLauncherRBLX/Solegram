@@ -86,6 +86,8 @@ public class SolegramConfig {
     public static boolean glassPreviewLook = true;
     /** Letters fade in when typed and fade out when erased. */
     public static boolean typingAnimation = true;
+    /** Loading spinners as the "bud" indicator (SolegramShapeProgress): Material 3 shapes filled as a sector. */
+    public static boolean shapeProgress = true;
     /** "Translate here" in the message menu: the bubble shows the translation. */
     public static boolean translateHere = true;
     /** Headers (chat list, Feed) blur what scrolls under them, also in the light theme, with a lighter veil. */
@@ -464,6 +466,7 @@ public class SolegramConfig {
         liquidControls = p.getBoolean("liquidControls", true);
         glassPreviewLook = p.getBoolean("glassPreviewLook", true);
         typingAnimation = p.getBoolean("typingAnimation", true);
+        shapeProgress = p.getBoolean("shapeProgress", true);
         translateHere = p.getBoolean("translateHere", true);
         frostedHeaders = p.getBoolean("frostedHeaders", true);
         floatingHeader = true;  // always: the bar behind the title is gone for good, the list fades under it
@@ -792,6 +795,7 @@ public class SolegramConfig {
             case "liquidControls":
             case "glassPreviewLook":
             case "typingAnimation":
+            case "shapeProgress":
             case "translateHere":
             case "frostedHeaders":
             case "floatingHeader":

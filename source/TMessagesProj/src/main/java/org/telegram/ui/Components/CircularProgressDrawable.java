@@ -56,12 +56,22 @@ public class CircularProgressDrawable extends Drawable {
     }
 
     private float angleOffset;
+    private com.solegram.messenger.ui.SolegramShapeProgress shapeProgress;
     private final RectF bounds = new RectF();
 
     @Override
     public void draw(@NonNull Canvas canvas) {
         if (start < 0) {
             start = SystemClock.elapsedRealtime();
+        }
+        if (com.solegram.messenger.ui.SolegramShapeProgress.enabled()) {
+            // Solegram: the "bud" indicator instead of the arc
+            if (shapeProgress == null) {
+                shapeProgress = new com.solegram.messenger.ui.SolegramShapeProgress();
+            }
+            shapeProgress.draw(canvas, bounds.centerX(), bounds.centerY(), com.solegram.messenger.ui.SolegramShapeProgress.sizeFor(size), paint.getColor());
+            invalidateSelf();
+            return;
         }
         updateSegment();
         canvas.drawArc(

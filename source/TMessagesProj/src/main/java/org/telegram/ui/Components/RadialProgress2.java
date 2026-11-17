@@ -32,6 +32,16 @@ public class RadialProgress2 {
     public RectF progressRect = new RectF();
     private View parent;
 
+    // Solegram: the "bud" indicator - while a file loads, the round button takes Material 3 shapes and fills as a sector
+    private com.solegram.messenger.ui.SolegramShapeProgress bud;
+    private float budAmount;
+    private long budTime;
+
+    private static boolean isLoadingIcon(int icon) {
+        return icon == MediaActionDrawable.ICON_CANCEL || icon == MediaActionDrawable.ICON_CANCEL_FILL
+            || icon == MediaActionDrawable.ICON_EMPTY || icon == MediaActionDrawable.ICON_CANCEL_PERCENT;
+    }
+
     private boolean previousCheckDrawable;
 
     private boolean drawMiniIcon;
@@ -461,7 +471,36 @@ public class RadialProgress2 {
             float scaleMini = 1.0f - 0.1f * (1.0f - circleCheckProgress);
             miniDrawCanvas.scale(scaleMini, scaleMini, centerX, centerY);
         }
-        if (drawCircle && drawBackground) {
+        // Solegram: the bud - only for the plain round button (no mini badge, no cover inside, no ring around)
+        final boolean canBud = com.solegram.messenger.ui.SolegramShapeProgress.enabled() && drawCircle && drawBackground
+            && !drawMiniIcon && circleCrossfadeColorKey < 0 && miniDrawCanvas == null && backgroundStroke == 0
+            && !overlayImageView.hasBitmapImage();
+        final boolean loading = isLoadingIcon(currentIcon) || currentIcon == MediaActionDrawable.ICON_NONE && isLoadingIcon(mediaActionDrawable.getNextIcon());
+        final long budNow = android.os.SystemClock.elapsedRealtime();
+        final float budDt = budTime == 0 ? 0.016f : Math.min(0.05f, (budNow - budTime) / 1000f);
+        budTime = budNow;
+        final float budTarget = canBud && loading ? 1f : 0f;
+        if (budAmount != budTarget) {
+            // grows into the shapes, and rounds back into the button when the file is there
+            budAmount = budTarget > budAmount ? Math.min(budTarget, budAmount + budDt / 0.25f) : Math.max(budTarget, budAmount - budDt / 0.3f);
+            if (parent != null) {
+                parent.invalidate();
+            }
+        }
+        mediaActionDrawable.solegramHideArc = canBud && budAmount > 0;
+        if (canBud && budAmount > 0 && (currentIcon != MediaActionDrawable.ICON_NONE || wholeAlpha != 0)) {
+            if (bud == null) {
+                bud = new com.solegram.messenger.ui.SolegramShapeProgress();
+            }
+            final float loaded = mediaActionDrawable.getAnimatedProgress();
+            bud.setIndeterminate(loaded <= 0.001f);
+            bud.setProgress(loaded);
+            final int sector = Theme.multAlpha(color, 0.34f * wholeAlpha * overrideAlpha * budAmount);
+            bud.drawButton(canvas, centerX, centerY, circleRadius, circlePaint.getColor(), sector, budAmount);
+            if (parent != null) {
+                parent.invalidate();
+            }
+        } else if (drawCircle && drawBackground) {
             if ((drawMiniIcon || circleCrossfadeColorKey >= 0) && miniDrawCanvas != null) {
                 miniDrawCanvas.drawCircle(centerX, centerY, circleRadius, circlePaint);
             } else {
