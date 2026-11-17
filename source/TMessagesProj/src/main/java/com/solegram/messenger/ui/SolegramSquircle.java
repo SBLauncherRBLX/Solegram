@@ -21,8 +21,8 @@ public final class SolegramSquircle {
      * Pills: the ends are not half circles but stretched along the length (the curve starts earlier on the long sides
      * and runs smoothly into them), as iOS draws its capsules.
      */
-    public static final float PILL_STRETCH = 1.18f;
-    public static final float PILL_EXPONENT = 2.3f;
+    public static final float PILL_STRETCH = 1.12f;
+    public static final float PILL_EXPONENT = 2.1f;
     /** Other shapes: corners that run a little more smoothly into the sides than a circle's quarter. */
     public static final float CORNER_EXPONENT = 2.1f;
     /** A superellipse corner looks smaller than a circle of the same radius: it is this much larger to look the same. */
