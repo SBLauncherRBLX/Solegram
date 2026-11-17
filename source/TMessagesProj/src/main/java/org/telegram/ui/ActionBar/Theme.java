@@ -6166,6 +6166,43 @@ public class Theme {
         refreshThemeColors(false, false);
     }
 
+    /**
+     * Solegram theme editor: every colour Telegram derives from the accent (reply lines, file icons, links, chat list
+     * marks...) is moved to {@code newAccent}, as an accent of a theme moves them ({@link ThemeAccent#fillAccentColors}).
+     * Works on the table being built; the editor's own colours are painted over it afterwards.
+     */
+    public static void solegramShiftAccent(SparseIntArray colors, int newAccent) {
+        if (newAccent == 0 || defaultColors == null) {
+            return;
+        }
+        final ThemeAccent accent = currentTheme.getAccent(false);
+        int base = accent != null && accent.accentColor != 0 ? accent.accentColor : currentTheme.accentBaseColor;
+        if (base == 0) {
+            base = getColorFromTable(colors, key_featuredStickers_addButton, null);
+        }
+        if (base == 0 || (base | 0xff000000) == (newAccent | 0xff000000)) {
+            return;
+        }
+        final float[] baseHsv = new float[3], newHsv = new float[3];
+        Color.colorToHSV(base, baseHsv);
+        Color.colorToHSV(newAccent, newHsv);
+        if (baseHsv[1] < 0.05f) {
+            return; // a grey accent: nothing to tell its shades by
+        }
+        final boolean dark = currentTheme.isDark();
+        for (int key = 0; key < defaultColors.length; key++) {
+            if (themeAccentExclusionKeys.contains(key)) {
+                continue;
+            }
+            final int index = colors.indexOfKey(key);
+            final int color = index >= 0 ? colors.valueAt(index) : defaultColors[key];
+            final int newColor = changeColorAccent(baseHsv, newHsv, color, dark, color);
+            if (newColor != color) {
+                colors.put(key, newColor);
+            }
+        }
+    }
+
     public static void refreshThemeColors(boolean bg, boolean messages) {
         // build the new table aside and publish it at once: getColor() never sees a half-filled table, and the live
         // SparseIntArray is never mutated while it is being read (a concurrent put corrupts its key order)

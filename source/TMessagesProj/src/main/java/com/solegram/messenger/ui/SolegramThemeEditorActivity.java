@@ -198,11 +198,13 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
     // region colours
 
     private SolegramThemeColors.Slot pendingSlot;
+    private boolean colorsChanged;
     private int pendingColor;
     private final Runnable applyPending = () -> {
         if (pendingSlot != null) {
             SolegramThemeColors.set(dark(), pendingSlot.id, pendingColor);
             pendingSlot = null;
+            colorsChanged = true;
             refreshTheme();
         }
     };
@@ -216,7 +218,18 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             return;
         }
         final int current = Theme.getColor(slot.shownKey);
-        new ColorPickerBottomSheet(getContext(), getResourceProvider())
+        final ColorPickerBottomSheet sheet = new ColorPickerBottomSheet(getContext(), getResourceProvider());
+        sheet.setOnDismissListener(d -> {
+            AndroidUtilities.cancelRunOnUIThread(applyPending);
+            if (pendingSlot != null) {
+                applyPending.run();
+            }
+            if (colorsChanged) {
+                colorsChanged = false;
+                SolegramThemeQuickActivity.refreshScreens(this);
+            }
+        });
+        sheet
             .setPipetteDelegate(NO_PIPETTE)
             .setColor(current == 0 ? Theme.getColor(Theme.key_chat_outBubble) : current)
             .setColorListener(color -> {
@@ -235,6 +248,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             .addIf(SolegramThemeColors.isSet(dark(), slot.id), R.drawable.msg_reset, getString(R.string.SG_ThemeResetColor), () -> {
                 SolegramThemeColors.set(dark(), slot.id, null);
                 refreshTheme();
+                SolegramThemeQuickActivity.refreshScreens(SolegramThemeEditorActivity.this);
             })
             .show();
     }
@@ -249,6 +263,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             .setPositiveButton(getString(R.string.SG_ThemeResetAllButton), (d, w) -> {
                 SolegramThemeColors.resetAll(dark());
                 refreshTheme();
+                SolegramThemeQuickActivity.refreshScreens(SolegramThemeEditorActivity.this);
             })
             .setNegativeButton(getString(R.string.Cancel), null)
             .create();
@@ -515,6 +530,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
                 tile.setOnClickListener(v -> {
                     SolegramThemeColors.applyPalette(dark(), accent);
                     refreshTheme();
+                    SolegramThemeQuickActivity.refreshScreens(SolegramThemeEditorActivity.this);
                 });
                 tiles.add(tile);
                 row.addView(tile, LayoutHelper.createLinear(78, LayoutHelper.WRAP_CONTENT));

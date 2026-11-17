@@ -49,7 +49,7 @@ import java.util.Map;
 
 /**
  * Solegram: "Edit theme" - a theme from a few colours. Pick a main colour, a second one (or let it be worked out)
- * and a style; the preview shows the theme Solegram makes of them (every shade worked out, see
+ * and a style; Solegram makes a light and a dark theme of them (every shade worked out, see
  * {@link SolegramThemeGenerator}), and "Create theme" puts it on with Telegram's circle reveal. Every colour one by
  * one is in the "⋮" menu (the advanced editor, {@link SolegramThemeEditorActivity}).
  */
@@ -63,7 +63,6 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
     private int secondary = SolegramThemeGenerator.savedSecondary();
     private int style = SolegramThemeGenerator.savedStyle();
 
-    private SolegramThemeMockView preview;
     private SwatchRow primaryRow, secondaryRow;
     private StyleRow styleRow;
     private FrameLayout buttonContainer;
@@ -85,8 +84,6 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
         if (id == NotificationCenter.didSetNewTheme) {
-            // light or dark may have changed: the preview is worked out for it again
-            updatePreview();
             if (primaryRow != null) {
                 primaryRow.invalidateAll();
                 secondaryRow.invalidateAll();
@@ -133,7 +130,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
     private void showOptions() {
         ItemOptions.makeOptions(this, menuButton)
             .add(R.drawable.msg_customize, getString(R.string.SG_ThemeAdvanced), () -> presentFragment(new SolegramThemeEditorActivity()))
-            .addIf(SolegramThemeColors.anySet(dark()), R.drawable.msg_reset, getString(R.string.SG_ThemeBackToOriginal), this::confirmReset)
+            .addIf(SolegramThemeColors.anySet(false) || SolegramThemeColors.anySet(true), R.drawable.msg_reset, getString(R.string.SG_ThemeBackToOriginal), this::confirmReset)
             .show();
     }
 
@@ -141,18 +138,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         return Theme.isCurrentThemeDark();
     }
 
-    private Map<String, Integer> generated() {
-        return SolegramThemeGenerator.generate(primary, secondary, style, dark());
-    }
-
-    private void updatePreview() {
-        if (preview != null) {
-            preview.setColorTable(SolegramThemeColors.preview(generated(), dark()));
-        }
-    }
-
     private void onChanged() {
-        updatePreview();
         primaryRow.invalidateAll();
         secondaryRow.invalidateAll();
         styleRow.invalidate();
@@ -164,10 +150,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         if (context == null) {
             return;
         }
-        if (preview == null) {
-            preview = new SolegramThemeMockView(context, slot -> { });
-            preview.setPreviewOnly(true);
-            updatePreview();
+        if (primaryRow == null) {
             primaryRow = new SwatchRow(context, false);
             secondaryRow = new SwatchRow(context, true);
             styleRow = new StyleRow(context);
@@ -177,10 +160,6 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             createButton.setOnClickListener(v -> create());
             buttonContainer.addView(createButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.CENTER, 16, 14, 16, 14));
         }
-        items.add(UItem.asHeader(getString(dark() ? R.string.SG_ThemeYoursDark : R.string.SG_ThemeYoursLight)));
-        items.add(UItem.asCustom(preview));
-        items.add(UItem.asShadow(null));
-
         items.add(UItem.asHeader(getString(R.string.SG_ThemeMainColor)));
         items.add(UItem.asCustom(primaryRow));
         items.add(UItem.asShadow(null));
@@ -215,6 +194,30 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
 
     // region creating
 
+    /**
+     * After new colours: the screens under this one are built again (a text coloured once when its screen was made
+     * kept the old colour), and this one makes its rows anew where it is scrolled to.
+     */
+    static void refreshScreens(UniversalFragment fragment) {
+        if (fragment.getParentLayout() != null) {
+            fragment.getParentLayout().rebuildAllFragmentViews(false, false);
+        }
+        final org.telegram.ui.Components.UniversalRecyclerView list = fragment.listView;
+        if (list != null && list.adapter != null) {
+            final androidx.recyclerview.widget.RecyclerView.LayoutManager layoutManager = list.getLayoutManager();
+            final android.os.Parcelable state = layoutManager != null ? layoutManager.onSaveInstanceState() : null;
+            list.adapter.update(false);
+            list.setAdapter(list.adapter);
+            list.getRecycledViewPool().clear();
+            if (state != null) {
+                layoutManager.onRestoreInstanceState(state);
+            }
+        }
+        if (fragment.getFragmentView() != null) {
+            fragment.getFragmentView().invalidate();
+        }
+    }
+
     private void create() {
         if (creating || getParentActivity() == null) {
             return;
@@ -222,9 +225,10 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         creating = true;
         createButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         createButton.setLoading(true);
-        final Map<String, Integer> theme = generated();
-        final boolean dark = dark();
-        final Integer accent = theme.get("accent");
+        // both: the theme stays when the app switches between day and night
+        final Map<String, Integer> light = SolegramThemeGenerator.generate(primary, secondary, style, false);
+        final Map<String, Integer> night = SolegramThemeGenerator.generate(primary, secondary, style, true);
+        final Integer accent = (dark() ? night : light).get("accent");
         // a moment of "making" on the button, then the new colours come out of it in a circle
         AndroidUtilities.runOnUIThread(() -> {
             if (getParentActivity() == null) {
@@ -237,8 +241,10 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             final float x = loc[0] + createButton.getWidth() / 2f, y = loc[1] + createButton.getHeight() / 2f;
             SolegramThemeReveal.start(getParentActivity(), x, y, accent != null ? accent : 0xFF3390EC, () -> {
                 SolegramThemeGenerator.save(primary, secondary, style);
-                SolegramThemeColors.setAll(dark, theme);
+                SolegramThemeColors.setAll(false, light);
+                SolegramThemeColors.setAll(true, night);
                 Theme.refreshThemeColors(false, true);
+                refreshScreens(this); // under the picture of the old colours: not seen
             });
             createButton.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             creating = false;
@@ -258,8 +264,10 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
                 anchor.getLocationInWindow(loc);
                 SolegramThemeReveal.start(getParentActivity(), loc[0] + anchor.getWidth() / 2f, loc[1] + anchor.getHeight() / 2f,
                     Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4), () -> {
-                        SolegramThemeColors.resetAll(dark());
+                        SolegramThemeColors.resetAll(false);
+                        SolegramThemeColors.resetAll(true);
                         Theme.refreshThemeColors(false, true);
+                        refreshScreens(this);
                     });
             })
             .setNegativeButton(getString(R.string.Cancel), null)

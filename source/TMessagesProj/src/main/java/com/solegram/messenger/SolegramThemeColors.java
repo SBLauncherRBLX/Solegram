@@ -212,6 +212,18 @@ public final class SolegramThemeColors {
     public static void apply(SparseIntArray colors, boolean dark) {
         final SparseBooleanArray keys = new SparseBooleanArray();
         final SharedPreferences p = prefs();
+        final String accentKey = prefKey(dark, "accent");
+        if (p.contains(accentKey)) {
+            // first everything Telegram derives from the accent, then the colours picked part by part over it
+            final SparseIntArray before = colors.clone();
+            Theme.solegramShiftAccent(colors, p.getInt(accentKey, 0));
+            for (int i = 0; i < colors.size(); i++) {
+                final int key = colors.keyAt(i);
+                if (before.get(key, 1) != colors.valueAt(i)) {
+                    keys.put(key, true); // the default theme reads them from the table, not its defaults
+                }
+            }
+        }
         for (Slot s : SLOTS) {
             final String key = prefKey(dark, s.id);
             if (!p.contains(key)) {
