@@ -17,8 +17,8 @@ import org.telegram.messenger.AndroidUtilities;
 import java.util.ArrayList;
 
 /**
- * Solegram: the "bud" loading indicator - Material 3 Expressive shapes (soft burst, cookies, pentagon, pill, sun,
- * oval) that turn into one another with a springy morph and a little kick of rotation.
+ * Solegram: the "bud" loading indicator - Material 3 Expressive shapes (soft burst, cookies, pentagon, clover, sun,
+ * flower) that turn into one another with a springy morph and a little kick of rotation.
  * <ul>
  *     <li>Without a percentage the whole shape is filled and a new shape comes every 0.78 s while it turns.</li>
  *     <li>With one, the shape is a soft track and the colour fills it as a sector from the top, clockwise; each
@@ -51,10 +51,10 @@ public final class SolegramShapeProgress {
             toRadii(star(10, 0.76f, 0.16f)),                                         // soft burst
             radial(a -> 1 + 0.07f * Math.cos(9 * a)),                                  // 9-sided cookie
             toRadii(ngon(5, 0.28f)),                                                   // pentagon
-            toRadii(rotate(roundedPoly(new float[][]{{-1, -0.48f}, {1, -0.48f}, {1, 0.48f}, {-1, 0.48f}}, 0.48f, 20), -40)), // pill
+            radial(a -> 0.7 + 0.3 * Math.pow(Math.abs(Math.cos(2 * a + Math.PI / 4)), 0.55)), // 4-leaf clover
             toRadii(star(8, 0.82f, 0.16f)),                                            // sunny
             radial(a -> 1 + 0.14f * Math.cos(4 * a + Math.PI / 4)),                    // 4-sided cookie
-            toRadii(rotate(ellipse(0.58f), -40)),                                      // oval
+            toRadii(star(8, 0.5f, 0.2f)),                                              // flower
         };
     }
 
@@ -73,15 +73,6 @@ public final class SolegramShapeProgress {
             r[i] /= max;
         }
         return r;
-    }
-
-    private static ArrayList<float[]> ellipse(float ry) {
-        final ArrayList<float[]> p = new ArrayList<>();
-        for (int i = 0; i < 360; i++) {
-            final double a = i / 360.0 * TAU;
-            p.add(new float[]{(float) Math.cos(a), (float) (Math.sin(a) * ry)});
-        }
-        return p;
     }
 
     /** A polygon with its corners rounded by quadratic arcs of radius {@code rad}. */
@@ -120,16 +111,6 @@ public final class SolegramShapeProgress {
             v[i] = new float[]{(float) Math.cos(a), (float) Math.sin(a)};
         }
         return roundedPoly(v, rad, 14);
-    }
-
-    private static ArrayList<float[]> rotate(ArrayList<float[]> pts, float deg) {
-        final double a = Math.toRadians(deg), c = Math.cos(a), s = Math.sin(a);
-        for (float[] p : pts) {
-            final float x = p[0], y = p[1];
-            p[0] = (float) (x * c - y * s);
-            p[1] = (float) (x * s + y * c);
-        }
-        return pts;
     }
 
     /** Polygon points → the radius at N angles round the area centre, scaled to fit the unit circle. */

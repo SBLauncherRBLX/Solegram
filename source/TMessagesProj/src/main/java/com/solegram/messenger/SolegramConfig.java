@@ -436,7 +436,8 @@ public class SolegramConfig {
         }
         // Solar by default; Telegram's own icons stay one of the choices
         iconPack = clamp(p.getInt("iconPack", SolegramIcons.PACK_SOLAR), 0, SolegramIcons.PACK_COUNT - 1);
-        settingsIconStyle = clamp(p.getInt("settingsIconStyle", 1), 0, 1);
+        // settings icons are always thin lines now (the coloured tiles are gone)
+        settingsIconStyle = 1;
         SolegramIcons.setPack(iconPack);
 
         glassThickness = clamp(p.getInt("glassThickness", 75), 25, 300);

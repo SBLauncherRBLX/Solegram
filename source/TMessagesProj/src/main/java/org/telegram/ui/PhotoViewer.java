@@ -24066,6 +24066,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             if (windowViewSkipRender) {
                 return;
             }
+            // Solegram: fully open on its black, the viewer hides the screens under it from glass over it
+            solegramGlassSource.coversBelow = isVisible && backgroundDrawable != null && backgroundDrawable.getAlpha() >= 255;
             if (solegramGlassSource.draw(canvas)) {
                 return;
             }

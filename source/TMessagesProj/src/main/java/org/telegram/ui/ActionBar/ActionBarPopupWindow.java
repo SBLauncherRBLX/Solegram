@@ -194,11 +194,9 @@ public class ActionBarPopupWindow extends PopupWindow implements com.solegram.me
             if (!com.solegram.messenger.ui.SolegramLiveGlass.canSample(windowRoot)) {
                 host = solegramScreenBehind();
                 if (host == null || !host.canSample()) {
-                    solegramDropGlass(); // nothing live to show: the menu's own panel
-                    // over a web page or video: the system's blur behind the window, seen through the panel
-                    if (com.solegram.messenger.ui.SolegramLiveGlass.frostBehind(windowRoot, backgroundDrawable)) {
-                        invalidate();
-                    }
+                    // nothing live to show (a video or web page under it): the menu's own panel; the screen under it is
+                    // never blurred when a menu opens
+                    solegramDropGlass();
                     return;
                 }
             }

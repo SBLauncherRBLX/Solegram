@@ -123,6 +123,11 @@ public final class SolegramLiveGlass implements GlassSource, org.telegram.ui.Com
         private ViewTreeObserver observer;
         /** Frame time of the window's last draw. */
         long drawnFrame = -1;
+        /**
+         * The screen fills its whole window with something opaque now (the photo viewer on its black): the windows
+         * under it can't be seen, so they don't matter to glass over it.
+         */
+        public volatile boolean coversBelow;
 
         public Host(@NonNull ViewGroup view, @NonNull Drawer drawer) {
             this(view, drawer, false);
@@ -359,7 +364,20 @@ public final class SolegramLiveGlass implements GlassSource, org.telegram.ui.Com
         }
         final long screenArea = (long) AndroidUtilities.displaySize.x * (AndroidUtilities.displaySize.y + AndroidUtilities.statusBarHeight);
         int count = 0, hosts = 0;
-        for (int i = 0; i < index; i++) {
+        // windows under an opaque full screen one (the photo viewer) are hidden: glass looks no further down
+        int start = 0;
+        for (int i = index - 1; i >= 0; i--) {
+            final View r = roots.get(i);
+            if (r == null || !r.isAttachedToWindow() || r.getWindowVisibility() != View.VISIBLE) {
+                continue;
+            }
+            final Host covering = hostFor(r);
+            if (covering != null && covering.coversBelow && covering.hasContent()) {
+                start = i;
+                break;
+            }
+        }
+        for (int i = start; i < index; i++) {
             final View r = roots.get(i);
             if (r == null || !r.isAttachedToWindow() || r.getVisibility() != View.VISIBLE || r.getWindowVisibility() != View.VISIBLE
                     || r.getWidth() <= 0 || r.getHeight() <= 0 || r.getAlpha() <= 0 || r instanceof PipRoundVideoView.PipFrameLayout) {

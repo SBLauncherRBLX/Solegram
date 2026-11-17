@@ -249,8 +249,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_SAVE_STORIES = 1121;
     private static final int ID_SKIP_SILENCE = 1122;
     private static final int ID_NAME_EMOJI_SHARE = 1123;
-    private static final int ID_ICONS_LINES = 1124;
-    private static final int ID_ICONS_TILES = 1125;
     private static final int ID_PROFILE_LINKS = 250;
     private static final int ID_PROFILE_LINKS_EDIT = 251;
 
@@ -515,13 +513,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCustom(iconPackPicker));
         items.add(UItem.asShadow(getString(R.string.SG_IconPackInfo)));
 
-        items.add(UItem.asHeader(getString(R.string.SG_SettingsIcons)));
-        items.add(UItem.asRadio2(ID_ICONS_LINES, getString(R.string.SG_SettingsIconsLines), getString(R.string.SG_SettingsIconsLinesInfo))
-            .setChecked(SolegramConfig.settingsIconStyle == com.solegram.messenger.SolegramIcons.STYLE_LINES));
-        items.add(UItem.asRadio2(ID_ICONS_TILES, getString(R.string.SG_SettingsIconsTiles), getString(R.string.SG_SettingsIconsTilesInfo))
-            .setChecked(SolegramConfig.settingsIconStyle == com.solegram.messenger.SolegramIcons.STYLE_TILES));
-        items.add(UItem.asShadow(null));
-
         items.add(UItem.asHeader(getString(R.string.SG_Animations)));
         items.add(UItem.asButtonCheck(ID_SMOOTH_TRANSITIONS, getString(R.string.SG_SmoothTransitions), getString(R.string.SG_SmoothTransitionsInfo)).setChecked(SolegramConfig.smoothTransitions));
         items.add(UItem.asButtonCheck(ID_PRESS_SCALE, getString(R.string.SG_PressScale), getString(R.string.SG_PressScaleInfo)).setChecked(SolegramConfig.pressScale));
@@ -553,15 +544,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
      * build their views again when they come back, and this list makes its rows anew (rebinding a row keeps
      * the icon it has).
      */
-    private void setSettingsIconStyle(int style) {
-        if (SolegramConfig.settingsIconStyle == style) {
-            return;
-        }
-        SolegramConfig.putInt("settingsIconStyle", style);
-        refreshIcons();
-        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "settingsIconStyle");
-    }
-
     private void setIconPack(int pack) {
         SolegramConfig.putInt("iconPack", pack);
         refreshIcons();
@@ -1012,7 +994,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_MAIN, 0, R.string.SG_SettingsTitle, 0},
         {PAGE_APPEARANCE, 0, R.string.SG_Appearance, -1},
         {PAGE_APPEARANCE, 0, R.string.SG_IconPack, 18},
-        {PAGE_APPEARANCE, ID_ICONS_LINES, R.string.SG_SettingsIcons, 18},
         {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_SystemFont, -1},
         {PAGE_MAIN_SCREEN, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
         {PAGE_MAIN_SCREEN, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
@@ -2223,12 +2204,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_SKIP_SILENCE:
                 toggleCheck(view, "voiceSkipSilence");
-                return;
-            case ID_ICONS_LINES:
-                setSettingsIconStyle(com.solegram.messenger.SolegramIcons.STYLE_LINES);
-                return;
-            case ID_ICONS_TILES:
-                setSettingsIconStyle(com.solegram.messenger.SolegramIcons.STYLE_TILES);
                 return;
             case ID_NAME_EMOJI_SHARE:
                 toggleCheck(view, "nameEmojiShare");

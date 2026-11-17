@@ -138,7 +138,7 @@ public final class SolegramIcons {
      * Telegram's and Solegram's).
      */
     public static boolean lineStyle() {
-        return SolegramConfig.settingsIconStyle == STYLE_LINES;
+        return true; // the only style now: the coloured tiles were removed
     }
 
     /** The colour of the line icons: the theme's accent, as its section headers have it. */
