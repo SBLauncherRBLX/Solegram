@@ -44,50 +44,53 @@ public final class SolegramThemeColors {
         public final int info;
         /** The key whose colour the slot shows (its current colour). */
         public final int shownKey;
+        /** A short name for the slot's tile in the editor. */
+        public final int shortTitle;
 
-        Slot(String id, int section, int title, int info, int shownKey) {
+        Slot(String id, int section, int title, int info, int shownKey, int shortTitle) {
             this.id = id;
             this.section = section;
             this.title = title;
             this.info = info;
             this.shownKey = shownKey;
+            this.shortTitle = shortTitle;
         }
     }
 
     // the order is the order they are applied in: the general ones first, the specific ones may repaint their keys
     public static final Slot[] SLOTS = {
-        new Slot("accent", SECTION_GENERAL, R.string.SG_ThemeSlotAccent, R.string.SG_ThemeSlotAccentInfo, Theme.key_featuredStickers_addButton),
-        new Slot("background", SECTION_GENERAL, R.string.SG_ThemeSlotBackground, R.string.SG_ThemeSlotBackgroundInfo, Theme.key_windowBackgroundWhite),
-        new Slot("text", SECTION_GENERAL, R.string.SG_ThemeSlotText, R.string.SG_ThemeSlotTextInfo, Theme.key_windowBackgroundWhiteBlackText),
-        new Slot("secondary", SECTION_GENERAL, R.string.SG_ThemeSlotSecondary, R.string.SG_ThemeSlotSecondaryInfo, Theme.key_windowBackgroundWhiteGrayText),
-        new Slot("icons", SECTION_GENERAL, R.string.SG_ThemeSlotIcons, R.string.SG_ThemeSlotIconsInfo, Theme.key_windowBackgroundWhiteGrayIcon),
-        new Slot("divider", SECTION_GENERAL, R.string.SG_ThemeSlotDivider, R.string.SG_ThemeSlotDividerInfo, Theme.key_divider),
+        new Slot("accent", SECTION_GENERAL, R.string.SG_ThemeSlotAccent, R.string.SG_ThemeSlotAccentInfo, Theme.key_featuredStickers_addButton, R.string.SG_ThemeShortAccent),
+        new Slot("background", SECTION_GENERAL, R.string.SG_ThemeSlotBackground, R.string.SG_ThemeSlotBackgroundInfo, Theme.key_windowBackgroundWhite, R.string.SG_ThemeShortBackground),
+        new Slot("text", SECTION_GENERAL, R.string.SG_ThemeSlotText, R.string.SG_ThemeSlotTextInfo, Theme.key_windowBackgroundWhiteBlackText, R.string.SG_ThemeShortText),
+        new Slot("secondary", SECTION_GENERAL, R.string.SG_ThemeSlotSecondary, R.string.SG_ThemeSlotSecondaryInfo, Theme.key_windowBackgroundWhiteGrayText, R.string.SG_ThemeShortSecondary),
+        new Slot("icons", SECTION_GENERAL, R.string.SG_ThemeSlotIcons, R.string.SG_ThemeSlotIconsInfo, Theme.key_windowBackgroundWhiteGrayIcon, R.string.SG_ThemeShortIcons),
+        new Slot("divider", SECTION_GENERAL, R.string.SG_ThemeSlotDivider, R.string.SG_ThemeSlotDividerInfo, Theme.key_divider, R.string.SG_ThemeShortDivider),
 
-        new Slot("headerBg", SECTION_HEADER, R.string.SG_ThemeSlotHeaderBg, R.string.SG_ThemeSlotHeaderBgInfo, Theme.key_actionBarDefault),
-        new Slot("headerText", SECTION_HEADER, R.string.SG_ThemeSlotHeaderText, R.string.SG_ThemeSlotHeaderTextInfo, Theme.key_actionBarDefaultTitle),
-        new Slot("menus", SECTION_HEADER, R.string.SG_ThemeSlotMenus, R.string.SG_ThemeSlotMenusInfo, Theme.key_actionBarDefaultSubmenuBackground),
+        new Slot("headerBg", SECTION_HEADER, R.string.SG_ThemeSlotHeaderBg, R.string.SG_ThemeSlotHeaderBgInfo, Theme.key_actionBarDefault, R.string.SG_ThemeShortHeaderBg),
+        new Slot("headerText", SECTION_HEADER, R.string.SG_ThemeSlotHeaderText, R.string.SG_ThemeSlotHeaderTextInfo, Theme.key_actionBarDefaultTitle, R.string.SG_ThemeShortHeaderText),
+        new Slot("menus", SECTION_HEADER, R.string.SG_ThemeSlotMenus, R.string.SG_ThemeSlotMenusInfo, Theme.key_actionBarDefaultSubmenuBackground, R.string.SG_ThemeShortMenus),
 
-        new Slot("chatName", SECTION_CHATS, R.string.SG_ThemeSlotChatName, R.string.SG_ThemeSlotChatNameInfo, Theme.key_chats_name),
-        new Slot("chatMessage", SECTION_CHATS, R.string.SG_ThemeSlotChatMessage, R.string.SG_ThemeSlotChatMessageInfo, Theme.key_chats_message),
-        new Slot("chatDate", SECTION_CHATS, R.string.SG_ThemeSlotChatDate, R.string.SG_ThemeSlotChatDateInfo, Theme.key_chats_date),
-        new Slot("unread", SECTION_CHATS, R.string.SG_ThemeSlotUnread, R.string.SG_ThemeSlotUnreadInfo, Theme.key_chats_unreadCounter),
-        new Slot("muted", SECTION_CHATS, R.string.SG_ThemeSlotMuted, R.string.SG_ThemeSlotMutedInfo, Theme.key_chats_unreadCounterMuted),
-        new Slot("online", SECTION_CHATS, R.string.SG_ThemeSlotOnline, R.string.SG_ThemeSlotOnlineInfo, Theme.key_chats_onlineCircle),
-        new Slot("fab", SECTION_CHATS, R.string.SG_ThemeSlotFab, R.string.SG_ThemeSlotFabInfo, Theme.key_chats_actionBackground),
+        new Slot("chatName", SECTION_CHATS, R.string.SG_ThemeSlotChatName, R.string.SG_ThemeSlotChatNameInfo, Theme.key_chats_name, R.string.SG_ThemeShortChatName),
+        new Slot("chatMessage", SECTION_CHATS, R.string.SG_ThemeSlotChatMessage, R.string.SG_ThemeSlotChatMessageInfo, Theme.key_chats_message, R.string.SG_ThemeShortChatMessage),
+        new Slot("chatDate", SECTION_CHATS, R.string.SG_ThemeSlotChatDate, R.string.SG_ThemeSlotChatDateInfo, Theme.key_chats_date, R.string.SG_ThemeShortChatDate),
+        new Slot("unread", SECTION_CHATS, R.string.SG_ThemeSlotUnread, R.string.SG_ThemeSlotUnreadInfo, Theme.key_chats_unreadCounter, R.string.SG_ThemeShortUnread),
+        new Slot("muted", SECTION_CHATS, R.string.SG_ThemeSlotMuted, R.string.SG_ThemeSlotMutedInfo, Theme.key_chats_unreadCounterMuted, R.string.SG_ThemeShortMuted),
+        new Slot("online", SECTION_CHATS, R.string.SG_ThemeSlotOnline, R.string.SG_ThemeSlotOnlineInfo, Theme.key_chats_onlineCircle, R.string.SG_ThemeShortOnline),
+        new Slot("fab", SECTION_CHATS, R.string.SG_ThemeSlotFab, R.string.SG_ThemeSlotFabInfo, Theme.key_chats_actionBackground, R.string.SG_ThemeShortFab),
 
-        new Slot("outBubble", SECTION_CHAT, R.string.SG_ThemeSlotOutBubble, R.string.SG_ThemeSlotOutBubbleInfo, Theme.key_chat_outBubble),
-        new Slot("outGradient", SECTION_CHAT, R.string.SG_ThemeSlotOutGradient, R.string.SG_ThemeSlotOutGradientInfo, Theme.key_chat_outBubbleGradient1),
-        new Slot("outText", SECTION_CHAT, R.string.SG_ThemeSlotOutText, R.string.SG_ThemeSlotOutTextInfo, Theme.key_chat_messageTextOut),
-        new Slot("inBubble", SECTION_CHAT, R.string.SG_ThemeSlotInBubble, R.string.SG_ThemeSlotInBubbleInfo, Theme.key_chat_inBubble),
-        new Slot("inText", SECTION_CHAT, R.string.SG_ThemeSlotInText, R.string.SG_ThemeSlotInTextInfo, Theme.key_chat_messageTextIn),
-        new Slot("links", SECTION_CHAT, R.string.SG_ThemeSlotLinks, R.string.SG_ThemeSlotLinksInfo, Theme.key_chat_messageLinkIn),
-        new Slot("checks", SECTION_CHAT, R.string.SG_ThemeSlotChecks, R.string.SG_ThemeSlotChecksInfo, Theme.key_chat_outSentCheckRead),
-        new Slot("panel", SECTION_CHAT, R.string.SG_ThemeSlotPanel, R.string.SG_ThemeSlotPanelInfo, Theme.key_chat_messagePanelBackground),
-        new Slot("send", SECTION_CHAT, R.string.SG_ThemeSlotSend, R.string.SG_ThemeSlotSendInfo, Theme.key_chat_messagePanelSend),
+        new Slot("outBubble", SECTION_CHAT, R.string.SG_ThemeSlotOutBubble, R.string.SG_ThemeSlotOutBubbleInfo, Theme.key_chat_outBubble, R.string.SG_ThemeShortOutBubble),
+        new Slot("outGradient", SECTION_CHAT, R.string.SG_ThemeSlotOutGradient, R.string.SG_ThemeSlotOutGradientInfo, Theme.key_chat_outBubbleGradient1, R.string.SG_ThemeShortOutGradient),
+        new Slot("outText", SECTION_CHAT, R.string.SG_ThemeSlotOutText, R.string.SG_ThemeSlotOutTextInfo, Theme.key_chat_messageTextOut, R.string.SG_ThemeShortOutText),
+        new Slot("inBubble", SECTION_CHAT, R.string.SG_ThemeSlotInBubble, R.string.SG_ThemeSlotInBubbleInfo, Theme.key_chat_inBubble, R.string.SG_ThemeShortInBubble),
+        new Slot("inText", SECTION_CHAT, R.string.SG_ThemeSlotInText, R.string.SG_ThemeSlotInTextInfo, Theme.key_chat_messageTextIn, R.string.SG_ThemeShortInText),
+        new Slot("links", SECTION_CHAT, R.string.SG_ThemeSlotLinks, R.string.SG_ThemeSlotLinksInfo, Theme.key_chat_messageLinkIn, R.string.SG_ThemeShortLinks),
+        new Slot("checks", SECTION_CHAT, R.string.SG_ThemeSlotChecks, R.string.SG_ThemeSlotChecksInfo, Theme.key_chat_outSentCheckRead, R.string.SG_ThemeShortChecks),
+        new Slot("panel", SECTION_CHAT, R.string.SG_ThemeSlotPanel, R.string.SG_ThemeSlotPanelInfo, Theme.key_chat_messagePanelBackground, R.string.SG_ThemeShortPanel),
+        new Slot("send", SECTION_CHAT, R.string.SG_ThemeSlotSend, R.string.SG_ThemeSlotSendInfo, Theme.key_chat_messagePanelSend, R.string.SG_ThemeShortSend),
 
-        new Slot("buttons", SECTION_CONTROLS, R.string.SG_ThemeSlotButtons, R.string.SG_ThemeSlotButtonsInfo, Theme.key_featuredStickers_addButton),
-        new Slot("switches", SECTION_CONTROLS, R.string.SG_ThemeSlotSwitches, R.string.SG_ThemeSlotSwitchesInfo, Theme.key_switchTrackChecked),
-        new Slot("checkboxes", SECTION_CONTROLS, R.string.SG_ThemeSlotCheckboxes, R.string.SG_ThemeSlotCheckboxesInfo, Theme.key_checkboxSquareBackground),
+        new Slot("buttons", SECTION_CONTROLS, R.string.SG_ThemeSlotButtons, R.string.SG_ThemeSlotButtonsInfo, Theme.key_featuredStickers_addButton, R.string.SG_ThemeShortButtons),
+        new Slot("switches", SECTION_CONTROLS, R.string.SG_ThemeSlotSwitches, R.string.SG_ThemeSlotSwitchesInfo, Theme.key_switchTrackChecked, R.string.SG_ThemeShortSwitches),
+        new Slot("checkboxes", SECTION_CONTROLS, R.string.SG_ThemeSlotCheckboxes, R.string.SG_ThemeSlotCheckboxesInfo, Theme.key_checkboxSquareBackground, R.string.SG_ThemeShortCheckboxes),
     };
 
     public static Slot slot(String id) {
@@ -147,6 +150,47 @@ public final class SolegramThemeColors {
             e.remove(prefKey(dark, s.id));
         }
         e.apply();
+    }
+
+    // endregion
+
+    // region palettes
+
+    /** The quick palettes: an accent each; the bubbles and links are worked out for light and dark themes. */
+    public static final int[] PALETTES = {0xFF3390EC, 0xFF14A8A0, 0xFF2FAA5B, 0xFFF0892A, 0xFFE5484D, 0xFFE0559B, 0xFF8E5CF7, 0xFF6E7781};
+    public static final int[] PALETTE_NAMES = {
+        R.string.SG_ThemePaletteBlue, R.string.SG_ThemePaletteTeal, R.string.SG_ThemePaletteGreen, R.string.SG_ThemePaletteOrange,
+        R.string.SG_ThemePaletteRed, R.string.SG_ThemePalettePink, R.string.SG_ThemePaletteViolet, R.string.SG_ThemePaletteGraphite
+    };
+    private static final String[] PALETTE_SLOTS = {"accent", "outBubble", "outGradient", "links"};
+
+    /** My bubbles in a palette: a light tint in light themes, a deep shade in dark ones. */
+    public static int paletteBubble(int accent, boolean dark) {
+        return dark ? ColorUtils.blendARGB(accent, 0xFF000000, 0.45f) : ColorUtils.blendARGB(accent, 0xFFFFFFFF, 0.80f);
+    }
+
+    /** Applies a palette ({@code accent}), or with 0 gives these parts their theme colours back. */
+    public static void applyPalette(boolean dark, int accent) {
+        final SharedPreferences.Editor e = prefs().edit();
+        for (String id : PALETTE_SLOTS) {
+            e.remove(prefKey(dark, id));
+        }
+        if (accent != 0) {
+            e.putInt(prefKey(dark, "accent"), accent);
+            e.putInt(prefKey(dark, "outBubble"), paletteBubble(accent, dark));
+            e.putInt(prefKey(dark, "links"), dark ? ColorUtils.blendARGB(accent, 0xFFFFFFFF, 0.25f) : accent);
+        }
+        e.apply();
+    }
+
+    /** The palette on now (its accent), 0 for none. */
+    public static int currentPalette(boolean dark) {
+        final Integer accent = get(dark, "accent");
+        final Integer bubble = get(dark, "outBubble");
+        if (accent == null || bubble == null || bubble != paletteBubble(accent, dark)) {
+            return 0;
+        }
+        return accent;
     }
 
     // endregion
