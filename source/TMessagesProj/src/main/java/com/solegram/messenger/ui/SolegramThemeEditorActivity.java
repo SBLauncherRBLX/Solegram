@@ -62,8 +62,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
         R.string.SG_ThemeSectionChat, R.string.SG_ThemeSectionControls
     };
 
-    private FrameLayout previewContainer;
-    private ThemePreviewMessagesCell preview;
+    private SolegramThemeMockView mockView;
     private PaletteRow paletteRow;
     private final SlotGrid[] grids = new SlotGrid[SECTION_TITLES.length];
 
@@ -95,8 +94,8 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             if (paletteRow != null) {
                 paletteRow.update();
             }
-            if (preview != null) {
-                invalidateAll(preview);
+            if (mockView != null) {
+                mockView.invalidate();
             }
             if (listView != null && listView.adapter != null) {
                 listView.adapter.update(true); // the header (light or dark) and the reset row
@@ -136,19 +135,29 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
         if (context == null) {
             return;
         }
-        // the current theme first, as it looks now, and the palettes that recolour it in one tap
+        // the test screens first: a tap on any part colours its whole group
         items.add(UItem.asHeader(getString(dark() ? R.string.SG_ThemeEditingDark : R.string.SG_ThemeEditingLight)));
-        if (previewContainer == null) {
-            previewContainer = new FrameLayout(context);
-            preview = new ThemePreviewMessagesCell(context, getParentLayout(), 0);
-            preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-            previewContainer.addView(preview, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        if (mockView == null) {
+            mockView = new SolegramThemeMockView(context, slotId -> {
+                if (SolegramThemeMockView.WALLPAPER.equals(slotId)) {
+                    presentFragment(new WallpapersListActivity(WallpapersListActivity.TYPE_ALL));
+                    return;
+                }
+                final SolegramThemeColors.Slot slot = SolegramThemeColors.slot(slotId);
+                if (slot != null) {
+                    openPicker(slot);
+                }
+            });
         }
-        items.add(UItem.asCustom(previewContainer));
+        items.add(UItem.asCustom(mockView));
         if (paletteRow == null) {
             paletteRow = new PaletteRow(context);
         }
         items.add(UItem.asCustom(paletteRow));
+        items.add(UItem.asShadow(getString(R.string.SG_ThemeMockHint)));
+
+        // below: every colour in detail
+        items.add(UItem.asHeader(getString(R.string.SG_ThemeDetailed)));
         items.add(UItem.asShadow(getString(R.string.SG_ThemeEditHint)));
 
         for (int section = 0; section < SECTION_TITLES.length; section++) {
@@ -292,7 +301,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
 
     // region views
 
-    /** A round colour with a thin ring; "none" as a crossed circle; a small dot when it was changed; a check when picked. */
+    /** A colour in a soft square with a thin ring; "none" as a crossed square; a small dot when it was changed; a check when picked. */
     static class Swatch extends View {
         final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Paint second = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -323,38 +332,55 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             invalidate();
         }
 
+        private final android.graphics.RectF box = new android.graphics.RectF();
+        private final android.graphics.Path clip = new android.graphics.Path();
+
         @Override
         protected void onDraw(@NonNull Canvas canvas) {
+            // a soft square: corners about a third of its size, never sharp
             final float cx = getWidth() / 2f, cy = getHeight() / 2f;
-            final float r = Math.min(cx, cy) - dp(selected ? 4 : 1.5f);
+            final float half = Math.min(cx, cy) - dp(selected ? 4.5f : 1.5f);
+            final float rad = half * 0.62f;
+            box.set(cx - half, cy - half, cx + half, cy + half);
             ring.setStrokeWidth(dp(1));
             ring.setColor(Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), 0.14f));
             if (selected) {
                 // a ring round the picked palette, a gap between them
                 outer.setStrokeWidth(dp(2));
                 outer.setColor(color);
-                canvas.drawCircle(cx, cy, Math.min(cx, cy) - dp(1), outer);
+                final float o = Math.min(cx, cy) - dp(1);
+                canvas.drawRoundRect(cx - o, cy - o, cx + o, cy + o, o * 0.62f, o * 0.62f, outer);
             }
             if (none) {
                 ring.setStrokeWidth(dp(1.5f));
                 ring.setColor(Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText), 0.7f));
-                canvas.drawCircle(cx, cy, r, ring);
-                final float d = r * 0.7071f;
+                canvas.drawRoundRect(box, rad, rad, ring);
+                final float d = half * 0.55f;
                 canvas.drawLine(cx - d, cy + d, cx + d, cy - d, ring);
                 return;
             }
             fill.setColor(color);
-            canvas.drawCircle(cx, cy, r, fill);
+            canvas.drawRoundRect(box, rad, rad, fill);
             if (halfColor != 0) {
+                // a palette: the bubble's colour in the lower right half
+                canvas.save();
+                clip.rewind();
+                clip.addRoundRect(box, rad, rad, android.graphics.Path.Direction.CW);
+                canvas.clipPath(clip);
+                clip.rewind();
+                clip.moveTo(box.right, box.top);
+                clip.lineTo(box.right, box.bottom);
+                clip.lineTo(box.left, box.bottom);
+                clip.close();
                 second.setColor(halfColor | 0xFF000000);
-                AndroidUtilities.rectTmp.set(cx - r, cy - r, cx + r, cy + r);
-                canvas.drawArc(AndroidUtilities.rectTmp, -45, 180, true, second);
+                canvas.drawPath(clip, second);
+                canvas.restore();
             }
-            canvas.drawCircle(cx, cy, r, ring);
+            canvas.drawRoundRect(box, rad, rad, ring);
             if (changed) {
                 // a small dot in the accent at the top right: this one is yours, not the theme's
                 final float dr = dp(4.5f);
-                final float dx = cx + r * 0.72f, dy = cy - r * 0.72f;
+                final float dx = box.right - dp(3), dy = box.top + dp(3);
                 mark.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                 canvas.drawCircle(dx, dy, dr + dp(2), mark);
                 mark.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
@@ -363,7 +389,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             if (selected) {
                 check.setStrokeWidth(dp(2.2f));
                 check.setColor(ColorUtils.calculateLuminance(color) > 0.6f ? 0xFF000000 : 0xFFFFFFFF);
-                final float s = r * 0.42f;
+                final float s = half * 0.42f;
                 checkPath.rewind();
                 checkPath.moveTo(cx - s, cy);
                 checkPath.lineTo(cx - s * 0.3f, cy + s * 0.7f);

@@ -2378,5 +2378,37 @@
     <string name="SG_ThemePaletteGraphite">Graphite</string>
     <string name="SG_ThemeEditHint">Tap a colour to change it. Hold it to bring the theme\'s colour back.</string>
     <string name="SG_ThemeMore">More</string>
+    <string name="SG_ThemeMockTabChats">Chats</string>
+    <string name="SG_ThemeMockTabChat">Chat</string>
+    <string name="SG_ThemeMockTabSettings">Settings</string>
+    <string name="SG_ThemeMockHint">Tap any part of the screen to colour its whole group. Scroll down for every colour in detail.</string>
+    <string name="SG_ThemeDetailed">In detail</string>
+    <string name="SG_ThemeMockName1">Alice</string>
+    <string name="SG_ThemeMockName2">Project team</string>
+    <string name="SG_ThemeMockName3">Mom</string>
+    <string name="SG_ThemeMockName4">News</string>
+    <string name="SG_ThemeMockName5">Max</string>
+    <string name="SG_ThemeMockMsg1">See you tonight?</string>
+    <string name="SG_ThemeMockMsg2">The report is ready, take a look</string>
+    <string name="SG_ThemeMockMsg3">Grab some bread on the way</string>
+    <string name="SG_ThemeMockMsg4">A new update is out</string>
+    <string name="SG_ThemeMockMsg5">Voice message</string>
+    <string name="SG_ThemeMockYesterday">Yesterday</string>
+    <string name="SG_ThemeMockIn1">How\'s the new theme?</string>
+    <string name="SG_ThemeMockOut1">Looks great</string>
+    <string name="SG_ThemeMockIn2">Show me a screenshot</string>
+    <string name="SG_ThemeMockOut2">Sending it now</string>
+    <string name="SG_ThemeMockOnline">online</string>
+    <string name="SG_ThemeMockInput">Message</string>
+    <string name="SG_ThemeMockGeneral">General</string>
+    <string name="SG_ThemeMockNotifications">Notifications</string>
+    <string name="SG_ThemeMockLanguage">Language</string>
+    <string name="SG_ThemeMockLanguageValue">English</string>
+    <string name="SG_ThemeMockPrivacy">Privacy</string>
+    <string name="SG_ThemeMockAutoload">Auto-download media</string>
+    <string name="SG_ThemeMockSave">Save</string>
+    <string name="SG_ThemeMockReply">Reply</string>
+    <string name="SG_ThemeMockCopy">Copy</string>
+    <string name="SG_ThemeMockForward">Forward</string>
     <!-- SOLEGRAM END -->
 </resources>

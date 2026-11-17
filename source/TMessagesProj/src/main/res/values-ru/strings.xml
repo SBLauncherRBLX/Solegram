@@ -2365,5 +2365,37 @@
     <string name="SG_ThemePaletteGraphite">Графит</string>
     <string name="SG_ThemeEditHint">Нажмите на цвет, чтобы изменить его. Удержите, чтобы вернуть цвет темы.</string>
     <string name="SG_ThemeMore">Ещё</string>
+    <string name="SG_ThemeMockTabChats">Чаты</string>
+    <string name="SG_ThemeMockTabChat">Чат</string>
+    <string name="SG_ThemeMockTabSettings">Настройки</string>
+    <string name="SG_ThemeMockHint">Нажмите на любой элемент экрана: цвет поменяется у всей его группы. Пролистайте вниз для подробной настройки.</string>
+    <string name="SG_ThemeDetailed">Подробная настройка</string>
+    <string name="SG_ThemeMockName1">Алиса</string>
+    <string name="SG_ThemeMockName2">Команда проекта</string>
+    <string name="SG_ThemeMockName3">Мама</string>
+    <string name="SG_ThemeMockName4">Новости</string>
+    <string name="SG_ThemeMockName5">Макс</string>
+    <string name="SG_ThemeMockMsg1">Увидимся вечером?</string>
+    <string name="SG_ThemeMockMsg2">Отчёт готов, проверьте</string>
+    <string name="SG_ThemeMockMsg3">Купи хлеба по дороге</string>
+    <string name="SG_ThemeMockMsg4">Вышло новое обновление</string>
+    <string name="SG_ThemeMockMsg5">Голосовое сообщение</string>
+    <string name="SG_ThemeMockYesterday">Вчера</string>
+    <string name="SG_ThemeMockIn1">Как тебе новая тема?</string>
+    <string name="SG_ThemeMockOut1">Выглядит отлично</string>
+    <string name="SG_ThemeMockIn2">Покажи скриншот</string>
+    <string name="SG_ThemeMockOut2">Сейчас пришлю</string>
+    <string name="SG_ThemeMockOnline">в сети</string>
+    <string name="SG_ThemeMockInput">Сообщение</string>
+    <string name="SG_ThemeMockGeneral">Основное</string>
+    <string name="SG_ThemeMockNotifications">Уведомления</string>
+    <string name="SG_ThemeMockLanguage">Язык</string>
+    <string name="SG_ThemeMockLanguageValue">Русский</string>
+    <string name="SG_ThemeMockPrivacy">Конфиденциальность</string>
+    <string name="SG_ThemeMockAutoload">Автозагрузка медиа</string>
+    <string name="SG_ThemeMockSave">Сохранить</string>
+    <string name="SG_ThemeMockReply">Ответить</string>
+    <string name="SG_ThemeMockCopy">Копировать</string>
+    <string name="SG_ThemeMockForward">Переслать</string>
     <!-- SOLEGRAM END -->
 </resources>
