@@ -765,12 +765,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             }
             bubbleRadiusInfoRow = rowCount++;
 
-            Theme.ThemeInfo themeInfo = Theme.getCurrentTheme();
-            Theme.ThemeAccent accent = themeInfo.getAccent(false);
-            if (themeInfo.themeAccents != null && !themeInfo.themeAccents.isEmpty() && accent != null && accent.id >= 100) {
-                editThemeRow = rowCount++;
-            }
-            createNewThemeRow = rowCount++;
+            // Solegram: no "edit theme" / "create new theme" here - Telegram's colour editors gave way to the theme editor
             lastShadowRow = rowCount++;
         } else if (currentType == THEME_TYPE_BASIC) {
             sgLinksRow = rowCount++;
@@ -1070,7 +1065,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
         simpleActionBar.setBackButtonImage(R.drawable.ic_ab_back);
         if (currentType == THEME_TYPE_THEMES_BROWSER) {
-            simpleActionBar.setTitle(getString("BrowseThemes", R.string.BrowseThemes));
+            simpleActionBar.setTitle(getString(R.string.SG_ThemeReady)); // Solegram: the themes are found from the theme editor
             SimpleActionBarMenu menu = simpleActionBar.createMenu();
             sunDrawable = new RLottieDrawable(R.raw.sun, dp(28), dp(28), true, null);
             if (lastIsDarkTheme) {
@@ -2328,7 +2323,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                     if (parentLayout != null) {
                         Theme.applyTheme(themeInfo);
                         parentLayout.rebuildAllFragmentViews(true, true);
-                        new ThemeEditorView().show(getParentActivity(), themeInfo);
+                        presentFragment(new com.solegram.messenger.ui.SolegramThemeEditorActivity()); // Solegram: the theme editor
                     }
                 } else if (which == 3) {
                     presentFragment(new ThemeSetUrlActivity(themeInfo, null, false));

@@ -8392,9 +8392,13 @@ public class AlertsCreator {
         Theme.ThemeInfo themeInfo = Theme.createNewTheme(editText.getText().toString());
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.themeListUpdated);
 
-        ThemeEditorView themeEditorView = new ThemeEditorView();
-        themeEditorView.show(fragment.getParentActivity(), themeInfo);
+        // Solegram: the new theme is coloured in the theme editor (Telegram's per-key editor is gone)
+        Theme.applyTheme(themeInfo);
         alertDialog.dismiss();
+        fragment.presentFragment(new com.solegram.messenger.ui.SolegramThemeEditorActivity());
+        if (true) {
+            return;
+        }
 
         SharedPreferences preferences = MessagesController.getGlobalMainSettings();
         if (preferences.getBoolean("themehint", false)) {

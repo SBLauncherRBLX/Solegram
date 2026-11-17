@@ -5697,11 +5697,45 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
             }
         }
         if (!solegramGlass.isLive()) {
+            if (solegramGlassBands) {
+                view.post(() -> solegramSetGlassBands(false)); // not in the middle of a draw
+            }
             return false;
+        }
+        if (!solegramGlassBands) {
+            view.post(() -> solegramSetGlassBands(true));
         }
         solegramGlass.drawable.setBounds(0, 0, view.getWidth(), view.getHeight());
         solegramGlass.drawable.draw(canvas);
         return true;
+    }
+
+    private boolean solegramGlassBands;
+    private android.graphics.drawable.Drawable solegramSearchBoxPanel;
+
+    /**
+     * Solegram: over the glass panel the search row and the fades at the top and bottom of the list do not paint the
+     * menu's plain colour (they made a grey band without the glass); over the plain panel they do, as before.
+     */
+    private void solegramSetGlassBands(boolean glass) {
+        if (solegramGlassBands == glass) {
+            return;
+        }
+        solegramGlassBands = glass;
+        if (searchBox != null) {
+            if (glass) {
+                solegramSearchBoxPanel = searchBox.getBackground();
+                searchBox.setBackground(null);
+            } else if (solegramSearchBoxPanel != null) {
+                searchBox.setBackground(solegramSearchBoxPanel);
+            }
+        }
+        if (topGradientView != null) {
+            topGradientView.setVisibility(glass ? View.INVISIBLE : View.VISIBLE);
+        }
+        if (bottomGradientView != null) {
+            bottomGradientView.setVisibility(glass ? View.INVISIBLE : View.VISIBLE);
+        }
     }
 
     public void setDrawBackground(boolean drawBackground) {

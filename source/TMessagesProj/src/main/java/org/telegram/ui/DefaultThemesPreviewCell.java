@@ -167,7 +167,7 @@ public class DefaultThemesPreviewCell extends LinearLayout implements Theme.Colo
             addView(dayNightCell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
             browseThemesCell = new TextCell(context);
-            browseThemesCell.setTextAndIcon(LocaleController.getString(R.string.SettingsBrowseThemes), R.drawable.msg_colors, false);
+            browseThemesCell.setTextAndIcon(LocaleController.getString(R.string.SG_ThemeEdit), R.drawable.msg_colors, false); // Solegram: the theme editor
 
             addView(browseThemesCell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -268,7 +268,8 @@ public class DefaultThemesPreviewCell extends LinearLayout implements Theme.Colo
 
             darkThemeDrawable.setPlayInDirectionOfCustomEndFrame(true);
             browseThemesCell.setOnClickListener(view -> {
-                parentFragment.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_THEMES_BROWSER));
+                // Solegram: the current theme's colours first; the ready-made themes are a row there
+                parentFragment.presentFragment(new com.solegram.messenger.ui.SolegramThemeEditorActivity());
             });
 
             if (!Theme.isCurrentThemeDay()) {

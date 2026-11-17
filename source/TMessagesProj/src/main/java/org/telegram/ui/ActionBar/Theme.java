@@ -6177,6 +6177,8 @@ public class Theme {
         }
         applyCalculatedTableColors(currentColorsNoAccent, colors, currentTheme.isDark());
         applyCalculatedArticleCodeColors(currentColorsNoAccent, colors, currentTheme.isDark());
+        // Solegram: the colours picked in the theme editor, over the theme's own
+        com.solegram.messenger.SolegramThemeColors.apply(colors, currentTheme.isDark());
         shouldDrawGradientIcons = gradientIcons;
         currentColors = colors;
         if (!messages) {
@@ -9158,7 +9160,7 @@ public class Theme {
                 || key_chat_stickerReplyLine == key || key_chat_stickerReplyNameText == key || key_chat_stickerReplyMessageText == key)) {
             return 0xffffffff;
         }
-        if (currentTheme == defaultTheme) {
+        if (currentTheme == defaultTheme && !com.solegram.messenger.SolegramThemeColors.paints(key)) {
             boolean useDefault;
             if (isMyMessagesBubbles(key)) {
                 useDefault = currentTheme.isDefaultMyMessagesBubbles();
