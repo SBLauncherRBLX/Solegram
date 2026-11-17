@@ -13828,5 +13828,7 @@
     <string name="SG_ThemeBackToOriginal">Back to the original theme</string>
     <string name="SG_ThemeAuto">Pick automatically</string>
     <string name="SG_ThemeAnyColor">Any colour</string>
+    <string name="SG_ThemeBackgroundColor">Background</string>
+    <string name="SG_ThemeBackgroundColorInfo">«A»: the background follows the main colour. A light background is used in the light theme, a dark one in the dark theme; black suits AMOLED screens.</string>
     <!-- SOLEGRAM END -->
 </resources>

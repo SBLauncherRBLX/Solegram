@@ -55,9 +55,20 @@ public final class SolegramThemeGenerator {
         return prefs().getInt("style", STYLE_CALM);
     }
 
-    public static void save(int primary, int secondary, int style) {
-        prefs().edit().putInt("primary", primary).putInt("secondary", secondary).putInt("style", style).apply();
+    /** 0: the background is worked out from the main colour. */
+    public static int savedBackground() {
+        return prefs().getInt("background", 0);
     }
+
+    public static void save(int primary, int secondary, int background, int style) {
+        prefs().edit().putInt("primary", primary).putInt("secondary", secondary).putInt("background", background).putInt("style", style).apply();
+    }
+
+    /** Backgrounds to pick from: light ones for light themes, dark ones for dark (black for AMOLED screens). */
+    public static final int[] BACKGROUNDS = {
+        0xFFF7F7F8, 0xFFF4EEE4, 0xFFE8F4EC, 0xFFE8F0FA, 0xFFF0EBFA, 0xFFFAECEF,
+        0xFF1C1C1E, 0xFF0F1828, 0xFF12201A, 0xFF1F1528, 0xFF000000
+    };
 
     // endregion
 
@@ -115,6 +126,15 @@ public final class SolegramThemeGenerator {
      * as slot id → colour.
      */
     public static Map<String, Integer> generate(int primary, int secondary, int style, boolean dark) {
+        return generate(primary, secondary, 0, style, dark);
+    }
+
+    /**
+     * {@code background}: 0 for one worked out from the main colour; otherwise its hue and saturation tint every
+     * surface (screens, menus, dividers, their bubbles, the input bar), and its lightness is kept in the themes it
+     * suits (a light colour in light themes, a dark one in dark themes; the other kind takes the usual lightness).
+     */
+    public static Map<String, Integer> generate(int primary, int secondary, int background, int style, boolean dark) {
         final float[] p = hsl(primary);
         final float hue = p[0];
         float sat;
@@ -143,31 +163,43 @@ public final class SolegramThemeGenerator {
         final float tint = style == STYLE_MONO ? 0.06f : style == STYLE_VIVID ? 0.42f : 0.3f;
         final float fix = lightnessFix(hue);
 
+        // the surfaces' family: the main colour's hue, or the picked background's
+        float nHue = hue, nTint = tint, lightL = 0.955f - fix * 0.3f, darkL = 0.12f;
+        if (background != 0) {
+            final float[] b = hsl(background);
+            nHue = b[0];
+            nTint = Math.min(0.6f, b[1]);
+            if (b[2] >= 0.6f) {
+                lightL = Math.max(0.86f, Math.min(0.99f, b[2]));
+            } else if (b[2] <= 0.4f) {
+                darkL = b[2] < 0.02f ? 0f : Math.max(0.05f, Math.min(0.2f, b[2]));
+            }
+        }
         final Map<String, Integer> out = new LinkedHashMap<>();
 
-        // the screens: a barely tinted background, the header and the input bar the same
-        final int background = dark ? hsl(hue, tint * 0.8f, 0.12f) : hsl(hue, tint, 0.955f - fix * 0.3f);
-        final int menus = dark ? hsl(hue, tint * 0.8f, 0.165f) : hsl(hue, tint * 0.6f, 0.985f);
-        final int text = readable(dark ? hsl(hue, 0.10f, 0.95f) : hsl(hue, 0.20f, 0.12f), background, 7, dark);
-        final int secondaryText = readable(dark ? hsl(hue, 0.10f, 0.64f) : hsl(hue, 0.13f, 0.47f), background, 3.6, dark);
+        // the screens: a tinted background, the header and the input bar the same family
+        final int background0 = dark ? hsl(nHue, nTint * 0.8f, darkL) : hsl(nHue, nTint, lightL);
+        final int menus = dark ? hsl(nHue, nTint * 0.8f, darkL + 0.045f) : hsl(nHue, nTint * 0.6f, Math.min(0.99f, lightL + 0.03f));
+        final int text = readable(dark ? hsl(nHue, 0.10f, 0.95f) : hsl(nHue, 0.20f, 0.12f), background0, 7, dark);
+        final int secondaryText = readable(dark ? hsl(nHue, 0.10f, 0.64f) : hsl(nHue, 0.13f, 0.47f), background0, 3.6, dark);
 
         // the accent: bright enough to read on the background, a little darker for yellows in light themes
-        final int accent = underWhite(readable(hsl(hue, style == STYLE_MONO ? Math.max(sat, 0.12f) : sat, dark ? 0.6f : 0.5f - fix), background, 3, dark), 0.26);
+        final int accent = underWhite(readable(hsl(hue, style == STYLE_MONO ? Math.max(sat, 0.12f) : sat, dark ? 0.6f : 0.5f - fix), background0, 3, dark), 0.26);
 
         out.put("accent", accent);
-        out.put("background", background);
+        out.put("background", background0);
         out.put("text", text);
         out.put("secondary", secondaryText);
-        out.put("icons", readable(dark ? hsl(hue, sat * 0.35f, 0.66f) : hsl(hue, sat * 0.35f, 0.52f), background, 2.6, dark));
-        out.put("divider", dark ? hsl(hue, tint * 0.8f, 0.21f) : hsl(hue, tint, 0.88f));
+        out.put("icons", readable(dark ? hsl(hue, sat * 0.35f, 0.66f) : hsl(hue, sat * 0.35f, 0.52f), background0, 2.6, dark));
+        out.put("divider", dark ? hsl(nHue, nTint * 0.8f, darkL + 0.09f) : hsl(nHue, nTint, lightL - 0.075f));
 
-        out.put("headerBg", background);
+        out.put("headerBg", background0);
         out.put("headerText", text);
         out.put("menus", menus);
 
         out.put("unread", accent);
-        out.put("muted", dark ? hsl(hue, 0.08f, 0.38f) : hsl(hue, 0.08f, 0.74f));
-        out.put("online", readable(hsl(hue2, Math.max(sat2, 0.5f), dark ? 0.6f : 0.47f - lightnessFix(hue2)), background, 2.4, dark));
+        out.put("muted", dark ? hsl(nHue, 0.08f, Math.max(0.38f, darkL + 0.26f)) : hsl(nHue, 0.08f, Math.min(0.74f, lightL - 0.2f)));
+        out.put("online", readable(hsl(hue2, Math.max(sat2, 0.5f), dark ? 0.6f : 0.47f - lightnessFix(hue2)), background0, 2.4, dark));
         out.put("fab", accent);
 
         // the chat: my bubbles pastel (light) or deep (dark), theirs nearly the background; texts readable on them
@@ -183,12 +215,12 @@ public final class SolegramThemeGenerator {
                 : hsl(hue2, sat2 * 0.7f, (style == STYLE_VIVID ? 0.85f : 0.89f) - lightnessFix(hue2) * 0.5f));
         }
         out.put("outText", readable(dark ? hsl(hue, 0.12f, 0.96f) : hsl(hue, 0.3f, 0.12f), outBubble, 7, dark));
-        final int inBubble = dark ? hsl(hue, tint * 0.8f, 0.19f) : hsl(hue, tint * 0.35f, 0.995f);
+        final int inBubble = dark ? hsl(nHue, nTint * 0.8f, darkL + 0.07f) : hsl(nHue, nTint * 0.35f, Math.min(0.995f, lightL + 0.04f));
         out.put("inBubble", inBubble);
         out.put("inText", readable(text, inBubble, 7, dark));
         out.put("links", readable(dark ? hsl(hue, Math.max(sat, 0.45f), 0.72f) : hsl(hue, Math.max(sat, 0.45f), 0.42f - fix), inBubble, 3.5, dark));
         out.put("checks", readable(dark ? hsl(hue, sat * 0.8f, 0.76f) : hsl(hue, sat, 0.42f - fix), outBubble, 2.6, dark));
-        out.put("panel", dark ? hsl(hue, tint * 0.8f, 0.14f) : hsl(hue, tint * 0.5f, 0.985f));
+        out.put("panel", dark ? hsl(nHue, nTint * 0.8f, darkL + 0.02f) : hsl(nHue, nTint * 0.5f, Math.min(0.99f, lightL + 0.03f)));
         out.put("send", accent);
 
         out.put("buttons", accent);

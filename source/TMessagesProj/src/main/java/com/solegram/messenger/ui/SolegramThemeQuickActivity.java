@@ -61,9 +61,30 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
 
     private int primary = SolegramThemeGenerator.savedPrimary();
     private int secondary = SolegramThemeGenerator.savedSecondary();
+    private int background = SolegramThemeGenerator.savedBackground();
+
+    private static final int ROW_MAIN = 0, ROW_SECOND = 1, ROW_BACKGROUND = 2;
+
+    private int valueOf(int row) {
+        return row == ROW_MAIN ? primary : row == ROW_SECOND ? secondary : background;
+    }
+
+    private void setValue(int row, int value) {
+        if (row == ROW_MAIN) {
+            primary = value;
+        } else if (row == ROW_SECOND) {
+            secondary = value;
+        } else {
+            background = value;
+        }
+    }
+
+    private static int[] presetsOf(int row) {
+        return row == ROW_BACKGROUND ? SolegramThemeGenerator.BACKGROUNDS : SolegramThemeGenerator.COLORS;
+    }
     private int style = SolegramThemeGenerator.savedStyle();
 
-    private SwatchRow primaryRow, secondaryRow;
+    private SwatchRow primaryRow, secondaryRow, backgroundRow;
     private StyleRow styleRow;
     private FrameLayout buttonContainer;
     private ButtonWithCounterView createButton;
@@ -87,6 +108,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             if (primaryRow != null) {
                 primaryRow.invalidateAll();
                 secondaryRow.invalidateAll();
+                backgroundRow.invalidateAll();
                 styleRow.invalidate();
             }
             if (listView != null && listView.adapter != null) {
@@ -141,6 +163,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
     private void onChanged() {
         primaryRow.invalidateAll();
         secondaryRow.invalidateAll();
+        backgroundRow.invalidateAll();
         styleRow.invalidate();
     }
 
@@ -151,8 +174,9 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             return;
         }
         if (primaryRow == null) {
-            primaryRow = new SwatchRow(context, false);
-            secondaryRow = new SwatchRow(context, true);
+            primaryRow = new SwatchRow(context, ROW_MAIN);
+            secondaryRow = new SwatchRow(context, ROW_SECOND);
+            backgroundRow = new SwatchRow(context, ROW_BACKGROUND);
             styleRow = new StyleRow(context);
             buttonContainer = new FrameLayout(context);
             createButton = new ButtonWithCounterView(context, getResourceProvider()).setRound();
@@ -167,6 +191,10 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         items.add(UItem.asHeader(getString(R.string.SG_ThemeSecondColor)));
         items.add(UItem.asCustom(secondaryRow));
         items.add(UItem.asShadow(getString(R.string.SG_ThemeSecondColorInfo)));
+
+        items.add(UItem.asHeader(getString(R.string.SG_ThemeBackgroundColor)));
+        items.add(UItem.asCustom(backgroundRow));
+        items.add(UItem.asShadow(getString(R.string.SG_ThemeBackgroundColorInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_ThemeStyle)));
         items.add(UItem.asCustom(styleRow));
@@ -226,8 +254,8 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         createButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         createButton.setLoading(true);
         // both: the theme stays when the app switches between day and night
-        final Map<String, Integer> light = SolegramThemeGenerator.generate(primary, secondary, style, false);
-        final Map<String, Integer> night = SolegramThemeGenerator.generate(primary, secondary, style, true);
+        final Map<String, Integer> light = SolegramThemeGenerator.generate(primary, secondary, background, style, false);
+        final Map<String, Integer> night = SolegramThemeGenerator.generate(primary, secondary, background, style, true);
         final Integer accent = (dark() ? night : light).get("accent");
         // a moment of "making" on the button, then the new colours come out of it in a circle
         AndroidUtilities.runOnUIThread(() -> {
@@ -240,7 +268,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             createButton.getLocationInWindow(loc);
             final float x = loc[0] + createButton.getWidth() / 2f, y = loc[1] + createButton.getHeight() / 2f;
             SolegramThemeReveal.start(getParentActivity(), x, y, accent != null ? accent : 0xFF3390EC, () -> {
-                SolegramThemeGenerator.save(primary, secondary, style);
+                SolegramThemeGenerator.save(primary, secondary, background, style);
                 SolegramThemeColors.setAll(false, light);
                 SolegramThemeColors.setAll(true, night);
                 Theme.refreshThemeColors(false, true);
@@ -294,27 +322,23 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         @Override public void onColorSelected(int color) { }
     };
 
-    private void pickCustom(boolean second) {
+    private void pickCustom(int row) {
         if (getContext() == null) {
             return;
         }
-        final int start = second ? (secondary != 0 ? secondary : primary) : primary;
+        final int start = valueOf(row) != 0 ? valueOf(row) : row == ROW_BACKGROUND ? (dark() ? 0xFF1C1C1E : 0xFFF7F7F8) : primary;
         new ColorPickerBottomSheet(getContext(), getResourceProvider())
             .setPipetteDelegate(NO_PIPETTE)
             .setColor(start)
             .setColorListener(color -> {
-                if (second) {
-                    secondary = color | 0xFF000000;
-                } else {
-                    primary = color | 0xFF000000;
-                }
+                setValue(row, color | 0xFF000000);
                 onChanged();
             })
             .show();
     }
 
-    private static boolean isPreset(int color) {
-        for (int c : SolegramThemeGenerator.COLORS) {
+    private static boolean isPreset(int row, int color) {
+        for (int c : presetsOf(row)) {
             if (c == color) {
                 return true;
             }
@@ -327,7 +351,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         static final int KIND_COLOR = 0, KIND_AUTO = 1, KIND_CUSTOM = 2;
         final int kind;
         final int presetColor;
-        final boolean second;
+        final int row;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final TextPaint text = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -335,36 +359,32 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         private final Path path = new Path();
         private float selectedProgress;
 
-        SwatchTile(Context context, int kind, int presetColor, boolean second) {
+        SwatchTile(Context context, int kind, int presetColor, int row) {
             super(context);
             this.kind = kind;
             this.presetColor = presetColor;
-            this.second = second;
+            this.row = row;
             stroke.setStyle(Paint.Style.STROKE);
             stroke.setStrokeCap(Paint.Cap.ROUND);
             stroke.setStrokeJoin(Paint.Join.ROUND);
             setOnClickListener(v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                 if (kind == KIND_CUSTOM) {
-                    pickCustom(second);
+                    pickCustom(row);
                     return;
                 }
-                if (second) {
-                    secondary = kind == KIND_AUTO ? 0 : presetColor;
-                } else {
-                    primary = presetColor;
-                }
+                setValue(row, kind == KIND_AUTO ? 0 : presetColor);
                 onChanged();
             });
         }
 
         boolean isSelected0() {
-            final int value = second ? secondary : primary;
+            final int value = valueOf(row);
             switch (kind) {
                 case KIND_AUTO:
                     return value == 0;
                 case KIND_CUSTOM:
-                    return value != 0 && !isPreset(value);
+                    return value != 0 && !isPreset(row, value);
                 default:
                     return value == presetColor;
             }
@@ -387,18 +407,28 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             final float half = outer - dp(2) - dp(3.5f) * selectedProgress;
             final float rad = half * 0.6f;
             box.set(cx - half, cy - half, cx + half, cy + half);
-            final int value = second ? secondary : primary;
-            int color;
+            final int value = valueOf(row);
+            int color, split = 0;
             if (kind == KIND_CUSTOM) {
-                color = value != 0 && !isPreset(value) ? value : 0;
+                color = value != 0 && !isPreset(row, value) ? value : 0;
+            } else if (kind == KIND_AUTO && row == ROW_BACKGROUND) {
+                // the backgrounds the main colour gives: the light one and the dark one
+                color = SolegramThemeGenerator.generate(primary, secondary, 0, style, false).get("background");
+                split = SolegramThemeGenerator.generate(primary, secondary, 0, style, true).get("background");
             } else if (kind == KIND_AUTO) {
+                final float[] hsl = new float[3];
+                ColorUtils.colorToHSL(primary, hsl);
+                hsl[0] = (hsl[0] + 26) % 360;
                 color = primary;
+                split = ColorUtils.HSLToColor(hsl);
             } else {
                 color = presetColor;
             }
             if (selectedProgress > 0) {
+                // backgrounds are near white or black: their ring takes the main colour so it shows
+                final int ring = row == ROW_BACKGROUND || color == 0 ? (row == ROW_BACKGROUND ? primary : Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4)) : color;
                 stroke.setStrokeWidth(dp(2));
-                stroke.setColor(Theme.multAlpha(color != 0 ? color | 0xFF000000 : Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4), selectedProgress));
+                stroke.setColor(Theme.multAlpha(ring | 0xFF000000, selectedProgress));
                 canvas.drawRoundRect(cx - outer, cy - outer, cx + outer, cy + outer, outer * 0.6f, outer * 0.6f, stroke);
             }
             if (kind == KIND_CUSTOM && color == 0) {
@@ -417,15 +447,12 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             paint.setColor(color | 0xFF000000);
             canvas.drawRoundRect(box, rad, rad, paint);
             if (kind == KIND_AUTO) {
-                // "worked out": the first colour and its neighbour, split, with an "A"
+                // "worked out": the two colours it gives, split, with an "A"
                 canvas.save();
                 path.rewind();
                 path.addRoundRect(box, rad, rad, Path.Direction.CW);
                 canvas.clipPath(path);
-                final float[] hsl = new float[3];
-                ColorUtils.colorToHSL(primary, hsl);
-                hsl[0] = (hsl[0] + 26) % 360;
-                paint.setColor(ColorUtils.HSLToColor(hsl));
+                paint.setColor(split | 0xFF000000);
                 path.rewind();
                 path.moveTo(box.right, box.top);
                 path.lineTo(box.right, box.bottom);
@@ -435,7 +462,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
                 canvas.restore();
                 text.setTextSize(dp(15));
                 text.setTypeface(AndroidUtilities.bold());
-                text.setColor(0xFFFFFFFF);
+                text.setColor(row == ROW_BACKGROUND ? primary | 0xFF000000 : 0xFFFFFFFF);
                 final float tw = text.measureText("A");
                 canvas.drawText("A", cx - tw / 2f, cy + dp(5.5f), text);
             }
@@ -456,20 +483,20 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
         }
     }
 
-    /** The colours to pick from, six in a row; "auto" first for the second colour, "any colour" last. */
+    /** The colours to pick from, seven in a row; "auto" first for the second colour and the background, "any colour" last. */
     private class SwatchRow extends ViewGroup {
         private static final int COLUMNS = 7;
         private final ArrayList<SwatchTile> tiles = new ArrayList<>();
 
-        SwatchRow(Context context, boolean second) {
+        SwatchRow(Context context, int row) {
             super(context);
-            if (second) {
-                tiles.add(new SwatchTile(context, SwatchTile.KIND_AUTO, 0, true));
+            if (row != ROW_MAIN) {
+                tiles.add(new SwatchTile(context, SwatchTile.KIND_AUTO, 0, row));
             }
-            for (int c : SolegramThemeGenerator.COLORS) {
-                tiles.add(new SwatchTile(context, SwatchTile.KIND_COLOR, c, second));
+            for (int c : presetsOf(row)) {
+                tiles.add(new SwatchTile(context, SwatchTile.KIND_COLOR, c, row));
             }
-            tiles.add(new SwatchTile(context, SwatchTile.KIND_CUSTOM, 0, second));
+            tiles.add(new SwatchTile(context, SwatchTile.KIND_CUSTOM, 0, row));
             for (SwatchTile tile : tiles) {
                 tile.setContentDescription(tile.kind == SwatchTile.KIND_AUTO ? getString(R.string.SG_ThemeAuto)
                     : tile.kind == SwatchTile.KIND_CUSTOM ? getString(R.string.SG_ThemeAnyColor) : null);
@@ -550,7 +577,7 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
                 final float l = side + i * (w + gap), t = dp(8), b = getHeight() - dp(8);
                 cards[i].set(l, t, l + w, b);
                 // a tiny screen in that style: its background, two bubbles and an accent pill
-                final Map<String, Integer> g = SolegramThemeGenerator.generate(primary, secondary, i, dark);
+                final Map<String, Integer> g = SolegramThemeGenerator.generate(primary, secondary, background, i, dark);
                 rect.set(l, t, l + w, b - dp(26));
                 paint.setColor(g.get("background"));
                 canvas.drawRoundRect(rect, dp(14), dp(14), paint);

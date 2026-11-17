@@ -2413,5 +2413,7 @@
     <string name="SG_ThemeBackToOriginal">Вернуть исходную тему</string>
     <string name="SG_ThemeAuto">Подобрать автоматически</string>
     <string name="SG_ThemeAnyColor">Любой цвет</string>
+    <string name="SG_ThemeBackgroundColor">Фон</string>
+    <string name="SG_ThemeBackgroundColorInfo">«A» — фон подберётся под основной цвет. Светлый фон применяется в светлой теме, тёмный — в тёмной, чёрный подходит для AMOLED-экранов.</string>
     <!-- SOLEGRAM END -->
 </resources>
