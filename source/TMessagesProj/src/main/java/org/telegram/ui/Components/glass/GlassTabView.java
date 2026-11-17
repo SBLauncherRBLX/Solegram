@@ -401,8 +401,9 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         icon.setPivotX(icon.getWidth() / 2f);
         icon.setPivotY(icon.getHeight() / 2f);
         if (type == TabAnimation.SETTINGS) {
-            // the gear turns half a round (the same look as at rest), quick at first and settling with a little spring
-            rotation = 180f * CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.05f));
+            // the gear turns a whole round, quick at first and settling with a little spring: it ends exactly where it
+            // rests (half a round looked the same only for a gear drawn right in the middle; an icon pack's one jumped)
+            rotation = 360f * CubicBezierInterpolator.EASE_OUT_BACK.getInterpolation(Math.min(1f, t * 1.05f));
             final float press = (float) Math.sin(Math.PI * Math.min(1f, t * 2.2f));
             scaleX = scaleY = 1f - 0.08f * press;
             if (t >= 1f) {

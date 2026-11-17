@@ -6195,6 +6195,9 @@ public class Theme {
                 continue;
             }
             final int index = colors.indexOfKey(key);
+            if (index < 0 && fallbackKeys.get(key, -1) >= 0) {
+                continue; // the theme has no colour for it and takes another key's (e.g. the tabs' the text's): kept so
+            }
             final int color = index >= 0 ? colors.valueAt(index) : defaultColors[key];
             final int newColor = changeColorAccent(baseHsv, newHsv, color, dark, color);
             if (newColor != color) {

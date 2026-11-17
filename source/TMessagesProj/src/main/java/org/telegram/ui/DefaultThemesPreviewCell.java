@@ -157,6 +157,8 @@ public class DefaultThemesPreviewCell extends LinearLayout implements Theme.Colo
         recyclerView.setAnimateEmptyView(true, RecyclerListView.EMPTY_VIEW_ANIMATION_TYPE_ALPHA);
 
         if (currentType == ThemeActivity.THEME_TYPE_BASIC) {
+            // Solegram: no ready-made themes here: they are a row of the theme editor ("Edit theme" below)
+            frameLayout.setVisibility(View.GONE);
             darkThemeDrawable = new RLottieDrawable(R.raw.sun_outline, AndroidUtilities.dp(28), AndroidUtilities.dp(28), true, null);
             darkThemeDrawable.setPlayInDirectionOfCustomEndFrame(true);
             darkThemeDrawable.beginApplyLayerColors();
