@@ -269,7 +269,7 @@ public class DefaultThemesPreviewCell extends LinearLayout implements Theme.Colo
             darkThemeDrawable.setPlayInDirectionOfCustomEndFrame(true);
             browseThemesCell.setOnClickListener(view -> {
                 // Solegram: the current theme's colours first; the ready-made themes are a row there
-                parentFragment.presentFragment(new com.solegram.messenger.ui.SolegramThemeEditorActivity());
+                parentFragment.presentFragment(new com.solegram.messenger.ui.SolegramThemeQuickActivity());
             });
 
             if (!Theme.isCurrentThemeDay()) {

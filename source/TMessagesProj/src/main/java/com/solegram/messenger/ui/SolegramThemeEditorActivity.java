@@ -105,7 +105,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
 
     @Override
     protected CharSequence getTitle() {
-        return getString(R.string.SG_ThemeEdit);
+        return getString(R.string.SG_ThemeAdvanced);
     }
 
     @Override

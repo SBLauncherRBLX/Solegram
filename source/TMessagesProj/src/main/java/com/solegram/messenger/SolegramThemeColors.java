@@ -230,7 +230,42 @@ public final class SolegramThemeColors {
     /** The colour as the table has it now (the theme's, or a slot painted before). */
     private static int current(SparseIntArray colors, int key) {
         final int i = colors.indexOfKey(key);
-        return i >= 0 ? colors.valueAt(i) : Theme.getDefaultColor(key);
+        if (i >= 0) {
+            return colors.valueAt(i);
+        }
+        // a preview is laid over the colours on screen now; the theme's table is being built from its defaults
+        return colors instanceof PreviewTable ? Theme.getColor(key) : Theme.getDefaultColor(key);
+    }
+
+    /** The colours a set of slots would paint, over the colours on screen now: for a preview, nothing is applied. */
+    public static final class PreviewTable extends SparseIntArray {
+    }
+
+    /** What {@code slots} (slot id → colour, in the order of {@link #SLOTS}) would paint, as a table of keys. */
+    public static PreviewTable preview(java.util.Map<String, Integer> slots, boolean dark) {
+        final PreviewTable colors = new PreviewTable();
+        final SparseBooleanArray keys = new SparseBooleanArray();
+        for (Slot s : SLOTS) {
+            final Integer c = slots.get(s.id);
+            if (c != null) {
+                paint(s.id, c, colors, keys, dark);
+            }
+        }
+        return colors;
+    }
+
+    /** Replaces the colours of light or dark themes with {@code slots} at once. */
+    public static void setAll(boolean dark, java.util.Map<String, Integer> slots) {
+        final SharedPreferences.Editor e = prefs().edit();
+        for (Slot s : SLOTS) {
+            final Integer c = slots.get(s.id);
+            if (c == null) {
+                e.remove(prefKey(dark, s.id));
+            } else {
+                e.putInt(prefKey(dark, s.id), c);
+            }
+        }
+        e.apply();
     }
 
     /** The colour with the alpha the key had in the theme (faded texts, selectors). */

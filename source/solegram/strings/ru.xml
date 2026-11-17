@@ -2143,4 +2143,20 @@
     <string name="SG_ThemeMockReply">Ответить</string>
     <string name="SG_ThemeMockCopy">Копировать</string>
     <string name="SG_ThemeMockForward">Переслать</string>
+    <string name="SG_ThemeYoursLight">Ваша тема · светлая</string>
+    <string name="SG_ThemeYoursDark">Ваша тема · тёмная</string>
+    <string name="SG_ThemeMainColor">Основной цвет</string>
+    <string name="SG_ThemeSecondColor">Второй цвет</string>
+    <string name="SG_ThemeSecondColorInfo">«A» — Solegram подберёт второй цвет сам, по соседству с основным.</string>
+    <string name="SG_ThemeStyle">Стиль</string>
+    <string name="SG_ThemeStyleCalm">Спокойный</string>
+    <string name="SG_ThemeStyleVivid">Яркий</string>
+    <string name="SG_ThemeStyleMono">Монохром</string>
+    <string name="SG_ThemeCreate">Создать тему</string>
+    <string name="SG_ThemeCreateInfo">Solegram сам подберёт мягкие оттенки фона, текста, сообщений и кнопок под выбранные цвета и проверит, что всё читается. У светлой и тёмной темы результат свой.</string>
+    <string name="SG_ThemeAdvanced">Расширенная настройка</string>
+    <string name="SG_ThemeAdvancedInfo">Каждый цвет по отдельности — в меню «⋮», «Расширенная настройка».</string>
+    <string name="SG_ThemeBackToOriginal">Вернуть исходную тему</string>
+    <string name="SG_ThemeAuto">Подобрать автоматически</string>
+    <string name="SG_ThemeAnyColor">Любой цвет</string>
 </resources>

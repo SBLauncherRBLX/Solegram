@@ -107,7 +107,28 @@ public class SolegramThemeMockView extends View {
     }
 
     private int color(int key) {
+        final android.util.SparseIntArray table = colorTable;
+        if (table != null) {
+            final int i = table.indexOfKey(key);
+            if (i >= 0) {
+                return table.valueAt(i);
+            }
+        }
         return Theme.getColor(key);
+    }
+
+    private android.util.SparseIntArray colorTable;
+    private boolean previewOnly;
+
+    /** Colours to draw instead of the theme's (a theme that is not applied yet), null: the theme's. */
+    public void setColorTable(android.util.SparseIntArray table) {
+        colorTable = table;
+        invalidate();
+    }
+
+    /** Only a preview: the parts of the screens are not picked by a tap (the tabs still switch). */
+    public void setPreviewOnly(boolean previewOnly) {
+        this.previewOnly = previewOnly;
     }
 
     /** Registers the part (in phone dp) for taps; the canvas is in phone dp scaled already. */
@@ -216,11 +237,11 @@ public class SolegramThemeMockView extends View {
         // the track and the moving selection, as a segmented control
         rect.set(left, top, left + w, top + h);
         paint.setShader(null);
-        paint.setColor(Theme.multAlpha(color(Theme.key_windowBackgroundWhiteBlackText), 0.06f));
+        paint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), 0.06f));
         canvas.drawRoundRect(rect, h / 2f, h / 2f, paint);
         final float sx = left + tabW * tabProgress;
         rect.set(sx + dp(3), top + dp(3), sx + tabW - dp(3), top + h - dp(3));
-        paint.setColor(color(Theme.key_windowBackgroundWhite));
+        paint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         paint.setShadowLayer(dp(2), 0, dp(1), 0x22000000);
         canvas.drawRoundRect(rect, (h - dp(6)) / 2f, (h - dp(6)) / 2f, paint);
         paint.clearShadowLayer();
@@ -229,7 +250,7 @@ public class SolegramThemeMockView extends View {
             tabRects[i].set(left + tabW * i, top, left + tabW * (i + 1), top + h);
             final boolean sel = i == screen;
             text.setTypeface(sel ? AndroidUtilities.bold() : null);
-            text.setColor(sel ? color(Theme.key_windowBackgroundWhiteBlackText) : color(Theme.key_windowBackgroundWhiteGrayText));
+            text.setColor(sel ? Theme.getColor(Theme.key_windowBackgroundWhiteBlackText) : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
             final float tw = text.measureText(names[i]);
             canvas.drawText(names[i], tabRects[i].centerX() - tw / 2f, tabRects[i].centerY() + dp(4.5f), text);
         }
@@ -608,6 +629,9 @@ public class SolegramThemeMockView extends View {
                 selectScreen(i);
                 return;
             }
+        }
+        if (previewOnly) {
+            return;
         }
         // the topmost part drawn under the finger: the regions go from the back to the front
         String slot = null;

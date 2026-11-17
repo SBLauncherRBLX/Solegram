@@ -2410,5 +2410,21 @@
     <string name="SG_ThemeMockReply">Reply</string>
     <string name="SG_ThemeMockCopy">Copy</string>
     <string name="SG_ThemeMockForward">Forward</string>
+    <string name="SG_ThemeYoursLight">Your theme · light</string>
+    <string name="SG_ThemeYoursDark">Your theme · dark</string>
+    <string name="SG_ThemeMainColor">Main colour</string>
+    <string name="SG_ThemeSecondColor">Second colour</string>
+    <string name="SG_ThemeSecondColorInfo">«A»: Solegram picks the second colour itself, next to the main one.</string>
+    <string name="SG_ThemeStyle">Style</string>
+    <string name="SG_ThemeStyleCalm">Calm</string>
+    <string name="SG_ThemeStyleVivid">Vivid</string>
+    <string name="SG_ThemeStyleMono">Mono</string>
+    <string name="SG_ThemeCreate">Create theme</string>
+    <string name="SG_ThemeCreateInfo">Solegram works out soft shades of the background, text, messages and buttons from your colours and checks that everything reads well. Light and dark themes get their own.</string>
+    <string name="SG_ThemeAdvanced">Advanced editor</string>
+    <string name="SG_ThemeAdvancedInfo">Every colour one by one is in the «⋮» menu, Advanced editor.</string>
+    <string name="SG_ThemeBackToOriginal">Back to the original theme</string>
+    <string name="SG_ThemeAuto">Pick automatically</string>
+    <string name="SG_ThemeAnyColor">Any colour</string>
     <!-- SOLEGRAM END -->
 </resources>
