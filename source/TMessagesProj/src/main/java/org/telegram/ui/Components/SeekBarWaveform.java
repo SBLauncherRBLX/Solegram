@@ -398,20 +398,6 @@ public class SeekBarWaveform {
         drawFill(canvas, this.alpha);
         canvas.restore();
 
-        // Solegram: the playhead, a round upright mark where it plays (while it has played some and not all)
-        if (!exploding && explosionRate <= 0 && this.progress > 0.001f && this.progress < 0.999f && heights != null) {
-            final float w = Math.min(width, heights.length * sgPitch());
-            final float px = this.progress * w;
-            final float half = dp(9), pw = dpf2Safe(3);
-            if (playheadPaint == null) {
-                playheadPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-            }
-            playheadPaint.setColor(outerColor);
-            playheadPaint.setAlpha((int) (android.graphics.Color.alpha(outerColor) * this.alpha));
-            final float cy = (height - dp(14)) / 2f + dp(7);
-            AndroidUtilities.rectTmp.set(px - pw / 2f, cy - half, px + pw / 2f, cy + half);
-            canvas.drawRoundRect(AndroidUtilities.rectTmp, pw / 2f, pw / 2f, playheadPaint);
-        }
 
         if (exploding || explosionRate > 0) {
             canvas.restore();
@@ -445,12 +431,6 @@ public class SeekBarWaveform {
                 .setEmitArea(emitArea)
                 .draw(canvas, explosionRate);
         }
-    }
-
-    private android.graphics.Paint playheadPaint;
-
-    private static float dpf2Safe(float v) {
-        return AndroidUtilities.dpf2(v);
     }
 
     private void drawFill(Canvas canvas, float alpha) {
@@ -498,7 +478,7 @@ public class SeekBarWaveform {
 
     /**
      * Solegram: fewer, fuller bars (2.6 dp every 4 dp instead of 2 dp every 3 dp) so the voice's shape reads at a
-     * glance; a playhead marks where it plays.
+     * glance.
      */
     private static float sgPitch() {
         return AndroidUtilities.dpf2(4);

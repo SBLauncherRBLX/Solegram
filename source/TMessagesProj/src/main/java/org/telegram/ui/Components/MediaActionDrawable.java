@@ -239,6 +239,10 @@ public class MediaActionDrawable extends Drawable {
         return animatedDownloadProgress;
     }
 
+    /** Solegram: drawn instead of the file icon (a plugin's puzzle piece from the icon pack), null for the usual one. */
+    @androidx.annotation.Nullable
+    public Drawable solegramFileIcon;
+
     /** Solegram: the button around draws the progress itself (the "bud" indicator), so the arc is left out. */
     public boolean solegramHideArc;
 
@@ -626,9 +630,17 @@ public class MediaActionDrawable extends Drawable {
             previousPath = Theme.chat_updatePath;
         }
         if (nextIcon == ICON_FILE) {
-            nextPath = Theme.chat_filePath;
+            if (solegramFileIcon != null) {
+                nextDrawable = solegramFileIcon;
+            } else {
+                nextPath = Theme.chat_filePath;
+            }
         } else if (currentIcon == ICON_FILE) {
-            previousPath = Theme.chat_filePath;
+            if (solegramFileIcon != null) {
+                previousDrawable = solegramFileIcon;
+            } else {
+                previousPath = Theme.chat_filePath;
+            }
         }
         if (nextIcon == ICON_FIRE) {
             nextDrawable = Theme.chat_flameIcon;

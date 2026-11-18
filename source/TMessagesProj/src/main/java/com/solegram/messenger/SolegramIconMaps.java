@@ -363,6 +363,7 @@ final class SolegramIconMaps {
             R.drawable.chats_unpin, R.drawable.sg_ph_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_ph_tabs_link_24,
             // Solegram: the voice effects
+            R.drawable.sg_plugin, R.drawable.sg_ph_plugin, // Solegram: the plugins' puzzle piece
             R.drawable.sg_fx_chipmunk, R.drawable.sg_ph_fx_chipmunk,
             R.drawable.sg_fx_deep, R.drawable.sg_ph_fx_deep,
             R.drawable.sg_fx_echo, R.drawable.sg_ph_fx_echo,
@@ -730,6 +731,7 @@ final class SolegramIconMaps {
             R.drawable.chats_unpin, R.drawable.sg_hg_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_hg_tabs_link_24,
             // Solegram: the voice effects
+            R.drawable.sg_plugin, R.drawable.sg_hg_plugin, // Solegram: the plugins' puzzle piece
             R.drawable.sg_fx_chipmunk, R.drawable.sg_hg_fx_chipmunk,
             R.drawable.sg_fx_deep, R.drawable.sg_hg_fx_deep,
             R.drawable.sg_fx_echo, R.drawable.sg_hg_fx_echo,
@@ -1097,6 +1099,7 @@ final class SolegramIconMaps {
             R.drawable.chats_unpin, R.drawable.sg_mc_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_mc_tabs_link_24,
             // Solegram: the voice effects
+            R.drawable.sg_plugin, R.drawable.sg_mc_plugin, // Solegram: the plugins' puzzle piece
             R.drawable.sg_fx_chipmunk, R.drawable.sg_mc_fx_chipmunk,
             R.drawable.sg_fx_deep, R.drawable.sg_mc_fx_deep,
             R.drawable.sg_fx_echo, R.drawable.sg_mc_fx_echo,
@@ -1460,6 +1463,7 @@ final class SolegramIconMaps {
             R.drawable.chats_unpin, R.drawable.sg_mj_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_mj_tabs_link_24,
             // Solegram: the voice effects
+            R.drawable.sg_plugin, R.drawable.sg_mj_plugin, // Solegram: the plugins' puzzle piece
             R.drawable.sg_fx_chipmunk, R.drawable.sg_mj_fx_chipmunk,
             R.drawable.sg_fx_deep, R.drawable.sg_mj_fx_deep,
             R.drawable.sg_fx_echo, R.drawable.sg_mj_fx_echo,
@@ -1818,6 +1822,7 @@ final class SolegramIconMaps {
             R.drawable.chats_unpin, R.drawable.sg_sl_chats_unpin,
             R.drawable.tabs_link_24, R.drawable.sg_sl_tabs_link_24,
             // Solegram: the voice effects
+            R.drawable.sg_plugin, R.drawable.sg_sl_plugin, // Solegram: the plugins' puzzle piece
             R.drawable.sg_fx_chipmunk, R.drawable.sg_sl_fx_chipmunk,
             R.drawable.sg_fx_deep, R.drawable.sg_sl_fx_deep,
             R.drawable.sg_fx_echo, R.drawable.sg_sl_fx_echo,
@@ -1831,6 +1836,7 @@ final class SolegramIconMaps {
     /** Solar glyphs for the settings rows (line style): the size and line weight of the line icons. */
     static int[] solarLine() {
         return new int[]{
+            R.drawable.sg_plugin, R.drawable.sg_sls_plugin, // Solegram: the plugins' puzzle piece
             R.drawable.menu_reply, R.drawable.sg_sls_menu_reply,
             R.drawable.msg_copy, R.drawable.sg_sls_msg_copy,
             R.drawable.msg_forward, R.drawable.sg_sls_msg_forward,
@@ -2180,6 +2186,7 @@ final class SolegramIconMaps {
 
     static int[] line() {
         return new int[]{
+            R.drawable.sg_plugin, R.drawable.sg_line_puzzle, // Solegram: the plugins' puzzle piece
             R.drawable.sg_sls_feature_ai, R.drawable.sg_line_sparkle,
             R.drawable.sg_sls_feature_gestures, R.drawable.sg_line_hand_waving,
             R.drawable.menu_reply, R.drawable.sg_line_arrow_bend_up_left,

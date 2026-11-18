@@ -458,7 +458,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(tile(UItem.asButton(ID_UPDATES, R.drawable.msg_download, getString(R.string.SG_Updates), updateValue), TILE_BLUE)
             .setSolegramSubtitle(LocaleController.formatString(R.string.SG_UpdatesSub, Solegram.getVersionName())));
         String pluginsValue = PluginsController.isEngineAvailable() ? String.valueOf(PluginsController.getInstance().getLoadedCount()) : "";
-        items.add(category(ID_PLUGINS, R.drawable.msg_bots, R.string.SG_Plugins, R.string.SG_PluginsSub, pluginsValue, TILE_ORANGE));
+        items.add(category(ID_PLUGINS, R.drawable.sg_plugin, R.string.SG_Plugins, R.string.SG_PluginsSub, pluginsValue, TILE_ORANGE));
         // accounts: up to 16 for free (UserConfig.MAX_ACCOUNT_COUNT)
         items.add(tile(UItem.asButton(ID_ADD_ACCOUNT, R.drawable.outline_add_account, getString(R.string.SG_Accounts),
             org.telegram.messenger.UserConfig.getActivatedAccountsCount() + " / " + org.telegram.messenger.UserConfig.MAX_ACCOUNT_COUNT), TILE_BLUE)

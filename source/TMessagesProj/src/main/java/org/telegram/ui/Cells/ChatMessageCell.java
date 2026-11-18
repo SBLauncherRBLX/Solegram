@@ -1053,6 +1053,20 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     /** Solegram: the profile card of someone the message mentions, where a link preview would be. */
     public final com.solegram.messenger.ui.SolegramMentionBubble sgMention = new com.solegram.messenger.ui.SolegramMentionBubble(this);
     public boolean sgMentionCard;
+
+    private android.graphics.drawable.Drawable sgPluginIcon;
+
+    /** The puzzle piece for a plugin file (.plugin), from the icon pack in use; null for any other file. */
+    private android.graphics.drawable.Drawable sgPluginIcon() {
+        final MessageObject m = currentMessageObject;
+        if (m == null || !com.solegram.messenger.plugins.PluginsController.isPluginFileName(m.getDocumentName())) {
+            return null;
+        }
+        if (sgPluginIcon == null) {
+            sgPluginIcon = getContext().getResources().getDrawable(R.drawable.sg_plugin).mutate();
+        }
+        return sgPluginIcon;
+    }
     /** Where a message that is only a profile card has the card: the bubble's top edge (3 dp) and a 6 dp frame. */
     private static final int SG_CARD_TOP = 9;
     public final GiveawayResultsMessageCell giveawayResultsMessageCell = new GiveawayResultsMessageCell(this);
@@ -14443,6 +14457,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 } else {
                     radialProgress.setColorKeys(Theme.key_chat_inLoader, Theme.key_chat_inLoaderSelected, Theme.key_chat_inMediaIcon, Theme.key_chat_inMediaIconSelected);
                 }
+                // Solegram: a plugin file shows the plugins' puzzle piece (of the icon pack) instead of the file icon
+                radialProgress.mediaActionDrawable.solegramFileIcon = sgPluginIcon();
                 if (buttonState == -1) {
                     return MediaActionDrawable.ICON_FILE;
                 } else if (buttonState == 0) {
