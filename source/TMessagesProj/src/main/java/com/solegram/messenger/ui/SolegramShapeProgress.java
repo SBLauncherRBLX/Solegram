@@ -155,6 +155,21 @@ public final class SolegramShapeProgress {
 
     // endregion
 
+    /** The shapes of the indicator (each its radius at {@link #N} angles), for other places that use them. */
+    public static int shapeCount() {
+        ensureShapes();
+        return shapes.length;
+    }
+
+    public static float[] shape(int index) {
+        ensureShapes();
+        return shapes[Math.floorMod(index, shapes.length)];
+    }
+
+    public static int pointCount() {
+        return N;
+    }
+
     private final float[] cur = new float[N];
     private float[] from, to;
     private float morph = 1f;

@@ -158,6 +158,10 @@ public class PythonEngine implements PluginEngine {
 
     @Override
     public boolean evalCondition(String expression, Map<String, Object> context) {
+        // Solegram: MVEL runs Java past the Python guard: an expression reaching for what the guard stops is not run
+        if (!com.solegram.messenger.plugins.PluginMvel.allowed(expression)) {
+            return false;
+        }
         try {
             if (!mvelReady) {
                 org.mvel2.optimizers.OptimizerFactory.setDefaultOptimizer("reflective");

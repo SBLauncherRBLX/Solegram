@@ -109,7 +109,25 @@ public class SolegramConfig {
      * 0 = free service (no key), 1 = the user's own OpenAI-compatible service. */
     public static int aiProvider = SolegramSummarizer.PROVIDER_AUTO;
     public static String aiBaseUrl = "";
-    public static String aiApiKey = "";
+    // Solegram security: the key is not kept in a public field (a plugin could read it with one line); it stays
+    // encrypted in SolegramSecrets (a class plugins may not reach) and is read through aiApiKey()
+    private static volatile boolean aiKeyLegacyPlain;
+    private static volatile String aiKeyLegacy = "";
+
+    /** The key of the user's own AI service ("" when not set). */
+    public static String aiApiKey() {
+        // never to a plugin: Python's calls into Java come through Chaquopy's bridge
+        for (StackTraceElement e : Thread.currentThread().getStackTrace()) {
+            if (e.getClassName().startsWith("com.chaquo.python.")) {
+                return "";
+            }
+        }
+        if (aiKeyLegacyPlain) {
+            return aiKeyLegacy;
+        }
+        final String v = SolegramSecrets.get("aiApiKey");
+        return v == null ? "" : v;
+    }
     public static String aiModel = "";
     /** 0 = in the language of the message, 1 = in the translation language. */
     public static int aiSummaryLanguage = 0;
@@ -487,7 +505,10 @@ public class SolegramConfig {
             : p.getInt("aiProvider", 0) == SolegramSummarizer.PROVIDER_OWN ? SolegramSummarizer.PROVIDER_OWN : SolegramSummarizer.PROVIDER_AUTO;
         aiBaseUrl = p.getString("aiBaseUrl", "");
         // kept encrypted (SolegramSecrets); a plain key of an older version is moved there here
-        aiApiKey = SolegramSecrets.migrate(p, "aiApiKey");
+        // moves a plain key of an older version into SolegramSecrets; kept only where the Keystore fails
+        final String migratedKey = SolegramSecrets.migrate(p, "aiApiKey");
+        aiKeyLegacyPlain = p.contains("aiApiKey");
+        aiKeyLegacy = aiKeyLegacyPlain ? (migratedKey == null ? "" : migratedKey) : "";
         aiModel = p.getString("aiModel", "");
         aiSummaryLanguage = p.getInt("aiSummaryLanguage", 0);
         aiConsent = p.getBoolean("aiConsent", false);
@@ -695,10 +716,13 @@ public class SolegramConfig {
         final String value = key == null ? "" : key.trim();
         if (SolegramSecrets.put("aiApiKey", value)) {
             prefs().edit().remove("aiApiKey").commit();
+            aiKeyLegacyPlain = false;
+            aiKeyLegacy = "";
         } else {
             prefs().edit().putString("aiApiKey", value).commit();
+            aiKeyLegacyPlain = true;
+            aiKeyLegacy = value;
         }
-        aiApiKey = value;
     }
 
     public static String getUpdateBranch() {
@@ -866,6 +890,13 @@ public class SolegramConfig {
         "nowPlayingShareBio", "nowPlayingBio", "nowPlayingBioWritten", "adBlockTotal", "updateRepo", "updateChannel", "updateSource",
         "pluginsDevMode", "betaUpdates", "betaCode");
 
+    // a settings file somebody sent may only make protection stronger: these switches are taken from it only when they
+    // turn protection on (or, for the plugins' payments, off); the trusted sites and the scam sensitivity stay
+    private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode",
+        "pluginsScanBeforeInstall", "pluginsSecurityV2", "scamAccounts", "scamLinks", "scamNano", "warnDangerousFiles", "secureRecents");
+    private static final java.util.List<String> PROTECTION_OFF = java.util.Arrays.asList("pluginsAllowPayments");
+    private static final java.util.List<String> PROTECTION_KEPT = java.util.Arrays.asList("scamTrustedSites", "scamSensitivity", "adBlockAllowed");
+
     public static String exportToJson() {
         try {
             JSONObject root = new JSONObject();
@@ -909,6 +940,11 @@ public class SolegramConfig {
                     continue;
                 }
                 Object v = values.get(key);
+                if (PROTECTION_KEPT.contains(key)
+                        || (PROTECTION_ON.contains(key) && !Boolean.TRUE.equals(v))
+                        || (PROTECTION_OFF.contains(key) && !Boolean.FALSE.equals(v))) {
+                    continue;
+                }
                 if (LONG_KEYS.contains(key)) {
                     if (v instanceof Number) {
                         editor.putLong(key, ((Number) v).longValue());

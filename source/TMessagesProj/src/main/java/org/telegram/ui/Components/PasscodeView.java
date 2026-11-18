@@ -162,6 +162,20 @@ public class PasscodeView extends FrameLayout implements NotificationCenter.Noti
                 addView(textView, LayoutHelper.createFrame(50, 50, Gravity.TOP | Gravity.LEFT));
                 dotTextViews.add(textView);
             }
+            // Solegram: Pixel-like code dots instead of the digits and bullets (they stay, unseen, for the animations)
+            pinDots = new com.solegram.messenger.ui.SolegramPinDots(context, 4);
+            pinDots.setColors(0x40FFFFFF, 0xFFFFFFFF);
+            addView(pinDots, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 34, Gravity.CENTER_VERTICAL));
+            for (int a = 0; a < 4; a++) {
+                characterTextViews.get(a).setVisibility(INVISIBLE);
+                dotTextViews.get(a).setVisibility(INVISIBLE);
+            }
+        }
+
+        private final com.solegram.messenger.ui.SolegramPinDots pinDots;
+
+        private void solegramSyncDots() {
+            pinDots.setCount(stringBuilder.length(), pinDots.isAttachedToWindow());
         }
 
         private int getXForTextView(int pos) {
@@ -182,6 +196,7 @@ public class PasscodeView extends FrameLayout implements NotificationCenter.Noti
             ArrayList<Animator> animators = new ArrayList<>();
             final int newPos = stringBuilder.length();
             stringBuilder.append(c);
+            solegramSyncDots();
 
             TextView textView = characterTextViews.get(newPos);
             textView.setText(c);
@@ -305,6 +320,7 @@ public class PasscodeView extends FrameLayout implements NotificationCenter.Noti
             int deletingPos = stringBuilder.length() - 1;
             if (deletingPos != 0) {
                 stringBuilder.deleteCharAt(deletingPos);
+                solegramSyncDots();
             }
 
             for (int a = deletingPos; a < 4; a++) {
@@ -329,6 +345,7 @@ public class PasscodeView extends FrameLayout implements NotificationCenter.Noti
 
             if (deletingPos == 0) {
                 stringBuilder.deleteCharAt(deletingPos);
+                solegramSyncDots();
             }
 
             for (int a = 0; a < deletingPos; a++) {
@@ -377,6 +394,7 @@ public class PasscodeView extends FrameLayout implements NotificationCenter.Noti
                 currentAnimation = null;
             }
             stringBuilder.delete(0, stringBuilder.length());
+            solegramSyncDots();
             if (animated) {
                 ArrayList<Animator> animators = new ArrayList<>();
 

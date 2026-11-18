@@ -393,7 +393,18 @@ public final class XposedHelpers {
         XC_MethodHook callback = (XC_MethodHook) parameterTypesAndCallback[parameterTypesAndCallback.length - 1];
         Object[] types = new Object[parameterTypesAndCallback.length - 1];
         System.arraycopy(parameterTypesAndCallback, 0, types, 0, types.length);
-        return XposedBridge.hookMethod(findMethodExact(clazz, methodName, types), callback);
+        final java.lang.reflect.Method method = findMethodExact(clazz, methodName, types);
+        solegramCheckHook(method, callback);
+        return XposedBridge.hookMethod(method, callback);
+    }
+
+    /** Solegram: a plugin may not hook the guard's own code, the secrets, the wallet, the app lock... */
+    private static void solegramCheckHook(java.lang.reflect.Member member, XC_MethodHook callback) {
+        final String reason = com.solegram.messenger.plugins.PluginRuntimeGuard.protectedHook(member, callback instanceof XC_MethodReplacement);
+        if (reason != null) {
+            com.solegram.messenger.plugins.PluginRuntimeGuard.onBlockedHook(reason);
+            throw new SecurityException("Solegram does not let plugins hook " + reason);
+        }
     }
 
     public static XC_MethodHook.Unhook findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {
@@ -404,7 +415,9 @@ public final class XposedHelpers {
         XC_MethodHook callback = (XC_MethodHook) parameterTypesAndCallback[parameterTypesAndCallback.length - 1];
         Object[] types = new Object[parameterTypesAndCallback.length - 1];
         System.arraycopy(parameterTypesAndCallback, 0, types, 0, types.length);
-        return XposedBridge.hookMethod(findConstructorExact(clazz, types), callback);
+        final java.lang.reflect.Constructor<?> constructor = findConstructorExact(clazz, types);
+        solegramCheckHook(constructor, callback);
+        return XposedBridge.hookMethod(constructor, callback);
     }
 
     public static Object callMethod(Object obj, String methodName, Object... args) {

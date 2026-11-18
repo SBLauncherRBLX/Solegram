@@ -27,6 +27,7 @@ _logger = get_logger("pip")
 _lock = threading.RLock()
 _libs_dir = None
 _INDEX = "https://pypi.org/pypi/{name}/json"
+_FILE_HOSTS = ("files.pythonhosted.org",)
 _TIMEOUT = 30
 
 
@@ -118,7 +119,7 @@ def _installed_version(name, state):
 
 def _http_get(url):
     import requests
-    response = requests.get(url, timeout=_TIMEOUT, headers={"User-Agent": "Solegram-plugins"})
+    response = requests.get(url, timeout=_TIMEOUT, headers={"User-Agent": "Solegram-plugins"}, allow_redirects=False)
     if response.status_code == 404:
         raise PipError("Package not found")
     response.raise_for_status()
@@ -194,9 +195,17 @@ def _remove_package_files(entry):
 
 
 def _install_wheel(name, version, fileinfo):
-    content = _http_get(fileinfo["url"]).content
+    # only PyPI's own file host over https, and only a file whose checksum PyPI gives and matches
+    url = str(fileinfo.get("url") or "")
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in _FILE_HOSTS:
+        raise PipError(f"{name}: the package is not served from PyPI")
     sha = (fileinfo.get("digests") or {}).get("sha256")
-    if sha and hashlib.sha256(content).hexdigest() != sha:
+    if not sha:
+        raise PipError(f"{name}: PyPI gives no checksum for {fileinfo.get('filename')}")
+    content = _http_get(url).content
+    if hashlib.sha256(content).hexdigest() != sha.lower():
         raise PipError(f"Checksum mismatch for {fileinfo['filename']}")
     tops = set()
     requires = []
@@ -311,6 +320,8 @@ def install(plugin_id, requirements):
                     req = Requirement(raw)
                 except Exception:
                     return f"Invalid requirement: {raw}"
+                if req.url:
+                    return f"{req.name}: packages come from PyPI only, not from a link"
                 if req.marker is not None and not req.marker.evaluate(env):
                     continue
                 _ensure(req, plugin_id, state, frozenset(), env)

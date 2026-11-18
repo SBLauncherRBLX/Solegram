@@ -329,6 +329,10 @@ public final class SolegramSummarizer {
 
     private static String chat(String instruction, String input, boolean own, @Nullable ChatOptions options) throws Exception {
         final String url = own ? chatCompletionsUrl(SolegramConfig.aiBaseUrl) : FREE_URL;
+        if (own && !secureEnough(url)) {
+            // the key and the messages would cross the internet readable by anyone on the way
+            throw new IOException("AI service address must be https (plain http only to this phone or the home network)");
+        }
         final String model = own ? (TextUtils.isEmpty(SolegramConfig.aiModel) ? DEFAULT_OWN_MODEL : SolegramConfig.aiModel.trim()) : FREE_MODEL;
 
         final JSONObject body = new JSONObject();
@@ -381,8 +385,8 @@ public final class SolegramSummarizer {
             c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             c.setRequestProperty("Accept", "application/json");
             c.setRequestProperty("User-Agent", "Solegram");
-            if (own && !TextUtils.isEmpty(SolegramConfig.aiApiKey)) {
-                c.setRequestProperty("Authorization", "Bearer " + SolegramConfig.aiApiKey.trim());
+            if (own && !TextUtils.isEmpty(SolegramConfig.aiApiKey())) {
+                c.setRequestProperty("Authorization", "Bearer " + SolegramConfig.aiApiKey().trim());
             }
             try (OutputStream out = c.getOutputStream()) {
                 out.write(body.toString().getBytes(StandardCharsets.UTF_8));
@@ -842,6 +846,33 @@ public final class SolegramSummarizer {
     // endregion
 
     /** Accepts both a base URL (".../v1") and the full ".../chat/completions" address. */
+    /** https, or plain http only to this phone or a private network (a model run at home). */
+    static boolean secureEnough(String url) {
+        try {
+            final java.net.URI uri = new java.net.URI(url.trim());
+            final String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+            if ("https".equals(scheme)) {
+                return true;
+            }
+            if (!"http".equals(scheme) || uri.getHost() == null) {
+                return false;
+            }
+            final String host = uri.getHost().toLowerCase(java.util.Locale.ROOT);
+            if ("localhost".equals(host) || host.endsWith(".local") || host.endsWith(".lan")) {
+                return true;
+            }
+            // only a written address is looked at: a name is not resolved here
+            if (!host.matches("[0-9.]+|\\[?[0-9a-f:]+\\]?")) {
+                return false;
+            }
+            final java.net.InetAddress a = java.net.InetAddress.getByName(host.replace("[", "").replace("]", ""));
+            return a.isLoopbackAddress() || a.isSiteLocalAddress() || a.isLinkLocalAddress()
+                || (a.getAddress().length == 16 && (a.getAddress()[0] & 0xFE) == 0xFC);
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
     static String chatCompletionsUrl(String base) {
         String url = base.trim();
         while (url.endsWith("/")) {

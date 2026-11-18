@@ -32,6 +32,9 @@ public final class PySupport {
      * {@code param} the MethodHookParam and {@code object} the value passed to the filter.
      */
     public static boolean evalCondition(String expression, XC_MethodHook.MethodHookParam param, Object object) {
+        if (!com.solegram.messenger.plugins.PluginMvel.allowed(expression)) {
+            return false;
+        }
         try {
             ensureMvel();
             Map<String, Object> vars = new HashMap<>();
@@ -49,6 +52,9 @@ public final class PySupport {
 
     /** Evaluates an MVEL expression with a context object and variables (class proxy jMVELmethod). */
     public static Object evalMvel(String expression, Object context, Map<String, Object> vars) {
+        if (!com.solegram.messenger.plugins.PluginMvel.allowed(expression)) {
+            throw new SecurityException("Solegram blocked this MVEL expression for the plugin");
+        }
         ensureMvel();
         return org.mvel2.MVEL.eval(expression, context, vars);
     }

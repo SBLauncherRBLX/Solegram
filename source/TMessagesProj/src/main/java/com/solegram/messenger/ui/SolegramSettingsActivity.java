@@ -881,7 +881,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             items.add(tile(UItem.asButton(ID_AI_URL, R.drawable.msg_link, getString(R.string.SG_AiUrl),
                 TextUtils.isEmpty(SolegramConfig.aiBaseUrl) ? getString(R.string.SG_AiNotSet) : aiHost()), TILE_BLUE));
             items.add(tile(UItem.asButton(ID_AI_KEY, R.drawable.msg_permissions, getString(R.string.SG_AiKey),
-                getString(TextUtils.isEmpty(SolegramConfig.aiApiKey) ? R.string.SG_AiNotSet : R.string.SG_AiKeySet)), TILE_GRAY));
+                getString(TextUtils.isEmpty(SolegramConfig.aiApiKey()) ? R.string.SG_AiNotSet : R.string.SG_AiKeySet)), TILE_GRAY));
             items.add(tile(UItem.asButton(ID_AI_MODEL, R.drawable.msg_bots, getString(R.string.SG_AiModel),
                 TextUtils.isEmpty(SolegramConfig.aiModel) ? "gpt-4o-mini" : SolegramConfig.aiModel), TILE_INDIGO));
         }
@@ -942,7 +942,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             SolegramConfig.reload();
             listView.adapter.update(true);
             // the key comes next: where to get one
-            askText(getString(R.string.SG_AiKey), LocaleController.formatString(R.string.SG_AiPresetKeyInfo, p[0], p[3]), SolegramConfig.aiApiKey, "", true, text -> {
+            askText(getString(R.string.SG_AiKey), LocaleController.formatString(R.string.SG_AiPresetKeyInfo, p[0], p[3]), SolegramConfig.aiApiKey(), "", true, text -> {
                 SolegramConfig.setAiApiKey(text);
                 SolegramConfig.reload();
                 listView.adapter.update(true);
@@ -2567,7 +2567,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 askAiUrl();
                 return;
             case ID_AI_KEY:
-                askText(getString(R.string.SG_AiKey), getString(R.string.SG_AiKeyInfo), SolegramConfig.aiApiKey, "sk-...", true, text -> {
+                askText(getString(R.string.SG_AiKey), getString(R.string.SG_AiKeyInfo), SolegramConfig.aiApiKey(), "sk-...", true, text -> {
                     SolegramConfig.setAiApiKey(text); // encrypted, see SolegramSecrets
                     SolegramConfig.reload();
                     listView.adapter.update(true);
@@ -3264,8 +3264,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             int r;
             while (in != null && (r = in.read(buf)) > 0) {
                 out.write(buf, 0, r);
+                if (out.size() > 1024 * 1024) {
+                    // a settings file is a few kilobytes: a huge file is not one
+                    break;
+                }
             }
-            int count = SolegramConfig.importFromJson(out.toString("UTF-8"));
+            int count = out.size() > 1024 * 1024 ? -1 : SolegramConfig.importFromJson(out.toString("UTF-8"));
             if (count < 0) {
                 BulletinFactory.of(bulletinHost()).createErrorBulletin(getString(R.string.SG_ImportFailed)).show();
             } else {

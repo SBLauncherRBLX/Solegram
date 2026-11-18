@@ -25,16 +25,20 @@ __all__ = [
     "hook_filters", "PluginMetadata", "PluginError",
 ]
 
-_xposed_bridge = None
+# taken while the SDK loads (no plugin code runs then): plugins themselves may not reach the bridge, nor the guard
+try:
+    _xposed_bridge = jclass("de.robv.android.xposed.XposedBridge")
+    _xposed_error = None
+except Exception as _e:
+    _xposed_bridge = None
+    _xposed_error = _e
+_RuntimeGuard = jclass("com.solegram.messenger.plugins.PluginRuntimeGuard")
+_PySupport = jclass("com.solegram.messenger.plugins.python.PySupport")
 
 
 def _xposed():
-    global _xposed_bridge
     if _xposed_bridge is None:
-        try:
-            _xposed_bridge = jclass("de.robv.android.xposed.XposedBridge")
-        except Exception as e:
-            raise PluginError(f"Method hooking is not available on this device: {e}")
+        raise PluginError(f"Method hooking is not available on this device: {_xposed_error}")
     return _xposed_bridge
 
 
@@ -153,7 +157,7 @@ class HookFilterData:
                 if t == "ARG_NOT_EQUAL":
                     return arg != self.object
             if t == "CONDITION":
-                support = jclass("com.solegram.messenger.plugins.python.PySupport")
+                support = _PySupport
                 return bool(support.evalCondition(self.mvel_expression, param, self.object))
             if t == "OR":
                 return any(f.matches(param) for f in self.or_filters)
@@ -424,7 +428,13 @@ class BasePlugin:
             method_or_constructor.setAccessible(True)
         except Exception:
             pass
-        if isinstance(hook, MethodReplacement) or (not hasattr(hook, "before_hooked_method") and hasattr(hook, "replace_hooked_method")):
+        replacing = isinstance(hook, MethodReplacement) or (not hasattr(hook, "before_hooked_method") and hasattr(hook, "replace_hooked_method"))
+        # Solegram: the guard's own code, the secrets, the wallet, the app lock... may not be hooked
+        reason = _RuntimeGuard.protectedHook(method_or_constructor, replacing)
+        if reason is not None:
+            _RuntimeGuard.onBlocked(self.id, "tamper", str(reason))
+            raise PluginError(f"Solegram does not let plugins hook {reason}", self.id)
+        if replacing:
             java_hook = _PyReplacement(self.id, bridge, prio)
         else:
             java_hook = _PyXposedHook(self.id, bridge, prio)

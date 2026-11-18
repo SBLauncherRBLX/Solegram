@@ -659,7 +659,8 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     private class PinPad extends LinearLayout {
         private static final int LENGTH = 6;
         private final TextView title, info, error;
-        private final LinearLayout dots;
+        // Solegram: Pixel-like code dots: soft dots that turn into random Material shapes as digits are typed
+        private final com.solegram.messenger.ui.SolegramPinDots dots;
         private final StringBuilder code = new StringBuilder();
         private Utilities.Callback<String> onComplete;
         private final TextView skip;
@@ -691,9 +692,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             info.setTextColor(gray());
             info.setGravity(Gravity.CENTER);
             addView(info, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 6, 0, 0));
-            dots = new LinearLayout(context);
-            dots.setGravity(Gravity.CENTER);
-            addView(dots, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 24, 0, 22, 0, 0));
+            dots = new com.solegram.messenger.ui.SolegramPinDots(context, LENGTH);
+            dots.setColors(Theme.multAlpha(text(), 0.22f), accent());
+            addView(dots, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 34, 0, 17, 0, 0));
             error = new TextView(context);
             error.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             error.setTextColor(getThemedColor(Theme.key_text_RedRegular));
@@ -792,19 +793,7 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
         }
 
         private void updateDots() {
-            dots.removeAllViews();
-            for (int i = 0; i < LENGTH; i++) {
-                final View d = new View(getContext());
-                final GradientDrawable dot = new GradientDrawable();
-                dot.setShape(GradientDrawable.OVAL);
-                if (i < code.length()) {
-                    dot.setColor(accent());
-                } else {
-                    dot.setStroke(dp(2), Theme.multAlpha(text(), 0.3f));
-                }
-                d.setBackground(dot);
-                dots.addView(d, LayoutHelper.createLinear(14, 14, 7, 0, 7, 0));
-            }
+            dots.setCount(code.length(), dots.isAttachedToWindow());
         }
     }
 

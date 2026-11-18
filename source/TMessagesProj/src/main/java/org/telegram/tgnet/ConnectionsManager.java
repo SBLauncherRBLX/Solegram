@@ -465,6 +465,11 @@ public class ConnectionsManager extends BaseController {
     }
 
     private void sendRequestInternal(TLObject object, RequestDelegate onComplete, RequestDelegateTimestamp onCompleteTimestamp, QuickAckDelegate onQuickAck, WriteToSocketDelegate onWriteToSocket, int flags, int datacenterId, int connectionType, boolean immediate, int requestToken) {
+        // Solegram: reached only from the stage queue; a call from elsewhere came through reflection (a plugin going
+        // round sendRequest's shield): checked the same way
+        if (Thread.currentThread() != Utilities.stageQueue && com.solegram.messenger.plugins.PluginRuntimeGuard.blockRequest(currentAccount, object)) {
+            return;
+        }
         // Solegram: ghost mode and plugin pre_request hooks may modify or cancel the request.
         final TLObject request = com.solegram.messenger.SolegramHooks.preRequest(currentAccount, object);
         if (request == null) {
@@ -474,6 +479,9 @@ public class ConnectionsManager extends BaseController {
     }
 
     private void sendRequestInternalImpl(TLObject object, RequestDelegate onComplete, RequestDelegateTimestamp onCompleteTimestamp, QuickAckDelegate onQuickAck, WriteToSocketDelegate onWriteToSocket, int flags, int datacenterId, int connectionType, boolean immediate, int requestToken) {
+        if (Thread.currentThread() != Utilities.stageQueue && com.solegram.messenger.plugins.PluginRuntimeGuard.blockRequest(currentAccount, object)) {
+            return;
+        }
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("send request " + object + " with token = " + requestToken);
         }

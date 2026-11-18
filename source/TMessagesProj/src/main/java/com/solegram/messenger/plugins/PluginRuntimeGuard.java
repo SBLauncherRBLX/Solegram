@@ -54,6 +54,12 @@ public final class PluginRuntimeGuard {
     public static final String PERM_EXEC = "exec";
     public static final String PERM_DESERIALIZE = "deserialize";
     public static final String PERM_INSTALL = "install";
+    /** Java's own file classes (FileInputStream, java.nio.file...): the Python guard checks open() by path. */
+    public static final String PERM_FILES = "files";
+    /** Opening databases directly (SQLite). */
+    public static final String PERM_DATABASE = "database";
+    /** java.lang.Class and java.lang.reflect by name. */
+    public static final String PERM_REFLECTION = "reflection";
 
     /** Error text a blocked request gets back (the plugin's callback still runs). */
     public static final String BLOCKED_ERROR = "SOLEGRAM_PLUGIN_BLOCKED";
@@ -124,6 +130,16 @@ public final class PluginRuntimeGuard {
         if (report.has("sys_install")) {
             set.add(PERM_INSTALL);
         }
+        if (report.has("file_io") || report.has("file_listing") || report.has("file_delete") || report.has("file_private_dir")
+                || report.has("file_shared_storage") || report.has("file_archive")) {
+            set.add(PERM_FILES);
+        }
+        if (report.has("msg_database")) {
+            set.add(PERM_DATABASE);
+        }
+        if (report.has("sys_reflection") || report.has("sys_hooks")) {
+            set.add(PERM_REFLECTION);
+        }
         return set;
     }
 
@@ -164,6 +180,58 @@ public final class PluginRuntimeGuard {
         } catch (Throwable e) {
             return f.getAbsolutePath();
         }
+    }
+    // endregion
+
+    // region Hooks a plugin may not make
+
+    // whole classes whose code is the protection itself (or guards the user's money, keys and lock)
+    private static final String[] PROTECTED_HOOK_CLASSES = {
+        "com.solegram.messenger.plugins.", "com.solegram.messenger.SolegramSecrets", "com.solegram.messenger.ApiCredentials",
+        "com.solegram.messenger.SolegramConfig", "com.solegram.messenger.wallet.", "com.solegram.messenger.SolegramScam",
+        "com.solegram.messenger.SolegramUpdate", "org.telegram.ui.Components.PasscodeView", "org.telegram.ui.PasscodeActivity",
+        "java.lang.ClassLoader", "dalvik.system.", "java.lang.Runtime", "java.lang.ProcessBuilder", "java.lang.reflect.",
+        "java.security.", "javax.crypto.", "android.security.", "de.robv.android.xposed.", "com.chaquo.python.",
+        "org.mvel2.", "de.robv.android.xposed.XposedHelpers",
+    };
+
+    /**
+     * Why a plugin may not hook this method (shown to the user), or null when it may. Requests: before/after hooks
+     * on sending stay possible (the shield runs inside the method, on what the hook left), replacing it does not.
+     */
+    @androidx.annotation.Nullable
+    public static String protectedHook(java.lang.reflect.Member member, boolean replacement) {
+        if (member == null) {
+            return null;
+        }
+        final String cls = member.getDeclaringClass().getName();
+        final String name = member.getName();
+        for (String p : PROTECTED_HOOK_CLASSES) {
+            if (p.endsWith(".") ? cls.startsWith(p) : cls.equals(p) || cls.startsWith(p + "$")) {
+                return cls + "." + name;
+            }
+        }
+        if ("org.telegram.tgnet.ConnectionsManager".equals(cls)) {
+            if (name.startsWith("solegram") || "sendRequestInternal".equals(name) || name.startsWith("native_")
+                    || replacement && name.startsWith("sendRequest")) {
+                return cls + "." + name;
+            }
+        }
+        // the app's passcode: checking and changing it
+        if ("org.telegram.messenger.SharedConfig".equals(cls) && name.toLowerCase(Locale.ROOT).contains("passcode")) {
+            return cls + "." + name;
+        }
+        return null;
+    }
+
+    /** A hook made through XposedHelpers was refused: recorded for the plugin that asked. */
+    public static void onBlockedHook(String reason) {
+        String plugin = null;
+        try {
+            plugin = callingPlugin();
+        } catch (Throwable ignore) {
+        }
+        onBlocked(plugin, "tamper", reason);
     }
     // endregion
 
@@ -356,7 +424,10 @@ public final class PluginRuntimeGuard {
             case "deserialize":
                 return LocaleController.getString(R.string.SG_GuardKindExec);
             case "secrets":
+            case "database":
                 return LocaleController.getString(R.string.SG_GuardKindSecrets);
+            case "reflection":
+                return LocaleController.getString(R.string.SG_GuardKindTamper);
             case "files":
                 return LocaleController.getString(R.string.SG_GuardKindFiles);
             case "tamper":

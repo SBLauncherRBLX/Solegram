@@ -248,8 +248,23 @@ def install(roots, package):
         ("javax.net.", "network"), ("okhttp3.", "network"), ("org.apache.http.", "network"),
         ("android.net.http.", "network"), ("android.webkit.WebView", "network"), ("android.net.LocalSocket", "network"),
         ("android.content.pm.PackageInstaller", "install"),
-        ("com.solegram.messenger.plugins.PluginRuntimeGuard", None), ("com.solegram.messenger.plugins.PluginGuard", None),
+        # Java's own ways to read and write files: never. open() in Python is the way to files, and there the guard
+        # sees the path (the session, the keys, the databases, plugin code are refused even with file access);
+        # Java's streams would take any path past it
+        ("java.io.FileInputStream", None), ("java.io.FileOutputStream", None), ("java.io.RandomAccessFile", None),
+        ("java.io.FileReader", None), ("java.io.FileWriter", None), ("java.nio.file.", None),
+        ("java.nio.channels.FileChannel", None), ("android.os.ParcelFileDescriptor", None),
+        ("android.os.SharedMemory", None),
+        ("android.database.sqlite.", "database"), ("org.telegram.SQLite.", "database"),
+        # reflection reaches what jclass would refuse: only for plugins whose report shows reflection or hooks
+        ("java.lang.Class", "reflection"), ("java.lang.reflect.", "reflection"),
+        # never: Solegram's plugin internals (installing, enabling, the guard, the report), its secrets and keys,
+        # the wallet, the raw hook bridge (hooks go through hook_method, which keeps the guard's own code safe)
+        ("com.solegram.messenger.plugins.", None),
         ("com.solegram.messenger.SolegramSecrets", None), ("com.solegram.messenger.ApiCredentials", None),
+        ("com.solegram.messenger.wallet.", None),
+        ("java.security.KeyStore", None), ("android.security.keystore.", None),
+        ("de.robv.android.xposed.XposedBridge", None),
     )
     java_roots = ("java", "javax", "android", "dalvik", "okhttp3", "org", "com")
 
@@ -271,7 +286,7 @@ def install(roots, package):
         if pid is None:
             return
         if permission is None:
-            deny(pid, "tamper" if "plugins" in name else "secrets", name)
+            deny(pid, "tamper" if ("plugins" in name or "xposed" in name) else ("files" if name.startswith(("java.io.", "java.nio.", "android.os.")) else "secrets"), name)
         if not permits(pid, permission):
             deny(pid, "native" if permission == "dex" else permission, name)
 

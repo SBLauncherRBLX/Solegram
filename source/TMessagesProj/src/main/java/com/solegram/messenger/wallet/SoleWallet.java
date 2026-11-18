@@ -72,11 +72,12 @@ public final class SoleWallet {
             .putString(k(account, "hash"), Base64.encodeToString(hash, Base64.NO_WRAP))
             .putInt(k(account, "fails"), 0)
             .putLong(k(account, "until"), 0)
+            .remove(k(account, "untilUp"))
             .apply();
     }
 
     public static void removeCode(int account) {
-        prefs().edit().remove(k(account, "salt")).remove(k(account, "hash")).remove(k(account, "fails")).remove(k(account, "until")).remove(k(account, "bio")).apply();
+        prefs().edit().remove(k(account, "salt")).remove(k(account, "hash")).remove(k(account, "fails")).remove(k(account, "until")).remove(k(account, "untilUp")).remove(k(account, "untilBoot")).remove(k(account, "bio")).apply();
         unlockedAt = 0;
     }
 
@@ -84,7 +85,14 @@ public final class SoleWallet {
     public static long waitLeft(int account) {
         final long until = prefs().getLong(k(account, "until"), 0);
         final long now = System.currentTimeMillis();
-        return until > now ? until - now : 0;
+        long left = until > now ? until - now : 0;
+        // the phone's clock moved forward does not end the wait: within the same start of the phone the time since
+        // it started is counted, which nobody can change
+        if (until > 0 && prefs().getInt(k(account, "untilBoot"), -1) == bootCount()) {
+            final long untilUp = prefs().getLong(k(account, "untilUp"), 0);
+            left = Math.max(left, untilUp - SystemClock.elapsedRealtime());
+        }
+        return Math.max(0, left);
     }
 
     /** Checks a code; a wrong one counts towards the wait. */
@@ -97,7 +105,7 @@ public final class SoleWallet {
             final byte[] want = Base64.decode(prefs().getString(k(account, "hash"), ""), Base64.NO_WRAP);
             final boolean ok = want.length > 0 && MessageDigest.isEqual(want, derive(code, salt));
             if (ok) {
-                prefs().edit().putInt(k(account, "fails"), 0).putLong(k(account, "until"), 0).apply();
+                prefs().edit().putInt(k(account, "fails"), 0).putLong(k(account, "until"), 0).remove(k(account, "untilUp")).apply();
                 unlockedAt = SystemClock.elapsedRealtime();
             } else {
                 final int fails = prefs().getInt(k(account, "fails"), 0) + 1;
@@ -106,12 +114,24 @@ public final class SoleWallet {
                     // 30 s after the fifth wrong code, doubling with each next one, up to an hour
                     wait = Math.min(60L * 60_000L, 30_000L << Math.min(7, fails - MAX_FREE_TRIES));
                 }
-                prefs().edit().putInt(k(account, "fails"), fails).putLong(k(account, "until"), wait > 0 ? System.currentTimeMillis() + wait : 0).apply();
+                prefs().edit().putInt(k(account, "fails"), fails)
+                    .putLong(k(account, "until"), wait > 0 ? System.currentTimeMillis() + wait : 0)
+                    .putLong(k(account, "untilUp"), wait > 0 ? SystemClock.elapsedRealtime() + wait : 0)
+                    .putInt(k(account, "untilBoot"), bootCount())
+                    .apply();
             }
             return ok;
         } catch (Exception e) {
             FileLog.e(e);
             return false;
+        }
+    }
+
+    private static int bootCount() {
+        try {
+            return android.provider.Settings.Global.getInt(org.telegram.messenger.ApplicationLoader.applicationContext.getContentResolver(), android.provider.Settings.Global.BOOT_COUNT);
+        } catch (Throwable e) {
+            return -2;
         }
     }
 
