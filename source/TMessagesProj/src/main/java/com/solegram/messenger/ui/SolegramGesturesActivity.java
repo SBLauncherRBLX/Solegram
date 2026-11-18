@@ -102,8 +102,18 @@ public class SolegramGesturesActivity extends UniversalFragment {
         return getString(SolegramGestures.actionName(action));
     }
 
+    private SolegramPageHeader header;
+
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
+        // the top: a duck waving, and what gestures are
+        if (header == null && getContext() != null) {
+            header = new SolegramPageHeader(getContext(), new String[]{"👋", "🤚", "✋", "👆"}, 2,
+                getString(R.string.SG_HdrGestures), getResourceProvider());
+        }
+        if (header != null) {
+            items.add(UItem.asCustomShadow(header).setChecked(true));
+        }
         items.add(UItem.asCheck(ID_ENABLED, getString(R.string.SG_GesturesEnabled)).setChecked(SolegramGestures.enabled()));
         items.add(UItem.asShadow(getString(R.string.SG_GesturesInfo)));
         items.add(UItem.asHeader(getString(R.string.SG_GesturesList)));
