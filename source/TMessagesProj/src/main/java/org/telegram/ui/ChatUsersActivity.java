@@ -3354,13 +3354,16 @@ public class ChatUsersActivity extends BaseFragment implements NotificationCente
                 case 11:
                     FlickerLoadingView flickerLoadingView = new FlickerLoadingView(mContext);
                     flickerLoadingView.setIsSingleCell(true);
+                    // Solegram: draw a full list of placeholder rows (a skeleton), not one stray row. In a scrolling
+                    // list the row is measured with no fixed height, so without this the cell always collapsed to a
+                    // single lonely placeholder that read as broken while members loaded.
+                    flickerLoadingView.setIgnoreHeightCheck(true);
                     flickerLoadingView.setViewType(FlickerLoadingView.USERS_TYPE);
                     flickerLoadingView.showDate(false);
                     flickerLoadingView.setUseHeaderOffset(false);
-                    flickerLoadingView.setPaddingLeft(dp(5));
-                    RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-                    lp.leftMargin = lp.rightMargin = dp(12);
-                    lp.topMargin = dp(30);
+                    // the list's own background, so the skeleton sits on the page like the real rows, not a dark block
+                    flickerLoadingView.setColors(Theme.key_windowBackgroundWhite, Theme.key_listSelector, Theme.key_listSelector);
+                    RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                     flickerLoadingView.setLayoutParams(lp);
                     view = flickerLoadingView;
                     break;
@@ -3737,11 +3740,10 @@ public class ChatUsersActivity extends BaseFragment implements NotificationCente
                     break;
                 case 11:
                     FlickerLoadingView flickerLoadingView = (FlickerLoadingView) holder.itemView;
-                    if (type == TYPE_BANNED) {
-                        flickerLoadingView.setItemsCount(info == null ? 1 : info.kicked_count);
-                    } else {
-                        flickerLoadingView.setItemsCount(1);
-                    }
+                    // Solegram: show a screenful of placeholder rows while members load (capped so it never
+                    // becomes an absurdly tall block). A real-looking skeleton reads far clearer than one row.
+                    int expected = type == TYPE_BANNED ? (info == null ? 0 : info.kicked_count) : (info == null ? 0 : info.participants_count);
+                    flickerLoadingView.setItemsCount(Math.max(5, Math.min(12, expected > 0 ? expected : 12)));
                     break;
                 case 12:
                     TextCell textCell = (TextCell) holder.itemView;

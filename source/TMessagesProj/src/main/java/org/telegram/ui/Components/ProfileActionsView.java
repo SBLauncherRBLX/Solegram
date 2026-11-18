@@ -73,6 +73,20 @@ public class ProfileActionsView extends View {
     private final int targetHeight;
     private float currentHeight = 0;
 
+    // Solegram: the flat buttons take the same puffed-sided squircle as the glass menus and pills
+    private final android.graphics.Path solegramShapePath = new android.graphics.Path();
+    private final com.solegram.messenger.ui.SolegramSquircle.Shape solegramShape = new com.solegram.messenger.ui.SolegramSquircle.Shape();
+
+    private void solegramFill(Canvas canvas, RectF rect, float radius, Paint p) {
+        if (com.solegram.messenger.ui.SolegramSquircle.enabled() && radius >= AndroidUtilities.dp(6)) {
+            solegramShapePath.rewind();
+            com.solegram.messenger.ui.SolegramSquircle.addTo(solegramShapePath, rect.left, rect.top, rect.right, rect.bottom, radius, solegramShape);
+            canvas.drawPath(solegramShapePath, p);
+        } else {
+            canvas.drawRoundRect(rect, radius, radius, p);
+        }
+    }
+
     private OnActionClickListener onActionClickListener = null;
 
     private final Set<Integer> allAvailableActions = new HashSet<>();
@@ -323,13 +337,13 @@ public class ProfileActionsView extends View {
             paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f + 0.9f * overPhoto : 1f)));
             paint.setShadowLayer(0, 0, 0, 0);
 
-            canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, paint);
+            solegramFill(canvas, AndroidUtilities.rectTmp, r, paint);
             if (radialGradient != null && overPhoto < 1f) {
                 int wasAlpha2 = shaderPaint.getAlpha();
                 shaderPaint.setAlpha((int) (action.getAlpha() * alphaFraction1 * wasAlpha2 * (1f - overPhoto)));
                 matrix.setTranslate(AndroidUtilities.rectTmp.left, AndroidUtilities.rectTmp.top);
                 radialGradient.setLocalMatrix(matrix);
-                canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, shaderPaint);
+                solegramFill(canvas, AndroidUtilities.rectTmp, r, shaderPaint);
                 shaderPaint.setAlpha(wasAlpha2);
             }
             paint.setColor(wasColor); // its own colour and alpha back
@@ -1055,7 +1069,7 @@ public class ProfileActionsView extends View {
             final int base = color != 0 ? color : 0xFF808080;
             plate.setColor(ColorUtils.blendARGB(base, isButtonColorLight() ? 0xFFFFFFFF : 0xFF000000, 0.12f));
             plate.setAlpha(0xE6);
-            c.drawRoundRect(a.rect, r, r, plate);
+            solegramFill(c, a.rect, r, plate);
             drawAction(c, a, 1f, 1f);
             return bitmap;
         }
