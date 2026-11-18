@@ -33963,64 +33963,105 @@ public class ChatActivity extends BaseFragment implements
         more.setMinimumWidth(AndroidUtilities.dp(200));
         more.setTextAndIcon(getString(R.string.SG_MenuMore), R.drawable.ic_ab_other);
         popupLayout.addView(more);
-        more.setOnClickListener(v1 -> solegramExpandMenu(hidden, more));
+        more.setOnClickListener(v1 -> solegramExpandMenu(popupLayout, hidden, more));
     }
 
     /**
-     * "More": the rest of the actions open in the same panel, which grows downwards; when the screen has no room for
-     * it below, the whole menu slides up until it fits.
+     * "More": the rest of the actions open in the same panel. One motion drives it all: the panel's bottom (the glass
+     * follows it) moves down, the new rows show as it reaches them, and when the screen has no room below the whole
+     * menu slides up at the same pace (the window moves once, its content eases back into place).
      */
-    private void solegramExpandMenu(ArrayList<View> hidden, View more) {
+    private void solegramExpandMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<View> hidden, View more) {
         final ActionBarPopupWindow window = scrimPopupWindow;
         if (window == null || !window.isShowing() || contentView == null) {
             return;
         }
         final View content = window.getContentView();
+        final int oldHeight = popupLayout.getMeasuredHeight();
         more.setVisibility(View.GONE);
         for (int i = 0; i < hidden.size(); i++) {
             final View item = hidden.get(i);
             item.setVisibility(View.VISIBLE);
             item.setAlpha(0f);
-            item.setTranslationY(-AndroidUtilities.dp(8));
-            item.animate().alpha(1f).translationY(0).setStartDelay(25L * i).setDuration(240)
-                .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
         }
-        // the panel may now be as tall as the screen allows
         if (content instanceof ChatScrimPopupContainerLayout) {
             ((ChatScrimPopupContainerLayout) content).setMaxHeight(AndroidUtilities.displaySize.y);
         }
-        if (solegramMenuLiquid != null && solegramMenuLiquid.window == window) {
-            solegramMenuLiquid.flowToNewSize(); // the glass grows on its springs, not at once
-        }
-        // how tall it is now, and whether its bottom still fits on the screen
         final int spec = View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST);
         content.measure(spec, spec);
-        final int newHeight = content.getMeasuredHeight();
+        final int newHeight = popupLayout.getMeasuredHeight();
+        final int grow = Math.max(0, newHeight - oldHeight);
+
+        // room on the screen: how far up the menu has to go so its new bottom fits
         final int[] loc = new int[2], area = new int[2];
         content.getLocationOnScreen(loc);
         contentView.getLocationOnScreen(area);
         final int bottomLimit = area[1] + contentView.getMeasuredHeight() - windowInsetsStateHolder.getCurrentMaxBottomInset() - AndroidUtilities.dp(8);
         final int topLimit = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(8);
-        final int overflow = loc[1] + newHeight - bottomLimit;
-        if (overflow <= 0) {
-            content.requestLayout();
-            return;
+        final int overflow = loc[1] + content.getMeasuredHeight() - bottomLimit;
+        final int shift = overflow > 0 ? Math.min(overflow, Math.max(0, loc[1] - topLimit)) : 0;
+        if (shift > 0) {
+            // the window goes up once; its content is pushed down by as much, so nothing moves yet
+            content.setTranslationY(shift);
+            scrimPopupY -= shift;
+            window.update(scrimPopupX, scrimPopupY, -1, -1);
         }
-        final int shift = Math.min(overflow, Math.max(0, loc[1] - topLimit));
-        final int fromY = scrimPopupY, toY = scrimPopupY - shift, x = scrimPopupX;
-        final ValueAnimator slide = ValueAnimator.ofFloat(0f, 1f);
-        slide.setDuration(320);
-        slide.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
-        slide.addUpdateListener(an -> {
-            if (scrimPopupWindow != window || !window.isShowing()) {
-                return;
-            }
-            final int y = Math.round(fromY + (toY - fromY) * (float) an.getAnimatedValue());
-            scrimPopupY = y;
-            window.update(x, y, -1, -1);
-        });
+
+        // the panel starts at its old size and opens with the rows
+        popupLayout.subtractBackgroundHeight = grow;
+        final android.graphics.Rect clip = new android.graphics.Rect(-AndroidUtilities.dp(40), -AndroidUtilities.dp(40), AndroidUtilities.dp(2000), newHeight - grow);
+        popupLayout.setClipBounds(clip);
         content.requestLayout();
-        slide.start();
+
+        final ValueAnimator open = ValueAnimator.ofFloat(0f, 1f);
+        open.setDuration(380);
+        open.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        open.addUpdateListener(an -> {
+            final float e = (float) an.getAnimatedValue();
+            final int left = Math.round(grow * (1f - e));
+            popupLayout.subtractBackgroundHeight = left;
+            clip.bottom = newHeight - left;
+            popupLayout.setClipBounds(clip);
+            if (shift > 0) {
+                content.setTranslationY(shift * (1f - e));
+            }
+            // each new row fades in as the panel's edge passes over it
+            final float edge = newHeight - left - AndroidUtilities.dp(8);
+            for (int i = 0; i < hidden.size(); i++) {
+                final View item = hidden.get(i);
+                final float top = solegramTopIn(item, popupLayout);
+                item.setAlpha(Utilities.clamp((edge - top) / Math.max(1f, item.getHeight()), 1f, 0f));
+            }
+            popupLayout.invalidate();
+        });
+        open.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                popupLayout.subtractBackgroundHeight = 0;
+                popupLayout.setClipBounds(null);
+                content.setTranslationY(0);
+                for (int i = 0; i < hidden.size(); i++) {
+                    hidden.get(i).setAlpha(1f);
+                }
+                popupLayout.invalidate();
+            }
+        });
+        open.start();
+    }
+
+    /** The top of {@code view} in the coordinates of {@code ancestor}. */
+    private static float solegramTopIn(View view, View ancestor) {
+        float y = 0;
+        View v = view;
+        while (v != null && v != ancestor) {
+            y += v.getTop() + v.getTranslationY();
+            final android.view.ViewParent parent = v.getParent();
+            if (parent instanceof android.widget.ScrollView) {
+                y -= ((android.widget.ScrollView) parent).getScrollY();
+            }
+            v = parent instanceof View ? (View) parent : null;
+        }
+        return y;
     }
 
     // endregion
@@ -34625,15 +34666,6 @@ public class ChatActivity extends BaseFragment implements
             if (moving || reactionDrop != null) {
                 schedule();
             }
-        }
-
-        /** Solegram "More": the menu panel grows to its new size on its springs (it is followed at once when settled). */
-        void flowToNewSize() {
-            if (released || closing) {
-                return;
-            }
-            menuSettled = false;
-            schedule();
         }
 
         /** The popup drew a frame: its panels may have moved or changed size (expanding, sub-menus). */
