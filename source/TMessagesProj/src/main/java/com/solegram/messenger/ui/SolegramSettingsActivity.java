@@ -489,7 +489,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillAppearance(ArrayList<UItem> items) {
-        pageHeader(items, R.raw.utyan_draw, "", R.string.SG_HdrAppearance);
+        pageHeader(items, R.raw.utyan_draw, null, R.string.SG_HdrAppearance);
         items.add(UItem.asHeader(getString(R.string.SG_AvatarCorners)));
         items.add(UItem.asIntSlideView(1, 0, SolegramConfig.avatarCorners, 100,
             v -> v == 100 ? getString(R.string.SG_AvatarCircle) : v == 0 ? getString(R.string.SG_AvatarSquare) : v + "%",
@@ -543,7 +543,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private SolegramPageHeader pageHeaderView;
 
     /** The top of the page: Telegram's animation (or animated emoji) that fits it and what the page is for. */
-    private void pageHeader(ArrayList<UItem> items, int animation, String emoji, int description) {
+    private void pageHeader(ArrayList<UItem> items, int animation, String[] emoji, int description) {
         if (embeddedHost != null || getContext() == null) {
             return; // shown inside another screen's list (Customization): that screen has its own top
         }
@@ -772,7 +772,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillChats(ArrayList<UItem> items) {
-        pageHeader(items, 0, "💬", R.string.SG_HdrChats);
+        pageHeader(items, 0, new String[]{"💬", "💭", "✉", "📨", "✍"}, R.string.SG_HdrChats);
         items.add(UItem.asHeader(getString(R.string.SG_StickerSize)));
         items.add(UItem.asIntSlideView(1, 50, SolegramConfig.stickerSize, 150,
             v -> v + "%",
@@ -1328,7 +1328,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
     /** What Premium has that Solegram does on the phone: in one place, each with its switch. */
     private void fillPremium(ArrayList<UItem> items) {
-        pageHeader(items, R.raw.wallet_diamond_blue, "", R.string.SG_HdrPremium);
+        pageHeader(items, R.raw.wallet_diamond_blue, null, R.string.SG_HdrPremium);
         items.add(UItem.asHeader(getString(R.string.SG_PremiumLook)));
         items.add(tile(UItem.asButton(ID_CARD_PAGE, R.drawable.msg_photos, getString(R.string.SG_ProfileCard)), TILE_ORANGE)
             .setSolegramSubtitle(getString(R.string.SG_ProfileCardSub)));
@@ -1482,7 +1482,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private SolegramNowPlayingView nowPlayingPreview;
 
     private void fillMusic(ArrayList<UItem> items) {
-        pageHeader(items, 0, "🎧", R.string.SG_HdrMusic);
+        pageHeader(items, 0, new String[]{"🎧", "🎶", "🎵", "🎸", "🎤", "🎹", "🥁"}, R.string.SG_HdrMusic);
         items.add(UItem.asHeader(getString(R.string.SG_PlayerSection)));
         items.add(UItem.asButtonCheck(ID_NEW_PLAYER, getString(R.string.SG_NewPlayer), getString(R.string.SG_NewPlayerInfo)).setChecked(SolegramConfig.newPlayer));
         items.add(tile(UItem.asButton(ID_MUSIC_TAB, R.drawable.files_music, getString(R.string.SG_MusicTab), getString(com.solegram.messenger.SolegramTabs.current().contains(com.solegram.messenger.SolegramTabs.MUSIC) ? R.string.SG_TabInBar : R.string.SG_TabNotInBar)), TILE_PINK));
@@ -1567,7 +1567,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillCamera(ArrayList<UItem> items) {
-        pageHeader(items, R.raw.utyan_gallery, "", R.string.SG_HdrCamera);
+        pageHeader(items, R.raw.utyan_gallery, null, R.string.SG_HdrCamera);
         items.add(UItem.asHeader(getString(R.string.SG_CameraScreen)));
         items.add(UItem.asCheck(ID_CAMERA_CONTROLS, getString(R.string.SG_CameraControls)).setChecked(SolegramConfig.cameraControls));
         items.add(UItem.asShadow(getString(R.string.SG_CameraControlsInfo2)));
@@ -1591,7 +1591,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillBrowser(ArrayList<UItem> items) {
-        pageHeader(items, 0, "🌍", R.string.SG_HdrBrowser);
+        pageHeader(items, 0, new String[]{"🌍", "🌎", "🌏", "🌐", "🧭"}, R.string.SG_HdrBrowser);
         items.add(UItem.asRippleCheck(ID_ADBLOCK, getString(R.string.SG_AdBlock)).setChecked(SolegramConfig.adBlock));
         items.add(UItem.asShadow(getString(R.string.SG_AdBlockInfo)));
         if (SolegramConfig.adBlock) {
@@ -1628,7 +1628,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
 
 
     private void fillScam(ArrayList<UItem> items) {
-        pageHeader(items, R.raw.utyan_private, "", R.string.SG_HdrScam);
+        pageHeader(items, R.raw.utyan_private, null, R.string.SG_HdrScam);
         items.add(UItem.asRippleCheck(ID_SCAM_LINKS, getString(R.string.SG_ScamLinks)).setChecked(SolegramConfig.scamLinks));
         items.add(UItem.asShadow(getString(R.string.SG_ScamLinksInfo)));
         items.add(UItem.asRippleCheck(ID_SCAM_ACCOUNTS, getString(R.string.SG_ScamAccounts)).setChecked(SolegramConfig.scamAccounts));
@@ -1698,7 +1698,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillProxy(ArrayList<UItem> items) {
-        pageHeader(items, R.raw.utyan_passcode, "", R.string.SG_HdrProxy);
+        pageHeader(items, R.raw.utyan_passcode, null, R.string.SG_HdrProxy);
         final int phase = SolegramProxy.getPhase();
         final CharSequence status;
         if (phase == SolegramProxy.PHASE_DOWNLOADING) {
@@ -2024,7 +2024,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     }
 
     private void fillMaps(ArrayList<UItem> items) {
-        pageHeader(items, 0, "🗺", R.string.SG_HdrMaps);
+        pageHeader(items, 0, new String[]{"🗺", "📍", "🧭", "🌍"}, R.string.SG_HdrMaps);
         // maps: the map in the app and the app routes open in
         items.add(UItem.asHeader(getString(R.string.SG_Maps)));
         items.add(tile(UItem.asButton(ID_MAP_ENGINE, R.drawable.msg_location, getString(R.string.SG_MapEngine), com.solegram.messenger.maps.SolegramMaps.engineName(SolegramConfig.mapEngine)), TILE_GREEN));

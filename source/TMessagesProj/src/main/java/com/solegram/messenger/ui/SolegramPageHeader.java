@@ -14,7 +14,6 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import org.telegram.messenger.Emoji;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.MediaDataController;
@@ -40,7 +39,8 @@ public class SolegramPageHeader extends LinearLayout implements NotificationCent
 
     /** Telegram's animation from the app (0: none), else its animated emoji. */
     private final int rawRes;
-    private final String emoji;
+    /** The page's emoji, the best first: the first one Telegram has animated is shown. */
+    private final String[] emoji;
     private final int account = UserConfig.selectedAccount;
     private RLottieImageView lottieView;
     private BackupImageView emojiView;
@@ -51,11 +51,11 @@ public class SolegramPageHeader extends LinearLayout implements NotificationCent
         return new SolegramPageHeader(context, rawRes, null, description, rp);
     }
 
-    public static SolegramPageHeader ofEmoji(Context context, String emoji, CharSequence description, Theme.ResourcesProvider rp) {
+    public static SolegramPageHeader ofEmoji(Context context, String[] emoji, CharSequence description, Theme.ResourcesProvider rp) {
         return new SolegramPageHeader(context, 0, emoji, description, rp);
     }
 
-    private SolegramPageHeader(Context context, int rawRes, String emoji, CharSequence description, Theme.ResourcesProvider resourcesProvider) {
+    private SolegramPageHeader(Context context, int rawRes, String[] emoji, CharSequence description, Theme.ResourcesProvider resourcesProvider) {
         super(context);
         this.rawRes = rawRes;
         this.emoji = emoji;
@@ -75,7 +75,8 @@ public class SolegramPageHeader extends LinearLayout implements NotificationCent
             emojiFallback = new TextView(context);
             emojiFallback.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 70);
             emojiFallback.setGravity(Gravity.CENTER);
-            emojiFallback.setText(Emoji.replaceEmoji(emoji, emojiFallback.getPaint().getFontMetricsInt(), false));
+            // the system's emoji font: sharp at this size (Telegram's emoji pictures are small and blur when this big)
+            emojiFallback.setText(emoji[0]);
             addView(emojiFallback, LayoutHelper.createLinear(SIZE, SIZE, Gravity.CENTER_HORIZONTAL));
             loadEmoji();
         }
@@ -92,7 +93,10 @@ public class SolegramPageHeader extends LinearLayout implements NotificationCent
     }
 
     private void loadEmoji() {
-        final TLRPC.Document document = MediaDataController.getInstance(account).getEmojiAnimatedSticker(emoji);
+        TLRPC.Document document = null;
+        for (int i = 0; i < emoji.length && document == null; i++) {
+            document = MediaDataController.getInstance(account).getEmojiAnimatedSticker(emoji[i]);
+        }
         if (document == null) {
             emojiView.setVisibility(GONE);
             emojiFallback.setVisibility(VISIBLE);
