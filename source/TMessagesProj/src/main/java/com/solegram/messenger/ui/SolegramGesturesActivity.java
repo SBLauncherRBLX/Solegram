@@ -106,10 +106,9 @@ public class SolegramGesturesActivity extends UniversalFragment {
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        // the top: a duck waving, and what gestures are
+        // the top: a waving hand, and what gestures are
         if (header == null && getContext() != null) {
-            header = new SolegramPageHeader(getContext(), new String[]{"👋", "🤚", "✋", "👆"}, 2,
-                getString(R.string.SG_HdrGestures), getResourceProvider());
+            header = SolegramPageHeader.ofEmoji(getContext(), "👋", getString(R.string.SG_HdrGestures), getResourceProvider());
         }
         if (header != null) {
             items.add(UItem.asCustomShadow(header).setChecked(true));

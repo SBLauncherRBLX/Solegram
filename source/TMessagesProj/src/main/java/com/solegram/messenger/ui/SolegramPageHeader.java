@@ -14,52 +14,71 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.DocumentObject;
+import org.telegram.messenger.Emoji;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.SvgHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RLottieDrawable;
+import org.telegram.ui.Components.RLottieImageView;
 
 /**
- * The top of a Solegram settings page, as Telegram's own pages have it: one of Telegram's yellow duck stickers (the
- * pack Telegram's empty screens use) and a line about what the page is for, on the page's background. The duck is
- * the one whose emoji fits the page, else a given one from the pack. It plays when the page opens and again when
- * tapped; until the pack is loaded its outline shows.
+ * The top of a Solegram settings page, as Telegram's own pages have it (chat folders, devices): an animation that
+ * fits the page and a line about what the page is for, on the page's background. The animation is one of
+ * Telegram's own (its duck painting, the duck with photos, the diamond...) or, where none fits, Telegram's animated
+ * emoji of the page's topic. It plays when the page opens and again when tapped.
  */
 @SuppressLint("ViewConstructor")
 public class SolegramPageHeader extends LinearLayout implements NotificationCenter.NotificationCenterDelegate {
 
-    private static final String PACK = AndroidUtilities.STICKERS_PLACEHOLDER_PACK_NAME;
+    private static final int SIZE = 120;
 
-    private final String[] emoji;
-    private final int fallbackIndex;
-    private final BackupImageView sticker;
+    /** Telegram's animation from the app (0: none), else its animated emoji. */
+    private final int rawRes;
+    private final String emoji;
     private final int account = UserConfig.selectedAccount;
-    private boolean hasSticker;
+    private RLottieImageView lottieView;
+    private BackupImageView emojiView;
+    private TextView emojiFallback;
+    private boolean hasEmojiSticker;
 
-    /**
-     * @param emoji the emoji of the duck that fits the page, the best first
-     * @param fallbackIndex the duck of the pack to show when none of them is in it
-     */
-    public SolegramPageHeader(Context context, String[] emoji, int fallbackIndex, CharSequence description, Theme.ResourcesProvider resourcesProvider) {
+    public static SolegramPageHeader ofAnimation(Context context, int rawRes, CharSequence description, Theme.ResourcesProvider rp) {
+        return new SolegramPageHeader(context, rawRes, null, description, rp);
+    }
+
+    public static SolegramPageHeader ofEmoji(Context context, String emoji, CharSequence description, Theme.ResourcesProvider rp) {
+        return new SolegramPageHeader(context, 0, emoji, description, rp);
+    }
+
+    private SolegramPageHeader(Context context, int rawRes, String emoji, CharSequence description, Theme.ResourcesProvider resourcesProvider) {
         super(context);
+        this.rawRes = rawRes;
         this.emoji = emoji;
-        this.fallbackIndex = fallbackIndex;
         setOrientation(VERTICAL);
         setGravity(Gravity.CENTER_HORIZONTAL);
         setPadding(dp(24), dp(10), dp(24), dp(18));
 
-        sticker = new BackupImageView(context);
-        sticker.setAspectFit(true);
-        addView(sticker, LayoutHelper.createLinear(120, 120, Gravity.CENTER_HORIZONTAL));
+        if (rawRes != 0) {
+            lottieView = new RLottieImageView(context);
+            lottieView.setAutoRepeat(false);
+            lottieView.setAnimation(rawRes, SIZE, SIZE);
+            addView(lottieView, LayoutHelper.createLinear(SIZE, SIZE, Gravity.CENTER_HORIZONTAL));
+        } else {
+            emojiView = new BackupImageView(context);
+            emojiView.setAspectFit(true);
+            addView(emojiView, LayoutHelper.createLinear(SIZE - 20, SIZE - 20, Gravity.CENTER_HORIZONTAL, 0, 10, 0, 10));
+            emojiFallback = new TextView(context);
+            emojiFallback.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 70);
+            emojiFallback.setGravity(Gravity.CENTER);
+            emojiFallback.setText(Emoji.replaceEmoji(emoji, emojiFallback.getPaint().getFontMetricsInt(), false));
+            addView(emojiFallback, LayoutHelper.createLinear(SIZE, SIZE, Gravity.CENTER_HORIZONTAL));
+            loadEmoji();
+        }
 
         final TextView text = new TextView(context);
         text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -69,90 +88,70 @@ public class SolegramPageHeader extends LinearLayout implements NotificationCent
         text.setText(description);
         addView(text, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 8, 0, 0));
 
-        setOnClickListener(v -> replay());
-        loadSticker();
+        setOnClickListener(v -> play());
     }
 
-    private TLRPC.TL_messages_stickerSet pack() {
-        final MediaDataController data = MediaDataController.getInstance(account);
-        TLRPC.TL_messages_stickerSet set = data.getStickerSetByName(PACK);
-        if (set == null) {
-            set = data.getStickerSetByEmojiOrName(PACK);
-        }
-        return set;
-    }
-
-    /** The duck for the page: the first one with one of the page's emoji, else the given one. */
-    private TLRPC.Document pick(TLRPC.TL_messages_stickerSet set) {
-        if (set == null || set.documents == null || set.documents.isEmpty()) {
-            return null;
-        }
-        for (String e : emoji) {
-            for (TLRPC.Document d : set.documents) {
-                for (TLRPC.DocumentAttribute a : d.attributes) {
-                    if (a instanceof TLRPC.TL_documentAttributeSticker && a.alt != null && a.alt.contains(e)) {
-                        return d;
-                    }
-                }
-            }
-        }
-        return set.documents.get(Math.max(0, Math.min(set.documents.size() - 1, fallbackIndex)));
-    }
-
-    private void loadSticker() {
-        final TLRPC.TL_messages_stickerSet set = pack();
-        final TLRPC.Document document = pick(set);
+    private void loadEmoji() {
+        final TLRPC.Document document = MediaDataController.getInstance(account).getEmojiAnimatedSticker(emoji);
         if (document == null) {
-            // the pack is not here yet: asked for, the duck comes when it is
-            MediaDataController.getInstance(account).loadStickersByEmojiOrName(PACK, false, true);
+            emojiView.setVisibility(GONE);
+            emojiFallback.setVisibility(VISIBLE);
             return;
         }
-        hasSticker = true;
-        final SvgHelper.SvgDrawable thumb = DocumentObject.getSvgThumb(document.thumbs, Theme.key_emptyListPlaceholder, 0.2f);
-        if (thumb != null) {
-            thumb.overrideWidthAndHeight(512, 512);
-        }
-        String filter = "120_120";
+        hasEmojiSticker = true;
+        emojiView.setVisibility(VISIBLE);
+        emojiFallback.setVisibility(GONE);
+        String filter = (SIZE - 20) + "_" + (SIZE - 20);
         if (!LiteMode.isEnabled(LiteMode.FLAGS_ANIMATED_STICKERS)) {
             filter += "_firstframe";
         }
-        sticker.setImage(ImageLocation.getForDocument(document), filter, "tgs", thumb, set);
-        sticker.getImageReceiver().setAutoRepeat(2);
-        sticker.getImageReceiver().setAllowStartLottieAnimation(true);
+        emojiView.setImage(ImageLocation.getForDocument(document), filter, "tgs", null, document);
+        emojiView.getImageReceiver().setAutoRepeat(2);
+        emojiView.getImageReceiver().setAllowStartLottieAnimation(true);
     }
 
-    /** Plays the duck from its start (a tap on the header). */
-    private void replay() {
-        if (!hasSticker) {
-            return;
-        }
-        final RLottieDrawable lottie = sticker.getImageReceiver().getLottieAnimation();
-        if (lottie != null) {
-            lottie.setCurrentFrame(0, false);
-            lottie.restart(true);
+    /** Plays the animation from its start (when the page opens and on a tap). */
+    private void play() {
+        if (lottieView != null) {
+            final RLottieDrawable d = lottieView.getAnimatedDrawable();
+            if (d != null) {
+                d.setCurrentFrame(0, false);
+            }
+            lottieView.playAnimation();
+        } else if (hasEmojiSticker) {
+            final RLottieDrawable d = emojiView.getImageReceiver().getLottieAnimation();
+            if (d != null) {
+                d.setCurrentFrame(0, false);
+                d.restart(true);
+            }
         }
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        NotificationCenter.getInstance(account).addObserver(this, NotificationCenter.diceStickersDidLoad);
-        if (!hasSticker) {
-            loadSticker();
+        if (emojiView != null) {
+            NotificationCenter.getInstance(account).addObserver(this, NotificationCenter.stickersDidLoad);
+            if (!hasEmojiSticker) {
+                loadEmoji();
+            }
+        }
+        if (lottieView != null) {
+            postDelayed(this::play, 150);
         }
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        NotificationCenter.getInstance(account).removeObserver(this, NotificationCenter.diceStickersDidLoad);
+        NotificationCenter.getInstance(account).removeObserver(this, NotificationCenter.stickersDidLoad);
     }
 
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        // the duck pack came
-        if (!hasSticker && args.length > 0 && PACK.equals(args[0])) {
-            loadSticker();
+        // Telegram's animated emoji came: the animation takes the plain emoji's place
+        if (emojiView != null && !hasEmojiSticker) {
+            loadEmoji();
         }
     }
 }

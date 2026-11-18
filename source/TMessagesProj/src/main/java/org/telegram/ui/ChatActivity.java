@@ -34306,39 +34306,73 @@ public class ChatActivity extends BaseFragment implements
         final float topLimit = AndroidUtilities.statusBarHeight + dp(8);
         final float bottomLimit = contentView.getMeasuredHeight() - windowInsetsStateHolder.getCurrentMaxBottomInset() - dp(8);
         // the whole window has to fit as placed (it is not clipped to the screen, nor squeezed)
-        final float height = container.getMeasuredHeight(), maxBottom = contentView.getMeasuredHeight();
+        final float maxBottom = contentView.getMeasuredHeight();
+        float height = container.getMeasuredHeight();
         int arrangement = -1;
         float top = 0, extra = 0;
-        if (reactionsLayout != null) {
-            // the reactions above the message, the menu below it: the container spans the bubble
-            final float t = bubble.top - gap - pill.bottom;
-            final float e = bubble.bottom + gap - (t + panel.top);
-            if (e >= 0 && t >= 0 && t + height + e <= maxBottom && t + pill.top >= topLimit && t + panel.bottom + e <= bottomLimit) {
-                arrangement = SOLEGRAM_MENU_SPLIT;
-                top = t;
-                extra = e;
+        for (int attempt = 0; attempt < 2 && arrangement < 0; attempt++) {
+            if (attempt == 1) {
+                // a compact menu placed for its full size is too tall for the screen: placed for its compact size
+                if (solegramMenuGrow <= 0 || solegramMenuPanel != popupLayout) {
+                    break;
+                }
+                popupLayout.setMinimumHeight(0);
+                popupLayout.subtractBackgroundHeight = 0;
+                solegramMenuGrow = 0;
+                container.measure(spec, spec);
+                container.layout(0, 0, container.getMeasuredWidth(), container.getMeasuredHeight());
+                if (reactionsLayout != null) {
+                    reactionsLayout.solegramGetPillRect(pill);
+                    pill.offset(reactionsLayout.getX(), reactionsLayout.getY());
+                }
+                solegramMenuPanelRect(popupLayout, panel, false);
+                panel.offset(popupLayout.getX(), popupLayout.getY());
+                height = container.getMeasuredHeight();
             }
-        } else {
-            final float t = bubble.bottom + gap - panel.top;
-            if (t >= 0 && t + height <= maxBottom && t + panel.bottom <= bottomLimit) {
-                arrangement = SOLEGRAM_MENU_BELOW;
-                top = t;
+            if (reactionsLayout != null) {
+                // the reactions above the message, the menu below it: the container spans the bubble
+                final float t = bubble.top - gap - pill.bottom;
+                final float e = bubble.bottom + gap - (t + panel.top);
+                if (e >= 0 && t >= 0 && t + height + e <= maxBottom && t + pill.top >= topLimit && t + panel.bottom + e <= bottomLimit) {
+                    arrangement = SOLEGRAM_MENU_SPLIT;
+                    top = t;
+                    extra = e;
+                }
+            } else {
+                final float t = bubble.bottom + gap - panel.top;
+                if (t >= 0 && t + height <= maxBottom && t + panel.bottom <= bottomLimit) {
+                    arrangement = SOLEGRAM_MENU_BELOW;
+                    top = t;
+                }
             }
-        }
-        if (arrangement < 0) {
-            // no room below: both above the message
-            final float t = bubble.top - gap - panel.bottom;
-            if (t >= 0 && t + height <= maxBottom && t + (reactionsLayout != null ? pill.top : panel.top) >= topLimit) {
-                arrangement = SOLEGRAM_MENU_ABOVE;
-                top = t;
+            if (arrangement < 0) {
+                // no room below: both above the message
+                final float t = bubble.top - gap - panel.bottom;
+                if (t >= 0 && t + height <= maxBottom && t + (reactionsLayout != null ? pill.top : panel.top) >= topLimit) {
+                    arrangement = SOLEGRAM_MENU_ABOVE;
+                    top = t;
+                }
             }
-        }
-        if (arrangement < 0 && reactionsLayout != null) {
-            // nor above: both below it
-            final float t = bubble.bottom + gap - pill.top;
-            if (t >= 0 && t + height <= maxBottom && t + panel.bottom <= bottomLimit) {
-                arrangement = SOLEGRAM_MENU_BELOW;
-                top = t;
+            if (arrangement < 0 && reactionsLayout != null) {
+                // nor above: both below it
+                final float t = bubble.bottom + gap - pill.top;
+                if (t >= 0 && t + height <= maxBottom && t + panel.bottom <= bottomLimit) {
+                    arrangement = SOLEGRAM_MENU_BELOW;
+                    top = t;
+                }
+            }
+            if (arrangement < 0) {
+                // no room for it whole above or below: as near the message as the screen lets it be, on the side
+                // with more room (it may cover part of a tall message), so it still flows out of the message
+                final float first = reactionsLayout != null ? Math.min(pill.top, panel.top) : panel.top;
+                final float minT = topLimit - first;
+                final float maxT = Math.min(bottomLimit - panel.bottom, maxBottom - height);
+                if (minT <= maxT) {
+                    final boolean roomAbove = bubble.centerY() > (topLimit + bottomLimit) / 2f;
+                    final float wanted = roomAbove ? bubble.top - gap - panel.bottom : bubble.bottom + gap - first;
+                    top = Math.max(minT, Math.min(maxT, wanted));
+                    arrangement = roomAbove ? SOLEGRAM_MENU_ABOVE : SOLEGRAM_MENU_BELOW;
+                }
             }
         }
         if (arrangement < 0) {
