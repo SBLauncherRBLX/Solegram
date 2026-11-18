@@ -222,6 +222,13 @@ public class TranscribeButton {
             parent.invalidate();
         }
         pressed = false;
+        // Solegram: without Premium the message is transcribed on the phone, free
+        if (processClick && !premium && toOpen && parent.getMessageObject() != null && parent.getMessageObject().messageOwner != null
+                && TextUtils.isEmpty(parent.getMessageObject().messageOwner.voiceTranscription)
+                && com.solegram.messenger.SolegramVoiceTranscriber.available()) {
+            solegramTranscribe(parent.getMessageObject());
+            return;
+        }
         if (processClick) {
             if (!premium && toOpen) {
                 if (canTranscribeTrial(parent.getMessageObject()) || parent.getMessageObject() != null && parent.getMessageObject().messageOwner != null && !TextUtils.isEmpty(parent.getMessageObject().messageOwner.voiceTranscription)) {
@@ -664,6 +671,32 @@ public class TranscribeButton {
             (transcribeOperationsByDialogPosition != null && (transcribeOperationsByDialogPosition.containsValue(messageObject) || transcribeOperationsByDialogPosition.containsKey((Integer) reqInfoHash(messageObject)))) ||
             (transcribeOperationsById != null && messageObject != null && messageObject.messageOwner != null && transcribeOperationsById.containsKey(messageObject.messageOwner.voiceTranscriptionId))
         );
+    }
+
+    /** Solegram: the free transcription on the phone (SolegramVoiceTranscriber), shown as Telegram's own. */
+    private void solegramTranscribe(MessageObject messageObject) {
+        final int account = messageObject.currentAccount;
+        setLoading(true, true);
+        if (transcribeOperationsByDialogPosition == null) {
+            transcribeOperationsByDialogPosition = new HashMap<>();
+        }
+        transcribeOperationsByDialogPosition.put((Integer) reqInfoHash(messageObject), messageObject);
+        com.solegram.messenger.SolegramVoiceTranscriber.transcribe(messageObject, text -> {
+            if (text == null || messageObject.messageOwner == null) {
+                if (transcribeOperationsByDialogPosition != null) {
+                    transcribeOperationsByDialogPosition.remove((Integer) reqInfoHash(messageObject));
+                }
+                setLoading(false, true);
+                NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject);
+                org.telegram.ui.Components.BulletinFactory.global().createSimpleBulletin(R.raw.error,
+                    org.telegram.messenger.LocaleController.getString(R.string.SG_TranscribeFailed)).show();
+                return;
+            }
+            openVideoTranscription(messageObject);
+            messageObject.messageOwner.voiceTranscriptionOpen = true;
+            MessagesStorage.getInstance(account).updateMessageVoiceTranscription(messageObject.getDialogId(), messageObject.getId(), text, messageObject.messageOwner);
+            finishTranscription(messageObject, 0, text);
+        });
     }
 
     private static void transcribePressed(MessageObject messageObject, boolean open, ChatMessageCell.ChatMessageCellDelegate delegate) {

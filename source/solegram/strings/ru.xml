@@ -2178,4 +2178,6 @@
     <string name="SG_HdrPremium">Баннер профиля, свои цвета и другие украшения профиля.</string>
     <string name="SG_HdrGestures">Быстрые действия жестами: встряхните, переверните, поверните или постучите по телефону — и Solegram сделает то, что вы выбрали.</string>
     <string name="SG_PluginsEmpty">Плагинов пока нет. Установите первый из файла или загляните в каталог ниже.</string>
+    <string name="SG_FreeTranscribe">Бесплатная расшифровка голосовых</string>
+    <string name="SG_TranscribeFailed">Не удалось расшифровать: распознавание речи на этом телефоне недоступно или не разобрало слова</string>
 </resources>

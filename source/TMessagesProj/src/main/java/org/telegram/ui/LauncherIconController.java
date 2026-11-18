@@ -15,7 +15,7 @@ import java.util.Calendar;
 
 public class LauncherIconController {
     /** Icons taken out of the picker; their launcher entries stay in the manifest so an install that has one on keeps an icon until the switch below. */
-    private static final String[] RETIRED = {"NeonIcon", "SpinIcon", "NebulaIcon", "FrostIcon", "MangaIcon", "JellyfishIcon", "DroidIcon", "RetroIcon", "AeroIcon"};
+    private static final String[] RETIRED = {"NeonIcon", "SpinIcon", "NebulaIcon", "FrostIcon", "MangaIcon", "JellyfishIcon", "DroidIcon", "RetroIcon", "AeroIcon", "CandyIcon"};
 
     public static void tryFixLauncherIconIfNeeded() {
         // Solegram: a retired icon that is still on gives way to the default one
@@ -231,7 +231,6 @@ public class LauncherIconController {
         DOOR("DoorIcon", R.mipmap.sg_icon_bg_door, R.mipmap.sg_icon_fg_door, R.string.SG_IconDoor, false, true),
         // homages to famous game styles (no names, characters or textures of any particular game)
         PIXEL("PixelIcon", R.mipmap.sg_icon_bg_pixel, R.mipmap.sg_icon_fg_pixel, R.string.SG_IconPixel, false, true),
-        CANDY("CandyIcon", R.mipmap.sg_icon_bg_candy, R.mipmap.sg_icon_fg_candy, R.string.SG_IconCandy, false, true),
         // Solegram 3.3: an early 2000s desktop, a deep sea
         // jellyfish, a green robot - homages to styles, no names or characters
         // the mark drawn in blue ballpoint on a squared school notebook page, hastily filled in

@@ -5,7 +5,7 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.15" android:scaleY="1.15" android:translateX="-0.338" android:translateY="0.337">
+    <group android:pivotX="12" android:pivotY="12" android:scaleX="1.15" android:scaleY="1.15" android:translateX="0.212" android:translateY="-0.186">
         <path
             android:strokeColor="#FFFFFFFF"
             android:strokeWidth="1.478"

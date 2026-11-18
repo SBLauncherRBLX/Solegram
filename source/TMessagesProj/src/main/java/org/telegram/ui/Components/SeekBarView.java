@@ -512,20 +512,6 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
         return pressed;
     }
 
-    /** Solegram: the colour this slider lies on (the first opaque colour behind it), 0 when unknown. */
-    private int solegramBackgroundColor() {
-        android.view.View v = this;
-        for (int i = 0; i < 8 && v != null; i++) {
-            final android.graphics.drawable.Drawable bg = v.getBackground();
-            if (bg instanceof android.graphics.drawable.ColorDrawable && bg.getAlpha() == 255
-                    && android.graphics.Color.alpha(((android.graphics.drawable.ColorDrawable) bg).getColor()) == 255) {
-                return ((android.graphics.drawable.ColorDrawable) bg).getColor();
-            }
-            v = v.getParent() instanceof android.view.View ? (android.view.View) v.getParent() : null;
-        }
-        return getThemedColor(Theme.key_windowBackgroundWhite);
-    }
-
     @Override
     protected void onDraw(Canvas canvas) {
         int thumbX = this.thumbX;
@@ -548,6 +534,11 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
         final boolean solegramLiquid = com.solegram.messenger.ui.LiquidControls.enabled() && !twoSided;
         float solegramActiveValue = 0, solegramTw = 0, solegramTh = 0, solegramCx = 0;
         boolean solegramClipped = false;
+        // the glass slider's filled part is not the theme's colour: a neutral, a little stronger than the track
+        final int solegramOuterColor = outerPaint1.getColor();
+        if (solegramLiquid) {
+            outerPaint1.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), 0x80));
+        }
         if (solegramLiquid) {
             thumbX = solegramFollow(thumbX); // the fill, the lens and the glass all follow the thumb as drawn
             solegramActiveValue = solegramActive.set(pressed ? 1f : 0f);
@@ -560,10 +551,11 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
             solegramTh *= 1f - solegramStretch * 0.2f;
             // never past the view: it clips, and the glass would be cut in half at the ends
             solegramCx = Math.max(solegramTw / 2f + 1, Math.min(getMeasuredWidth() - solegramTw / 2f - 1, thumbX + selectorWidth / 2f));
-            // the thumb is glass at rest too: the track under it is only seen through it
-            canvas.save();
-            com.solegram.messenger.ui.LiquidControls.clipOutThumb(canvas, solegramCx, centerY, solegramTw, solegramTh);
-            solegramClipped = true;
+            if (a > 0.01f) {
+                canvas.save();
+                com.solegram.messenger.ui.LiquidControls.clipOutThumb(canvas, solegramCx, centerY, solegramTw, solegramTh);
+                solegramClipped = true;
+            }
         }
 
         rect.set(left, top, right, bottom);
@@ -642,7 +634,6 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
             if (solegramLens == null) {
                 solegramLens = new com.solegram.messenger.ui.LiquidControls.Lens();
             }
-            solegramLens.background = solegramBackgroundColor();
             final float lensTop = top, lensBottom = bottom, lensLeft = left, lensRight = right;
             final int lensThumbX = thumbX;
             com.solegram.messenger.ui.LiquidControls.drawSliderThumb(canvas, solegramCx, centerY, solegramTw, solegramTh, solegramActiveValue, c -> {
@@ -669,6 +660,7 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
                     }
                 }
             }, solegramLens, getMeasuredWidth(), getMeasuredHeight());
+            outerPaint1.setColor(solegramOuterColor);
         } else if (transitionProgress < 1f) {
             final float oldCircleProgress = 1f - Easings.easeInQuad.getInterpolation(Math.min(1f, transitionProgress * 3f));
             final float newCircleProgress = Easings.easeOutQuad.getInterpolation(transitionProgress);

@@ -2178,4 +2178,6 @@
     <string name="SG_HdrPremium">Your profile banner, your own colours and other profile decorations.</string>
     <string name="SG_HdrGestures">Quick actions by gesture: shake, flip, twist or knock on the phone, and Solegram does what you chose.</string>
     <string name="SG_PluginsEmpty">No plugins yet. Install one from a file or look in the catalog below.</string>
+    <string name="SG_FreeTranscribe">Free transcription of voice messages</string>
+    <string name="SG_TranscribeFailed">Could not transcribe: speech recognition is not available on this phone or could not make out the words</string>
 </resources>

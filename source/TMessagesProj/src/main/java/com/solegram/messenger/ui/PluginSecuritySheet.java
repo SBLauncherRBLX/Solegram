@@ -281,7 +281,7 @@ public class PluginSecuritySheet extends BottomSheet {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(dp(20), dp(8), dp(20), dp(8));
-        row.addView(tileIcon(context, icon, colors, 30), LayoutHelper.createLinear(30, 30, Gravity.TOP, 0, 2, 0, 0));
+        row.addView(lineIcon(context, icon, 30), LayoutHelper.createLinear(30, 30, Gravity.TOP, 0, 2, 0, 0));
 
         LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(LinearLayout.VERTICAL);
@@ -425,24 +425,32 @@ public class PluginSecuritySheet extends BottomSheet {
         return view;
     }
 
-    /** A rounded gradient tile with a white glyph, drawn like the icons of Solegram's settings. */
+    /**
+     * The icon of a row, drawn like the icons of Solegram's settings now: the glyph alone, in thin lines of the
+     * theme's colour (no coloured tile behind it).
+     */
     static ImageView tileIcon(Context context, int icon, int[] colors, int sizeDp) {
+        // a warning keeps its colour (its level); the glyph alone, no tile
+        return glyphIcon(context, icon, color(colors), sizeDp);
+    }
+
+    /** A row's icon in the theme's colour, as the settings rows have them. */
+    static ImageView lineIcon(Context context, int icon, int sizeDp) {
+        return glyphIcon(context, icon, com.solegram.messenger.SolegramIcons.lineColor(null), sizeDp);
+    }
+
+    private static ImageView glyphIcon(Context context, int icon, int tint, int sizeDp) {
         ImageView view = new ImageView(context);
-        int base = color(colors);
-        SettingsActivity.SettingCell.Background bg = new SettingsActivity.SettingCell.Background();
-        bg.setColor(ColorUtils.blendARGB(base, 0xFFFFFFFF, 0.18f), base);
-        bg.setDrawBorder(Theme.isCurrentThemeDark());
-        view.setBackground(bg);
         Drawable glyph = ContextCompat.getDrawable(context, icon);
         if (glyph != null) {
             LayerDrawable sized = new LayerDrawable(new Drawable[]{glyph.mutate()});
-            int glyphSize = dp(sizeDp * 0.66f);
+            int glyphSize = dp(sizeDp * 0.86f);
             sized.setLayerSize(0, glyphSize, glyphSize);
             sized.setLayerGravity(0, Gravity.CENTER);
             view.setImageDrawable(sized);
         }
         view.setScaleType(ImageView.ScaleType.CENTER);
-        view.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
+        view.setColorFilter(new PorterDuffColorFilter(tint, PorterDuff.Mode.SRC_IN));
         return view;
     }
 

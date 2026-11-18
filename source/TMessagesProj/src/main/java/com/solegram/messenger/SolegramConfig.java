@@ -321,6 +321,8 @@ public class SolegramConfig {
     public static boolean mentionCards;
     /** Long message menus show the main actions and "More" (ChatActivity.solegramCompactMenu). */
     public static boolean shortMenus = true;
+    /** Voice messages and round videos transcribed on the phone, free, without Premium (SolegramVoiceTranscriber). */
+    public static boolean freeTranscribe = true;
     /** A voice message is not sent when the button is let go: it waits to be heard (and given an effect). */
     public static boolean voicePreview;
     /** Voice effects in that preview. */
@@ -611,6 +613,7 @@ public class SolegramConfig {
         hidePremiumNags = p.getBoolean("hidePremiumNags", true);
         mentionCards = p.getBoolean("mentionCards", true);
         shortMenus = p.getBoolean("shortMenus", true);
+        freeTranscribe = p.getBoolean("freeTranscribe", true);
         voicePreview = p.getBoolean("voicePreview", true);
         voiceEffects = p.getBoolean("voiceEffects", true);
         roundEditor = p.getBoolean("roundEditor", true);
@@ -766,6 +769,7 @@ public class SolegramConfig {
             case "hidePremiumNags":
             case "mentionCards":
             case "shortMenus":
+            case "freeTranscribe":
             case "voicePreview":
             case "voiceEffects":
             case "roundEditor":
