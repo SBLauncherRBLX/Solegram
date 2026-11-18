@@ -227,7 +227,8 @@ public class UserObject {
         if (user == null) return 0;
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileColor();
         if (user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 1) != 0) return user.profile_color.color;
-        return -1;
+        // Solegram: the colour someone chose in Solegram without Premium, from their profile card
+        return com.solegram.messenger.SolegramProfileCard.profileColorOf(user.id);
     }
 
     public static long getProfileEmojiId(TLRPC.User user) {
@@ -236,13 +237,14 @@ public class UserObject {
         }
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileEmoji();
         if (user != null && user.profile_color != null && (user.profile_color.flags & 2) != 0) return user.profile_color.background_emoji_id;
-        return 0;
+        // Solegram: the pattern emoji someone chose in Solegram without Premium, from their profile card
+        return user != null ? com.solegram.messenger.SolegramProfileCard.profileEmojiOf(user.id) : 0;
     }
 
     public static long getOnlyProfileEmojiId(TLRPC.User user) {
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileEmoji();
         if (user != null && user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 2) != 0) return user.profile_color.background_emoji_id;
-        return 0;
+        return user != null ? com.solegram.messenger.SolegramProfileCard.profileEmojiOf(user.id) : 0;
     }
 
     public static long getProfileCollectibleId(TLRPC.User user) {

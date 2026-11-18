@@ -218,6 +218,10 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
         int buttonRow = -1;
         int clearRow = -1;
         int shadowRow = -1;
+        // Solegram (the own profile): its own colours, and the profile card (banner, order of the blocks...)
+        int sgColorsRow = -1;
+        int sgProfileRow = -1;
+        int sgInfoRow = -1;
         int giftsHeaderRow = -1;
         int giftsStartRow = -1;
         int giftsEndRow = -1;
@@ -477,6 +481,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                                 cell.setFixedSize(12);
                             } else if (position == giftsInfoRow) {
                                 cell.setText(getString(R.string.UserProfileCollectibleInfo));
+                            } else if (position == sgInfoRow) {
+                                cell.setText(getString(R.string.SG_ProfileStyleInfo));
                             }
                             break;
                         case VIEW_TYPE_TEXT:
@@ -486,6 +492,11 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                             textCell.updateColors();
                             if (position == clearRow) {
                                 textCell.setText(getString(isChannel ? R.string.ChannelProfileColorReset : R.string.UserProfileColorReset), false);
+                            } else if (position == sgColorsRow) {
+                                textCell.setTextAndValue(getString(R.string.SG_ProfileOwnColors),
+                                    getString(com.solegram.messenger.SolegramSelfColors.customColor1() != 0 ? R.string.SG_ProfileOwnColorsOn : R.string.SG_ProfileOwnColorsOff), true);
+                            } else if (position == sgProfileRow) {
+                                textCell.setTextAndValue(getString(R.string.SG_ProfileCardEdit), "", false);
                             }
                             break;
                         case VIEW_TYPE_HEADER:
@@ -616,8 +627,11 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
 
                 @Override
                 public int getItemViewType(int position) {
-                    if (position == infoRow || position == giftsInfoRow || position == info2Row || position == shadowRow) {
+                    if (position == infoRow || position == giftsInfoRow || position == info2Row || position == shadowRow || position == sgInfoRow) {
                         return VIEW_TYPE_INFO;
+                    }
+                    if (position == sgColorsRow || position == sgProfileRow) {
+                        return VIEW_TYPE_TEXT;
                     }
                     if (position == colorPickerRow) {
                         return VIEW_TYPE_COLOR_PICKER;
@@ -659,7 +673,15 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             listView.setOnItemClickListener((view, position) -> {
                 if (view instanceof SetReplyIconCell) {
                     showSelectStatusDialog((SetReplyIconCell) view);
+                } else if (position == sgColorsRow) {
+                    sgShowOwnColors();
+                } else if (position == sgProfileRow) {
+                    presentFragment(new com.solegram.messenger.ui.SolegramProfileEditorActivity());
                 } else if (position == clearRow) {
+                    if (!isChannel && com.solegram.messenger.SolegramSelfColors.customColor1() != 0) {
+                        com.solegram.messenger.SolegramSelfColors.saveCustomColors(0, 0);
+                        com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+                    }
                     selectedColor = -1;
                     selectedEmoji = 0;
                     selectedEmojiCollectible = null;
@@ -772,6 +794,10 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             if (type == PAGE_PROFILE) {
                 profilePreview = new ProfilePreview(getContext(), currentAccount, dialogId, resourceProvider);
                 updateProfilePreview(false);
+                if (!isChannel) {
+                    // Solegram: a tap on the profile's background opens its card: the banner, the order of the blocks
+                    profilePreview.setOnClickListener(v -> presentFragment(new com.solegram.messenger.ui.SolegramProfileEditorActivity()));
+                }
             } else {
                 messagesCellFade2 = new View(getContext());
                 BlurredBackgroundWithFadeDrawable fade2 = new BlurredBackgroundWithFadeDrawable(iBlur3BackgroundFactory.create(messagesCellFade2));
@@ -1148,6 +1174,9 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
         private void updateRows() {
             clearRow = -1;
             shadowRow = -1;
+            sgColorsRow = -1;
+            sgProfileRow = -1;
+            sgInfoRow = -1;
             giftsHeaderRow = -1;
             giftsStartRow = -1;
             giftsLoadingStartRow = -1;
@@ -1164,9 +1193,15 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             colorPickerRow = rowCount++;
             iconRow = rowCount++;
             infoRow = rowCount++;
-            if ((type == PAGE_PROFILE) && (selectedColor >= 0 || selectedEmojiCollectible != null || selectedPeerCollectible != null)) {
+            if ((type == PAGE_PROFILE) && (selectedColor >= 0 || selectedEmojiCollectible != null || selectedPeerCollectible != null
+                    || !isChannel && com.solegram.messenger.SolegramSelfColors.customColor1() != 0)) {
                 clearRow = rowCount++;
                 shadowRow = rowCount++;
+            }
+            if (type == PAGE_PROFILE && !isChannel) {
+                sgColorsRow = rowCount++;
+                sgProfileRow = rowCount++;
+                sgInfoRow = rowCount++;
             }
             final StarsController.GiftsList giftsList = type == PAGE_NAME ? giftsWithPeerColor : gifts;
             if ((type == PAGE_PROFILE || type == PAGE_NAME) && giftsList != null) {
@@ -1261,6 +1296,72 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             }
         }
 
+        /** The own profile's own colours, when chosen (they win over the palette colour). */
+        private MessagesController.PeerColor sgOwnPeerColor() {
+            if (isChannel || selectedEmojiCollectible != null) {
+                return null;
+            }
+            return MessagesController.PeerColor.fromCustom(com.solegram.messenger.SolegramSelfColors.customColor1(), com.solegram.messenger.SolegramSelfColors.customColor2());
+        }
+
+        /** Own colours of the profile: the top and the bottom of its gradient, each from a colour picker. */
+        private void sgShowOwnColors() {
+            if (getParentActivity() == null) {
+                return;
+            }
+            final boolean has = com.solegram.messenger.SolegramSelfColors.customColor1() != 0;
+            final CharSequence[] items = has
+                ? new CharSequence[]{getString(R.string.SG_ProfileColorTop), getString(R.string.SG_ProfileColorBottom), getString(R.string.SG_ProfileOwnColorsReset)}
+                : new CharSequence[]{getString(R.string.SG_ProfileColorTop), getString(R.string.SG_ProfileColorBottom)};
+            final AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+            b.setTitle(getString(R.string.SG_ProfileOwnColors));
+            b.setItems(items, (d, which) -> {
+                if (which == 2) {
+                    com.solegram.messenger.SolegramSelfColors.saveCustomColors(0, 0);
+                    sgOwnColorsChanged();
+                    return;
+                }
+                sgPickOwnColor(which == 0);
+            });
+            showDialog(b.create());
+        }
+
+        private void sgPickOwnColor(boolean top) {
+            final boolean dark = Theme.isCurrentThemeDark();
+            final MessagesController.PeerColors pcs = MessagesController.getInstance(currentAccount).profilePeerColors;
+            final MessagesController.PeerColor palette = pcs != null && selectedColor >= 0 ? pcs.getColor(selectedColor) : null;
+            int c1 = com.solegram.messenger.SolegramSelfColors.customColor1(), c2 = com.solegram.messenger.SolegramSelfColors.customColor2();
+            // start from what the profile shows now
+            if (c1 == 0 || c2 == 0) {
+                c1 = palette != null ? palette.getBgColor1(dark) : 0xFF3B82C4;
+                c2 = palette != null ? palette.getBgColor2(dark) : 0xFF2A5F96;
+            }
+            final int[] cur = {c1, c2};
+            final org.telegram.ui.Components.Paint.ColorPickerBottomSheet sheet = new org.telegram.ui.Components.Paint.ColorPickerBottomSheet(getParentActivity(), getResourceProvider());
+            sheet.setColor(top ? cur[0] : cur[1]);
+            sheet.setColorListener(color -> {
+                if (top) {
+                    cur[0] = color | 0xFF000000;
+                } else {
+                    cur[1] = color | 0xFF000000;
+                }
+                com.solegram.messenger.SolegramSelfColors.saveCustomColors(cur[0], cur[1]);
+                updateProfilePreview(true);
+            });
+            sheet.setOnDismissListener(d -> sgOwnColorsChanged());
+            sheet.show();
+        }
+
+        private void sgOwnColorsChanged() {
+            updateRows();
+            if (listView != null && listView.getAdapter() != null) {
+                listView.getAdapter().notifyDataSetChanged();
+            }
+            updateProfilePreview(true);
+            // onto the profile card, so others with Solegram see the colours
+            com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+        }
+
         public void updateProfilePreview(boolean animated) {
             if (peerColorPicker != null) {
                 peerColorPicker.setSelected(selectedColor, animated);
@@ -1276,7 +1377,12 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                     } else {
                         profilePreview.setStatusEmoji(DialogObject.getEmojiStatusDocumentId(dialogId), DialogObject.isEmojiStatusCollectible(dialogId), animated);
                     }
-                    profilePreview.setColor(selectedColor, animated);
+                    final MessagesController.PeerColor sgOwn = sgOwnPeerColor();
+                    if (sgOwn != null) {
+                        profilePreview.setColor(sgOwn, animated);
+                    } else {
+                        profilePreview.setColor(selectedColor, animated);
+                    }
                     profilePreview.setEmoji(selectedEmoji, false, animated);
                 }
             }
@@ -1284,7 +1390,12 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 if (selectedEmojiCollectible != null) {
                     colorBar.setColor(MessagesController.PeerColor.fromCollectible(selectedEmojiCollectible), animated);
                 } else {
-                    colorBar.setColor(currentAccount, selectedColor, animated);
+                    final MessagesController.PeerColor sgOwnBar = sgOwnPeerColor();
+                    if (sgOwnBar != null) {
+                        colorBar.setColor(sgOwnBar, animated);
+                    } else {
+                        colorBar.setColor(currentAccount, selectedColor, animated);
+                    }
                 }
             }
             checkResetColorButton();
@@ -1890,6 +2001,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 }
                 // Solegram: the colours and patterns are kept on this device, only the user sees them
                 com.solegram.messenger.SolegramSelfColors.save(namePage.selectedColor, namePage.selectedEmoji, profilePage.selectedColor, profilePage.selectedEmoji);
+                // Solegram: onto the profile card too, so others with Solegram see the profile's colour and emoji
+                com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
                 getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
                 finishFragment();
                 if (bulletinFragment != null) {

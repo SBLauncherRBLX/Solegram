@@ -12098,6 +12098,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             final MessagesController.PeerColor wasPeerColor = peerColor;
             peerColor = MessagesController.PeerColor.fromCollectible(user.emoji_status);
             if (peerColor == null) {
+                // Solegram: the profile's own colours (chosen in Solegram) before the palette colour
+                peerColor = com.solegram.messenger.SolegramSelfColors.customPeerColor(user);
+            }
+            if (peerColor == null) {
                 final int colorId = UserObject.getProfileColorId(user);
                 final MessagesController.PeerColors peerColors = MessagesController.getInstance(currentAccount).profilePeerColors;
                 peerColor = peerColors == null ? null : peerColors.getColor(colorId);

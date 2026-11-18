@@ -13152,6 +13152,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 } else {
                     canvas.translate(seekBarX, seekBarY + yoffset);
                     seekBar.setAlpha(isRoundVideo ? CubicBezierInterpolator.EASE_IN.getInterpolation(getVideoTranscriptionProgress()) : 1f);
+                    // Solegram: music in chat waves like the full player while it plays
+                    seekBar.solegramWave = documentAttachType == DOCUMENT_ATTACH_TYPE_MUSIC;
+                    seekBar.solegramPlaying = seekBar.solegramWave && currentMessageObject != null
+                        && MediaController.getInstance().isPlayingMessage(currentMessageObject) && !MediaController.getInstance().isMessagePaused();
                     seekBar.draw(canvas);
                 }
             }

@@ -200,6 +200,13 @@ public class SeekBar {
         if (alpha < 1) {
             canvas.saveLayerAlpha(0, 0, width, height, (int) (255 * alpha), Canvas.ALL_SAVE_FLAG);
         }
+        if (solegramWave) {
+            solegramDrawWave(canvas);
+            if (alpha < 1) {
+                canvas.restore();
+            }
+            return;
+        }
         rect.set(thumbWidth / 2, height / 2 - lineHeight / 2, width - thumbWidth / 2, height / 2 + lineHeight / 2);
         paint.setColor(selected ? backgroundSelectedColor : backgroundColor);
         drawProgressBar(canvas, rect, paint);
@@ -244,6 +251,85 @@ public class SeekBar {
 
         updateTimestampAnimation();
     }
+
+    // region Solegram: music in chat with the full player's wave (the played part waves while the track plays)
+    /** Draw as the full player's wave (music in chat), and whether this track is playing now. */
+    public boolean solegramWave, solegramPlaying;
+    private float sgWaveAmount, sgWavePhase;
+    private long sgLastFrame;
+    private final Path sgWavePath = new Path();
+    private final Paint sgStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private void solegramDrawWave(Canvas canvas) {
+        final long now = SystemClock.elapsedRealtime();
+        final float dt = sgLastFrame == 0 ? 16 : Math.min(64, now - sgLastFrame);
+        sgLastFrame = now;
+        boolean animating = false;
+        final float target = solegramPlaying && !pressed ? 1f : 0f;
+        if (sgWaveAmount != target) {
+            sgWaveAmount = target > sgWaveAmount ? Math.min(1f, sgWaveAmount + dt / 400f) : Math.max(0f, sgWaveAmount - dt / 500f);
+            animating = true;
+        }
+        final float eased = sgWaveAmount * sgWaveAmount * (3 - 2 * sgWaveAmount);
+        final float wavelength = AndroidUtilities.dp(26);
+        sgWavePhase += AndroidUtilities.dp(34) * dt / 1000f * eased;
+        if (sgWavePhase > wavelength * 1000) {
+            sgWavePhase -= wavelength * 1000;
+        }
+        final float left = thumbWidth / 2f, right = width - thumbWidth / 2f;
+        final float x = left + (pressed ? draggingThumbX : thumbX);
+        final float cy = height / 2f;
+        final float stroke = AndroidUtilities.dp(3) + (pressed ? AndroidUtilities.dp(1) : 0);
+        final float gap = AndroidUtilities.dp(5);
+        final float amp = AndroidUtilities.dp(2.2f) * eased;
+
+        sgStroke.setStyle(Paint.Style.STROKE);
+        sgStroke.setStrokeCap(Paint.Cap.ROUND);
+        sgStroke.setStrokeJoin(Paint.Join.ROUND);
+        sgStroke.setStrokeWidth(stroke);
+        // the track still ahead, and what is loaded of it
+        if (x + gap < right) {
+            sgStroke.setColor(selected ? backgroundSelectedColor : backgroundColor);
+            canvas.drawLine(x + gap, cy, right, cy, sgStroke);
+            final float loaded = left + bufferedProgress * (right - left);
+            if (loaded > x + gap) {
+                sgStroke.setColor(selected ? backgroundSelectedColor : cacheColor);
+                canvas.drawLine(x + gap, cy, loaded, cy, sgStroke);
+            }
+        }
+        // the played part: a wave that runs forward while playing and lies down flat on pause
+        final float end = x - gap;
+        if (end > left) {
+            sgWavePath.rewind();
+            final float step = AndroidUtilities.dp(1.5f), flatEnd = AndroidUtilities.dp(12), flatStart = AndroidUtilities.dp(8);
+            for (float px = left; ; px += step) {
+                final float at = Math.min(px, end);
+                final float fade = Math.min(1, (end - at) / flatEnd) * Math.min(1, (at - left) / flatStart);
+                final float y = cy + (float) Math.sin((at - sgWavePhase) / wavelength * Math.PI * 2) * amp * fade;
+                if (at == left) {
+                    sgWavePath.moveTo(at, y);
+                } else {
+                    sgWavePath.lineTo(at, y);
+                }
+                if (at >= end) {
+                    break;
+                }
+            }
+            sgStroke.setColor(progressColor);
+            canvas.drawPath(sgWavePath, sgStroke);
+        }
+        // the head: an upright pill, as the full player's
+        final float hh = AndroidUtilities.dp(13) + (pressed ? AndroidUtilities.dp(5) : 0), hw = AndroidUtilities.dp(3.5f);
+        paint.setColor(circleColor);
+        AndroidUtilities.rectTmp.set(x - hw / 2f, cy - hh / 2f, x + hw / 2f, cy + hh / 2f);
+        canvas.drawRoundRect(AndroidUtilities.rectTmp, hw / 2f, hw / 2f, paint);
+        if (parentView != null && (animating || sgWaveAmount > 0)) {
+            parentView.invalidate();
+        } else {
+            sgLastFrame = 0;
+        }
+    }
+    // endregion
 
     protected void onTimestampUpdate(URLSpanNoUnderline link) {
 

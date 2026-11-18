@@ -5458,6 +5458,29 @@ public class MessagesController extends BaseController implements NotificationCe
             return peerColor;
         }
 
+        /** Solegram: a profile colour made of two own colours (the top and bottom of its gradient). */
+        public static PeerColor fromCustom(int top, int bottom) {
+            if (top == 0 || bottom == 0) return null;
+            top |= 0xFF000000;
+            bottom |= 0xFF000000;
+            final PeerColor peerColor = new PeerColor();
+            peerColor.id = -1;
+            peerColor.hidden = true;
+            // as a collectible's: the gradient in 2/3, the accent (badges, buttons) in 4/5, which differs from 0 so
+            // the gradient is used (hasColor6)
+            final int accent = androidx.core.graphics.ColorUtils.blendARGB(top, 0xFFFFFFFF, 0.35f);
+            peerColor.colors[0] = top;
+            peerColor.colors[1] = bottom;
+            peerColor.colors[2] = top;
+            peerColor.colors[3] = bottom;
+            peerColor.colors[4] = accent;
+            peerColor.colors[5] = accent == top ? (accent ^ 0x00010101) : accent;
+            System.arraycopy(peerColor.colors, 0, peerColor.darkColors, 0, 6);
+            peerColor.patternColor = androidx.core.graphics.ColorUtils.blendARGB(bottom, 0xFF000000, 0.25f);
+            peerColor.textColor = 0xFFFFFFFF;
+            return peerColor;
+        }
+
         public static PeerColor fromTL(TLRPC.TL_help_peerColorOption tl) {
             if (tl == null) return null;
 

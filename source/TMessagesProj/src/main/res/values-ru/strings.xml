@@ -2445,5 +2445,13 @@
     <string name="SG_FontApplied">Шрифт применён. Часть экранов обновится после перезапуска.</string>
     <string name="SG_FontFailed">Не удалось загрузить шрифт</string>
     <string name="SG_FontInfo">Выберите встроенный шрифт или добавьте свой из файла или по ссылке (.ttf или .otf). Выбранный шрифт применяется ко всему приложению.</string>
+    <string name="SG_ProfileOwnColors">Свои цвета профиля</string>
+    <string name="SG_ProfileOwnColorsOn">Вкл</string>
+    <string name="SG_ProfileOwnColorsOff">Выкл</string>
+    <string name="SG_ProfileOwnColorsReset">Вернуть цвет из палитры</string>
+    <string name="SG_ProfileColorTop">Цвет сверху</string>
+    <string name="SG_ProfileColorBottom">Цвет снизу</string>
+    <string name="SG_ProfileCardEdit">Баннер, блоки и посты</string>
+    <string name="SG_ProfileStyleInfo">Любые цвета, бесплатно. Цвет профиля, свои цвета и значки попадают в вашу карточку профиля Solegram (нужен личный канал), поэтому их видят все с Solegram. Нажмите на профиль сверху, чтобы сменить баннер.</string>
     <!-- SOLEGRAM END -->
 </resources>

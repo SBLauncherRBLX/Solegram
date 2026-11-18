@@ -2191,4 +2191,12 @@
     <string name="SG_FontApplied">Font applied. Some screens update after a restart.</string>
     <string name="SG_FontFailed">Could not load the font</string>
     <string name="SG_FontInfo">Pick a built-in font, or add your own from a file or a link (.ttf or .otf). The chosen font is used across the whole app.</string>
+    <string name="SG_ProfileOwnColors">Own profile colours</string>
+    <string name="SG_ProfileOwnColorsOn">On</string>
+    <string name="SG_ProfileOwnColorsOff">Off</string>
+    <string name="SG_ProfileOwnColorsReset">Back to the palette colour</string>
+    <string name="SG_ProfileColorTop">Top colour</string>
+    <string name="SG_ProfileColorBottom">Bottom colour</string>
+    <string name="SG_ProfileCardEdit">Banner, blocks and posts</string>
+    <string name="SG_ProfileStyleInfo">Any colours you like, free. Your profile colour, own colours and icons are put on your Solegram profile card (it needs a personal channel), so everyone with Solegram sees them. Tap the profile above to change the banner.</string>
 </resources>

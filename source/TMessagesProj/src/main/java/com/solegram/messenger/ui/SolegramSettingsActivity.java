@@ -2975,7 +2975,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 askBetaCode();
                 return;
             case ID_CARD_PAGE:
-                presentFragment(new SolegramProfileEditorActivity());
+                // one place for the whole profile's look: Telegram's profile customization with Solegram's parts in it
+                presentFragment(new org.telegram.ui.PeerColorActivity(0).startOnProfile());
                 return;
             case ID_CARD_SHOW_OTHERS:
                 toggleCheck(view, "profileCards");

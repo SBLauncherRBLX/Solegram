@@ -133,6 +133,10 @@ public class SolegramMentionBubble {
     private int[] bannerColors = new int[2];
     private boolean hasBannerImage;
     private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable statusDrawable;
+    // the emoji the person set behind their profile (a premium feature, but public): shown as a pattern over the
+    // banner colours when there is no banner picture, so everyone sees it
+    private AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable bannerEmoji;
+    private long bannerEmojiId;
     private long statusId;
     @Nullable
     private Drawable badge;
@@ -307,6 +311,15 @@ public class SolegramMentionBubble {
             final int idx = AvatarDrawable.getColorIndex(dialogId);
             bannerColors = new int[]{Theme.getColor(Theme.keys_avatar_background[idx], rp), Theme.getColor(Theme.keys_avatar_background2[idx], rp)};
         }
+        // Solegram: the profile's own colours (chosen in Solegram, read from the profile card) win over the palette
+        if (user != null) {
+            final int[] own = user.self && com.solegram.messenger.SolegramSelfColors.customColor1() != 0
+                ? new int[]{com.solegram.messenger.SolegramSelfColors.customColor1(), com.solegram.messenger.SolegramSelfColors.customColor2()}
+                : com.solegram.messenger.SolegramProfileCard.customColorsOf(user.id);
+            if (own != null) {
+                bannerColors = own;
+            }
+        }
         hasBannerImage = false;
         TLRPC.UserFull full = null;
         if (user != null) {
@@ -334,6 +347,21 @@ public class SolegramMentionBubble {
         }
         if (!hasBannerImage) {
             bannerImage.clearImage();
+        }
+        // the profile-background emoji, over the banner colours, when there is no banner picture
+        bannerEmojiId = !hasBannerImage
+            ? (user != null ? UserObject.getProfileEmojiId(user) : chat != null ? ChatObject.getProfileEmojiId(chat) : 0)
+            : 0;
+        if (bannerEmojiId != 0) {
+            if (bannerEmoji == null) {
+                bannerEmoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(parent, dp(24), AnimatedEmojiDrawable.CACHE_TYPE_ALERT_PREVIEW_STATIC);
+                if (parent != null && parent.isAttachedToWindow()) {
+                    bannerEmoji.attach();
+                }
+            }
+            bannerEmoji.set(bannerEmojiId, false);
+        } else if (bannerEmoji != null) {
+            bannerEmoji.set(0, false);
         }
 
         // avatar: the profile shape (Telegram's radius scaled by the avatar corners option)
@@ -508,6 +536,22 @@ public class SolegramMentionBubble {
             paint.setShader(new LinearGradient(left, top, left + width, bannerBottom, bannerColors[0], bannerColors[1], Shader.TileMode.CLAMP));
             canvas.drawRect(left, top, left + width, bannerBottom, paint);
             paint.setShader(null);
+            // the profile-background emoji tiled faintly over the colours (visible to everyone)
+            if (bannerEmoji != null && bannerEmojiId != 0 && bannerEmoji.getDrawable() != null) {
+                canvas.save();
+                canvas.clipRect(left, top, left + width, bannerBottom);
+                bannerEmoji.setColor(ColorUtils.setAlphaComponent(0xFFFFFFFF, 38));
+                final float es = dp(20), step = dp(30);
+                int row = 0;
+                for (float yy = top - step; yy < bannerBottom + step; yy += step, row++) {
+                    final float rowOff = (row % 2) * step / 2f;
+                    for (float xx = left - step; xx < left + width + step; xx += step) {
+                        bannerEmoji.setBounds((int) (xx + rowOff), (int) yy, (int) (xx + rowOff + es), (int) (yy + es));
+                        bannerEmoji.draw(canvas);
+                    }
+                }
+                canvas.restore();
+            }
         }
 
         // avatar with a ring that follows its shape: the same corners, grown by the ring's width
@@ -658,6 +702,9 @@ public class SolegramMentionBubble {
         if (statusDrawable != null) {
             statusDrawable.attach();
         }
+        if (bannerEmoji != null) {
+            bannerEmoji.attach();
+        }
     }
 
     public void onDetachedFromWindow() {
@@ -666,6 +713,9 @@ public class SolegramMentionBubble {
         bannerImage.onDetachedFromWindow();
         if (statusDrawable != null) {
             statusDrawable.detach();
+        }
+        if (bannerEmoji != null) {
+            bannerEmoji.detach();
         }
     }
 }

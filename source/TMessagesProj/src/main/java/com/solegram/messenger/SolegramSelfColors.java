@@ -12,7 +12,8 @@ import org.telegram.tgnet.TLRPC;
 /**
  * The colours of the user's own name and profile (and their emoji patterns), like Premium's, but kept on this
  * device: Telegram's own colour screen saves here when the account has no Premium, and the app draws the user with
- * them wherever it asks for the user's colours. Nobody else sees them.
+ * them wherever it asks for the user's colours. The profile's colour and emoji also go onto the Solegram profile
+ * card, so others with Solegram see them (see SolegramProfileCard).
  */
 public final class SolegramSelfColors {
 
@@ -20,6 +21,8 @@ public final class SolegramSelfColors {
     private static boolean set;
     private static int nameColor, profileColor;
     private static long nameEmoji, profileEmoji;
+    // own colours of the profile (top, bottom of its gradient); 0: none
+    private static int custom1, custom2;
 
     private SolegramSelfColors() {
     }
@@ -34,6 +37,8 @@ public final class SolegramSelfColors {
         nameEmoji = p.getLong("selfNameEmoji", 0);
         profileColor = p.getInt("selfProfileColor", -1);
         profileEmoji = p.getLong("selfProfileEmoji", 0);
+        custom1 = p.getInt("selfCustom1", 0);
+        custom2 = p.getInt("selfCustom2", 0);
         loaded = true;
     }
 
@@ -67,6 +72,22 @@ public final class SolegramSelfColors {
         return profileEmoji;
     }
 
+    public static int customColor1() {
+        load();
+        return custom1;
+    }
+
+    public static int customColor2() {
+        load();
+        return custom2;
+    }
+
+    /** The profile's own colours (0, 0: back to the palette colour). */
+    public static void saveCustomColors(int c1, int c2) {
+        SolegramConfig.prefs().edit().putInt("selfCustom1", c1).putInt("selfCustom2", c2).apply();
+        loaded = false;
+    }
+
     public static void save(int nameColor, long nameEmoji, int profileColor, long profileEmoji) {
         SolegramConfig.prefs().edit()
             .putBoolean("selfColorsSet", true)
@@ -82,8 +103,32 @@ public final class SolegramSelfColors {
     public static void reset() {
         SolegramConfig.prefs().edit()
             .remove("selfColorsSet").remove("selfNameColor").remove("selfNameEmoji").remove("selfProfileColor").remove("selfProfileEmoji")
+            .remove("selfCustom1").remove("selfCustom2")
             .apply();
         loaded = false;
+    }
+
+    /** The profile colour made of someone's own colours (the own ones from here, others' from their profile card),
+     *  or null. UI thread. */
+    @androidx.annotation.Nullable
+    public static org.telegram.messenger.MessagesController.PeerColor customPeerColor(TLRPC.User user) {
+        if (user == null) {
+            return null;
+        }
+        int c1, c2;
+        if (user.self) {
+            load();
+            c1 = custom1;
+            c2 = custom2;
+        } else {
+            final int[] own = SolegramProfileCard.customColorsOf(user.id);
+            if (own == null) {
+                return null;
+            }
+            c1 = own[0];
+            c2 = own[1];
+        }
+        return org.telegram.messenger.MessagesController.PeerColor.fromCustom(c1, c2);
     }
 
     public static boolean isSet() {

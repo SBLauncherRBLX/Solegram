@@ -69,6 +69,12 @@ public final class SolegramProfileCard {
         public long streakDay;
         /** The emoji spreading out from the cover of the profile's music (0: none). */
         public long musicEmoji;
+        /** The profile's colour and pattern emoji chosen in Solegram without Premium (Telegram keeps those only for
+         *  Premium): published here so everyone with Solegram sees them. -1 / 0: none. */
+        public int profileColor = -1;
+        public long profileEmoji;
+        /** Own colours of the profile (top and bottom of its gradient, ARGB); 0: none, the palette colour is used. */
+        public int customColor1, customColor2;
 
         /** The pinned streak, unless it is more than a day older than its last check. */
         public boolean hasStreak() {
@@ -99,6 +105,15 @@ public final class SolegramProfileCard {
             }
             if (musicEmoji != 0) {
                 sb.append("|me=").append(musicEmoji);
+            }
+            if (profileColor >= 0) {
+                sb.append("|pc=").append(profileColor);
+            }
+            if (profileEmoji != 0) {
+                sb.append("|pe=").append(profileEmoji);
+            }
+            if (customColor1 != 0 && customColor2 != 0) {
+                sb.append("|px=").append(Integer.toHexString(customColor1)).append('.').append(Integer.toHexString(customColor2));
             }
             if (streakDays > 0) {
                 sb.append("|s=").append(streakDays).append('.').append(streakColor).append('.').append(streakPartner).append('.').append(streakDay);
@@ -162,6 +177,21 @@ public final class SolegramProfileCard {
                         case "me":
                             c.musicEmoji = Long.parseLong(v);
                             break;
+                        case "pc":
+                            c.profileColor = Math.max(-1, Math.min(1000, Integer.parseInt(v)));
+                            break;
+                        case "pe":
+                            c.profileEmoji = Long.parseLong(v);
+                            break;
+                        case "px": {
+                            final String[] f = v.split("\\.");
+                            if (f.length == 2) {
+                                // opaque colours only: a card can't make a profile invisible
+                                c.customColor1 = 0xFF000000 | (int) Long.parseLong(f[0], 16);
+                                c.customColor2 = 0xFF000000 | (int) Long.parseLong(f[1], 16);
+                            }
+                            break;
+                        }
                         case "s": {
                             final String[] f = v.split("\\.");
                             if (f.length >= 4) {
@@ -407,6 +437,64 @@ public final class SolegramProfileCard {
         });
     }
 
+    /** The profile colour and pattern chosen in Solegram, as the own card should carry them. */
+    static void applyLocalStyle(Card card) {
+        if (SolegramSelfColors.isSet()) {
+            card.profileColor = SolegramSelfColors.profileColor();
+            card.profileEmoji = SolegramSelfColors.profileEmoji();
+        } else {
+            card.profileColor = -1;
+            card.profileEmoji = 0;
+        }
+        card.customColor1 = SolegramSelfColors.customColor1();
+        card.customColor2 = SolegramSelfColors.customColor2();
+    }
+
+    private static boolean styleMatches(Card card) {
+        final Card want = new Card();
+        applyLocalStyle(want);
+        return card.profileColor == want.profileColor && card.profileEmoji == want.profileEmoji
+            && card.customColor1 == want.customColor1 && card.customColor2 == want.customColor2;
+    }
+
+    /** The card for these lookups: only on the UI thread (the cache is not thread-safe; UserObject is asked from
+     *  other threads too, which then just see no Solegram style). */
+    @Nullable
+    private static Card styleCard(long userId) {
+        if (userId == 0 || !SolegramConfig.profileCards || android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            return null;
+        }
+        try {
+            return get(userId);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    /** The profile colour someone published on their card (-1: none, or the card is not read yet). */
+    public static int profileColorOf(long userId) {
+        final Card c = styleCard(userId);
+        return c != null ? c.profileColor : -1;
+    }
+
+    /** The profile pattern emoji someone published on their card (0: none). */
+    public static long profileEmojiOf(long userId) {
+        final Card c = styleCard(userId);
+        return c != null ? c.profileEmoji : 0;
+    }
+
+    /** Someone's own profile colours from their card, or null. */
+    @Nullable
+    public static int[] customColorsOf(long userId) {
+        final Card c = styleCard(userId);
+        return c != null && c.customColor1 != 0 && c.customColor2 != 0 ? new int[]{c.customColor1, c.customColor2} : null;
+    }
+
+    /** The own profile's colour or pattern changed: the card takes it at once so others see it. UI thread. */
+    public static void syncProfileStyle(int account) {
+        syncMusicEmoji(account, null, true);
+    }
+
     /**
      * The music's pattern emoji was picked: it goes onto the own card at once, so others see it (they read it from
      * the card). Without a card nobody else can see it; {@code noCard} runs then. UI thread.
@@ -429,7 +517,7 @@ public final class SolegramProfileCard {
             }
             return;
         }
-        if (card.musicEmoji == SolegramConfig.profileMusicEmoji) {
+        if (card.musicEmoji == SolegramConfig.profileMusicEmoji && styleMatches(card)) {
             return;
         }
         final TLRPC.Chat channel = mc.getChat(-card.post.getDialogId());
@@ -457,6 +545,7 @@ public final class SolegramProfileCard {
         edit.id = post.getId();
         final String caption = strip(post.messageOwner.message);
         card.musicEmoji = SolegramConfig.profileMusicEmoji; // the music's pattern goes with the card
+        applyLocalStyle(card); // and the profile's colour and pattern emoji chosen without Premium
         final String mark = mark(card.encode());
         if (caption.length() + mark.length() > mc.maxCaptionLength) {
             done.run("CAPTION_TOO_LONG");
