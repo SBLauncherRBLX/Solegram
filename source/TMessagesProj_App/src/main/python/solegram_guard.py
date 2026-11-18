@@ -24,6 +24,7 @@ import builtins
 import os
 import sys
 import threading
+import _thread
 
 __all__ = ["install", "register", "forget", "current_plugin", "check_java_class"]
 
@@ -47,6 +48,10 @@ def install(roots, package):
     # plugin module globals (by identity) -> plugin id; the dicts are kept so an id is never reused
     registry = {}
     local = threading.local()
+    # a thread a plugin started -> that plugin's id (so what runs on it counts as the plugin even when no
+    # plugin code is on the stack, e.g. threading.Thread(target=<a stdlib function>)); only the threads a
+    # plugin itself started are here, never the app's own threads
+    thread_owner = {}
 
     code_ext = (".so", ".dex", ".jar", ".apk", ".odex", ".vdex", ".oat", ".pth")
     plugin_code_ext = (".py", ".plugin", ".pyc", ".pth", ".so", ".dex", ".jar")
@@ -110,6 +115,9 @@ def install(roots, package):
             if immediate:
                 return None
             f = f.f_back
+        # no plugin code on the stack: still the plugin's doing if this is a thread the plugin started
+        if not immediate:
+            return thread_owner.get(_thread.get_ident())
         return None
 
     def permits(plugin_id, permission):
@@ -294,6 +302,40 @@ def install(roots, package):
         """For SDK helpers that look classes up by name for a plugin (hook_utils.find_class)."""
         check_java(name, caller(1))
 
+    # --- dangerous Java *packages* a plugin must not import as a module (import java.io, from java import io,
+    # importlib.import_module("java.io")). The jclass rules above see a class name; this sees a package the
+    # plugin pulls in to reach a class by attribute, past the from-import check. Packages with ordinary plugin
+    # use (java.util, android.widget, org.telegram.*, java.nio ByteBuffer) are not here.
+    import_rules = (
+        ("java.io", None), ("java.nio.file", None), ("java.nio.channels", None),
+        ("java.net", "network"),
+        ("java.lang.reflect", "reflection"),
+        ("dalvik.system", "dex"), ("java.lang.ClassLoader", "dex"), ("java.net.URLClassLoader", "dex"),
+        ("android.security", None), ("java.security.KeyStore", None),
+        ("de.robv.android.xposed", None),
+        ("com.solegram.messenger.plugins", None), ("com.solegram.messenger.wallet", None),
+        ("com.solegram.messenger.SolegramSecrets", None), ("com.solegram.messenger.ApiCredentials", None),
+    )
+
+    def import_rule(name):
+        for prefix, permission in import_rules:
+            if name == prefix or name.startswith(prefix + "."):
+                return True, permission
+        return False, None
+
+    def check_import(name, frame):
+        matched, permission = import_rule(name)
+        if not matched:
+            return
+        pid = plugin_at(frame)
+        if pid is None:
+            return
+        if permission is None:
+            deny(pid, "tamper" if ("plugins" in name or "xposed" in name)
+                 else ("files" if name.startswith(("java.io", "java.nio")) else "secrets"), name)
+        if not permits(pid, permission):
+            deny(pid, "native" if permission == "dex" else permission, name)
+
     original_jclass = java.jclass
 
     def guarded_jclass(name, *args, **kwargs):
@@ -309,14 +351,17 @@ def install(roots, package):
 
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
         if level == 0 and name:
-            if fromlist and name.split(".", 1)[0] in java_roots:
-                frame = None
-                for item in fromlist:
-                    if not isinstance(item, str) or item == "*":
-                        continue
-                    if frame is None:
-                        frame = caller(1)
-                    check_java(name + "." + item, frame)
+            if name.split(".", 1)[0] in java_roots:
+                frame = caller(1)
+                # the module being pulled in (import java.io, importlib.import_module("java.io"))
+                check_import(name, frame)
+                if fromlist:
+                    for item in fromlist:
+                        if not isinstance(item, str) or item == "*":
+                            continue
+                        # from java.io import FileInputStream  /  from java import io
+                        check_java(name + "." + item, frame)
+                        check_import(name + "." + item, frame)
             elif name == "solegram_guard":
                 # the plugin's own import statement only (the SDK imports the guard for it)
                 pid = plugin_at(caller(1), immediate=True)
@@ -326,10 +371,76 @@ def install(roots, package):
 
     builtins.__import__ = guarded_import
 
+    # importlib.import_module does not go through builtins.__import__, so the same package check is put on it;
+    # a plugin reaching dangerous Java packages or the guard module through importlib is stopped the same way
+    try:
+        import importlib as _importlib
+        original_import_module = _importlib.import_module
+
+        def guarded_import_module(name, package=None):
+            if name and not name.startswith("."):
+                root = name.split(".", 1)[0]
+                if root in java_roots:
+                    check_import(name, caller(1))
+                elif name == "solegram_guard":
+                    pid = plugin_at(caller(1), immediate=True)
+                    if pid is not None:
+                        deny(pid, "tamper", name)
+            return original_import_module(name, package)
+
+        guarded_import_module.__name__ = "import_module"
+        _importlib.import_module = guarded_import_module
+    except Exception:
+        pass
+
+    # --- threads a plugin starts are tagged, so what runs on them is still attributed to the plugin even when
+    # the thread's work is a stdlib function with no plugin frame on it: threading.Thread(target=shutil.copyfile),
+    # a thread pool the plugin fed (ThreadPoolExecutor.submit), raw _thread. Every new OS thread, whatever starts
+    # it, comes through one of these low-level primitives; the function it will run is wrapped so that, while it
+    # runs, this thread is noted as the plugin's. The plugin is looked for anywhere under the code that started
+    # the thread (fail closed): the app itself is Java and almost never makes a Python thread, so a Python thread
+    # born while a plugin is on the stack is the plugin's doing. The tag is dropped the moment the thread ends.
+    def run_as(pid, func, args, kwargs):
+        ident = _thread.get_ident()
+        thread_owner[ident] = pid
+        try:
+            return func(*args, **(kwargs or {}))
+        finally:
+            thread_owner.pop(ident, None)
+
+    def wrap_thread_primitive(module, attr):
+        original = getattr(module, attr, None)
+        if not callable(original):
+            return
+        def guarded(func, *a, **k):
+            pid = plugin_at(caller(1))  # the plugin under whoever is starting this thread
+            wrapped = func if pid is None else (lambda *fa, **fk: run_as(pid, func, fa, fk))
+            return original(wrapped, *a, **k)
+        guarded.__name__ = getattr(original, "__name__", attr)
+        try:
+            setattr(module, attr, guarded)
+        except Exception:
+            pass
+
+    # the OS primitive in _thread (for raw users), and the names threading cached from it at its own import
+    for _m, _a in ((_thread, "start_new_thread"), (_thread, "start_joinable_thread"),
+                   (threading, "_start_new_thread"), (threading, "_start_joinable_thread")):
+        wrap_thread_primitive(_m, _a)
+
+    def control_caller_ok(depth):
+        """These are the engine's to call, never a plugin's. A plugin that got a handle to this module
+        (sys.modules, a cached import) and tries to unregister itself or register something is stopped: its
+        own frames are on the stack, the engine's calls run with none."""
+        pid = plugin_at(sys._getframe(depth + 1))
+        if pid is not None:
+            deny(pid, "tamper", "guard control")
+
     def register(module_globals, plugin_id):
+        control_caller_ok(1)
         registry[id(module_globals)] = (module_globals, str(plugin_id))
 
     def forget(plugin_id):
+        control_caller_ok(1)
         plugin_id = str(plugin_id)
         for key in [k for k, v in registry.items() if v[1] == plugin_id]:
             registry.pop(key, None)

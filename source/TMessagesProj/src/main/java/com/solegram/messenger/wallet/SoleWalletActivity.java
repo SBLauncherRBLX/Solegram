@@ -196,7 +196,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
                 } else if (id == MENU_REMOVE_CODE) {
                     askRemoveCode();
                 } else if (id == MENU_STYLE) {
-                    pickStyle();
+                    // let the overflow popup finish closing before the sheet opens, so the tap that chose this
+                    // item cannot also land on the sheet and the popup's window never overlaps the sheet
+                    AndroidUtilities.runOnUIThread(SoleWalletActivity.this::pickStyle, 200);
                 } else if (id == MENU_COPY_NUMBER) {
                     if (AndroidUtilities.addToClipboard(SoleWallet.cardNumberGrouped(currentAccount, false).replace("  ", " "))) {
                         BulletinFactory.of(SoleWalletActivity.this).createCopyBulletin(getString(R.string.SG_WalletCardCopied)).show();
@@ -1743,6 +1745,10 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     private void pickStyle() {
         if (card == null || getParentActivity() == null) {
             return;
+        }
+        // a sheet from a previous tap still up: close it first, so a second tap always gives a fresh sheet
+        if (visibleDialog != null && visibleDialog.isShowing()) {
+            visibleDialog.dismiss();
         }
         final Context context = getParentActivity();
         final org.telegram.ui.ActionBar.BottomSheet sheet = new org.telegram.ui.ActionBar.BottomSheet(context, false, getResourceProvider());
