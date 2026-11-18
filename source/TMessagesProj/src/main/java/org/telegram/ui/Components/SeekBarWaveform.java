@@ -98,7 +98,7 @@ public class SeekBarWaveform {
 
     public void setWaveform(byte[] waveform) {
         waveformBytes = waveform;
-        heights = calculateHeights((int) (width / AndroidUtilities.dpf2(3)));
+        heights = calculateHeights((int) (width / sgPitch()));
         if (!delegate.isSeekBarDragAllowed()) {
             this.progress = 1f;
         }
@@ -222,14 +222,14 @@ public class SeekBarWaveform {
         int wasWidth = width;
         width = w;
         height = h;
-        if (heights == null || heights.length != (int) (width / AndroidUtilities.dpf2(3))) {
-            heights = calculateHeights((int) (width / AndroidUtilities.dpf2(3)));
+        if (heights == null || heights.length != (int) (width / sgPitch())) {
+            heights = calculateHeights((int) (width / sgPitch()));
         }
         if (fromW != toW && (fromWidth != fromW || toWidth != toW)) {
             fromWidth = fromW;
             toWidth = toW;
-            fromHeights = calculateHeights((int) (fromWidth / AndroidUtilities.dpf2(3)));
-            toHeights = calculateHeights((int) (toWidth / AndroidUtilities.dpf2(3)));
+            fromHeights = calculateHeights((int) (fromWidth / sgPitch()));
+            toHeights = calculateHeights((int) (toWidth / sgPitch()));
         } else if (fromW == toW) {
             fromHeights = toHeights = null;
         }
@@ -315,7 +315,7 @@ public class SeekBarWaveform {
         if (waveformBytes == null || width == 0 || alpha <= 0) {
             return;
         }
-        float totalBarsCount = width / AndroidUtilities.dpf2(3);
+        float totalBarsCount = width / sgPitch();
         if (totalBarsCount <= 0.1f) {
             return;
         }
@@ -356,12 +356,12 @@ public class SeekBarWaveform {
             for (int barNum = 0; barNum < maxlen; ++barNum) {
                 int l = MathUtils.clamp((int) Math.floor(barNum / (float) maxlen * minlen), 0, minlen - 1);
                 if (k < l) {
-                    float x = AndroidUtilities.lerp((float) l, (float) barNum, T) * AndroidUtilities.dpf2(3);
+                    float x = AndroidUtilities.lerp((float) l, (float) barNum, T) * sgPitch();
                     float h = AndroidUtilities.dpf2(AndroidUtilities.lerp(minarr[reverse ? minarr.length - 1 - l : l], maxarr[reverse ? maxarr.length - 1 - barNum : barNum], T));
                     addBar(path, x, h);
                     k = l;
                 } else {
-                    float x = AndroidUtilities.lerp((float) l, (float) barNum, T) * AndroidUtilities.dpf2(3);
+                    float x = AndroidUtilities.lerp((float) l, (float) barNum, T) * sgPitch();
                     float h = AndroidUtilities.dpf2(AndroidUtilities.lerp(minarr[reverse ? minarr.length - 1 - l : l], maxarr[reverse ? maxarr.length - 1 - barNum : barNum], T));
                     addBar(alphaPath, x, h);
                     alpha = T;
@@ -372,7 +372,7 @@ public class SeekBarWaveform {
                 if (barNum >= heights.length) {
                     break;
                 }
-                float x = barNum * AndroidUtilities.dpf2(3);
+                float x = barNum * sgPitch();
                 float bart = MathUtils.clamp(appearProgress * totalBarsCount - barNum, 0, 1);
                 float h = AndroidUtilities.dpf2(heights[reverse ? heights.length - 1 - barNum : barNum]) * bart;
                 h -= AndroidUtilities.dpf2(1) * (1f - bart);
@@ -382,7 +382,7 @@ public class SeekBarWaveform {
 
         if (exploding || explosionRate > 0) {
             canvas.save();
-            final float w = totalBarsCount * AndroidUtilities.dpf2(3);
+            final float w = totalBarsCount * sgPitch();
             canvas.clipRect(0, 0, w * (1f - explodeProgress * explosionRate), height);
         }
 
@@ -397,6 +397,21 @@ public class SeekBarWaveform {
         canvas.clipPath(path);
         drawFill(canvas, this.alpha);
         canvas.restore();
+
+        // Solegram: the playhead, a round upright mark where it plays (while it has played some and not all)
+        if (!exploding && explosionRate <= 0 && this.progress > 0.001f && this.progress < 0.999f && heights != null) {
+            final float w = Math.min(width, heights.length * sgPitch());
+            final float px = this.progress * w;
+            final float half = dp(9), pw = dpf2Safe(3);
+            if (playheadPaint == null) {
+                playheadPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            }
+            playheadPaint.setColor(outerColor);
+            playheadPaint.setAlpha((int) (android.graphics.Color.alpha(outerColor) * this.alpha));
+            final float cy = (height - dp(14)) / 2f + dp(7);
+            AndroidUtilities.rectTmp.set(px - pw / 2f, cy - half, px + pw / 2f, cy + half);
+            canvas.drawRoundRect(AndroidUtilities.rectTmp, pw / 2f, pw / 2f, playheadPaint);
+        }
 
         if (exploding || explosionRate > 0) {
             canvas.restore();
@@ -413,7 +428,7 @@ public class SeekBarWaveform {
                     float bart = MathUtils.clamp(appearProgress * totalBarsCount - barNum, 0, 1);
                     float h = AndroidUtilities.dpf2(heights[barNum]) * bart;
                     emitArea = AndroidUtilities.rectTmp;
-                    final float x = (totalBarsCount * (1f - explodeProgress)) * AndroidUtilities.dpf2(3);
+                    final float x = (totalBarsCount * (1f - explodeProgress)) * sgPitch();
                     final float strokeWidth = AndroidUtilities.dpf2(2);
                     final int y = (height - dp(14)) / 2;
                     h *= waveScaling;
@@ -432,8 +447,14 @@ public class SeekBarWaveform {
         }
     }
 
+    private android.graphics.Paint playheadPaint;
+
+    private static float dpf2Safe(float v) {
+        return AndroidUtilities.dpf2(v);
+    }
+
     private void drawFill(Canvas canvas, float alpha) {
-        final float strokeWidth = AndroidUtilities.dpf2(2);
+        final float strokeWidth = sgBar();
 
         isUnread = messageObject != null && messageObject.isContentUnread() && !messageObject.isOut() && this.progress <= 0;
         paintInner.setColor(isUnread ? outerColor : (selected ? selectedColor : innerColor));
@@ -475,14 +496,26 @@ public class SeekBarWaveform {
         }
     }
 
+    /**
+     * Solegram: fewer, fuller bars (2.6 dp every 4 dp instead of 2 dp every 3 dp) so the voice's shape reads at a
+     * glance; a playhead marks where it plays.
+     */
+    private static float sgPitch() {
+        return AndroidUtilities.dpf2(4);
+    }
+
+    private static float sgBar() {
+        return AndroidUtilities.dpf2(2.6f);
+    }
+
     private void addBar(Path path, float x, float h) {
-        final float strokeWidth = AndroidUtilities.dpf2(2);
+        final float strokeWidth = sgBar();
         final int y = (height - dp(14)) / 2;
         h *= waveScaling;
         AndroidUtilities.rectTmp.set(
-            x + AndroidUtilities.dpf2(1) - strokeWidth / 2f,
+            x + sgPitch() / 2f - strokeWidth / 2f,
             y + dp(7) + (-h - strokeWidth / 2f),
-            x + AndroidUtilities.dpf2(1) + strokeWidth / 2f,
+            x + sgPitch() / 2f + strokeWidth / 2f,
             y + dp(7) + (h + strokeWidth / 2f)
         );
         path.addRoundRect(AndroidUtilities.rectTmp, strokeWidth, strokeWidth, Path.Direction.CW);

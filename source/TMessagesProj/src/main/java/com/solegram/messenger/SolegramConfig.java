@@ -319,6 +319,10 @@ public class SolegramConfig {
     public static boolean hidePremiumNags;
     /** A message that mentions someone (@name) shows their small profile card in the bubble. */
     public static boolean mentionCards;
+    /** A mini preview card of the page under links that have no preview (SolegramLinkBubble). */
+    public static boolean linkCards = true;
+    /** Long message menus show the main actions and "More" (ChatActivity.solegramCompactMenu). */
+    public static boolean shortMenus = true;
     /** A voice message is not sent when the button is let go: it waits to be heard (and given an effect). */
     public static boolean voicePreview;
     /** Voice effects in that preview. */
@@ -608,6 +612,8 @@ public class SolegramConfig {
         hidePremiumSettings = p.getBoolean("hidePremiumSettings", false);
         hidePremiumNags = p.getBoolean("hidePremiumNags", true);
         mentionCards = p.getBoolean("mentionCards", true);
+        linkCards = p.getBoolean("linkCards", true);
+        shortMenus = p.getBoolean("shortMenus", true);
         voicePreview = p.getBoolean("voicePreview", true);
         voiceEffects = p.getBoolean("voiceEffects", true);
         roundEditor = p.getBoolean("roundEditor", true);
@@ -762,6 +768,8 @@ public class SolegramConfig {
         switch (key) {
             case "hidePremiumNags":
             case "mentionCards":
+            case "linkCards":
+            case "shortMenus":
             case "voicePreview":
             case "voiceEffects":
             case "roundEditor":

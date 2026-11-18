@@ -13833,5 +13833,8 @@
     <string name="SG_ShapeProgress">“Bud” loading indicator</string>
     <string name="SG_ShapeProgressInfo">Loading as Material 3 shapes that flow into one another; a percentage fills them as a sector.</string>
     <string name="SG_PlayerProgressWave">Wave</string>
+    <string name="SG_LinkCards">Mini previews of links</string>
+    <string name="SG_MenuMore">More</string>
+    <string name="SG_ShortMenus">Short message menu</string>
     <!-- SOLEGRAM END -->
 </resources>

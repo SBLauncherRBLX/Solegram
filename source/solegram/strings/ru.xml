@@ -2164,4 +2164,7 @@
     <string name="SG_ShapeProgress">Индикатор «Бутон»</string>
     <string name="SG_ShapeProgressInfo">Загрузка в виде форм Material 3, которые перетекают друг в друга; процент заполняется сектором.</string>
     <string name="SG_PlayerProgressWave">Волна</string>
+    <string name="SG_LinkCards">Мини-превью ссылок</string>
+    <string name="SG_MenuMore">Ещё</string>
+    <string name="SG_ShortMenus">Короткое меню сообщений</string>
 </resources>

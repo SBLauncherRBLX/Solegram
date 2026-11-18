@@ -31838,6 +31838,7 @@ public class ChatActivity extends BaseFragment implements
         if (actionBar.isActionModeShowed() || isReport()) {
             return false;
         }
+        solegramMenuArgs = new Object[]{v, single, listView, x, y, searchGroup, longpress, suggestEdit};
         if (chatActivityEnterView != null) {
             chatActivityEnterView.hideHints();
         }
@@ -33207,6 +33208,8 @@ public class ChatActivity extends BaseFragment implements
                         }
                     }
                 }
+                // Solegram: a long menu shows the main actions and "More"; More opens it again with everything
+                solegramCompactMenu(popupLayout, options);
                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.video_processing_pending) {
                     popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
                     FrameLayout layout = new FrameLayout(getParentActivity());
@@ -33901,6 +33904,98 @@ public class ChatActivity extends BaseFragment implements
     public void closeMenu() {
         closeMenu(true);
     }
+
+    // region Solegram compact message menu
+
+    /** The arguments the message menu was opened with, to open it again with everything ("More"). */
+    @Nullable
+    private Object[] solegramMenuArgs;
+    private boolean solegramMenuShowAll;
+    private static final int SOLEGRAM_MENU_MAX = 6;
+
+    /**
+     * A message menu longer than {@link #SOLEGRAM_MENU_MAX} rows shows only the main actions (reply, copy, edit,
+     * forward, delete, then the first ones up to four) and a "More" row; More opens the same menu with every action.
+     */
+    private void solegramCompactMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<Integer> options) {
+        if (solegramMenuShowAll || !com.solegram.messenger.SolegramConfig.shortMenus || scrimPopupWindowItems == null || solegramMenuArgs == null) {
+            return;
+        }
+        final int n = Math.min(scrimPopupWindowItems.length, options.size());
+        int visible = 0;
+        for (int a = 0; a < n; a++) {
+            if (scrimPopupWindowItems[a] != null && scrimPopupWindowItems[a].getVisibility() == View.VISIBLE) {
+                visible++;
+            }
+        }
+        if (visible <= SOLEGRAM_MENU_MAX) {
+            return;
+        }
+        final boolean[] keep = new boolean[n];
+        int kept = 0;
+        for (int a = 0; a < n; a++) {
+            final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
+            if (cell == null || cell.getVisibility() != View.VISIBLE) {
+                continue;
+            }
+            final int option = options.get(a);
+            if (option == OPTION_REPLY || option == OPTION_COPY || option == OPTION_EDIT || option == OPTION_FORWARD
+                    || option == OPTION_DELETE || option == OPTION_WELCOME_REVERT) {
+                keep[a] = true;
+                kept++;
+            }
+        }
+        // a message without most of those (a service message, a channel post): its first actions
+        for (int a = 0; a < n && kept < 4; a++) {
+            final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
+            if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a]) {
+                keep[a] = true;
+                kept++;
+            }
+        }
+        int hidden = 0;
+        for (int a = 0; a < n; a++) {
+            final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
+            if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a]) {
+                cell.setVisibility(View.GONE);
+                hidden++;
+            }
+        }
+        if (hidden == 0) {
+            return;
+        }
+        final ActionBarMenuSubItem more = new ActionBarMenuSubItem(getParentActivity(), false, true, themeDelegate);
+        more.setMinimumWidth(AndroidUtilities.dp(200));
+        more.setTextAndIcon(getString(R.string.SG_MenuMore), R.drawable.ic_ab_other);
+        popupLayout.addView(more);
+        more.setOnClickListener(v1 -> solegramOpenFullMenu());
+    }
+
+    /** "More": the menu again, at the same message, with every action. */
+    private void solegramOpenFullMenu() {
+        final Object[] a = solegramMenuArgs;
+        if (a == null) {
+            return;
+        }
+        // the dim stays: the menu goes and comes back right away in full
+        closeMenu(false);
+        if (scrimViewAlphaAnimator != null) {
+            scrimViewAlphaAnimator.cancel();
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            if (getParentActivity() == null || fragmentView == null) {
+                return;
+            }
+            solegramMenuShowAll = true;
+            try {
+                createMenu((View) a[0], (Boolean) a[1], (Boolean) a[2], (Float) a[3], (Float) a[4], (Boolean) a[5], (Boolean) a[6], (Boolean) a[7]);
+            } finally {
+                solegramMenuShowAll = false;
+            }
+        }, 60);
+    }
+
+    // endregion
 
     private ValueAnimator scrimViewAlphaAnimator;
 
