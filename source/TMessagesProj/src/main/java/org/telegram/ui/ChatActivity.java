@@ -34000,9 +34000,24 @@ public class ChatActivity extends BaseFragment implements
         final int topLimit = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(8);
         final int overflow = loc[1] + content.getMeasuredHeight() - bottomLimit;
         final int shift = overflow > 0 ? Math.min(overflow, Math.max(0, loc[1] - topLimit)) : 0;
-        if (shift > 0) {
-            // the window goes up once; its content is pushed down by as much, so nothing moves yet
-            content.setTranslationY(shift);
+        // where the menu's top is on the screen and how far up it goes (e: 0..1)
+        final float[] progress = new float[1];
+        final int startTop = loc[1];
+        final int[] rootLoc = new int[2];
+        final View root = content.getRootView();
+        final android.view.ViewTreeObserver.OnPreDrawListener place = shift <= 0 ? null : () -> {
+            // the window goes up once; until the system has moved it, and after, the content is put where the menu
+            // should be now, from where the window really is (so nothing jumps while it moves)
+            root.getLocationOnScreen(rootLoc);
+            final float wanted = startTop - shift * progress[0];
+            final float translation = wanted - (rootLoc[1] + content.getTop());
+            if (Math.abs(content.getTranslationY() - translation) > 0.5f) {
+                content.setTranslationY(translation);
+            }
+            return true;
+        };
+        if (place != null) {
+            content.getViewTreeObserver().addOnPreDrawListener(place);
             scrimPopupY -= shift;
             window.update(scrimPopupX, scrimPopupY, -1, -1);
         }
@@ -34022,9 +34037,8 @@ public class ChatActivity extends BaseFragment implements
             popupLayout.subtractBackgroundHeight = left;
             clip.bottom = newHeight - left;
             popupLayout.setClipBounds(clip);
-            if (shift > 0) {
-                content.setTranslationY(shift * (1f - e));
-            }
+            progress[0] = e;
+            content.invalidate();
             // each new row fades in as the panel's edge passes over it
             final float edge = newHeight - left - AndroidUtilities.dp(8);
             for (int i = 0; i < hidden.size(); i++) {
@@ -34039,7 +34053,13 @@ public class ChatActivity extends BaseFragment implements
             public void onAnimationEnd(Animator animation) {
                 popupLayout.subtractBackgroundHeight = 0;
                 popupLayout.setClipBounds(null);
-                content.setTranslationY(0);
+                if (place != null) {
+                    progress[0] = 1f;
+                    content.getViewTreeObserver().removeOnPreDrawListener(place);
+                    // settled where the window now is (it has moved by now)
+                    root.getLocationOnScreen(rootLoc);
+                    content.setTranslationY(Math.abs(startTop - shift - (rootLoc[1] + content.getTop())) < 2 ? 0 : startTop - shift - (rootLoc[1] + content.getTop()));
+                }
                 for (int i = 0; i < hidden.size(); i++) {
                     hidden.get(i).setAlpha(1f);
                 }
