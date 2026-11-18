@@ -158,7 +158,7 @@ class ChatMessageLinkPreview {
         boolean restore = false;
         boolean drawInstantButtonInside = false;
         boolean loading = cell.delegate != null && cell.delegate.isProgressLoading(cell, ChatActivity.PROGRESS_INSTANT);
-        if (!cell.hasInvoicePreview && !cell.currentMessageObject.isGiveawayOrGiveawayResults() && !cell.currentMessageObject.isUnsupported() && !cell.sgMentionCard && !cell.sgLinkCard) {
+        if (!cell.hasInvoicePreview && !cell.currentMessageObject.isGiveawayOrGiveawayResults() && !cell.currentMessageObject.isUnsupported() && !cell.sgMentionCard) {
             drawInstantButtonInside = true;
 
             if (bounce == null) {
@@ -667,19 +667,6 @@ class ChatMessageLinkPreview {
                 cardLeft = (visibleLeft + visibleRight - cell.sgMention.getMeasuredWidth()) / 2f;
             }
             cell.sgMention.draw(canvas, cardLeft, startY, cell.currentMessageObject.isOutOwner());
-        }
-        if (cell.sgLinkCard) {
-            // the link's mini preview, centred in the bubble as the profile card is
-            float cardLeft = linkX - AndroidUtilities.dp(6);
-            final org.telegram.ui.ActionBar.MessageDrawable bubble = cell.currentBackgroundDrawable;
-            if (bubble != null && !cell.mediaBackground && !bubble.getBounds().isEmpty()) {
-                final android.graphics.Rect b = bubble.getBounds();
-                final boolean out = cell.currentMessageObject.isOutOwner();
-                final int tail = AndroidUtilities.dp(bubble.sgHasTailInset() ? 8 : 2), edge = AndroidUtilities.dp(2);
-                final float visibleLeft = b.left + (out ? edge : tail), visibleRight = b.right - (out ? tail : edge);
-                cardLeft = (visibleLeft + visibleRight - cell.sgLink.getMeasuredWidth()) / 2f;
-            }
-            cell.sgLink.draw(canvas, cardLeft, startY, cell.currentMessageObject.isOutOwner());
         }
 
         if (cell.drawInstantView) {

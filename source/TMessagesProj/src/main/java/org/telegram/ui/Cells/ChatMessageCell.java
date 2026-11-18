@@ -1053,9 +1053,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     /** Solegram: the profile card of someone the message mentions, where a link preview would be. */
     public final com.solegram.messenger.ui.SolegramMentionBubble sgMention = new com.solegram.messenger.ui.SolegramMentionBubble(this);
     public boolean sgMentionCard;
-    // Solegram: a mini preview of a link that has no preview of its own
-    public final com.solegram.messenger.ui.SolegramLinkBubble sgLink = new com.solegram.messenger.ui.SolegramLinkBubble(this);
-    public boolean sgLinkCard;
     /** Where a message that is only a profile card has the card: the bubble's top edge (3 dp) and a 6 dp frame. */
     private static final int SG_CARD_TOP = 9;
     public final GiveawayResultsMessageCell giveawayResultsMessageCell = new GiveawayResultsMessageCell(this);
@@ -4398,9 +4395,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (!result && sgMentionCard) {
             result = sgMention.checkMotionEvent(event, getEventX(event), getEventY(event));
         }
-        if (!result && sgLinkCard) {
-            result = sgLink.checkMotionEvent(event, getEventX(event), getEventY(event));
-        }
         if (!result) {
             result = checkTextBlockMotionEvent(event);
         }
@@ -6121,7 +6115,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 giveawayMessageCell.onAttachedToWindow();
                 giveawayResultsMessageCell.onAttachedToWindow();
                 sgMention.onAttachedToWindow();
-                sgLink.onAttachedToWindow();
                 replyImageReceiver.onAttachedToWindow();
                 locationImageReceiver.onAttachedToWindow();
                 blurredPhotoImage.onAttachedToWindow();
@@ -6164,7 +6157,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 giveawayMessageCell.onDetachedFromWindow();
                 giveawayResultsMessageCell.onDetachedFromWindow();
                 sgMention.onDetachedFromWindow();
-                sgLink.onDetachedFromWindow();
 
                 AnimatedEmojiSpan.release(this, animatedEmojiDescriptionStack);
                 AnimatedEmojiSpan.release(this, animatedEmojiReplyStack);
@@ -6524,7 +6516,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             drawMediaCheckBox = false;
             hasLinkPreview = false;
             sgMentionCard = false;
-            sgLinkCard = false;
             if (factCheck != null) {
                 factCheck.visible = false;
             }
@@ -6979,15 +6970,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                         hasLinkPreview = true;
                     }
                 }
-                // Solegram: a link with no preview of its own gets a mini preview of its page
-                if (!hasLinkPreview && !drawInstantView && com.solegram.messenger.ui.SolegramLinkBubble.candidate(messageObject)) {
-                    final int cardMax = (AndroidUtilities.isTablet() ? AndroidUtilities.getMinTabletSide() : getParentWidth()) - dp(80 + (isSideMenued ? 68 : drawAvatar ? 52 : 0));
-                    sgLink.setMessageContent(messageObject, cardMax);
-                    sgLinkCard = sgLink.isActive();
-                    if (sgLinkCard) {
-                        hasLinkPreview = true;
-                    }
-                }
                 instantDrawable = null;
 
                 if (!drawInstantView) {
@@ -7410,7 +7392,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                             isSmallImage = false;
                         }
                         linkPreviewAbove = false;
-                    } else if (drawInstantViewType == 19 || sgMentionCard || sgLinkCard) {
+                    } else if (drawInstantViewType == 19 || sgMentionCard) {
                         site_name = null;
                         title = null;
                         webDocument = null;
@@ -7571,11 +7553,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                         totalHeight += sgMention.getMeasuredHeight();
                         linkPreviewHeight += sgMention.getMeasuredHeight();
                         maxChildWidth = Math.max(maxChildWidth, sgMention.getMeasuredWidth() - dp(6));
-                    }
-                    if (sgLinkCard) {
-                        totalHeight += sgLink.getMeasuredHeight();
-                        linkPreviewHeight += sgLink.getMeasuredHeight();
-                        maxChildWidth = Math.max(maxChildWidth, sgLink.getMeasuredWidth() - dp(6));
                     }
 
                     if (site_name != null) {

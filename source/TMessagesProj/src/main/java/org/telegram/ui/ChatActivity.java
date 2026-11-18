@@ -31838,7 +31838,6 @@ public class ChatActivity extends BaseFragment implements
         if (actionBar.isActionModeShowed() || isReport()) {
             return false;
         }
-        solegramMenuArgs = new Object[]{v, single, listView, x, y, searchGroup, longpress, suggestEdit};
         if (chatActivityEnterView != null) {
             chatActivityEnterView.hideHints();
         }
@@ -33907,18 +33906,14 @@ public class ChatActivity extends BaseFragment implements
 
     // region Solegram compact message menu
 
-    /** The arguments the message menu was opened with, to open it again with everything ("More"). */
-    @Nullable
-    private Object[] solegramMenuArgs;
-    private boolean solegramMenuShowAll;
     private static final int SOLEGRAM_MENU_MAX = 6;
 
     /**
      * A message menu longer than {@link #SOLEGRAM_MENU_MAX} rows shows only the main actions (reply, copy, edit,
-     * forward, delete, then the first ones up to four) and a "More" row; More opens the same menu with every action.
+     * forward, delete, then the first ones up to four) and a "More" row; More opens the rest in the same panel.
      */
     private void solegramCompactMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<Integer> options) {
-        if (solegramMenuShowAll || !com.solegram.messenger.SolegramConfig.shortMenus || scrimPopupWindowItems == null || solegramMenuArgs == null) {
+        if (!com.solegram.messenger.SolegramConfig.shortMenus || scrimPopupWindowItems == null) {
             return;
         }
         final int n = Math.min(scrimPopupWindowItems.length, options.size());
@@ -33953,46 +33948,79 @@ public class ChatActivity extends BaseFragment implements
                 kept++;
             }
         }
-        int hidden = 0;
+        final ArrayList<View> hidden = new ArrayList<>();
         for (int a = 0; a < n; a++) {
             final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
             if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a]) {
                 cell.setVisibility(View.GONE);
-                hidden++;
+                hidden.add(cell);
             }
         }
-        if (hidden == 0) {
+        if (hidden.isEmpty()) {
             return;
         }
         final ActionBarMenuSubItem more = new ActionBarMenuSubItem(getParentActivity(), false, true, themeDelegate);
         more.setMinimumWidth(AndroidUtilities.dp(200));
         more.setTextAndIcon(getString(R.string.SG_MenuMore), R.drawable.ic_ab_other);
         popupLayout.addView(more);
-        more.setOnClickListener(v1 -> solegramOpenFullMenu());
+        more.setOnClickListener(v1 -> solegramExpandMenu(hidden, more));
     }
 
-    /** "More": the menu again, at the same message, with every action. */
-    private void solegramOpenFullMenu() {
-        final Object[] a = solegramMenuArgs;
-        if (a == null) {
+    /**
+     * "More": the rest of the actions open in the same panel, which grows downwards; when the screen has no room for
+     * it below, the whole menu slides up until it fits.
+     */
+    private void solegramExpandMenu(ArrayList<View> hidden, View more) {
+        final ActionBarPopupWindow window = scrimPopupWindow;
+        if (window == null || !window.isShowing() || contentView == null) {
             return;
         }
-        // the dim stays: the menu goes and comes back right away in full
-        closeMenu(false);
-        if (scrimViewAlphaAnimator != null) {
-            scrimViewAlphaAnimator.cancel();
+        final View content = window.getContentView();
+        more.setVisibility(View.GONE);
+        for (int i = 0; i < hidden.size(); i++) {
+            final View item = hidden.get(i);
+            item.setVisibility(View.VISIBLE);
+            item.setAlpha(0f);
+            item.setTranslationY(-AndroidUtilities.dp(8));
+            item.animate().alpha(1f).translationY(0).setStartDelay(25L * i).setDuration(240)
+                .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
         }
-        AndroidUtilities.runOnUIThread(() -> {
-            if (getParentActivity() == null || fragmentView == null) {
+        // the panel may now be as tall as the screen allows
+        if (content instanceof ChatScrimPopupContainerLayout) {
+            ((ChatScrimPopupContainerLayout) content).setMaxHeight(AndroidUtilities.displaySize.y);
+        }
+        if (solegramMenuLiquid != null && solegramMenuLiquid.window == window) {
+            solegramMenuLiquid.flowToNewSize(); // the glass grows on its springs, not at once
+        }
+        // how tall it is now, and whether its bottom still fits on the screen
+        final int spec = View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST);
+        content.measure(spec, spec);
+        final int newHeight = content.getMeasuredHeight();
+        final int[] loc = new int[2], area = new int[2];
+        content.getLocationOnScreen(loc);
+        contentView.getLocationOnScreen(area);
+        final int bottomLimit = area[1] + contentView.getMeasuredHeight() - windowInsetsStateHolder.getCurrentMaxBottomInset() - AndroidUtilities.dp(8);
+        final int topLimit = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(8);
+        final int overflow = loc[1] + newHeight - bottomLimit;
+        if (overflow <= 0) {
+            content.requestLayout();
+            return;
+        }
+        final int shift = Math.min(overflow, Math.max(0, loc[1] - topLimit));
+        final int fromY = scrimPopupY, toY = scrimPopupY - shift, x = scrimPopupX;
+        final ValueAnimator slide = ValueAnimator.ofFloat(0f, 1f);
+        slide.setDuration(320);
+        slide.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        slide.addUpdateListener(an -> {
+            if (scrimPopupWindow != window || !window.isShowing()) {
                 return;
             }
-            solegramMenuShowAll = true;
-            try {
-                createMenu((View) a[0], (Boolean) a[1], (Boolean) a[2], (Float) a[3], (Float) a[4], (Boolean) a[5], (Boolean) a[6], (Boolean) a[7]);
-            } finally {
-                solegramMenuShowAll = false;
-            }
-        }, 60);
+            final int y = Math.round(fromY + (toY - fromY) * (float) an.getAnimatedValue());
+            scrimPopupY = y;
+            window.update(x, y, -1, -1);
+        });
+        content.requestLayout();
+        slide.start();
     }
 
     // endregion
@@ -34597,6 +34625,15 @@ public class ChatActivity extends BaseFragment implements
             if (moving || reactionDrop != null) {
                 schedule();
             }
+        }
+
+        /** Solegram "More": the menu panel grows to its new size on its springs (it is followed at once when settled). */
+        void flowToNewSize() {
+            if (released || closing) {
+                return;
+            }
+            menuSettled = false;
+            schedule();
         }
 
         /** The popup drew a frame: its panels may have moved or changed size (expanding, sub-menus). */

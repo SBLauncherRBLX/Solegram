@@ -272,7 +272,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_PREMIUM_NAGS = 4243;
     private static final int ID_PREMIUM_STICKERS = 4245;
     private static final int ID_MENTION_CARDS = 4246;
-    private static final int ID_LINK_CARDS = 4254;
     private static final int ID_SHORT_MENUS = 4255;
     private static final int ID_NAME_EFFECT = 4247;
     private static final int ID_VOICE_PREVIEW = 4248;
@@ -531,7 +530,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_PREMIUM_NAGS, getString(R.string.SG_HidePremiumNags)).setChecked(SolegramConfig.hidePremiumNags));
         items.add(UItem.asCheck(ID_PREMIUM_STICKERS, getString(R.string.SG_PremiumStickersShare)).setChecked(com.solegram.messenger.SolegramPremiumStickers.enabled()));
         items.add(UItem.asCheck(ID_MENTION_CARDS, getString(R.string.SG_MentionCards)).setChecked(SolegramConfig.mentionCards));
-        items.add(UItem.asCheck(ID_LINK_CARDS, getString(R.string.SG_LinkCards)).setChecked(SolegramConfig.linkCards));
         items.add(UItem.asCheck(ID_SHORT_MENUS, getString(R.string.SG_ShortMenus)).setChecked(SolegramConfig.shortMenus));
         items.add(UItem.asCheck(ID_VOICE_PREVIEW, getString(R.string.SG_VoicePreview)).setChecked(SolegramConfig.voicePreview));
         items.add(UItem.asCheck(ID_VOICE_EFFECTS, getString(R.string.SG_VoiceFxSetting)).setChecked(SolegramConfig.voiceEffects));
@@ -2884,10 +2882,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_MENTION_CARDS:
                 toggleCheck(view, "mentionCards");
-                redrawEverything();
-                return;
-            case ID_LINK_CARDS:
-                toggleCheck(view, "linkCards");
                 redrawEverything();
                 return;
             case ID_SHORT_MENUS:
