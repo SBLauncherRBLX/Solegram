@@ -216,6 +216,9 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             }
         });
         final ActionBarMenuItem other = actionBar.createMenu().addItem(0, R.drawable.ic_ab_other);
+        // the menu opens just below the three-dots button instead of over it, so its top row (Card design) is not
+        // under the button: when it was, taps on that row's right half fell through to the button and reopened the menu
+        other.setMenuYOffset(ActionBar.getCurrentActionBarHeight());
         other.addSubItem(MENU_STYLE, R.drawable.msg_palette, getString(R.string.SG_WalletCardStyle));
         // the number others send a gift to, anonymously
         other.addSubItem(MENU_COPY_NUMBER, R.drawable.msg_copy, getString(R.string.SG_WalletCopyCardNumber));
@@ -263,6 +266,13 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
     }
 
     private void swap(View page) {
+        // a page still flowing out from an earlier swap is removed at once, so pages never stack up behind each
+        // other (e.g. the last tour page left sitting as the wallet's background)
+        while (root.getChildCount() > 1) {
+            final View extra = root.getChildAt(0);
+            extra.animate().cancel();
+            root.removeView(extra);
+        }
         final View old = root.getChildCount() > 0 ? root.getChildAt(0) : null;
         root.addView(page, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         page.setAlpha(0f);
@@ -438,6 +448,18 @@ public class SoleWalletActivity extends BaseFragment implements NotificationCent
             floatAnim.setRepeatCount(android.animation.ValueAnimator.INFINITE);
             floatAnim.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
             floatAnim.start();
+            // the float never ends on its own: cancel it when the page leaves the window, so it does not keep
+            // running (lag) and keep the old tour page alive behind the wallet after the tour closes
+            tile.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) {
+                }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) {
+                    floatAnim.cancel();
+                }
+            });
         }
         column.addView(art, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 250));
 
