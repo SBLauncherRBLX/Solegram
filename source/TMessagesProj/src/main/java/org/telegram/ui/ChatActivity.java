@@ -33607,6 +33607,7 @@ public class ChatActivity extends BaseFragment implements
                 popupX = liquidMenu.windowX;
                 popupY = liquidMenu.windowY;
             }
+            solegramPlaceCompactMenu(scrimPopupContainerLayout, liquidMenu); // Solegram: a compact menu above the message sits by it
             final int finalPopupX = scrimPopupX = popupX;
             final int finalPopupY = scrimPopupY = popupY;
             if (liquidMenu == null) {
@@ -33908,11 +33909,20 @@ public class ChatActivity extends BaseFragment implements
 
     private static final int SOLEGRAM_MENU_MAX = 6;
 
+    /** How much taller the compact message menu gets with "More" (0: not compact); reserved when it is placed. */
+    private int solegramMenuGrow;
+    @Nullable
+    private ActionBarPopupWindow.ActionBarPopupWindowLayout solegramMenuPanel;
+
     /**
      * A message menu longer than {@link #SOLEGRAM_MENU_MAX} rows shows only the main actions (reply, copy, edit,
-     * forward, delete, then the first ones up to four) and a "More" row; More opens the rest in the same panel.
+     * forward, delete, then the first ones up to four) and a "More" row; the rest follow More, hidden. The menu is
+     * placed for its full size from the start (the panel just shows less of it), so More only opens the panel: the
+     * window never moves, and nothing under the glass jumps.
      */
     private void solegramCompactMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<Integer> options) {
+        solegramMenuGrow = 0;
+        solegramMenuPanel = null;
         if (!com.solegram.messenger.SolegramConfig.shortMenus || scrimPopupWindowItems == null) {
             return;
         }
@@ -33949,98 +33959,118 @@ public class ChatActivity extends BaseFragment implements
             }
         }
         final ArrayList<View> hidden = new ArrayList<>();
+        ViewGroup rows = null;
         for (int a = 0; a < n; a++) {
             final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
-            if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a]) {
-                cell.setVisibility(View.GONE);
+            if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a] && cell.getParent() instanceof ViewGroup) {
+                rows = (ViewGroup) cell.getParent();
                 hidden.add(cell);
             }
         }
-        if (hidden.isEmpty()) {
+        if (hidden.isEmpty() || rows == null) {
             return;
         }
         final ActionBarMenuSubItem more = new ActionBarMenuSubItem(getParentActivity(), false, true, themeDelegate);
         more.setMinimumWidth(AndroidUtilities.dp(200));
         more.setTextAndIcon(getString(R.string.SG_MenuMore), R.drawable.ic_ab_other);
         popupLayout.addView(more);
+        // the hidden rows go after More: opening adds rows at the end, the shown ones never move
+        for (int i = 0; i < hidden.size(); i++) {
+            final View row = hidden.get(i);
+            rows.removeView(row);
+            rows.addView(row);
+        }
+        // the full size and the compact one
+        final int spec = View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST);
+        more.setVisibility(View.GONE);
+        popupLayout.measure(spec, spec);
+        final int full = popupLayout.getMeasuredHeight();
+        for (int i = 0; i < hidden.size(); i++) {
+            hidden.get(i).setVisibility(View.GONE);
+        }
+        more.setVisibility(View.VISIBLE);
+        popupLayout.measure(spec, spec);
+        final int compact = popupLayout.getMeasuredHeight();
+        final int grow = full - compact;
+        if (grow > 0) {
+            // placed for its full size; the panel (and the glass, which follows it) shows the compact part
+            popupLayout.setMinimumHeight(full);
+            popupLayout.subtractBackgroundHeight = grow;
+            solegramMenuGrow = grow;
+            solegramMenuPanel = popupLayout;
+            // a tap in the room kept below the panel closes the menu, as a tap outside it would
+            popupLayout.setOnTouchListener((v, e) -> {
+                if (e.getAction() == MotionEvent.ACTION_DOWN && popupLayout.subtractBackgroundHeight > 0
+                        && e.getY() > v.getHeight() - popupLayout.subtractBackgroundHeight) {
+                    closeMenu();
+                    return true;
+                }
+                return false;
+            });
+        }
         more.setOnClickListener(v1 -> solegramExpandMenu(popupLayout, hidden, more));
     }
 
     /**
-     * "More": the rest of the actions open in the same panel. One motion drives it all: the panel's bottom (the glass
-     * follows it) moves down, the new rows show as it reaches them, and when the screen has no room below the whole
-     * menu slides up at the same pace (the window moves once, its content eases back into place).
+     * The menu was placed above the message: its compact panel sits at the bottom of the room kept for it (next to
+     * the message), and More opens it upwards.
+     */
+    private boolean solegramMenuGrowsUp;
+
+    private void solegramPlaceCompactMenu(View container, @Nullable SolegramMenuLiquid liquidMenu) {
+        solegramMenuGrowsUp = false;
+        if (solegramMenuGrow <= 0 || liquidMenu == null || liquidMenu.arrangement != SOLEGRAM_MENU_ABOVE) {
+            return;
+        }
+        solegramMenuGrowsUp = true;
+        container.setTranslationY(solegramMenuGrow);
+    }
+
+    /**
+     * "More": the rest of the actions open in the same panel, in place: its edge (and the glass with it) moves to
+     * the full size it was placed for, the new rows show as the edge reaches them. Above the message the panel opens
+     * upwards (its bottom stays next to the message), below it downwards. The window does not move.
      */
     private void solegramExpandMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<View> hidden, View more) {
         final ActionBarPopupWindow window = scrimPopupWindow;
-        if (window == null || !window.isShowing() || contentView == null) {
+        if (window == null || !window.isShowing()) {
             return;
         }
         final View content = window.getContentView();
-        final int oldHeight = popupLayout.getMeasuredHeight();
+        final int grow = popupLayout.subtractBackgroundHeight;
+        final boolean up = solegramMenuGrowsUp;
         more.setVisibility(View.GONE);
         for (int i = 0; i < hidden.size(); i++) {
             final View item = hidden.get(i);
             item.setVisibility(View.VISIBLE);
             item.setAlpha(0f);
         }
-        if (content instanceof ChatScrimPopupContainerLayout) {
-            ((ChatScrimPopupContainerLayout) content).setMaxHeight(AndroidUtilities.displaySize.y);
-        }
-        final int spec = View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST);
-        content.measure(spec, spec);
-        final int newHeight = popupLayout.getMeasuredHeight();
-        final int grow = Math.max(0, newHeight - oldHeight);
-
-        // room on the screen: how far up the menu has to go so its new bottom fits
-        final int[] loc = new int[2], area = new int[2];
-        content.getLocationOnScreen(loc);
-        contentView.getLocationOnScreen(area);
-        final int bottomLimit = area[1] + contentView.getMeasuredHeight() - windowInsetsStateHolder.getCurrentMaxBottomInset() - AndroidUtilities.dp(8);
-        final int topLimit = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(8);
-        final int overflow = loc[1] + content.getMeasuredHeight() - bottomLimit;
-        final int shift = overflow > 0 ? Math.min(overflow, Math.max(0, loc[1] - topLimit)) : 0;
-        // where the menu's top is on the screen and how far up it goes (e: 0..1)
-        final float[] progress = new float[1];
-        final int startTop = loc[1];
-        final int[] rootLoc = new int[2];
-        final View root = content.getRootView();
-        final android.view.ViewTreeObserver.OnPreDrawListener place = shift <= 0 ? null : () -> {
-            // the window goes up once; until the system has moved it, and after, the content is put where the menu
-            // should be now, from where the window really is (so nothing jumps while it moves)
-            root.getLocationOnScreen(rootLoc);
-            final float wanted = startTop - shift * progress[0];
-            final float translation = wanted - (rootLoc[1] + content.getTop());
-            if (Math.abs(content.getTranslationY() - translation) > 0.5f) {
-                content.setTranslationY(translation);
+        if (grow <= 0) {
+            for (int i = 0; i < hidden.size(); i++) {
+                hidden.get(i).animate().alpha(1f).setDuration(200).start();
             }
-            return true;
-        };
-        if (place != null) {
-            content.getViewTreeObserver().addOnPreDrawListener(place);
-            scrimPopupY -= shift;
-            window.update(scrimPopupX, scrimPopupY, -1, -1);
+            return;
         }
-
-        // the panel starts at its old size and opens with the rows
-        popupLayout.subtractBackgroundHeight = grow;
-        final android.graphics.Rect clip = new android.graphics.Rect(-AndroidUtilities.dp(40), -AndroidUtilities.dp(40), AndroidUtilities.dp(2000), newHeight - grow);
+        final int full = Math.max(popupLayout.getMeasuredHeight(), popupLayout.getMinimumHeight());
+        final android.graphics.Rect clip = new android.graphics.Rect(-AndroidUtilities.dp(40), -AndroidUtilities.dp(40), AndroidUtilities.dp(2000), full - grow);
         popupLayout.setClipBounds(clip);
-        content.requestLayout();
+        final float fromTranslation = content.getTranslationY();
 
         final ValueAnimator open = ValueAnimator.ofFloat(0f, 1f);
-        open.setDuration(380);
+        open.setDuration(360);
         open.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
         open.addUpdateListener(an -> {
             final float e = (float) an.getAnimatedValue();
             final int left = Math.round(grow * (1f - e));
             popupLayout.subtractBackgroundHeight = left;
-            clip.bottom = newHeight - left;
+            clip.bottom = full - left;
             popupLayout.setClipBounds(clip);
-            progress[0] = e;
-            content.invalidate();
+            if (up) {
+                // the bottom stays by the message, the top rises
+                content.setTranslationY(fromTranslation * (1f - e));
+            }
             // each new row fades in as the panel's edge passes over it
-            final float edge = newHeight - left - AndroidUtilities.dp(8);
+            final float edge = full - left - AndroidUtilities.dp(8);
             for (int i = 0; i < hidden.size(); i++) {
                 final View item = hidden.get(i);
                 final float top = solegramTopIn(item, popupLayout);
@@ -34053,12 +34083,8 @@ public class ChatActivity extends BaseFragment implements
             public void onAnimationEnd(Animator animation) {
                 popupLayout.subtractBackgroundHeight = 0;
                 popupLayout.setClipBounds(null);
-                if (place != null) {
-                    progress[0] = 1f;
-                    content.getViewTreeObserver().removeOnPreDrawListener(place);
-                    // settled where the window now is (it has moved by now)
-                    root.getLocationOnScreen(rootLoc);
-                    content.setTranslationY(Math.abs(startTop - shift - (rootLoc[1] + content.getTop())) < 2 ? 0 : startTop - shift - (rootLoc[1] + content.getTop()));
+                if (up) {
+                    content.setTranslationY(0);
                 }
                 for (int i = 0; i < hidden.size(); i++) {
                     hidden.get(i).setAlpha(1f);

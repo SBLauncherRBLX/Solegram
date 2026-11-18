@@ -11159,6 +11159,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private void sgSetMusicEmoji(long id) {
         com.solegram.messenger.SolegramConfig.putLong("profileMusicEmoji", id);
+        // others read the emoji from the profile card: it goes there at once
+        com.solegram.messenger.SolegramProfileCard.syncMusicEmoji(currentAccount, () ->
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.info, getString(R.string.SG_MusicEmojiNeedsCard)).show());
         if (listView != null && sgNowPlayingRow >= 0) {
             final RecyclerView.ViewHolder holder = listView.findViewHolderForAdapterPosition(sgNowPlayingRow);
             if (holder != null && holder.itemView instanceof com.solegram.messenger.ui.SolegramNowPlayingView) {

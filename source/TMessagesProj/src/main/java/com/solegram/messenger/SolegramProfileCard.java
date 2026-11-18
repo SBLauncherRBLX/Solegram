@@ -408,6 +408,45 @@ public final class SolegramProfileCard {
     }
 
     /**
+     * The music's pattern emoji was picked: it goes onto the own card at once, so others see it (they read it from
+     * the card). Without a card nobody else can see it; {@code noCard} runs then. UI thread.
+     */
+    public static void syncMusicEmoji(int account, @Nullable Runnable noCard) {
+        syncMusicEmoji(account, noCard, true);
+    }
+
+    private static void syncMusicEmoji(int account, @Nullable Runnable noCard, boolean mayLoad) {
+        final long self = org.telegram.messenger.UserConfig.getInstance(account).getClientUserId();
+        final MessagesController mc = MessagesController.getInstance(account);
+        final Card card = get(self);
+        if (card == null || card.post == null) {
+            final TLRPC.UserFull full = mc.getUserFull(self);
+            if (mayLoad && full != null) {
+                // the own card may not have been read in this run yet
+                load(account, self, full, () -> syncMusicEmoji(account, noCard, false));
+            } else if (noCard != null) {
+                noCard.run();
+            }
+            return;
+        }
+        if (card.musicEmoji == SolegramConfig.profileMusicEmoji) {
+            return;
+        }
+        final TLRPC.Chat channel = mc.getChat(-card.post.getDialogId());
+        if (channel == null) {
+            if (noCard != null) {
+                noCard.run();
+            }
+            return;
+        }
+        publish(account, channel, card.post, card, error -> {
+            if (error != null) {
+                org.telegram.messenger.FileLog.e("Solegram: the card did not take the music emoji: " + error);
+            }
+        });
+    }
+
+    /**
      * Puts the card on a post of the own channel: its caption gets the mark (the visible text stays), and the post
      * is pinned (silently). {@code done} gets null on success, or Telegram's error. UI thread.
      */

@@ -2420,5 +2420,15 @@
     <string name="SG_PlayerProgressWave">Волна</string>
     <string name="SG_MenuMore">Ещё</string>
     <string name="SG_ShortMenus">Короткое меню сообщений</string>
+    <string name="SG_MusicEmojiNeedsCard">Чтобы другие видели этот эмодзи, сделайте карточку профиля: Solegram → «Баннер и плитки профиля». Пока он виден только вам.</string>
+    <string name="SG_HdrAppearance">Форма аватарок, иконки, шрифт и анимации — настройте, как выглядит Solegram.</string>
+    <string name="SG_HdrChats">Размер стикеров, поведение сообщений и мелочи, которые делают переписку удобнее.</string>
+    <string name="SG_HdrMusic">Плеер, вкладка музыки и карточка трека в профиле.</string>
+    <string name="SG_HdrCamera">Камера внутри Solegram: управление, фото и видео.</string>
+    <string name="SG_HdrBrowser">Встроенный браузер: блокировка рекламы и удобства для сайтов.</string>
+    <string name="SG_HdrProxy">Подключение через прокси, когда Telegram работает плохо. Solegram сам найдёт рабочие.</string>
+    <string name="SG_HdrScam">Предупреждения о подозрительных ссылках и аккаунтах, чтобы вас не обманули.</string>
+    <string name="SG_HdrMaps">Какая карта показывается в чатах и куда открываются маршруты.</string>
+    <string name="SG_HdrPremium">Баннер профиля, свои цвета и другие украшения профиля.</string>
     <!-- SOLEGRAM END -->
 </resources>

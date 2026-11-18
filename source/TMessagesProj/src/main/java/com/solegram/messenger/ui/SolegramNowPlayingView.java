@@ -518,7 +518,7 @@ public class SolegramNowPlayingView extends View {
                 continue;
             }
             // the same brightness from top to bottom: it only fades from left to right
-            final float opacity = 0.4f - 0.33f * tt;
+            final float opacity = 0.62f - 0.4f * tt;
             canvas.save();
             canvas.rotate(scatterAngle[n], x, y);
             pattern.setBounds((int) (x - half), (int) (y - half), (int) (x + half), (int) (y + half));
@@ -590,7 +590,12 @@ public class SolegramNowPlayingView extends View {
         button.set(bLeftPre, rowCover.centerY() - bsizePre / 2f, bLeftPre + bsizePre, rowCover.centerY() + bsizePre / 2f);
         patternText.set(rtl ? button.right + dp(12) : rowCover.right + dp(14), rowCover.centerY() - dp(22),
             rtl ? rowCover.left - dp(14) : (bsizePre > 0 ? button.left - dp(12) : card.right - dp(14)), rowCover.centerY() + dp(22));
-        final int patternTint = ColorUtils.blendARGB(Color.WHITE, ColorUtils.blendARGB(base, Color.WHITE, 0.55f), 0.45f);
+        // the pattern stands out from the background whatever its colour: lighter on a dark one, deeper on a light one
+        // (the blurred cover is darkened under the text, so it counts as darker)
+        final double backLum = ColorUtils.calculateLuminance(blur ? ColorUtils.blendARGB(base, Color.BLACK, 0.35f) : base);
+        final int patternTint = backLum > 0.42
+            ? ColorUtils.blendARGB(base, Color.BLACK, 0.55f)
+            : ColorUtils.blendARGB(base, Color.WHITE, 0.82f);
         drawPattern(canvas, rowCover.centerX(), rowCover.centerY(), patternTint, alpha);
         final float coverRadius = dp(12);
         if (track != null && track.art != null && !track.art.isRecycled()) {
