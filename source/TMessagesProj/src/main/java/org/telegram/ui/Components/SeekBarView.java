@@ -512,6 +512,20 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
         return pressed;
     }
 
+    /** Solegram: the colour this slider lies on (the first opaque colour behind it), 0 when unknown. */
+    private int solegramBackgroundColor() {
+        android.view.View v = this;
+        for (int i = 0; i < 8 && v != null; i++) {
+            final android.graphics.drawable.Drawable bg = v.getBackground();
+            if (bg instanceof android.graphics.drawable.ColorDrawable && bg.getAlpha() == 255
+                    && android.graphics.Color.alpha(((android.graphics.drawable.ColorDrawable) bg).getColor()) == 255) {
+                return ((android.graphics.drawable.ColorDrawable) bg).getColor();
+            }
+            v = v.getParent() instanceof android.view.View ? (android.view.View) v.getParent() : null;
+        }
+        return getThemedColor(Theme.key_windowBackgroundWhite);
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         int thumbX = this.thumbX;
@@ -546,11 +560,10 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
             solegramTh *= 1f - solegramStretch * 0.2f;
             // never past the view: it clips, and the glass would be cut in half at the ends
             solegramCx = Math.max(solegramTw / 2f + 1, Math.min(getMeasuredWidth() - solegramTw / 2f - 1, thumbX + selectorWidth / 2f));
-            if (a > 0.01f) {
-                canvas.save();
-                com.solegram.messenger.ui.LiquidControls.clipOutThumb(canvas, solegramCx, centerY, solegramTw, solegramTh);
-                solegramClipped = true;
-            }
+            // the thumb is glass at rest too: the track under it is only seen through it
+            canvas.save();
+            com.solegram.messenger.ui.LiquidControls.clipOutThumb(canvas, solegramCx, centerY, solegramTw, solegramTh);
+            solegramClipped = true;
         }
 
         rect.set(left, top, right, bottom);
@@ -629,6 +642,7 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
             if (solegramLens == null) {
                 solegramLens = new com.solegram.messenger.ui.LiquidControls.Lens();
             }
+            solegramLens.background = solegramBackgroundColor();
             final float lensTop = top, lensBottom = bottom, lensLeft = left, lensRight = right;
             final int lensThumbX = thumbX;
             com.solegram.messenger.ui.LiquidControls.drawSliderThumb(canvas, solegramCx, centerY, solegramTw, solegramTh, solegramActiveValue, c -> {

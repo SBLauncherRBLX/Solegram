@@ -2177,4 +2177,5 @@
     <string name="SG_HdrMaps">Which map chats show and where routes open.</string>
     <string name="SG_HdrPremium">Your profile banner, your own colours and other profile decorations.</string>
     <string name="SG_HdrGestures">Quick actions by gesture: shake, flip, twist or knock on the phone, and Solegram does what you chose.</string>
+    <string name="SG_PluginsEmpty">No plugins yet. Install one from a file or look in the catalog below.</string>
 </resources>

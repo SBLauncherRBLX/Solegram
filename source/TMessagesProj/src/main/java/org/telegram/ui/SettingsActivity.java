@@ -799,7 +799,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         // Solegram
         items.add(SettingCell.Factory.of(100, 0xFFFFA24A, 0xFF8A3CF0, R.drawable.sg_settings_mark, getString(R.string.SG_SettingsTitle), getString(R.string.SG_SettingsSubtitle), com.solegram.messenger.updater.UpdateController.getInstance().hasPendingUpdate() ? getString(R.string.SG_UpdateAvailableShort) : null));
-        items.add(SettingCell.Factory.of(101, 0xFF4FC3F7, 0xFF3F51B5, R.drawable.msg_bots, getString(R.string.SG_Plugins), com.solegram.messenger.plugins.PluginsController.isEngineAvailable() ? String.valueOf(com.solegram.messenger.plugins.PluginsController.getInstance().getPlugins().size()) : null));
+        items.add(SettingCell.Factory.of(101, 0xFF4FC3F7, 0xFF3F51B5, R.drawable.sg_plugin, getString(R.string.SG_Plugins), com.solegram.messenger.plugins.PluginsController.isEngineAvailable() ? String.valueOf(com.solegram.messenger.plugins.PluginsController.getInstance().getPlugins().size()) : null));
         items.add(UItem.asShadow(null));
         // Solegram's own features, which Telegram's settings have no place for (the rest sit in Telegram's sections)
         items.add(UItem.asHeader(getString(R.string.SG_SettingsFeatures)));

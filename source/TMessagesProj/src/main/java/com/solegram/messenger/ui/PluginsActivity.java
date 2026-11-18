@@ -143,6 +143,8 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
         return getString(R.string.SG_Plugins);
     }
 
+    private com.solegram.messenger.ui.SolegramPageHeader emptyHeader;
+
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         PluginsController controller = PluginsController.getInstance();
@@ -165,6 +167,13 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
                 items.add(PluginCell.Factory.of(meta));
             }
             items.add(UItem.asShadow(getString(R.string.SG_PluginsListInfo)));
+        } else if (getContext() != null) {
+            // nothing installed yet: a shopping cart where the list will be, gone as soon as a plugin is there
+            if (emptyHeader == null) {
+                emptyHeader = com.solegram.messenger.ui.SolegramPageHeader.ofEmoji(getContext(), new String[]{"🛒", "🛍", "🧩", "📦", "🎁"},
+                    getString(R.string.SG_PluginsEmpty), getResourceProvider());
+            }
+            items.add(UItem.asCustomShadow(emptyHeader).setChecked(true));
         }
 
         items.add(UItem.asButton(ID_INSTALL, R.drawable.msg_add, getString(R.string.SG_InstallPlugin)).accent());

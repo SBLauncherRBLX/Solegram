@@ -94,7 +94,10 @@ public final class LiquidControls {
      */
     public static final class Lens {
         private Object impl;
+        private Object glassImpl;
         private boolean failed;
+        /** The colour of what the control lies on (a slider's glass refracts it with the track). */
+        public int background;
 
         /** @return false when the shader lens is not available here (old Android, software canvas) */
         boolean draw(Canvas canvas, int viewW, int viewH, float cx, float cy, float w, float h, float a, LensContent content) {
@@ -102,6 +105,14 @@ public final class LiquidControls {
                 return false;
             }
             try {
+                if (sliderLens) {
+                    // a slider's thumb: the app's own glass (refraction, colour split, rim, as set in the glass settings)
+                    if (glassImpl == null) {
+                        glassImpl = new GlassThumb();
+                    }
+                    ((GlassThumb) glassImpl).draw(canvas, viewW, viewH, cx, cy, w, h, a, background, content);
+                    return true;
+                }
                 if (impl == null) {
                     impl = new ShaderLens();
                 }
@@ -148,6 +159,45 @@ public final class LiquidControls {
             shader.setFloatUniform("tint", body, body, body, body);
             node.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "img"));
             canvas.drawRenderNode(node);
+        }
+    }
+
+    /**
+     * A slider's thumb as real glass, the same as every glass of the app (LiquidGlassEffect: the solegram glass
+     * shader with the user's thickness, refraction, colour split and rim): what lies under it (the row's
+     * background and the track) is refracted through a pill of glass, not just magnified.
+     */
+    @RequiresApi(33)
+    private static final class GlassThumb {
+        private final RenderNode node = new RenderNode("solegramGlassThumb");
+        private final org.telegram.ui.Components.blur3.LiquidGlassEffect effect = new org.telegram.ui.Components.blur3.LiquidGlassEffect(node);
+        private final Path clip = new Path();
+        private final RectF bounds = new RectF();
+
+        void draw(Canvas canvas, int viewW, int viewH, float cx, float cy, float w, float h, float a, int background, LensContent content) {
+            node.setPosition(0, 0, viewW, viewH);
+            final RecordingCanvas rc = node.beginRecording(viewW, viewH);
+            try {
+                if (background != 0) {
+                    rc.drawColor(background | 0xFF000000);
+                }
+                content.draw(rc);
+            } finally {
+                node.endRecording();
+            }
+            final float r = h / 2f;
+            // thicker glass while it is held: the bend reaches further in
+            final float thickness = h * (0.32f + 0.12f * a);
+            // the glass body: a whisper of white, a little more while held
+            final int body = ((int) (255 * (0.05f + 0.05f * a)) << 24) | 0xFFFFFF;
+            effect.update(w, h, cx - w / 2f, cy - h / 2f, r, r, r, r, thickness, 0.75f, 1.5f, body, 0, 0, 1);
+            bounds.set(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f);
+            clip.rewind();
+            clip.addRoundRect(bounds, r, r, Path.Direction.CW);
+            canvas.save();
+            canvas.clipPath(clip);
+            canvas.drawRenderNode(node);
+            canvas.restore();
         }
     }
 
@@ -222,9 +272,10 @@ public final class LiquidControls {
             }
         }
 
-        // lens: the track under the thumb, magnified in the middle and bent at the curved rim
+        // lens: the track under the thumb, magnified in the middle and bent at the curved rim (a slider's thumb is
+        // glass at rest too: no solid pill)
         boolean shaderLens = false;
-        if (a > 0.01f && lens != null) {
+        if ((a > 0.01f || sliderLens) && lens != null) {
             shaderLens = glass != null && glass.draw(canvas, viewWidth, viewHeight, cx, cy, width, height, a, lens);
             if (!shaderLens) {
                 canvas.save();
@@ -239,9 +290,11 @@ public final class LiquidControls {
             rect.set(cx - width / 2f, cy - height / 2f, cx + width / 2f, cy + height / 2f);
         }
 
-        // white body fades to a faint tint (demo: background opacity 1 -> 0.1)
-        fillPaint.setColor(((int) (255 * (1f - (sliderLens ? 0.94f : 0.9f) * a)) << 24) | 0xFFFFFF);
-        canvas.drawRoundRect(rect, r, r, fillPaint);
+        // white body fades to a faint tint (demo: background opacity 1 -> 0.1); a slider's thumb is clear glass
+        if (!sliderLens || !shaderLens) {
+            fillPaint.setColor(((int) (255 * (sliderLens ? 0.08f : 1f - 0.9f * a)) << 24) | 0xFFFFFF);
+            canvas.drawRoundRect(rect, r, r, fillPaint);
+        }
 
         if (Build.VERSION.SDK_INT < 28) {
             // no shadow layers on hardware canvases before Android 9: a hairline keeps the white pill visible on white
@@ -251,11 +304,19 @@ public final class LiquidControls {
             canvas.drawRoundRect(rect, r, r, rimPaint);
         }
 
-        // specular rim: bright where light hits (top-left), soft at the opposite edge (the shader lens has its own)
-        if (a > 0.01f && !shaderLens) {
+        // specular rim: bright where light hits (top-left), soft at the opposite edge (the switch's shader lens has its
+        // own; a slider's glass always shows its edge, so the clear thumb is seen at rest)
+        if (sliderLens || a > 0.01f && !shaderLens) {
+            if (sliderLens) {
+                // a faint dark line round it first: the clear glass stays visible on a light row
+                rimPaint.setShader(null);
+                rimPaint.setStrokeWidth(Math.max(1f, dpf2(0.8f)));
+                rimPaint.setColor(0x1F000000);
+                canvas.drawRoundRect(rect, r, r, rimPaint);
+            }
             rimPaint.setStrokeWidth(Math.max(1f, dpf2(1.2f)));
             rimPaint.setColor(0xFFFFFFFF);
-            final int light = (int) (210 * a);
+            final int light = (int) (sliderLens ? 150 + 70 * a : 210 * a);
             rimPaint.setShader(new LinearGradient(rect.left, rect.top, rect.right, rect.bottom,
                 new int[]{(light << 24) | 0xFFFFFF, ((light / 6) << 24) | 0xFFFFFF, ((light / 2) << 24) | 0xFFFFFF},
                 new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
