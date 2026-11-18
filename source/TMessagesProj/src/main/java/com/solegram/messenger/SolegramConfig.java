@@ -28,6 +28,12 @@ public class SolegramConfig {
     /** Avatar roundness in percent: 100 = circle, 0 = square. */
     public static int avatarCorners = 100;
     public static boolean useSystemFont;
+    /** The app's font: "" = bundled Roboto, "system" = device font, "custom" = the user's chosen/loaded font. */
+    public static String appFont = "";
+    /** A short display name of the chosen font (for the settings row), and a token bumped on every change so the
+     *  font cache is dropped when the files change. */
+    public static String appFontName = "";
+    public static String appFontToken = "";
     public static boolean centerTitle;
     public static boolean hideStories;
     public static boolean hideEmojiStatus;
@@ -431,6 +437,9 @@ public class SolegramConfig {
         SharedPreferences p = prefs();
         avatarCorners = clamp(p.getInt("avatarCorners", 100), 0, 100);
         useSystemFont = p.getBoolean("useSystemFont", false);
+        appFont = p.getString("appFont", useSystemFont && !p.contains("appFont") ? "system" : "");
+        appFontName = p.getString("appFontName", "");
+        appFontToken = p.getString("appFontToken", "");
         centerTitle = p.getBoolean("centerTitle", false);
         hideStories = p.getBoolean("hideStories", false);
         hideEmojiStatus = p.getBoolean("hideEmojiStatus", false);
@@ -685,6 +694,27 @@ public class SolegramConfig {
             .apply();
         ghostNoTyping = ghostNoRead = ghostOffline = ghostNoStoryRead = enabled;
         GhostMode.onGhostModeChanged();
+    }
+
+    /** Sets the app's font. mode: "" (bundled Roboto), "system", or "custom" (files already in SolegramFonts.dir()).
+     *  The token changes every time so the font cache is dropped. */
+    public static void setAppFont(String mode, String name) {
+        appFont = mode == null ? "" : mode;
+        appFontName = name == null ? "" : name;
+        appFontToken = Long.toString(System.currentTimeMillis());
+        useSystemFont = "system".equals(appFont);
+        prefs().edit()
+            .putString("appFont", appFont)
+            .putString("appFontName", appFontName)
+            .putString("appFontToken", appFontToken)
+            .putBoolean("useSystemFont", useSystemFont)
+            .apply();
+        // the bold face is cached once; drop it so new views pick up the chosen font (the rest follows on restart)
+        try {
+            org.telegram.messenger.AndroidUtilities.mediumTypeface = null;
+        } catch (Throwable ignore) {
+        }
+        version++;
     }
 
     public static final int UPDATE_SOURCE_GITHUB = 0;

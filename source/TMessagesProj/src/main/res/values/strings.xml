@@ -13849,5 +13849,16 @@
     <string name="SG_PluginsEmpty">No plugins yet. Install one from a file or look in the catalog below.</string>
     <string name="SG_FreeTranscribe">Free transcription of voice messages</string>
     <string name="SG_TranscribeFailed">Could not transcribe: speech recognition is not available on this phone or could not make out the words</string>
+    <string name="SG_Font">Font</string>
+    <string name="SG_FontChoose">Fonts</string>
+    <string name="SG_FontDefault">Default (Roboto)</string>
+    <string name="SG_FontFromFile">From a file…</string>
+    <string name="SG_FontFromLink">From a link…</string>
+    <string name="SG_FontLinkHint">https://…/font.ttf</string>
+    <string name="SG_FontLinkBad">Enter a valid http(s) link to a .ttf or .otf file</string>
+    <string name="SG_FontCustom">Custom font</string>
+    <string name="SG_FontApplied">Font applied. Some screens update after a restart.</string>
+    <string name="SG_FontFailed">Could not load the font</string>
+    <string name="SG_FontInfo">Pick a built-in font, or add your own from a file or a link (.ttf or .otf). The chosen font is used across the whole app.</string>
     <!-- SOLEGRAM END -->
 </resources>

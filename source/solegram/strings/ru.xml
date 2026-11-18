@@ -2180,4 +2180,15 @@
     <string name="SG_PluginsEmpty">Плагинов пока нет. Установите первый из файла или загляните в каталог ниже.</string>
     <string name="SG_FreeTranscribe">Бесплатная расшифровка голосовых</string>
     <string name="SG_TranscribeFailed">Не удалось расшифровать: распознавание речи на этом телефоне недоступно или не разобрало слова</string>
+    <string name="SG_Font">Шрифт</string>
+    <string name="SG_FontChoose">Шрифты</string>
+    <string name="SG_FontDefault">Стандартный (Roboto)</string>
+    <string name="SG_FontFromFile">Из файла…</string>
+    <string name="SG_FontFromLink">По ссылке…</string>
+    <string name="SG_FontLinkHint">https://…/font.ttf</string>
+    <string name="SG_FontLinkBad">Введите правильную http(s)-ссылку на файл .ttf или .otf</string>
+    <string name="SG_FontCustom">Свой шрифт</string>
+    <string name="SG_FontApplied">Шрифт применён. Часть экранов обновится после перезапуска.</string>
+    <string name="SG_FontFailed">Не удалось загрузить шрифт</string>
+    <string name="SG_FontInfo">Выберите встроенный шрифт или добавьте свой из файла или по ссылке (.ttf или .otf). Выбранный шрифт применяется ко всему приложению.</string>
 </resources>
