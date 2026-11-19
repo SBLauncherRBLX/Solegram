@@ -218,7 +218,15 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
             return;
         }
         final int current = Theme.getColor(slot.shownKey);
-        final ColorPickerBottomSheet sheet = new ColorPickerBottomSheet(getContext(), getResourceProvider());
+        // the same picker as the profile's own colours, for one colour
+        final SolegramGradientPickerSheet sheet = SolegramGradientPickerSheet.single(getContext(), getResourceProvider(),
+            current == 0 ? Theme.getColor(Theme.key_chat_outBubble) : current, getString(slot.title), color -> {
+                // the screen follows the picker; the theme is built at most every 60 ms while dragging
+                pendingSlot = slot;
+                pendingColor = color;
+                AndroidUtilities.cancelRunOnUIThread(applyPending);
+                AndroidUtilities.runOnUIThread(applyPending, 60);
+            });
         sheet.setOnDismissListener(d -> {
             AndroidUtilities.cancelRunOnUIThread(applyPending);
             if (pendingSlot != null) {
@@ -229,17 +237,7 @@ public class SolegramThemeEditorActivity extends UniversalFragment implements No
                 SolegramThemeQuickActivity.refreshScreens(this);
             }
         });
-        sheet
-            .setPipetteDelegate(NO_PIPETTE)
-            .setColor(current == 0 ? Theme.getColor(Theme.key_chat_outBubble) : current)
-            .setColorListener(color -> {
-                // the screen follows the picker; the theme is built at most every 60 ms while dragging
-                pendingSlot = slot;
-                pendingColor = color;
-                AndroidUtilities.cancelRunOnUIThread(applyPending);
-                AndroidUtilities.runOnUIThread(applyPending, 60);
-            })
-            .show();
+        sheet.show();
     }
 
     private void slotMenu(SolegramThemeColors.Slot slot, View anchor) {

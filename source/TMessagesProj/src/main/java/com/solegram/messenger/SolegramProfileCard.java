@@ -44,7 +44,7 @@ public final class SolegramProfileCard {
     public static final String CHANNEL_TOP = "top", CHANNEL_BOTTOM = "bottom", CHANNEL_HIDDEN = "hidden";
 
     private static final char START = '⁤'; // invisible plus
-    private static final int MAX_BYTES = 400;
+    private static final int MAX_BYTES = 520;
     private static final long REFRESH_MS = 20 * 60_000L;
 
     /** One user's card. */
@@ -83,6 +83,10 @@ public final class SolegramProfileCard {
         /** The accent of the owner's theme (two colours, ARGB): their profile shows in it for everyone with Solegram
          *  when no profile colour was chosen. 0: none. */
         public int themeColor1, themeColor2;
+        /** The owner's theme for their whole profile page: its built-in base and key colours (SolegramProfileTheme).
+         *  null: none. */
+        public String themeBase;
+        public int[] themePalette;
 
         /** The pinned streak, unless it is more than a day older than its last check. */
         public boolean hasStreak() {
@@ -125,6 +129,15 @@ public final class SolegramProfileCard {
             }
             if (themeColor1 != 0 && themeColor2 != 0) {
                 sb.append("|tx=").append(Integer.toHexString(themeColor1 & 0xFFFFFF)).append('.').append(Integer.toHexString(themeColor2 & 0xFFFFFF));
+            }
+            if (themeBase != null && themePalette != null && themePalette.length > 0) {
+                sb.append("|tb=").append(themeBase).append("|tp=");
+                for (int i = 0; i < themePalette.length; i++) {
+                    if (i > 0) {
+                        sb.append('.');
+                    }
+                    sb.append(Integer.toHexString(themePalette[i] & 0xFFFFFF));
+                }
             }
             if (nameColor >= 0) {
                 sb.append("|nc=").append(nameColor);
@@ -215,6 +228,19 @@ public final class SolegramProfileCard {
                                 c.nameCustom1 = 0xFF000000 | (int) Long.parseLong(f[0], 16);
                                 c.nameCustom2 = 0xFF000000 | (int) Long.parseLong(f[1], 16);
                             }
+                            break;
+                        }
+                        case "tb":
+                            c.themeBase = SolegramProfileTheme.validBase(v) ? v : null;
+                            break;
+                        case "tp": {
+                            final String[] f = v.split("\\.");
+                            final int n = Math.min(f.length, 32);
+                            final int[] palette = new int[n];
+                            for (int i = 0; i < n; i++) {
+                                palette[i] = 0xFF000000 | (int) Long.parseLong(f[i], 16);
+                            }
+                            c.themePalette = palette;
                             break;
                         }
                         case "tx": {
@@ -653,7 +679,17 @@ public final class SolegramProfileCard {
         final int[] theme = SolegramSelfColors.themeColors();
         card.themeColor1 = theme[0];
         card.themeColor2 = theme[1];
+        if (themeTooLong) {
+            card.themeBase = null;
+            card.themePalette = null;
+        } else {
+            card.themeBase = SolegramProfileTheme.baseNow();
+            card.themePalette = SolegramProfileTheme.paletteNow();
+        }
     }
+
+    /** The caption had no room for the page's theme in this run: it is left off (not tried again until restart). */
+    private static boolean themeTooLong;
 
     private static boolean styleMatches(Card card) {
         final Card want = new Card();
@@ -662,7 +698,14 @@ public final class SolegramProfileCard {
             && card.customColor1 == want.customColor1 && card.customColor2 == want.customColor2
             && card.nameColor == want.nameColor && card.nameEmoji == want.nameEmoji
             && card.nameCustom1 == want.nameCustom1 && card.nameCustom2 == want.nameCustom2
-            && card.themeColor1 == want.themeColor1 && card.themeColor2 == want.themeColor2;
+            && card.themeColor1 == want.themeColor1 && card.themeColor2 == want.themeColor2
+            && TextUtils.equals(card.themeBase, want.themeBase) && Arrays.equals(card.themePalette, want.themePalette);
+    }
+
+    /** Someone's card for drawing their profile page in their theme (UI thread), or null. */
+    @Nullable
+    static Card cardForTheme(long userId) {
+        return styleCard(userId);
     }
 
     /** The card for these lookups: only on the UI thread (the cache is not thread-safe; UserObject is asked from
@@ -808,7 +851,14 @@ public final class SolegramProfileCard {
         final String caption = strip(post.messageOwner.message);
         card.musicEmoji = SolegramConfig.profileMusicEmoji; // the music's pattern goes with the card
         applyLocalStyle(card); // and the profile's colour and pattern emoji chosen without Premium
-        final String mark = mark(card.encode());
+        String mark = mark(card.encode());
+        if (caption.length() + mark.length() > mc.maxCaptionLength && card.themePalette != null) {
+            // the theme of the profile page is the first to give way: the rest of the card still fits
+            themeTooLong = true;
+            card.themeBase = null;
+            card.themePalette = null;
+            mark = mark(card.encode());
+        }
         if (caption.length() + mark.length() > mc.maxCaptionLength) {
             done.run("CAPTION_TOO_LONG");
             return;

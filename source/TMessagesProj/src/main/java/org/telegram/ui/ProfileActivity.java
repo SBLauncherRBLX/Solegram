@@ -2594,6 +2594,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (lastFragment instanceof ChatActivity && ((ChatActivity) lastFragment).themeDelegate != null && ((ChatActivity) lastFragment).themeDelegate.getCurrentTheme() != null && !((ChatActivity) lastFragment).themeDelegate.isGiftTheme()) {
             resourcesProvider = lastFragment.getResourceProvider();
         }
+        if (resourcesProvider == null && userId != 0) {
+            // Solegram: someone's profile page in the colours of their own theme (from their profile card)
+            resourcesProvider = com.solegram.messenger.SolegramProfileTheme.providerFor(userId, userId == getUserConfig().getClientUserId());
+        }
         ActionBar actionBar = new ActionBar(context, resourcesProvider) {
             @Override
             public boolean onTouchEvent(MotionEvent event) {
@@ -2696,6 +2700,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         BaseFragment lastFragment = parentLayout.getLastFragment();
         if (lastFragment instanceof ChatActivity && ((ChatActivity) lastFragment).themeDelegate != null && ((ChatActivity) lastFragment).themeDelegate.getCurrentTheme() != null && !((ChatActivity) lastFragment).themeDelegate.isGiftTheme()) {
             resourcesProvider = lastFragment.getResourceProvider();
+        }
+        if (resourcesProvider == null && userId != 0) {
+            // Solegram: someone's profile page in the colours of their own theme (from their profile card)
+            resourcesProvider = com.solegram.messenger.SolegramProfileTheme.providerFor(userId, userId == getUserConfig().getClientUserId());
         }
         searchTransitionOffset = 0;
         searchTransitionProgress = 1f;

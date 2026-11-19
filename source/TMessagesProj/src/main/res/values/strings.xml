@@ -13889,5 +13889,6 @@
     <string name="SG_WhisperLater">Not now</string>
     <string name="SG_WhisperDownloading">Downloading the speech model…</string>
     <string name="SG_WhisperFailed">The speech model did not download, check the connection and try again</string>
+    <string name="SG_ThemePickColor">Your colour</string>
     <!-- SOLEGRAM END -->
 </resources>

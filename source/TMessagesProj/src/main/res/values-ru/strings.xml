@@ -2474,5 +2474,6 @@
     <string name="SG_WhisperLater">Не сейчас</string>
     <string name="SG_WhisperDownloading">Скачивается модель распознавания…</string>
     <string name="SG_WhisperFailed">Модель распознавания не скачалась, проверь интернет и попробуй снова</string>
+    <string name="SG_ThemePickColor">Свой цвет</string>
     <!-- SOLEGRAM END -->
 </resources>

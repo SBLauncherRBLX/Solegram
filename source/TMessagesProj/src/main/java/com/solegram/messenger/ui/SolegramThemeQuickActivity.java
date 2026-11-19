@@ -327,14 +327,11 @@ public class SolegramThemeQuickActivity extends UniversalFragment implements Not
             return;
         }
         final int start = valueOf(row) != 0 ? valueOf(row) : row == ROW_BACKGROUND ? (dark() ? 0xFF1C1C1E : 0xFFF7F7F8) : primary;
-        new ColorPickerBottomSheet(getContext(), getResourceProvider())
-            .setPipetteDelegate(NO_PIPETTE)
-            .setColor(start)
-            .setColorListener(color -> {
-                setValue(row, color | 0xFF000000);
-                onChanged();
-            })
-            .show();
+        // the same picker as the profile's own colours, for one colour
+        SolegramGradientPickerSheet.single(getContext(), getResourceProvider(), start, getString(R.string.SG_ThemePickColor), color -> {
+            setValue(row, color | 0xFF000000);
+            onChanged();
+        }).show();
     }
 
     private static boolean isPreset(int row, int color) {

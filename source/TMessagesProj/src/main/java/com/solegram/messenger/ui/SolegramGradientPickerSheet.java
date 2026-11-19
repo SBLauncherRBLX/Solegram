@@ -56,7 +56,12 @@ public class SolegramGradientPickerSheet extends BottomSheet {
     private int editing; // 0 top, 1 bottom
     private final Listener listener;
     private final GradientDrawable previewDrawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0, 0});
-    private final TextView[] chips = new TextView[2];
+    private final LinearLayout[] chips = new LinearLayout[2];
+    private final TextView[] chipLabels = new TextView[2];
+    private final View[] chipDots = new View[2];
+    private final LinearLayout chipRow;
+    private final TextView hexView;
+    private boolean single;
     private final SvSquare square;
     private final HueBar hueBar;
     private final float[] hsv = new float[3];
@@ -80,26 +85,45 @@ public class SolegramGradientPickerSheet extends BottomSheet {
         title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, rp));
         column.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 6, 8, 6, 12));
 
-        // the gradient as the profile will have it
-        final View preview = new View(context);
+        // the gradient as the profile will have it, with the colour's code on it
+        final FrameLayout preview = new FrameLayout(context);
         previewDrawable.setCornerRadius(dp(18));
         preview.setBackground(previewDrawable);
+        hexView = new TextView(context);
+        hexView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        hexView.setTypeface(AndroidUtilities.bold());
+        hexView.setPadding(dp(10), dp(4), dp(10), dp(4));
+        final GradientDrawable hexBg = new GradientDrawable();
+        hexBg.setCornerRadius(dp(12));
+        hexBg.setColor(0x33000000);
+        hexView.setBackground(hexBg);
+        hexView.setTextColor(Color.WHITE);
+        preview.addView(hexView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 10, 10));
         column.addView(preview, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 72));
 
-        // which end is being chosen
-        final LinearLayout chipRow = new LinearLayout(context);
+        // which end is being chosen: a centred dot and its name in each pill
+        chipRow = new LinearLayout(context);
         chipRow.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < 2; i++) {
             final int index = i;
-            final TextView chip = new TextView(context);
-            chip.setText(getString(i == 0 ? R.string.SG_ProfileColorTop : R.string.SG_ProfileColorBottom));
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            chip.setTypeface(AndroidUtilities.bold());
+            final LinearLayout chip = new LinearLayout(context);
+            chip.setOrientation(LinearLayout.HORIZONTAL);
             chip.setGravity(Gravity.CENTER);
-            chip.setCompoundDrawablePadding(dp(8));
+            chip.setPadding(dp(12), 0, dp(12), 0);
             chip.setOnClickListener(v -> select(index));
+            final View dot = new View(context);
+            chip.addView(dot, LayoutHelper.createLinear(18, 18, Gravity.CENTER_VERTICAL, 0, 0, 8, 0));
+            final TextView label = new TextView(context);
+            label.setText(getString(i == 0 ? R.string.SG_ProfileColorTop : R.string.SG_ProfileColorBottom));
+            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            label.setTypeface(AndroidUtilities.bold());
+            label.setSingleLine(true);
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            chip.addView(label, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
             chips[i] = chip;
-            chipRow.addView(chip, LayoutHelper.createLinear(0, 40, 1f, i == 0 ? 0 : 5, 0, i == 0 ? 5 : 0, 0));
+            chipDots[i] = dot;
+            chipLabels[i] = label;
+            chipRow.addView(chip, LayoutHelper.createLinear(0, 44, 1f, i == 0 ? 0 : 5, 0, i == 0 ? 5 : 0, 0));
         }
         column.addView(chipRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 12));
 
@@ -136,9 +160,20 @@ public class SolegramGradientPickerSheet extends BottomSheet {
     /** Other words for the sheet (the name's colours: the name and the reply line's second stripe). */
     public SolegramGradientPickerSheet labels(CharSequence title, CharSequence first, CharSequence second) {
         titleView.setText(title);
-        chips[0].setText(first);
-        chips[1].setText(second);
+        chipLabels[0].setText(first);
+        chipLabels[1].setText(second);
         return this;
+    }
+
+    /** One colour instead of two (a theme's colour): no ends to switch between, the preview is that colour. */
+    public static SolegramGradientPickerSheet single(Context context, Theme.ResourcesProvider rp, int color, CharSequence title,
+                                                     org.telegram.messenger.Utilities.Callback<Integer> onColor) {
+        final SolegramGradientPickerSheet sheet = new SolegramGradientPickerSheet(context, rp, color, color, (top, bottom) -> onColor.run(top));
+        sheet.single = true;
+        sheet.chipRow.setVisibility(View.GONE);
+        sheet.titleView.setText(title);
+        sheet.refresh(false);
+        return sheet;
     }
 
     private void select(int index) {
@@ -151,6 +186,9 @@ public class SolegramGradientPickerSheet extends BottomSheet {
 
     private void setEditing(int color) {
         colors[editing] = color | 0xFF000000;
+        if (single) {
+            colors[1] = colors[0];
+        }
         Color.colorToHSV(colors[editing], hsv);
         square.invalidate();
         hueBar.invalidate();
@@ -159,29 +197,31 @@ public class SolegramGradientPickerSheet extends BottomSheet {
 
     private void fromHsv() {
         colors[editing] = Color.HSVToColor(hsv) | 0xFF000000;
+        if (single) {
+            colors[1] = colors[0];
+        }
         refresh(true);
     }
 
     private void refresh(boolean notify) {
         previewDrawable.setColors(new int[]{colors[0], colors[1]});
+        hexView.setText(String.format(java.util.Locale.ROOT, "#%06X", colors[editing] & 0xFFFFFF));
         final int text = Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider);
         final int accent = Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
         for (int i = 0; i < 2; i++) {
             final boolean on = i == editing;
             final GradientDrawable bg = new GradientDrawable();
-            bg.setCornerRadius(dp(20));
-            bg.setColor(on ? Theme.multAlpha(accent, 0.15f) : Theme.multAlpha(text, 0.06f));
-            if (on) {
-                bg.setStroke(dp(1.5f), accent);
-            }
+            bg.setCornerRadius(dp(22));
+            bg.setColor(on ? Theme.multAlpha(accent, 0.14f) : Theme.multAlpha(text, 0.06f));
+            // the same stroke width on both, so the pills keep one size; only the selected one shows it
+            bg.setStroke(dp(1.5f), on ? accent : 0);
             chips[i].setBackground(bg);
-            chips[i].setTextColor(on ? accent : text);
+            chipLabels[i].setTextColor(on ? accent : text);
             final GradientDrawable dot = new GradientDrawable();
             dot.setShape(GradientDrawable.OVAL);
             dot.setColor(colors[i]);
-            dot.setStroke(dp(1), Theme.multAlpha(text, 0.2f));
-            dot.setSize(dp(14), dp(14));
-            chips[i].setCompoundDrawablesWithIntrinsicBounds(dot, null, null, null);
+            dot.setStroke(dp(2), on ? Theme.multAlpha(accent, 0.6f) : Theme.multAlpha(text, 0.18f));
+            chipDots[i].setBackground(dot);
         }
         if (notify && listener != null) {
             listener.onChange(colors[0], colors[1]);
