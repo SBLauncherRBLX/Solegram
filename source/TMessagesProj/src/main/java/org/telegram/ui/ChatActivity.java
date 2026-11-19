@@ -33628,6 +33628,7 @@ public class ChatActivity extends BaseFragment implements
                 popupY = liquidMenu.windowY;
             }
             solegramPlaceCompactMenu(scrimPopupContainerLayout, liquidMenu); // Solegram: a compact menu above the message sits by it
+            solegramFixMenuWidth(scrimPopupContainerLayout, scrimPopupWindow); // Solegram: the icons' pill is never cut off
             final int finalPopupX = scrimPopupX = popupX;
             final int finalPopupY = scrimPopupY = popupY;
             if (liquidMenu == null) {
@@ -34100,6 +34101,28 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    /** The width the message menu is measured with: the screen's (a window wraps its content up to it). */
+    private int solegramMenuWidthSpec() {
+        final int width = contentView != null && contentView.getMeasuredWidth() > 0 ? contentView.getMeasuredWidth() : AndroidUtilities.displaySize.x;
+        return View.MeasureSpec.makeMeasureSpec(Math.max(dp(240), width), View.MeasureSpec.AT_MOST);
+    }
+
+    /**
+     * Solegram: with the icons' pill the menu window gets an exact width, the width the menu and the pill take side by
+     * side on this screen. Left to wrap its content, Android first measures a window as narrow as a dialog and then
+     * keeps that width: the menu came out wider than it, and the pill at its right was cut off.
+     */
+    private void solegramFixMenuWidth(ChatScrimPopupContainerLayout container, ActionBarPopupWindow window) {
+        final LinearLayout pill = solegramQuickPill;
+        if (pill == null || pill.getParent() != container || window == null) {
+            return;
+        }
+        container.measure(solegramMenuWidthSpec(), View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST));
+        if (container.getMeasuredWidth() > 0) {
+            window.setWidth(container.getMeasuredWidth());
+        }
+    }
+
     /** Solegram: the icons' pill opens with the menu: it grows out of the menu's side, its icons come in one by one. */
     private void solegramAnimateQuickPill() {
         final LinearLayout pill = solegramQuickPill;
@@ -34188,6 +34211,15 @@ public class ChatActivity extends BaseFragment implements
         }
         popupLayout.measure(spec, spec);
         final int full = popupLayout.getMeasuredHeight();
+        // the widest row (the hidden ones counted in): More keeps the panel that wide, so opening it never widens the
+        // window (its width is fixed when it has the icons' pill)
+        int widest = 0;
+        for (int i = 0; i < rows.getChildCount(); i++) {
+            final View row = rows.getChildAt(i);
+            if (row.getVisibility() == View.VISIBLE && row instanceof ActionBarMenuSubItem) {
+                widest = Math.max(widest, row.getMeasuredWidth());
+            }
+        }
         if (pendingWasGone) {
             pending.setVisibility(View.GONE);
         }
@@ -34195,6 +34227,9 @@ public class ChatActivity extends BaseFragment implements
             hidden.get(i).setVisibility(View.GONE);
         }
         more.setVisibility(View.VISIBLE);
+        if (widest > 0) {
+            more.setMinimumWidth(widest);
+        }
         popupLayout.measure(spec, spec);
         final int compact = popupLayout.getMeasuredHeight();
         final int grow = full - compact;
@@ -34325,13 +34360,14 @@ public class ChatActivity extends BaseFragment implements
             reactionsLayout = null;
         }
         final int spec = View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST);
+        final int widthSpec = solegramMenuWidthSpec(); // as wide as the window will be (see solegramFixMenuWidth)
         // a "Translate" still unknown (shown in place when it comes): its room is kept
         final View pending = solegramPendingTranslateHidden ? null : solegramPendingTranslate;
         final boolean reserve = pending != null && pending.getVisibility() != View.VISIBLE;
         if (reserve) {
             pending.setVisibility(View.VISIBLE);
         }
-        container.measure(spec, spec);
+        container.measure(widthSpec, spec);
         container.layout(0, 0, container.getMeasuredWidth(), container.getMeasuredHeight());
         if (reserve) {
             pending.setVisibility(View.GONE);
