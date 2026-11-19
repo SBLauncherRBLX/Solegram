@@ -1349,6 +1349,9 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
 
     @Override
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        if ((solegramDockDragging || solegramDockAnimating) && (child == containerView || child == containerViewBack)) {
+            return solegramDrawDockChild(canvas, child, drawingTime); // Solegram: the chat as a card going into the side dock
+        }
         if (drawerLayoutContainer != null && drawerLayoutContainer.isDrawCurrentPreviewFragmentAbove()) {
             if (inPreviewMode || transitionAnimationPreviewMode || previewOpenAnimationInProgress) {
                 if (child == (oldFragment != null && oldFragment.inPreviewMode ? containerViewBack : containerView)) {
@@ -3814,11 +3817,16 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     /**
      * Two fingers drawn together to the right across a chat put it into the side dock. A pinch (the fingers come
      * closer or apart), a scroll (up or down), a single finger (swipe back) and a touch that started on the dock stay
-     * what they are. Once it is recognized the screen gets a cancel, and the rest of the touch is the dock's.
+     * what they are. Once it is recognized the screen gets a cancel and the chat follows the fingers: it shrinks as it
+     * goes (the screen under it shows), and let go far or fast enough it shrinks into its place in the dock and closes;
+     * else it comes back.
      */
     private boolean solegramDockTouch(MotionEvent ev) {
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                if (solegramDockAnimating) {
+                    return true; // the chat is still on its way: this touch waits
+                }
                 solegramTwoFingers = false;
                 solegramDockGesture = false;
                 return false;
@@ -3836,13 +3844,19 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         maybeStartTracking = false; // two fingers are not a swipe back
                     }
                 }
-                return solegramDockGesture;
-            case MotionEvent.ACTION_MOVE:
-                if (solegramDockGesture) {
+                return solegramDockGesture || solegramDockAnimating;
+            case MotionEvent.ACTION_MOVE: {
+                final int i0 = ev.findPointerIndex(solegramPointer0), i1 = ev.findPointerIndex(solegramPointer1);
+                if (solegramDockDragging) {
+                    if (i0 >= 0 && i1 >= 0) {
+                        solegramDockDragTo((ev.getX(i0) + ev.getX(i1)) / 2f, (ev.getY(i0) + ev.getY(i1)) / 2f, ev.getEventTime());
+                    }
+                    return true;
+                }
+                if (solegramDockGesture || solegramDockAnimating) {
                     return true;
                 }
                 if (solegramTwoFingers) {
-                    final int i0 = ev.findPointerIndex(solegramPointer0), i1 = ev.findPointerIndex(solegramPointer1);
                     if (i0 < 0 || i1 < 0) {
                         solegramTwoFingers = false;
                         return false;
@@ -3852,11 +3866,11 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                     final float spreadDown = (float) Math.hypot(solegramX1 - solegramX0, solegramY1 - solegramY0);
                     final float spreadNow = (float) Math.hypot(ev.getX(i1) - ev.getX(i0), ev.getY(i1) - ev.getY(i0));
                     final float spread = Math.abs(spreadNow - spreadDown);
-                    if (spread > dp(40) || dx0 < -dp(16) || dx1 < -dp(16) || Math.abs(dy0) > dp(48) && Math.abs(dy0) > dx0 || Math.abs(dy1) > dp(48) && Math.abs(dy1) > dx1) {
+                    if (spread > dp(40) || dx0 < -dp(16) || dx1 < -dp(16) || Math.abs(dy0) > dp(40) && Math.abs(dy0) > dx0 || Math.abs(dy1) > dp(40) && Math.abs(dy1) > dx1) {
                         solegramTwoFingers = false; // a pinch, a scroll, the other way: not this
                         return false;
                     }
-                    if (dx0 > dp(64) && dx1 > dp(64) && Math.abs(dy0) < dx0 * 0.6f && Math.abs(dy1) < dx1 * 0.6f) {
+                    if (dx0 > dp(24) && dx1 > dp(24) && Math.abs(dy0) < dx0 * 0.7f && Math.abs(dy1) < dx1 * 0.7f) {
                         solegramTwoFingers = false;
                         if (!solegramCanDockTop()) {
                             return false;
@@ -3867,28 +3881,183 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                         super.dispatchTouchEvent(cancel);
                         cancel.recycle();
                         onTouchEvent(null);
-                        final BaseFragment last = getLastFragment();
-                        if (last instanceof org.telegram.ui.ChatActivity) {
-                            ((org.telegram.ui.ChatActivity) last).solegramDockByGesture((ev.getX(i0) + ev.getX(i1)) / 2f, (ev.getY(i0) + ev.getY(i1)) / 2f);
+                        final org.telegram.ui.ChatActivity chat = (org.telegram.ui.ChatActivity) getLastFragment();
+                        final int state = com.solegram.messenger.ui.SolegramChatDock.state(chat.getDialogId());
+                        final float x = (ev.getX(i0) + ev.getX(i1)) / 2f, y = (ev.getY(i0) + ev.getY(i1)) / 2f;
+                        if (state == com.solegram.messenger.ui.SolegramChatDock.FULL) {
+                            com.solegram.messenger.ui.SolegramChatDock.showFull(chat); // the chat stays
+                        } else if (state != com.solegram.messenger.ui.SolegramChatDock.UNAVAILABLE && fragmentsStack.size() >= 2
+                                && !animationInProgress && !transitionAnimationInProgress) {
+                            solegramDockDragStart((solegramX0 + solegramX1) / 2f, (solegramY0 + solegramY1) / 2f, ev.getEventTime());
+                            solegramDockDragTo(x, y, ev.getEventTime());
+                        } else {
+                            chat.solegramDockByGesture(x, y); // nothing under the chat: it only goes into the dock
                         }
                         return true;
                     }
                 }
                 return false;
-            case MotionEvent.ACTION_POINTER_UP:
+            }
+            case MotionEvent.ACTION_POINTER_UP: {
+                final int id = ev.getPointerId(ev.getActionIndex());
+                if (solegramDockDragging && (id == solegramPointer0 || id == solegramPointer1)) {
+                    solegramDockDragEnd(false); // a finger let go: the chat goes (or comes back) now
+                }
                 if (!solegramDockGesture) {
                     solegramTwoFingers = false;
                 }
-                return solegramDockGesture;
+                return solegramDockGesture || solegramDockAnimating;
+            }
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
-                final boolean consumed = solegramDockGesture;
+                if (solegramDockDragging) {
+                    solegramDockDragEnd(ev.getActionMasked() == MotionEvent.ACTION_CANCEL);
+                }
+                final boolean consumed = solegramDockGesture || solegramDockAnimating;
                 solegramTwoFingers = false;
                 solegramDockGesture = false;
                 return consumed;
             }
         }
-        return solegramDockGesture;
+        return solegramDockGesture || solegramDockAnimating;
+    }
+
+    // the chat following the fingers
+    private boolean solegramDockDragging, solegramDockAnimating;
+    private float solegramDragStartX, solegramDragStartY, solegramDragX, solegramDragVelocity;
+    private long solegramDragTime;
+    private float solegramDockProgress;
+    private final float[] solegramSlot = new float[3];
+
+    private void solegramDockDragStart(float x, float y, long time) {
+        solegramDockDragging = true;
+        solegramDragStartX = solegramDragX = x;
+        solegramDragStartY = y;
+        solegramDragTime = time;
+        solegramDragVelocity = 0;
+        prepareForMoving(); // the screen under the chat, as for a swipe back
+        if (parentActivity.getCurrentFocus() != null) {
+            AndroidUtilities.hideKeyboard(parentActivity.getCurrentFocus());
+        }
+        fragmentsStack.get(fragmentsStack.size() - 1).onBeginSlide();
+        beginTrackingSent = true;
+        final View card = containerView;
+        card.setPivotX(x);
+        card.setPivotY(y);
+        card.setOutlineProvider(solegramCardOutline);
+        card.setClipToOutline(true);
+        solegramDockProgress = 0;
+        invalidate();
+    }
+
+    /** The chat as a card: its corners round off as it shrinks. */
+    private final android.view.ViewOutlineProvider solegramCardOutline = new android.view.ViewOutlineProvider() {
+        @Override
+        public void getOutline(View view, android.graphics.Outline outline) {
+            final float scale = Math.max(0.05f, view.getScaleX());
+            outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(40) * solegramDockProgress / scale);
+        }
+    };
+
+    private void solegramDockDragTo(float x, float y, long time) {
+        final long dt = Math.max(1, time - solegramDragTime);
+        solegramDragVelocity = solegramDragVelocity * 0.4f + (x - solegramDragX) / dt * 1000f * 0.6f;
+        solegramDragX = x;
+        solegramDragTime = time;
+        final float dx = Math.max(0, x - solegramDragStartX);
+        final float dy = y - solegramDragStartY;
+        final float progress = Utilities.clamp(dx / (getWidth() * 0.55f), 1f, 0f);
+        solegramDockProgress = progress;
+        final View card = containerView;
+        final float scale = 1f - 0.5f * progress;
+        card.setScaleX(scale);
+        card.setScaleY(scale);
+        card.setTranslationX(dx);
+        card.setTranslationY(dy * 0.6f);
+        card.invalidateOutline();
+        invalidate();
+    }
+
+    private void solegramDockDragEnd(boolean cancelled) {
+        if (!solegramDockDragging) {
+            return;
+        }
+        solegramDockDragging = false;
+        final View card = containerView;
+        final BaseFragment fragment = fragmentsStack.isEmpty() ? null : fragmentsStack.get(fragmentsStack.size() - 1);
+        final boolean dock = !cancelled && fragment instanceof org.telegram.ui.ChatActivity
+            && (solegramDockProgress > 0.3f || solegramDragVelocity > dp(600) && solegramDockProgress > 0.08f)
+            && ((org.telegram.ui.ChatActivity) fragment).solegramCanDock()
+            && com.solegram.messenger.ui.SolegramChatDock.slot(((org.telegram.ui.ChatActivity) fragment).getDialogId(), solegramSlot)
+            && com.solegram.messenger.ui.SolegramChatDock.dock((org.telegram.ui.ChatActivity) fragment, solegramSlot[0], solegramSlot[1], false, 230);
+        solegramDockAnimating = true;
+        animationInProgress = true;
+        final float fromScale = card.getScaleX(), fromX = card.getTranslationX(), fromY = card.getTranslationY(), fromProgress = solegramDockProgress;
+        final float toScale, toX, toY, toProgress;
+        if (dock) {
+            // into the slot: the card's middle onto the slot's, a little wider than the slot
+            toScale = solegramSlot[2] * 1.15f / Math.max(1, card.getWidth());
+            final float px = card.getPivotX(), py = card.getPivotY();
+            toX = solegramSlot[0] - (px + (card.getWidth() / 2f - px) * toScale);
+            toY = solegramSlot[1] - (py + (card.getHeight() / 2f - py) * toScale);
+            toProgress = 1f;
+        } else {
+            toScale = 1f;
+            toX = 0;
+            toY = 0;
+            toProgress = 0f;
+        }
+        final ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(dock ? 380 : 320);
+        animator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        animator.addUpdateListener(a -> {
+            final float t = (float) a.getAnimatedValue();
+            final float scale = AndroidUtilities.lerp(fromScale, toScale, t);
+            card.setScaleX(scale);
+            card.setScaleY(scale);
+            card.setTranslationX(AndroidUtilities.lerp(fromX, toX, t));
+            card.setTranslationY(AndroidUtilities.lerp(fromY, toY, t));
+            solegramDockProgress = AndroidUtilities.lerp(fromProgress, toProgress, t);
+            if (dock) {
+                // it melts into the place as it reaches it
+                card.setAlpha(1f - Utilities.clamp((t - 0.55f) / 0.45f, 1f, 0f));
+            }
+            card.invalidateOutline();
+            invalidate();
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                solegramResetCard(card);
+                solegramDockAnimating = false;
+                solegramDockProgress = 0;
+                onSlideAnimationEnd(!dock); // the chat closes (or the screen under it goes away again)
+                invalidate();
+            }
+        });
+        animator.start();
+    }
+
+    private void solegramResetCard(View card) {
+        card.setScaleX(1f);
+        card.setScaleY(1f);
+        card.setTranslationX(0);
+        card.setTranslationY(0);
+        card.setAlpha(1f);
+        card.setClipToOutline(false);
+        card.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+    }
+
+    /** While the chat is a card: the screen under it whole (no swipe-back clips), a dim that lifts as the card shrinks. */
+    private boolean solegramDrawDockChild(Canvas canvas, View child, long drawingTime) {
+        final boolean result = super.drawChild(canvas, child, drawingTime);
+        if (child == containerViewBack) {
+            final int alpha = (int) (0x40 * (1f - solegramDockProgress));
+            if (alpha > 0) {
+                canvas.drawColor(alpha << 24);
+            }
+        }
+        return result;
     }
 
     private boolean solegramCanDockTop() {

@@ -30,6 +30,7 @@ import android.widget.LinearLayout;
 import androidx.annotation.Nullable;
 
 import com.solegram.messenger.SolegramGlass;
+import com.solegram.messenger.SolegramUi;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DialogObject;
@@ -79,7 +80,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
     private static final String KEY = "sg_chat_dock";
     private static final String KEY_HINT = "sg_chat_dock_hint";
 
-    private static final int AVATAR = 38, PAD = 4, GAP = 6, EDGE = 8, GLASS_PAD = 6;
+    private static final int AVATAR = 48, PAD = 5, GAP = 8, EDGE = 8, GLASS_PAD = 6;
 
     @Nullable
     private static SolegramChatDock instance;
@@ -96,6 +97,11 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
 
     @Nullable
     private GlassSourceRenderNode source;
+    @Nullable
+    private BlurredBackgroundDrawable glassShape;
+    @Nullable
+    private GradientDrawable plainShape;
+    private float shapeRadius = -1;
     private final ArrayList<View> flying = new ArrayList<>();
 
     private SolegramChatDock(Context context, ActionBarLayout root) {
@@ -110,7 +116,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
         pill.setClipToPadding(false);
         pill.setPadding(dp(GLASS_PAD + PAD), dp(GLASS_PAD + PAD), dp(GLASS_PAD + PAD), dp(GLASS_PAD + PAD));
         pill.setBackground(createBackground());
-        pill.setPivotX(dp(GLASS_PAD + PAD + AVATAR));
+        pill.setPivotX(dp(GLASS_PAD + PAD + AVATAR) + dp(PAD));
         pill.setPivotY(dp(GLASS_PAD));
         pill.setAlpha(0f);
         pill.setVisibility(INVISIBLE);
@@ -156,9 +162,10 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
                 factory.setSourceRootView(new ViewPositionWatcher(root), root);
                 factory.setLiquidGlassEffectAllowed(true);
                 final BlurredBackgroundDrawable drawable = factory.create(pill, BlurredBackgroundProviderImpl.mainTabs(null));
-                drawable.setRadius(dp(AVATAR / 2 + PAD));
                 drawable.setPadding(dp(GLASS_PAD));
                 source = glassSource;
+                glassShape = drawable;
+                applyShape();
                 return drawable;
             } catch (Throwable e) {
                 FileLog.e(e);
@@ -166,10 +173,35 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
             }
         }
         final GradientDrawable plain = new GradientDrawable();
-        plain.setCornerRadius(dp(AVATAR / 2 + PAD));
+        plainShape = plain;
+        applyShape();
         plain.setColor(Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground), 0.94f));
         plain.setStroke(Math.max(1, dp(0.66f)), Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), 0.08f));
         return new android.graphics.drawable.InsetDrawable(plain, dp(GLASS_PAD));
+    }
+
+    /** The avatars' corner radius at a size (the "avatar corners" setting: a circle at 100%, a square at 0%). */
+    static float avatarRadius(float size) {
+        return size / 2f * SolegramUi.avatarPercent(SolegramUi.SHAPE_DEFAULT) / 100f;
+    }
+
+    /** The pill's corners follow the avatars' shape (the avatars' radius and the padding around them). */
+    private void applyShape() {
+        final float radius = avatarRadius(dp(AVATAR)) + dp(PAD);
+        if (radius == shapeRadius) {
+            return;
+        }
+        shapeRadius = radius;
+        if (glassShape != null) {
+            glassShape.setRadius(radius);
+        }
+        if (plainShape != null) {
+            plainShape.setCornerRadius(radius);
+        }
+        for (int i = 0; i < pill.getChildCount(); i++) {
+            pill.getChildAt(i).invalidate();
+        }
+        pill.invalidate();
     }
 
     /** What is under the dock: the layout's screens (the children before it), where they are now. */
@@ -181,7 +213,11 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
                 continue;
             }
             final int count = canvas.save();
-            canvas.translate(child.getX(), child.getY());
+            canvas.translate(child.getLeft(), child.getTop());
+            final android.graphics.Matrix matrix = child.getMatrix(); // its move and scale (a chat going into the dock)
+            if (!matrix.isIdentity()) {
+                canvas.concat(matrix);
+            }
             child.draw(canvas);
             canvas.restoreToCount(count);
         }
@@ -302,6 +338,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
             bindAccount(UserConfig.selectedAccount);
         }
         updatePosition();
+        applyShape();
         // the chat open now is ringed
         final BaseFragment last = LaunchActivity.getLastFragment();
         final long open = last instanceof ChatActivity && ((ChatActivity) last).solegramCanDock() ? ((ChatActivity) last).getDialogId() : 0;
@@ -390,31 +427,102 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
 
     // region Docking
 
+    public static final int ACCEPT = 0, ALREADY = 1, FULL = 2, UNAVAILABLE = 3;
+
+    /** Whether a chat can go into the dock now. */
+    public static int state(long did) {
+        final SolegramChatDock dock = instance;
+        if (dock == null || dock.getParent() == null) {
+            return UNAVAILABLE;
+        }
+        dock.bindAccount(UserConfig.selectedAccount);
+        if (dock.dialogs.contains(did)) {
+            return ALREADY;
+        }
+        return dock.dialogs.size() >= MAX ? FULL : ACCEPT;
+    }
+
+    /** The dock is full: says so (the chat stays). */
+    public static void showFull(@Nullable BaseFragment fragment) {
+        if (fragment == null) {
+            return;
+        }
+        try {
+            if (fragment.getFragmentView() != null) {
+                fragment.getFragmentView().performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            }
+        } catch (Throwable ignore) {
+        }
+        BulletinFactory.of(fragment).createSimpleBulletin(R.raw.error, LocaleController.getString(R.string.SG_DockFull)).show();
+    }
+
+    /**
+     * Where the chat's place in the dock is (its own, or the next free one), in the coordinates of the layout:
+     * {@code out} = {centre x, centre y, size}. False when there is no dock or no room.
+     */
+    public static boolean slot(long did, float[] out) {
+        final SolegramChatDock dock = instance;
+        if (dock == null || dock.getParent() == null || dock.root.getWidth() <= 0) {
+            return false;
+        }
+        int index = dock.dialogs.indexOf(did);
+        if (index < 0) {
+            if (dock.dialogs.size() >= MAX) {
+                return false;
+            }
+            index = dock.dialogs.size();
+        }
+        dock.updatePosition();
+        final LayoutParams lp = (LayoutParams) dock.pill.getLayoutParams();
+        final float size = dp(AVATAR);
+        final float right = dock.root.getWidth() - lp.rightMargin - dp(GLASS_PAD + PAD);
+        out[0] = right - size / 2f;
+        out[1] = lp.topMargin + dp(GLASS_PAD + PAD) + index * (size + dp(GAP)) + size / 2f;
+        out[2] = size;
+        return true;
+    }
+
     /** Puts the chat into the dock (it flies there from the fingers). False: the dock is full, nothing changed. */
     public static boolean dock(ChatActivity chat, float x, float y) {
+        return dock(chat, x, y, true, 0);
+    }
+
+    /**
+     * Puts the chat into the dock. {@code fly}: a small picture flies there from (x, y); else the place fills in
+     * after {@code revealDelay} ms (the chat itself shrinks into it). False: the dock is full, nothing changed.
+     */
+    public static boolean dock(ChatActivity chat, float x, float y, boolean fly, long revealDelay) {
         final SolegramChatDock dock = instance;
         if (dock == null || chat == null || dock.getParent() == null) {
             return false;
         }
-        dock.bindAccount(UserConfig.selectedAccount);
         final long did = chat.getDialogId();
-        if (dock.dialogs.contains(did)) {
-            dock.pop(did);
+        final int state = state(did);
+        if (state == ALREADY) {
+            dock.postDelayed(() -> dock.pop(did), fly ? 0 : revealDelay);
             return true;
         }
-        if (dock.dialogs.size() >= MAX) {
-            try {
-                chat.getFragmentView().performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-            } catch (Throwable ignore) {
+        if (state != ACCEPT) {
+            if (state == FULL) {
+                showFull(chat);
             }
-            BulletinFactory.of(chat).createSimpleBulletin(R.raw.error, LocaleController.getString(R.string.SG_DockFull)).show();
             return false;
         }
         dock.dialogs.add(did);
         dock.save();
         final Item item = dock.addItem(did, dock.dialogs.size() - 1);
-        item.setVisibility(INVISIBLE);
-        dock.fly(item, x, y);
+        if (fly) {
+            item.setVisibility(INVISIBLE);
+            dock.fly(item, x, y);
+        } else {
+            // the chat shrinks into this place: it fills in as the chat arrives
+            item.setAlpha(0f);
+            item.setScaleX(0.5f);
+            item.setScaleY(0.5f);
+            item.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(revealDelay).setDuration(260)
+                .setInterpolator(CubicBezierInterpolator.EASE_OUT_BACK).start();
+            dock.setShownNow();
+        }
         try {
             dock.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
         } catch (Throwable ignore) {
@@ -427,7 +535,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
                 if (last != null) {
                     BulletinFactory.of(last).createSimpleBulletin(R.raw.info, LocaleController.getString(R.string.SG_DockHint)).show();
                 }
-            }, 450);
+            }, 600);
         }
         return true;
     }
@@ -435,7 +543,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
     /** The chat flies from the fingers to its place in the dock, then the place shows it. */
     private void fly(Item item, float x, float y) {
         final BackupImageView flyer = new BackupImageView(getContext());
-        flyer.setRoundRadius(dp(28));
+        flyer.setRoundRadius(dp(28)); // scaled by the avatar corners setting as every avatar is
         item.bindImage(flyer);
         final int size = dp(56);
         addView(flyer, new LayoutParams(size, size));
@@ -566,7 +674,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
             this.did = did;
             setWillNotDraw(false);
             image = new BackupImageView(context);
-            image.setRoundRadius(dp(AVATAR / 2f));
+            image.setRoundRadius(dp(AVATAR) / 2); // the "avatar corners" setting makes it the avatars' shape
             addView(image, LayoutHelper.createFrame(AVATAR, AVATAR));
             ringPaint.setStyle(Paint.Style.STROKE);
             ringPaint.setStrokeWidth(dp(2));
@@ -627,14 +735,20 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
         @Override
         protected void dispatchDraw(Canvas canvas) {
             super.dispatchDraw(canvas);
-            final float cx = getWidth() / 2f, cy = getHeight() / 2f;
+            // the ring and the dot follow the avatar's shape (its corner radius)
+            final float radius = Math.min(avatarRadius(getWidth()), getWidth() / 2f);
             if (current == did) {
                 ringPaint.setColor(Theme.getColor(Theme.key_featuredStickers_addButton));
-                canvas.drawCircle(cx, cy, getWidth() / 2f - dp(1), ringPaint);
+                final float inset = dp(1);
+                AndroidUtilities.rectTmp.set(inset, inset, getWidth() - inset, getHeight() - inset);
+                final float r = Math.max(0, radius - inset);
+                canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, ringPaint);
             }
             if (unread()) {
-                final float r = dp(5);
-                final float x = getWidth() - r, y = r;
+                final float r = dp(5.5f);
+                // on the avatar's top right corner, where its edge turns
+                final float corner = radius * (1f - 0.7071f);
+                final float x = getWidth() - corner, y = corner;
                 dotPaint.setColor(Color.WHITE);
                 canvas.drawCircle(x, y, r + dp(1.5f), dotPaint);
                 dotPaint.setColor(Theme.getColor(Theme.key_chats_unreadCounter));

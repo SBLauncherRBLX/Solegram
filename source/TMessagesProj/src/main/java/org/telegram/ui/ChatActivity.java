@@ -33639,6 +33639,7 @@ public class ChatActivity extends BaseFragment implements
                     return;
                 }
                 scrimPopupWindow.showAtLocation(chatListView, Gravity.LEFT | Gravity.TOP, finalPopupX, finalPopupY);
+                solegramAnimateQuickPill(); // Solegram: the icons' pill comes in with the menu
                 if (liquidMenu != null && solegramMenuLiquid == liquidMenu) {
                     liquidMenu.open();
                 } else if (isReactionsAvailableFinal && finalReactionsLayout != null) {
@@ -34024,7 +34025,9 @@ public class ChatActivity extends BaseFragment implements
                 }
                 final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
                 final ImageView button = new ImageView(context);
-                button.setScaleType(ImageView.ScaleType.CENTER);
+                // every icon in the same 22dp box, whatever its own size
+                button.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                button.setPadding(dp(11), dp(11), dp(11), dp(11));
                 button.setImageResource(icons.get(a));
                 button.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
                 button.setBackground(Theme.createRadSelectorDrawable(selector, 22, 22));
@@ -34047,6 +34050,31 @@ public class ChatActivity extends BaseFragment implements
             }
         }
         return pill;
+    }
+
+    /** Solegram: the icons' pill opens with the menu: it grows out of the menu's side, its icons come in one by one. */
+    private void solegramAnimateQuickPill() {
+        final LinearLayout pill = solegramQuickPill;
+        if (pill == null || pill.getParent() == null) {
+            return;
+        }
+        if (!LiteMode.isEnabled(LiteMode.FLAGS_CHAT)) {
+            return;
+        }
+        pill.setPivotX(0);
+        pill.setPivotY(dp(16));
+        pill.setAlpha(0f);
+        pill.setScaleX(0.7f);
+        pill.setScaleY(0.7f);
+        pill.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(40).setDuration(340)
+            .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        for (int i = 0; i < pill.getChildCount(); i++) {
+            final View icon = pill.getChildAt(i);
+            icon.setAlpha(0f);
+            icon.setTranslationY(-dp(6));
+            icon.animate().alpha(1f).translationY(0).setStartDelay(80 + i * 30L).setDuration(220)
+                .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        }
     }
 
     /** Solegram: the language detection allowed "Translate" after the menu was made. */
