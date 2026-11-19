@@ -13867,6 +13867,14 @@
     <string name="SG_ProfileColorTop">Top colour</string>
     <string name="SG_ProfileColorBottom">Bottom colour</string>
     <string name="SG_ProfileCardEdit">Banner, blocks and posts</string>
-    <string name="SG_ProfileStyleInfo">Any colours you like, free. Your profile colour, own colours and icons are put on your Solegram profile card (it needs a personal channel), so everyone with Solegram sees them. Tap the profile above to change the banner.</string>
+    <string name="SG_ProfileStyleInfo">Hold a block to move it, the eye hides it. Your colours, icons and banner go onto your Solegram profile, so everyone with Solegram sees them. Tap the profile at the top to change the banner or the icons.</string>
+    <string name="SG_ProfileCardHeader">Solegram profile</string>
+    <string name="SG_ProfileCardNeedsBanner">Choose a banner to save the profile: the layout is kept on the banner post.</string>
+    <string name="SG_ProfileBannerSet">Set a banner</string>
+    <string name="SG_ProfileBannerChange">Change the banner</string>
+    <string name="SG_ProfileBannerRemove">Remove the banner</string>
+    <string name="SG_ProfileBackgroundEmoji">Icons on the background</string>
+    <string name="SG_ProfilePinGift">Pin a gift</string>
+    <string name="SG_CardTapToChangeShort">Chosen</string>
     <!-- SOLEGRAM END -->
 </resources>

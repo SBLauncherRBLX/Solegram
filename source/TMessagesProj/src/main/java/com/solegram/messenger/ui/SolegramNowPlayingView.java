@@ -93,6 +93,10 @@ public class SolegramNowPlayingView extends View {
     private final Paint markPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // the played part's wave (as the full player's)
+    private final android.graphics.Path sgWavePath = new android.graphics.Path();
+    private float sgWaveAmount, sgWavePhase;
+    private long sgWaveLast;
     private final TextPaint statusPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint titlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint artistPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -687,15 +691,66 @@ public class SolegramNowPlayingView extends View {
             final float lineY = card.bottom - dp(11);
             final float l = card.left + dp(16), r = card.right - dp(16);
             progressPaint.setStrokeWidth(dp(3));
+            final float end = rtl ? r - (r - l) * shown : l + (r - l) * shown;
+            // as the full player: the played part is a wave that runs while the music plays and lies flat on pause,
+            // a small gap, then the rest of the track
+            final long nowMs = android.os.SystemClock.elapsedRealtime();
+            final float dtMs = sgWaveLast == 0 ? 16 : Math.min(64, nowMs - sgWaveLast);
+            sgWaveLast = nowMs;
+            final float targetWave = track.playing ? 1f : 0f;
+            boolean waveMoving = false;
+            if (sgWaveAmount != targetWave) {
+                sgWaveAmount = targetWave > sgWaveAmount ? Math.min(1f, sgWaveAmount + dtMs / 400f) : Math.max(0f, sgWaveAmount - dtMs / 500f);
+                waveMoving = true;
+            }
+            final float waveEased = sgWaveAmount * sgWaveAmount * (3 - 2 * sgWaveAmount);
+            final float wavelength = dp(26);
+            sgWavePhase += dp(34) * dtMs / 1000f * waveEased;
+            if (sgWavePhase > wavelength * 1000) {
+                sgWavePhase -= wavelength * 1000;
+            }
+            final float gap = dp(5);
             progressPaint.setColor(0x40FFFFFF);
             progressPaint.setAlpha((int) (0x40 * contentAlpha * appear));
-            canvas.drawLine(l, lineY, r, lineY, progressPaint);
+            if (rtl) {
+                if (end - gap > l) {
+                    canvas.drawLine(l, lineY, end - gap, lineY, progressPaint);
+                }
+            } else if (end + gap < r) {
+                canvas.drawLine(end + gap, lineY, r, lineY, progressPaint);
+            }
             progressPaint.setColor(0xFFFFFFFF);
             progressPaint.setAlpha(alpha);
-            final float end = rtl ? r - (r - l) * shown : l + (r - l) * shown;
-            canvas.drawLine(rtl ? r : l, lineY, end, lineY, progressPaint);
-            if (track.playing) {
+            final float from = rtl ? r : l, to = rtl ? end + gap : end - gap;
+            if (rtl ? to < from : to > from) {
+                final float amp = dp(2.2f) * waveEased;
+                sgWavePath.rewind();
+                final float step = dp(1.5f) * (rtl ? -1 : 1);
+                final float len = Math.abs(to - from);
+                for (float d = 0; ; d += Math.abs(step)) {
+                    final float dd = Math.min(d, len);
+                    final float px = from + (rtl ? -dd : dd);
+                    final float fade = Math.min(1, (len - dd) / dp(12)) * Math.min(1, dd / dp(8));
+                    final float py = lineY + (float) Math.sin((dd - sgWavePhase) / wavelength * Math.PI * 2) * amp * fade;
+                    if (dd == 0) {
+                        sgWavePath.moveTo(px, py);
+                    } else {
+                        sgWavePath.lineTo(px, py);
+                    }
+                    if (dd >= len) {
+                        break;
+                    }
+                }
+                final Paint.Style wasStyle = progressPaint.getStyle();
+                progressPaint.setStyle(Paint.Style.STROKE);
+                progressPaint.setStrokeJoin(Paint.Join.ROUND);
+                canvas.drawPath(sgWavePath, progressPaint);
+                progressPaint.setStyle(wasStyle);
+            }
+            if (track.playing || waveMoving || sgWaveAmount > 0) {
                 postInvalidateOnAnimation();
+            } else {
+                sgWaveLast = 0;
             }
         }
         selector.draw(canvas);

@@ -2198,5 +2198,13 @@
     <string name="SG_ProfileColorTop">Цвет сверху</string>
     <string name="SG_ProfileColorBottom">Цвет снизу</string>
     <string name="SG_ProfileCardEdit">Баннер, блоки и посты</string>
-    <string name="SG_ProfileStyleInfo">Любые цвета, бесплатно. Цвет профиля, свои цвета и значки попадают в вашу карточку профиля Solegram (нужен личный канал), поэтому их видят все с Solegram. Нажмите на профиль сверху, чтобы сменить баннер.</string>
+    <string name="SG_ProfileStyleInfo">Удерживайте блок, чтобы переместить его, глаз скрывает его. Цвета, значки и баннер попадают в ваш профиль Solegram, поэтому их видят все с Solegram. Нажмите на профиль сверху, чтобы сменить баннер или значки.</string>
+    <string name="SG_ProfileCardHeader">Профиль Solegram</string>
+    <string name="SG_ProfileCardNeedsBanner">Выберите баннер, чтобы сохранить профиль: расположение хранится на посте с баннером.</string>
+    <string name="SG_ProfileBannerSet">Поставить баннер</string>
+    <string name="SG_ProfileBannerChange">Сменить баннер</string>
+    <string name="SG_ProfileBannerRemove">Убрать баннер</string>
+    <string name="SG_ProfileBackgroundEmoji">Значки на фоне</string>
+    <string name="SG_ProfilePinGift">Закрепить подарок</string>
+    <string name="SG_CardTapToChangeShort">Выбран</string>
 </resources>

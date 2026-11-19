@@ -1678,8 +1678,104 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (solegramDispatchToTabs(ev)) {
                 return true;
             }
+            if (solegramDispatchToChats(ev)) {
+                return true;
+            }
             return clickHelper.onTouchEvent(this, ev) || super.dispatchTouchEvent(ev);
         }
+
+        // region Solegram: a tap on a chat always reaches the chat
+        private boolean solegramChatsTouch;
+        private final android.graphics.RectF solegramTmpRect = new android.graphics.RectF();
+
+        /** Where a header view is really drawn (in this view's coordinates), when it is shown at all. */
+        private boolean solegramHeaderAt(View v, float x, float y, float visibleHeight) {
+            if (v == null || v.getVisibility() != View.VISIBLE || v.getAlpha() <= 0.02f) {
+                return false;
+            }
+            final float top = v.getY();
+            final float h = visibleHeight > 0 ? Math.min(visibleHeight, v.getHeight()) : v.getHeight();
+            return x >= v.getX() && x <= v.getX() + v.getWidth() && y >= top && y <= top + h;
+        }
+
+        /**
+         * A touch on a chat goes to the chats list, unless a header part that is really drawn there is under it: views
+         * laid over the list (some larger than what they draw, some faded out) took the taps on the top of the first chat.
+         */
+        private boolean solegramDispatchToChats(MotionEvent ev) {
+            final int action = ev.getActionMasked();
+            final ViewPage page = viewPages != null && viewPages.length > 0 ? viewPages[0] : null;
+            final DialogsRecyclerView list = page != null ? page.listView : null;
+            if (action == MotionEvent.ACTION_DOWN) {
+                solegramChatsTouch = false;
+                if (list == null || searching || searchIsShowed || page.getVisibility() != View.VISIBLE
+                        || rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment()
+                        || actionBar != null && actionBar.isActionModeShowed() || filterTabsView != null && filterTabsView.isEditing()) {
+                    return false;
+                }
+                final float x = ev.getX(), y = ev.getY();
+                // the header's real parts
+                if (solegramHeaderAt(actionBar, x, y, 0)
+                        || solegramHeaderAt(dialogStoriesCell, x, y, 0)
+                        || solegramHeaderAt(filterTabsView, x, y, dp(36 + 7))
+                        || topPanelLayout != null && topPanelLayout.getMetadata().getTotalVisibility() > 0.02f
+                            && solegramHeaderAt(topPanelLayout, x, y, topPanelLayout.getAnimatedHeightWithPadding(0))
+                        || solegramHeaderAt(fragmentContextView, x, y, 0)
+                        || solegramHeaderAt(fragmentSearchField, x, y, 0)) {
+                    return false;
+                }
+                // over a chat?
+                final float lx = x - page.getX() - list.getX(), ly = y - page.getY() - list.getY();
+                boolean onChat = false;
+                for (int i = 0; i < list.getChildCount(); i++) {
+                    final View child = list.getChildAt(i);
+                    if (child instanceof org.telegram.ui.Cells.DialogCell) {
+                        solegramTmpRect.set(child.getX(), child.getY(), child.getX() + child.getWidth(), child.getY() + child.getHeight());
+                        if (solegramTmpRect.contains(lx, ly)) {
+                            onChat = true;
+                            break;
+                        }
+                    }
+                }
+                if (!onChat) {
+                    return false;
+                }
+                // only at the top, where the header's views lie over the list (the tab bar, the button, the bulletins
+                // at the bottom keep their taps)
+                if (ly > list.getPaddingTop() + dp(96)) {
+                    return false;
+                }
+                // only when something over the list would otherwise take it: the list answers as usual elsewhere
+                View top = null;
+                for (int i = getChildCount() - 1; i >= 0; i--) {
+                    final View child = getChildAt(i);
+                    if (child == page) {
+                        break;
+                    }
+                    if (child.getVisibility() == View.VISIBLE && x >= child.getX() && x <= child.getX() + child.getWidth()
+                            && y >= child.getY() && y <= child.getY() + child.getHeight()) {
+                        top = child;
+                        break;
+                    }
+                }
+                if (top == null) {
+                    return false;
+                }
+                solegramChatsTouch = true;
+            }
+            if (!solegramChatsTouch || list == null) {
+                return false;
+            }
+            final float dx = page.getX() + list.getX(), dy = page.getY() + list.getY();
+            ev.offsetLocation(-dx, -dy);
+            list.dispatchTouchEvent(ev);
+            ev.offsetLocation(dx, dy);
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                solegramChatsTouch = false;
+            }
+            return true;
+        }
+        // endregion
 
         @Override
         public boolean hasOverlappingRendering() {

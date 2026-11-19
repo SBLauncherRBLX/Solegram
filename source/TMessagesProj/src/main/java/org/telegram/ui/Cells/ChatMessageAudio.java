@@ -232,7 +232,12 @@ class ChatMessageAudio {
                 canvas.save();
             }
             canvas.translate(tx + cell.seekBarX, y);
+            // Solegram: music in chat waves like the full player while it plays
+            cell.seekBar.solegramWave = true;
+            final MessageObject sgMsg = cell.getMessageObject();
+            cell.seekBar.solegramPlaying = sgMsg != null && MediaController.getInstance().isPlayingMessage(sgMsg) && !MediaController.getInstance().isMessagePaused();
             cell.seekBar.draw(canvas);
+            cell.seekBar.solegramWave = false;
             canvas.restore();
         }
         if (toSeekBarProgress < 1f) {

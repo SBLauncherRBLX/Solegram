@@ -1,5 +1,8 @@
 package org.telegram.ui;
 
+import org.telegram.messenger.ImageLoader;
+import org.telegram.ui.Components.ItemOptions;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import static org.telegram.messenger.AndroidUtilities.distance;
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
@@ -218,10 +221,24 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
         int buttonRow = -1;
         int clearRow = -1;
         int shadowRow = -1;
-        // Solegram (the own profile): its own colours, and the profile card (banner, order of the blocks...)
-        int sgColorsRow = -1;
-        int sgProfileRow = -1;
+        // Solegram (the own profile): its profile card right here: banner, darkening, blocks, posts, streak
+        int sgHeaderRow = -1;
+        int sgBannerRow = -1;
+        int sgDimRow = -1;
+        int sgTilesStartRow = -1;
+        int sgTilesEndRow = -1;
+        int sgPostsRow = -1;
+        int sgStreakRow = -1;
+        int sgLinksRow = -1;
+        int sgMusicEmojiRow = -1;
         int sgInfoRow = -1;
+        // Solegram on the Name tab: the emoji next to the name, the name's effect
+        int sgNameEmojiRow = -1;
+        int sgNameEffectRow = -1;
+        int sgNameShadowRow = -1;
+        com.solegram.messenger.ui.SolegramProfileCardSection sgSection;
+        private static final int VIEW_TYPE_SG_DIM = 40;
+        private static final int VIEW_TYPE_SG_TILE = 41;
         int giftsHeaderRow = -1;
         int giftsStartRow = -1;
         int giftsEndRow = -1;
@@ -362,7 +379,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             listView.setAdapter(listAdapter = new RecyclerListView.SelectionAdapter() {
                 @Override
                 public boolean isEnabled(RecyclerView.ViewHolder holder) {
-                    return holder.getItemViewType() == VIEW_TYPE_ICON || holder.getItemViewType() == VIEW_TYPE_TEXT || holder.getItemViewType() == VIEW_TYPE_GIFT || holder.getItemViewType() == VIEW_TYPE_GIFT_FOREIGN;
+                    return holder.getItemViewType() == VIEW_TYPE_ICON || holder.getItemViewType() == VIEW_TYPE_TEXT || holder.getItemViewType() == VIEW_TYPE_GIFT || holder.getItemViewType() == VIEW_TYPE_GIFT_FOREIGN
+                        || holder.getItemViewType() == VIEW_TYPE_SG_TILE;
                 }
 
                 @NonNull
@@ -401,7 +419,24 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                             PeerColorGrid colorPicker = peerColorPicker = new PeerColorGrid(getContext(), type, currentAccount, resourceProvider);
                             ThemeBind.backgroundColor(colorPicker, Theme.key_windowBackgroundWhite, PeerColorActivity.this.getResourceProvider());
                             colorPicker.setSelected(selectedColor, false);
+                            if (type == PAGE_PROFILE && !isChannel) {
+                                // Solegram: own colours, as one more circle among the palette's
+                                colorPicker.sgSetCustom(true, com.solegram.messenger.SolegramSelfColors.customColor1(), com.solegram.messenger.SolegramSelfColors.customColor2());
+                                if (sgOwnPeerColor() != null) {
+                                    colorPicker.setSelected(PeerColorGrid.SG_CUSTOM_ID, false);
+                                }
+                            }
                             colorPicker.setOnColorClick(colorId -> {
+                                if (colorId == PeerColorGrid.SG_CUSTOM_ID) {
+                                    sgOpenOwnColors();
+                                    return;
+                                }
+                                if (type == PAGE_PROFILE && !isChannel && com.solegram.messenger.SolegramSelfColors.customColor1() != 0) {
+                                    // a palette colour instead of the own ones
+                                    com.solegram.messenger.SolegramSelfColors.saveCustomColors(0, 0);
+                                    colorPicker.sgSetCustom(true, 0, 0);
+                                    com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+                                }
                                 selectedColor = colorId;
                                 selectedEmojiCollectible = null;
                                 selectedPeerCollectible = null;
@@ -456,6 +491,12 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                         case VIEW_TYPE_GIFTS_EMPTY:
                             view = new EmptyView(getContext());
                             break;
+                        case VIEW_TYPE_SG_DIM:
+                            view = new SgDimCell(getContext());
+                            break;
+                        case VIEW_TYPE_SG_TILE:
+                            view = new SgTileCell(getContext());
+                            break;
                     }
                     return new RecyclerListView.Holder(view);
                 }
@@ -481,8 +522,22 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                                 cell.setFixedSize(12);
                             } else if (position == giftsInfoRow) {
                                 cell.setText(getString(R.string.UserProfileCollectibleInfo));
+                            } else if (position == sgNameShadowRow) {
+                                cell.setText("");
+                                cell.setFixedSize(12);
                             } else if (position == sgInfoRow) {
-                                cell.setText(getString(R.string.SG_ProfileStyleInfo));
+                                cell.setText(getString(sgSection != null && sgSection.waitsForBanner() ? R.string.SG_ProfileCardNeedsBanner : R.string.SG_ProfileStyleInfo));
+                            }
+                            break;
+                        case VIEW_TYPE_SG_DIM:
+                            if (sgSection != null) {
+                                ((SgDimCell) holder.itemView).bind(sgSection.dim());
+                            }
+                            break;
+                        case VIEW_TYPE_SG_TILE:
+                            if (sgSection != null) {
+                                final String tile = sgSection.rows().get(position - sgTilesStartRow);
+                                ((SgTileCell) holder.itemView).bind(tile, sgSection.tileTitle(tile), sgSection.tileValue(tile), sgSection.isShown(tile), position + 1 < sgTilesEndRow);
                             }
                             break;
                         case VIEW_TYPE_TEXT:
@@ -492,17 +547,32 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                             textCell.updateColors();
                             if (position == clearRow) {
                                 textCell.setText(getString(isChannel ? R.string.ChannelProfileColorReset : R.string.UserProfileColorReset), false);
-                            } else if (position == sgColorsRow) {
-                                textCell.setTextAndValue(getString(R.string.SG_ProfileOwnColors),
-                                    getString(com.solegram.messenger.SolegramSelfColors.customColor1() != 0 ? R.string.SG_ProfileOwnColorsOn : R.string.SG_ProfileOwnColorsOff), true);
-                            } else if (position == sgProfileRow) {
-                                textCell.setTextAndValue(getString(R.string.SG_ProfileCardEdit), "", false);
+                            } else if (position == sgBannerRow && sgSection != null) {
+                                textCell.setTextAndValue(getString(R.string.SG_CardBanner), sgSection.bannerValue(), true);
+                            } else if (position == sgPostsRow && sgSection != null) {
+                                textCell.setTextAndValue(getString(R.string.SG_TilePosts), sgSection.postsValue(), true);
+                            } else if (position == sgStreakRow && sgSection != null) {
+                                textCell.setTextAndValue(getString(R.string.SG_TileStreak), sgSection.streakValue(), true);
+                            } else if (position == sgLinksRow) {
+                                textCell.setTextAndValue(getString(R.string.SG_ProfileLinksMine), "", true);
+                            } else if (position == sgMusicEmojiRow) {
+                                textCell.setTextAndValue(getString(R.string.SG_NowPlayingPatternProfile),
+                                    getString(com.solegram.messenger.SolegramConfig.profileMusicEmoji != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone), false);
+                            } else if (position == sgNameEmojiRow) {
+                                textCell.setTextAndValue(getString(R.string.SG_NameEmoji),
+                                    getString(com.solegram.messenger.SolegramNameEmoji.get() != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone), true);
+                            } else if (position == sgNameEffectRow) {
+                                final int effect = com.solegram.messenger.SolegramNameEffect.own();
+                                textCell.setTextAndValue(getString(R.string.SG_NameEffect),
+                                    getString(com.solegram.messenger.SolegramNameEffect.nameOf(com.solegram.messenger.SolegramNameEffect.kindOf(effect))), false);
                             }
                             break;
                         case VIEW_TYPE_HEADER:
                             HeaderCell headerCell = (HeaderCell) holder.itemView;
                             if (position == giftsHeaderRow) {
                                 headerCell.setText(getString(R.string.UserProfileCollectibleHeader), false);
+                            } else if (position == sgHeaderRow) {
+                                headerCell.setText(getString(R.string.SG_ProfileCardHeader), false);
                             }
                             ThemeBind.backgroundColor(headerCell, Theme.key_windowBackgroundWhite, PeerColorActivity.this.getResourceProvider());
                             break;
@@ -630,8 +700,21 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                     if (position == infoRow || position == giftsInfoRow || position == info2Row || position == shadowRow || position == sgInfoRow) {
                         return VIEW_TYPE_INFO;
                     }
-                    if (position == sgColorsRow || position == sgProfileRow) {
+                    if (position == sgBannerRow || position == sgPostsRow || position == sgStreakRow || position == sgLinksRow || position == sgMusicEmojiRow
+                            || position == sgNameEmojiRow || position == sgNameEffectRow) {
                         return VIEW_TYPE_TEXT;
+                    }
+                    if (position == sgNameShadowRow) {
+                        return VIEW_TYPE_INFO;
+                    }
+                    if (position == sgHeaderRow) {
+                        return VIEW_TYPE_HEADER;
+                    }
+                    if (position == sgDimRow) {
+                        return VIEW_TYPE_SG_DIM;
+                    }
+                    if (position >= sgTilesStartRow && position < sgTilesEndRow) {
+                        return VIEW_TYPE_SG_TILE;
                     }
                     if (position == colorPickerRow) {
                         return VIEW_TYPE_COLOR_PICKER;
@@ -670,17 +753,87 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                     return VIEW_TYPE_INFO;
                 }
             });
+            if (type == PAGE_PROFILE && !isChannel) {
+                // Solegram: hold a shown block and move it
+                new ItemTouchHelper(new ItemTouchHelper.Callback() {
+                    private boolean moved;
+
+                    private boolean draggable(int position) {
+                        return sgSection != null && position >= sgTilesStartRow && position < sgTilesStartRow + sgSection.shownCount();
+                    }
+
+                    @Override
+                    public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder holder) {
+                        return draggable(holder.getAdapterPosition()) ? makeMovementFlags(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) : 0;
+                    }
+
+                    @Override
+                    public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder source, @NonNull RecyclerView.ViewHolder target) {
+                        final int from = source.getAdapterPosition(), to = target.getAdapterPosition();
+                        if (!draggable(from) || !draggable(to)) {
+                            return false;
+                        }
+                        sgSection.moved(from - sgTilesStartRow, to - sgTilesStartRow);
+                        listAdapter.notifyItemMoved(from, to);
+                        moved = true;
+                        return true;
+                    }
+
+                    @Override
+                    public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                    }
+
+                    @Override
+                    public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+                        super.onSelectedChanged(viewHolder, actionState);
+                        if (viewHolder != null && actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                            viewHolder.itemView.setTranslationZ(dp(6));
+                        }
+                    }
+
+                    @Override
+                    public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                        super.clearView(recyclerView, viewHolder);
+                        viewHolder.itemView.setTranslationZ(0);
+                        if (moved && sgSection != null) {
+                            moved = false;
+                            sgSection.moveDone();
+                        }
+                    }
+                }).attachToRecyclerView(listView);
+            }
             listView.setOnItemClickListener((view, position) -> {
                 if (view instanceof SetReplyIconCell) {
                     showSelectStatusDialog((SetReplyIconCell) view);
-                } else if (position == sgColorsRow) {
-                    sgShowOwnColors();
-                } else if (position == sgProfileRow) {
-                    presentFragment(new com.solegram.messenger.ui.SolegramProfileEditorActivity());
+                } else if (position == sgBannerRow && sgSection != null) {
+                    sgBannerMenu(view);
+                } else if (position == sgLinksRow) {
+                    com.solegram.messenger.ui.SolegramProfileLinksSheet.show(PeerColorActivity.this);
+                } else if (position == sgMusicEmojiRow) {
+                    com.solegram.messenger.SolegramTitleEmoji.showPicker(PeerColorActivity.this, view, 0, 0, null, null, null,
+                        com.solegram.messenger.SolegramConfig.profileMusicEmoji, id -> {
+                            com.solegram.messenger.SolegramConfig.putLong("profileMusicEmoji", id == null ? 0 : id);
+                            // others read it from the profile card
+                            com.solegram.messenger.SolegramProfileCard.syncMusicEmoji(currentAccount, null);
+                        }, () -> listAdapter.notifyItemChanged(position));
+                } else if (position == sgNameEmojiRow) {
+                    com.solegram.messenger.SolegramTitleEmoji.showPicker(PeerColorActivity.this, view, 0, 0, null, null, null,
+                        com.solegram.messenger.SolegramNameEmoji.get(), com.solegram.messenger.SolegramNameEmoji::set, () -> listAdapter.notifyItemChanged(position));
+                } else if (position == sgNameEffectRow) {
+                    presentFragment(new com.solegram.messenger.ui.SolegramNameEffectActivity());
+                } else if (position == sgPostsRow && sgSection != null) {
+                    sgSection.pickPosts();
+                } else if (position == sgStreakRow && sgSection != null) {
+                    sgSection.pickStreak();
+                } else if (position >= sgTilesStartRow && position < sgTilesEndRow && sgSection != null) {
+                    sgSection.toggle(sgSection.rows().get(position - sgTilesStartRow));
                 } else if (position == clearRow) {
                     if (!isChannel && com.solegram.messenger.SolegramSelfColors.customColor1() != 0) {
                         com.solegram.messenger.SolegramSelfColors.saveCustomColors(0, 0);
                         com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+                        if (peerColorPicker != null) {
+                            peerColorPicker.sgSetCustom(true, 0, 0);
+                        }
                     }
                     selectedColor = -1;
                     selectedEmoji = 0;
@@ -795,8 +948,12 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 profilePreview = new ProfilePreview(getContext(), currentAccount, dialogId, resourceProvider);
                 updateProfilePreview(false);
                 if (!isChannel) {
-                    // Solegram: a tap on the profile's background opens its card: the banner, the order of the blocks
-                    profilePreview.setOnClickListener(v -> presentFragment(new com.solegram.messenger.ui.SolegramProfileEditorActivity()));
+                    // Solegram: the own profile's card is edited right here
+                    // refreshed a frame later: a change can come from the end of a drag, mid-layout
+                    sgSection = new com.solegram.messenger.ui.SolegramProfileCardSection(PeerColorActivity.this, currentAccount, () -> AndroidUtilities.runOnUIThread(this::sgRefresh));
+                    // a tap on the profile's background: change the banner, the background emoji, a gift, right away
+                    profilePreview.setOnClickListener(v -> sgBannerMenu(profilePreview));
+                    AndroidUtilities.runOnUIThread(this::sgRefresh);
                 }
             } else {
                 messagesCellFade2 = new View(getContext());
@@ -1174,9 +1331,19 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
         private void updateRows() {
             clearRow = -1;
             shadowRow = -1;
-            sgColorsRow = -1;
-            sgProfileRow = -1;
+            sgHeaderRow = -1;
+            sgBannerRow = -1;
+            sgDimRow = -1;
+            sgTilesStartRow = -1;
+            sgTilesEndRow = -1;
+            sgPostsRow = -1;
+            sgStreakRow = -1;
+            sgLinksRow = -1;
+            sgMusicEmojiRow = -1;
             sgInfoRow = -1;
+            sgNameEmojiRow = -1;
+            sgNameEffectRow = -1;
+            sgNameShadowRow = -1;
             giftsHeaderRow = -1;
             giftsStartRow = -1;
             giftsLoadingStartRow = -1;
@@ -1198,10 +1365,25 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 clearRow = rowCount++;
                 shadowRow = rowCount++;
             }
-            if (type == PAGE_PROFILE && !isChannel) {
-                sgColorsRow = rowCount++;
-                sgProfileRow = rowCount++;
+            if (type == PAGE_PROFILE && !isChannel && sgSection != null) {
+                sgHeaderRow = rowCount++;
+                sgBannerRow = rowCount++;
+                if (sgSection.hasBanner()) {
+                    sgDimRow = rowCount++;
+                }
+                sgTilesStartRow = rowCount;
+                rowCount += sgSection.rows().size();
+                sgTilesEndRow = rowCount;
+                sgPostsRow = rowCount++;
+                sgStreakRow = rowCount++;
+                sgLinksRow = rowCount++;
+                sgMusicEmojiRow = rowCount++;
                 sgInfoRow = rowCount++;
+            }
+            if (type == PAGE_NAME && !isChannel) {
+                sgNameEmojiRow = rowCount++;
+                sgNameEffectRow = rowCount++;
+                sgNameShadowRow = rowCount++;
             }
             final StarsController.GiftsList giftsList = type == PAGE_NAME ? giftsWithPeerColor : gifts;
             if ((type == PAGE_PROFILE || type == PAGE_NAME) && giftsList != null) {
@@ -1304,67 +1486,173 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             return MessagesController.PeerColor.fromCustom(com.solegram.messenger.SolegramSelfColors.customColor1(), com.solegram.messenger.SolegramSelfColors.customColor2());
         }
 
-        /** Own colours of the profile: the top and the bottom of its gradient, each from a colour picker. */
-        private void sgShowOwnColors() {
+        /** Own colours of the profile: a sheet with the gradient's two ends, live on the preview. */
+        private void sgOpenOwnColors() {
             if (getParentActivity() == null) {
                 return;
             }
-            final boolean has = com.solegram.messenger.SolegramSelfColors.customColor1() != 0;
-            final CharSequence[] items = has
-                ? new CharSequence[]{getString(R.string.SG_ProfileColorTop), getString(R.string.SG_ProfileColorBottom), getString(R.string.SG_ProfileOwnColorsReset)}
-                : new CharSequence[]{getString(R.string.SG_ProfileColorTop), getString(R.string.SG_ProfileColorBottom)};
-            final AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
-            b.setTitle(getString(R.string.SG_ProfileOwnColors));
-            b.setItems(items, (d, which) -> {
-                if (which == 2) {
-                    com.solegram.messenger.SolegramSelfColors.saveCustomColors(0, 0);
-                    sgOwnColorsChanged();
-                    return;
-                }
-                sgPickOwnColor(which == 0);
-            });
-            showDialog(b.create());
-        }
-
-        private void sgPickOwnColor(boolean top) {
             final boolean dark = Theme.isCurrentThemeDark();
             final MessagesController.PeerColors pcs = MessagesController.getInstance(currentAccount).profilePeerColors;
             final MessagesController.PeerColor palette = pcs != null && selectedColor >= 0 ? pcs.getColor(selectedColor) : null;
             int c1 = com.solegram.messenger.SolegramSelfColors.customColor1(), c2 = com.solegram.messenger.SolegramSelfColors.customColor2();
-            // start from what the profile shows now
             if (c1 == 0 || c2 == 0) {
+                // start from what the profile shows now
                 c1 = palette != null ? palette.getBgColor1(dark) : 0xFF3B82C4;
                 c2 = palette != null ? palette.getBgColor2(dark) : 0xFF2A5F96;
             }
-            final int[] cur = {c1, c2};
-            final org.telegram.ui.Components.Paint.ColorPickerBottomSheet sheet = new org.telegram.ui.Components.Paint.ColorPickerBottomSheet(getParentActivity(), getResourceProvider());
-            sheet.setColor(top ? cur[0] : cur[1]);
-            sheet.setColorListener(color -> {
-                if (top) {
-                    cur[0] = color | 0xFF000000;
-                } else {
-                    cur[1] = color | 0xFF000000;
+            final com.solegram.messenger.ui.SolegramGradientPickerSheet sheet = new com.solegram.messenger.ui.SolegramGradientPickerSheet(getParentActivity(), getResourceProvider(), c1, c2, (top, bottom) -> {
+                com.solegram.messenger.SolegramSelfColors.saveCustomColors(top, bottom);
+                if (peerColorPicker != null) {
+                    peerColorPicker.sgSetCustom(true, top, bottom);
                 }
-                com.solegram.messenger.SolegramSelfColors.saveCustomColors(cur[0], cur[1]);
                 updateProfilePreview(true);
             });
-            sheet.setOnDismissListener(d -> sgOwnColorsChanged());
-            sheet.show();
+            sheet.setOnDismissListener(d -> {
+                updateRows();
+                if (listAdapter != null) {
+                    listAdapter.notifyDataSetChanged();
+                }
+                updateProfilePreview(true);
+                // onto the profile card, so others with Solegram see the colours
+                com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+            });
+            showDialog(sheet);
         }
 
-        private void sgOwnColorsChanged() {
+        /** The card changed (or was read): the rows and the preview follow it. */
+        private void sgRefresh() {
             updateRows();
-            if (listView != null && listView.getAdapter() != null) {
-                listView.getAdapter().notifyDataSetChanged();
+            if (listAdapter != null) {
+                listAdapter.notifyDataSetChanged();
             }
-            updateProfilePreview(true);
-            // onto the profile card, so others with Solegram see the colours
-            com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+            if (profilePreview != null && sgSection != null) {
+                profilePreview.sgSetBanner(sgSection.bannerPost(), sgSection.dim());
+            }
+        }
+
+        /** The banner, the background emoji, a gift: right from the profile's top. */
+        private void sgBannerMenu(View anchor) {
+            if (sgSection == null) {
+                return;
+            }
+            final ItemOptions o = ItemOptions.makeOptions(PeerColorActivity.this, anchor);
+            o.add(R.drawable.msg_photos, getString(sgSection.hasBanner() ? R.string.SG_ProfileBannerChange : R.string.SG_ProfileBannerSet), () -> sgSection.pickBanner());
+            if (sgSection.hasBanner()) {
+                o.add(R.drawable.msg_delete, getString(R.string.SG_ProfileBannerRemove), true, () -> sgSection.removeBanner());
+            }
+            o.add(R.drawable.msg_emoji_cat, getString(R.string.SG_ProfileBackgroundEmoji), () -> {
+                if (setReplyIconCell != null) {
+                    showSelectStatusDialog(setReplyIconCell);
+                } else if (iconRow >= 0) {
+                    listView.smoothScrollToPosition(iconRow);
+                }
+            });
+            if (giftsTabsRow >= 0) {
+                o.add(R.drawable.msg_gift_premium, getString(R.string.SG_ProfilePinGift), () -> listView.smoothScrollToPosition(giftsTabsRow));
+            }
+            o.setGravity(Gravity.CENTER_HORIZONTAL).show();
+        }
+
+        /** Darkening of the banner under the name. */
+        private class SgDimCell extends FrameLayout {
+            private final TextView title;
+            private final org.telegram.ui.Components.SeekBarView bar;
+
+            SgDimCell(Context context) {
+                super(context);
+                ThemeBind.backgroundColor(this, Theme.key_windowBackgroundWhite, PeerColorActivity.this.getResourceProvider());
+                title = new TextView(context);
+                title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+                title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, getResourceProvider()));
+                title.setText(getString(R.string.SG_CardDim));
+                addView(title, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 21, 12, 21, 0));
+                bar = new org.telegram.ui.Components.SeekBarView(context, getResourceProvider());
+                bar.setReportChanges(true);
+                bar.setDelegate((stop, progress) -> {
+                    if (sgSection == null) {
+                        return;
+                    }
+                    if (profilePreview != null) {
+                        profilePreview.sgSetBanner(sgSection.bannerPost(), Math.round(progress * 80));
+                    }
+                    if (stop) {
+                        sgSection.setDim(Math.round(progress * 80));
+                    }
+                });
+                addView(bar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 38, Gravity.TOP, 6, 40, 6, 8));
+            }
+
+            void bind(int dim) {
+                bar.setProgress(dim / 80f);
+            }
+
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(88), MeasureSpec.EXACTLY));
+            }
+        }
+
+        /** One block of the profile: hold to move it, the eye shows or hides it. */
+        private class SgTileCell extends FrameLayout {
+            private final TextView value, title;
+            private final android.widget.ImageView handle, eye;
+            private boolean divider;
+
+            SgTileCell(Context context) {
+                super(context);
+                setWillNotDraw(false);
+                ThemeBind.backgroundColor(this, Theme.key_windowBackgroundWhite, PeerColorActivity.this.getResourceProvider());
+                handle = new android.widget.ImageView(context);
+                handle.setImageResource(R.drawable.list_reorder);
+                handle.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+                handle.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_stickers_menu, getResourceProvider()), PorterDuff.Mode.MULTIPLY));
+                addView(handle, LayoutHelper.createFrame(48, 56, Gravity.LEFT | Gravity.CENTER_VERTICAL, 6, 0, 0, 0));
+                final LinearLayout texts = new LinearLayout(context);
+                texts.setOrientation(LinearLayout.VERTICAL);
+                value = new TextView(context);
+                value.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+                value.setSingleLine();
+                value.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                value.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, getResourceProvider()));
+                texts.addView(value);
+                title = new TextView(context);
+                title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, getResourceProvider()));
+                texts.addView(title, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 1, 0, 0));
+                addView(texts, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.CENTER_VERTICAL, 60, 0, 60, 0));
+                eye = new android.widget.ImageView(context);
+                eye.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+                eye.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, getResourceProvider()), PorterDuff.Mode.SRC_IN));
+                addView(eye, LayoutHelper.createFrame(48, 56, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 8, 0));
+            }
+
+            void bind(String tile, String titleText, String valueText, boolean shown, boolean divider) {
+                this.divider = divider;
+                value.setText(valueText);
+                title.setText(titleText);
+                eye.setImageResource(shown ? R.drawable.sg_line_eye : R.drawable.sg_line_eye_slash);
+                handle.setVisibility(shown ? VISIBLE : INVISIBLE);
+                value.setAlpha(shown ? 1f : .45f);
+                title.setAlpha(shown ? 1f : .45f);
+                invalidate();
+            }
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                if (divider) {
+                    canvas.drawRect(dp(60), getMeasuredHeight() - 1, getMeasuredWidth(), getMeasuredHeight(), Theme.dividerPaint);
+                }
+            }
+
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(60), MeasureSpec.EXACTLY));
+            }
         }
 
         public void updateProfilePreview(boolean animated) {
             if (peerColorPicker != null) {
-                peerColorPicker.setSelected(selectedColor, animated);
+                peerColorPicker.setSelected(sgOwnPeerColor() != null ? PeerColorGrid.SG_CUSTOM_ID : selectedColor, animated);
             }
             if (profilePreview != null) {
                 if (selectedEmojiCollectible != null) {
@@ -2234,6 +2522,9 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
 
     @Override
     public void onFragmentDestroy() {
+        if (profilePage != null && profilePage.sgSection != null) {
+            profilePage.sgSection.flush();
+        }
         super.onFragmentDestroy();
         getNotificationCenter().removeObserver(this, NotificationCenter.currentUserPremiumStatusChanged);
         getNotificationCenter().removeObserver(this, NotificationCenter.starUserGiftsLoaded);
@@ -2706,6 +2997,9 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             private final Path color2Path = new Path();
             private boolean hasColor2, hasColor3;
             private boolean hasClose;
+            // Solegram: the own-colours circle before colours are chosen: a rainbow with a plus
+            boolean sgRainbow;
+            private Paint sgRainbowPaint;
 
             private Path closePath;
             private Paint closePaint;
@@ -2784,8 +3078,17 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 circlePath.rewind();
                 circlePath.addCircle(bounds.centerX(), bounds.centerY(), Math.min(bounds.height() / 2f, bounds.width() / 2f), Path.Direction.CW);
                 canvas.clipPath(circlePath);
-                canvas.drawPaint(paint1);
-                if (hasColor2) {
+                if (sgRainbow) {
+                    if (sgRainbowPaint == null) {
+                        sgRainbowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                    }
+                    sgRainbowPaint.setShader(new android.graphics.SweepGradient(bounds.centerX(), bounds.centerY(),
+                        new int[]{0xFFFF4D4D, 0xFFFFB13D, 0xFFF4E04D, 0xFF4DD97A, 0xFF4DB8FF, 0xFF8C6CFF, 0xFFFF5FC8, 0xFFFF4D4D}, null));
+                    canvas.drawPaint(sgRainbowPaint);
+                } else {
+                    canvas.drawPaint(paint1);
+                }
+                if (hasColor2 && !sgRainbow) {
                     color2Path.rewind();
                     color2Path.moveTo(bounds.right, bounds.top);
                     color2Path.lineTo(bounds.right, bounds.bottom);
@@ -2819,6 +3122,19 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                             Math.min(bounds.height() / 2f, bounds.width() / 2f) + backgroundPaint.getStrokeWidth() * lerp(.5f, -2f, selectT),
                             backgroundPaint
                     );
+                }
+
+                if (sgRainbow) {
+                    if (closePaint == null) {
+                        closePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                        closePaint.setColor(0xffffffff);
+                        closePaint.setStyle(Paint.Style.STROKE);
+                        closePaint.setStrokeCap(Paint.Cap.ROUND);
+                    }
+                    closePaint.setStrokeWidth(dp(2.5f));
+                    final float pr = dp(6);
+                    canvas.drawLine(bounds.centerX() - pr, bounds.centerY(), bounds.centerX() + pr, bounds.centerY(), closePaint);
+                    canvas.drawLine(bounds.centerX(), bounds.centerY() - pr, bounds.centerX(), bounds.centerY() + pr, closePaint);
                 }
 
                 if (hasClose) {
@@ -2885,6 +3201,35 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             this.lock = lock;
         }
 
+        // Solegram: an own-colours circle after the palette (the own profile only)
+        public static final int SG_CUSTOM_ID = -1000;
+        private boolean sgCustom;
+        private int sgCustom1, sgCustom2;
+
+        public void sgSetCustom(boolean show, int c1, int c2) {
+            final boolean relayout = sgCustom != show;
+            sgCustom = show;
+            sgCustom1 = c1;
+            sgCustom2 = c2;
+            if (relayout) {
+                buttons = null;
+                requestLayout();
+            } else if (buttons != null && sgCustom && buttons.length > 0) {
+                sgLook(buttons[buttons.length - 1]);
+                invalidate();
+            }
+        }
+
+        private void sgLook(ColorButton b) {
+            b.id = SG_CUSTOM_ID;
+            if (sgCustom1 != 0 && sgCustom2 != 0) {
+                b.sgRainbow = false;
+                b.set(sgCustom1, sgCustom2);
+            } else {
+                b.sgRainbow = true;
+            }
+        }
+
         /** also called on every theme update (Theme.Colorable) */
         @Override
         public void updateColors() {
@@ -2899,6 +3244,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 } else if (i < 7 && type == PAGE_NAME) {
                     buttons[i].id = order[i];
                     buttons[i].set(Theme.getColor(Theme.keys_avatar_nameInMessage[order[i]], resourcesProvider));
+                } else if (sgCustom && i == buttons.length - 1) {
+                    sgLook(buttons[i]);
                 } else {
                     final int id = i;
                     if (peerColors != null && id >= 0 && id < peerColors.colors.size()) {
@@ -2934,7 +3281,11 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             final float horizontalSeparator = Math.min(iconSize * .28947f, dp(8));
             final float verticalSeparator = Math.min(iconSize * .315789474f, dp(11.33f));
 
-            final int rows = colorsCount / columns;
+            final int paletteCount = colorsCount;
+            if (sgCustom && type == PAGE_PROFILE) {
+                colorsCount++;
+            }
+            final int rows = (colorsCount + columns - 1) / columns;
             final int height = (int) (iconSize * rows + verticalSeparator * (rows + 1));
 
             setMeasuredDimension(width, height);
@@ -2947,6 +3298,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                         buttons[i].id = order[i];
                         buttons[i].setClose(buttons[i].id < 0);
                         buttons[i].set(Theme.getColor(order[i] < 0 ? Theme.key_avatar_backgroundGray : Theme.keys_avatar_nameInMessage[order[i] % Theme.keys_avatar_nameInMessage.length], resourcesProvider));
+                    } else if (sgCustom && type == PAGE_PROFILE && i == paletteCount) {
+                        sgLook(buttons[i]);
                     } else if (peerColors != null && i >= 0 && i < peerColors.colors.size()) {
                         buttons[i].id = peerColors.colors.get(i).id;
                         buttons[i].set(peerColors.colors.get(i));
@@ -3565,6 +3918,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             super.onAttachedToWindow();
             emoji.attach();
             imageReceiver.onAttachedToWindow();
+            sgBanner.onAttachedToWindow();
         }
 
         @Override
@@ -3572,6 +3926,37 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             super.onDetachedFromWindow();
             emoji.detach();
             imageReceiver.onDetachedFromWindow();
+            sgBanner.onDetachedFromWindow();
+        }
+
+        // Solegram: the profile card's banner (a post of the personal channel) behind the avatar, darkened
+        private final ImageReceiver sgBanner = new ImageReceiver(this);
+        private MessageObject sgBannerPost;
+        private int sgBannerDim;
+
+        public void sgSetBanner(MessageObject post, int dim) {
+            sgBannerDim = dim;
+            if (post == sgBannerPost) {
+                invalidate();
+                return;
+            }
+            sgBannerPost = post;
+            if (post == null) {
+                sgBanner.clearImage();
+            } else {
+                final TLRPC.Document doc = post.getDocument();
+                if (doc != null && !(post.messageOwner.media instanceof TLRPC.TL_messageMediaPhoto)) {
+                    final TLRPC.PhotoSize thumb = FileLoader.getClosestPhotoSizeWithSize(doc.thumbs, 320);
+                    sgBanner.setImage(ImageLocation.getForDocument(doc), ImageLoader.AUTOPLAY_FILTER, ImageLocation.getForDocument(thumb, doc), "b", null, doc.size, null, post, 1);
+                    sgBanner.setAutoRepeat(1);
+                    sgBanner.setAllowStartAnimation(true);
+                } else {
+                    final TLRPC.PhotoSize size = FileLoader.getClosestPhotoSizeWithSize(post.photoThumbs, 1280);
+                    final TLRPC.PhotoSize small = FileLoader.getClosestPhotoSizeWithSize(post.photoThumbs, 50);
+                    sgBanner.setImage(ImageLocation.getForObject(size, post.photoThumbsObject), null, ImageLocation.getForObject(small, post.photoThumbsObject), "b", 0, null, post, 1);
+                }
+            }
+            invalidate();
         }
 
         private int getThemedColor(int key) {
@@ -3737,15 +4122,21 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                     getHeight() - dp(82)
             );
 
-            StarGiftPatterns.drawProfileAnimatedPattern(
-                    canvas,
-                    emoji,
-                    getWidth(),
-                    getHeight(),
-                    1.0f,
-                    rectF,
-                    1.0f
-            );
+            if (sgBannerPost != null) {
+                sgBanner.setImageCoords(0, 0, getWidth(), getHeight());
+                sgBanner.draw(canvas);
+                canvas.drawColor(Color.argb(Math.round(255 * sgBannerDim / 100f), 0, 0, 0));
+            } else {
+                StarGiftPatterns.drawProfileAnimatedPattern(
+                        canvas,
+                        emoji,
+                        getWidth(),
+                        getHeight(),
+                        1.0f,
+                        rectF,
+                        1.0f
+                );
+            }
 
             imageReceiver.setRoundRadius(isForum ? dp(18) : dp(54));
             imageReceiver.setImageCoords(rectF);
