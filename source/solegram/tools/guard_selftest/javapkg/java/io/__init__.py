@@ -4,3 +4,8 @@ class FileInputStream:
         # simulate Java reading the file bytes
         self._data = open(path, "rb").read()
     def read(self, *a): return self._data
+
+
+class File:
+    def __init__(self, path, *a, **k):
+        self.path = path

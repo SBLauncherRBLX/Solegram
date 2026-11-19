@@ -48,9 +48,15 @@ public final class SolegramVoiceTranscriber {
     private SolegramVoiceTranscriber() {
     }
 
-    /** Whether this phone can do it at all (Android 13+, a speech recognizer). */
+    /** Whether this phone can do it at all: Whisper (any Android, any language) or Android's recognizer (13+). */
     public static boolean available() {
-        if (Build.VERSION.SDK_INT < 33 || !SolegramConfig.freeTranscribe) {
+        if (!SolegramConfig.freeTranscribe) {
+            return false;
+        }
+        if (SolegramWhisper.libraryAvailable()) {
+            return true;
+        }
+        if (Build.VERSION.SDK_INT < 33) {
             return false;
         }
         final Context ctx = ApplicationLoader.applicationContext;
@@ -67,7 +73,8 @@ public final class SolegramVoiceTranscriber {
     /** {@code done} gets the text (UI thread), or null when it could not be done ({@link #lastFailure} says why). */
     public static void transcribe(MessageObject message, Utilities.Callback<String> done) {
         lastFailure = FAIL_NONE;
-        if (Build.VERSION.SDK_INT < 33 || message == null || message.getDocument() == null) {
+        final boolean whisper = SolegramWhisper.ready();
+        if (message == null || message.getDocument() == null || !whisper && Build.VERSION.SDK_INT < 33) {
             lastFailure = FAIL_NO_RECOGNIZER;
             done.run(null);
             return;
@@ -81,6 +88,24 @@ public final class SolegramVoiceTranscriber {
                     final Pcm pcm = decode(file);
                     if (pcm != null && pcm.data.length > 0) {
                         final Pcm ready = resample(pcm, RATE);
+                        if (whisper) {
+                            // Whisper first: every language, found by itself, entirely on the phone
+                            final String text = SolegramWhisper.transcribe(ready.data);
+                            if (text != null) {
+                                AndroidUtilities.runOnUIThread(() -> {
+                                    lastFailure = FAIL_NONE;
+                                    done.run(text);
+                                });
+                                return;
+                            }
+                            if (Build.VERSION.SDK_INT < 33) {
+                                AndroidUtilities.runOnUIThread(() -> {
+                                    lastFailure = FAIL_NO_WORDS;
+                                    done.run(null);
+                                });
+                                return;
+                            }
+                        }
                         AndroidUtilities.runOnUIThread(() -> recognizeAll(ready, done));
                         return;
                     }

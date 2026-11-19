@@ -2468,5 +2468,11 @@
     <string name="SG_TranscribeNoRecognizer">На этом телефоне нет распознавания речи для приложений. Установи или включи приложение Google («Speech Services by Google») и попробуй снова</string>
     <string name="SG_TranscribeNoWords">В этом сообщении не удалось разобрать слова</string>
     <string name="SG_TranscribeNoFile">Голосовое не скачалось, проверь интернет и попробуй снова</string>
+    <string name="SG_WhisperTitle">Расшифровка на всех языках</string>
+    <string name="SG_WhisperText">Распознавание речи телефона не справилось с этим сообщением. Solegram может один раз скачать модель распознавания (Whisper, %1$s): после этого голосовые на любом языке расшифровываются прямо на телефоне, без интернета, и звук никуда не отправляется.</string>
+    <string name="SG_WhisperDownload">Скачать</string>
+    <string name="SG_WhisperLater">Не сейчас</string>
+    <string name="SG_WhisperDownloading">Скачивается модель распознавания…</string>
+    <string name="SG_WhisperFailed">Модель распознавания не скачалась, проверь интернет и попробуй снова</string>
     <!-- SOLEGRAM END -->
 </resources>

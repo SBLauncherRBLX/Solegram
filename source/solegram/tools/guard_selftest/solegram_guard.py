@@ -24,6 +24,7 @@ import builtins
 import os
 import sys
 import threading
+import types
 import _thread
 
 __all__ = ["install", "register", "forget", "current_plugin", "check_java_class"]
@@ -323,6 +324,16 @@ def install(roots, package):
                 return True, permission
         return False, None
 
+    def import_denied(name, frame):
+        """Whether check_import would refuse this package to the plugin on the stack (no report, no raise)."""
+        matched, permission = import_rule(name)
+        if not matched:
+            return False
+        pid = plugin_at(frame)
+        if pid is None:
+            return False
+        return permission is None or not permits(pid, permission)
+
     def check_import(name, frame):
         matched, permission = import_rule(name)
         if not matched:
@@ -353,15 +364,33 @@ def install(roots, package):
         if level == 0 and name:
             if name.split(".", 1)[0] in java_roots:
                 frame = caller(1)
-                # the module being pulled in (import java.io, importlib.import_module("java.io"))
-                check_import(name, frame)
+                # the module being pulled in (import java.io, importlib.import_module("java.io")); with a from-list
+                # the plugin takes named classes out of it and gets no handle to the package itself, so the
+                # classes are checked one by one instead: "from java.io import File" is fine, FileInputStream
+                # is not ("from java import io" still checks the package, as java.io below)
+                if not fromlist or "*" in fromlist:
+                    check_import(name, frame)
                 if fromlist:
                     for item in fromlist:
                         if not isinstance(item, str) or item == "*":
                             continue
                         # from java.io import FileInputStream  /  from java import io
                         check_java(name + "." + item, frame)
-                        check_import(name + "." + item, frame)
+                        if not item[:1].isupper():
+                            # a package (Java packages are lower case, classes start with a capital)
+                            check_import(name + "." + item, frame)
+                    if import_denied(name, frame):
+                        # __import__ hands back the package itself: a plugin calling it straight would get all
+                        # of java.io past the checks, so it gets a stand-in holding only the checked names
+                        module = original_import(name, globals, locals, fromlist, level)
+                        stand_in = types.ModuleType(name)
+                        for item in fromlist:
+                            if isinstance(item, str) and item != "*":
+                                try:
+                                    setattr(stand_in, item, getattr(module, item))
+                                except AttributeError:
+                                    pass
+                        return stand_in
             elif name == "solegram_guard":
                 # the plugin's own import statement only (the SDK imports the guard for it)
                 pid = plugin_at(caller(1), immediate=True)

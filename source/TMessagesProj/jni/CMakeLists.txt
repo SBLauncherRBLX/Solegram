@@ -335,3 +335,6 @@ target_link_libraries(${NATIVE_LIB}
 
 include(AndroidNdkModules)
 android_ndk_import_module_cpufeatures()
+
+# Solegram: Whisper for transcribing voice messages in any language, on the phone (own library, loaded on demand)
+add_subdirectory(whisper)

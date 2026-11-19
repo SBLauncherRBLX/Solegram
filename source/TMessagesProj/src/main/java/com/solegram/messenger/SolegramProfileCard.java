@@ -80,6 +80,9 @@ public final class SolegramProfileCard {
         public int nameColor = -1;
         public long nameEmoji;
         public int nameCustom1, nameCustom2;
+        /** The accent of the owner's theme (two colours, ARGB): their profile shows in it for everyone with Solegram
+         *  when no profile colour was chosen. 0: none. */
+        public int themeColor1, themeColor2;
 
         /** The pinned streak, unless it is more than a day older than its last check. */
         public boolean hasStreak() {
@@ -119,6 +122,9 @@ public final class SolegramProfileCard {
             }
             if (customColor1 != 0 && customColor2 != 0) {
                 sb.append("|px=").append(Integer.toHexString(customColor1)).append('.').append(Integer.toHexString(customColor2));
+            }
+            if (themeColor1 != 0 && themeColor2 != 0) {
+                sb.append("|tx=").append(Integer.toHexString(themeColor1 & 0xFFFFFF)).append('.').append(Integer.toHexString(themeColor2 & 0xFFFFFF));
             }
             if (nameColor >= 0) {
                 sb.append("|nc=").append(nameColor);
@@ -208,6 +214,14 @@ public final class SolegramProfileCard {
                             if (f.length == 2) {
                                 c.nameCustom1 = 0xFF000000 | (int) Long.parseLong(f[0], 16);
                                 c.nameCustom2 = 0xFF000000 | (int) Long.parseLong(f[1], 16);
+                            }
+                            break;
+                        }
+                        case "tx": {
+                            final String[] f = v.split("\\.");
+                            if (f.length == 2) {
+                                c.themeColor1 = 0xFF000000 | (int) Long.parseLong(f[0], 16);
+                                c.themeColor2 = 0xFF000000 | (int) Long.parseLong(f[1], 16);
                             }
                             break;
                         }
@@ -636,6 +650,9 @@ public final class SolegramProfileCard {
         card.nameEmoji = SolegramSelfColors.isSet() ? SolegramSelfColors.nameEmoji() : 0;
         card.nameCustom1 = SolegramSelfColors.nameCustom1();
         card.nameCustom2 = SolegramSelfColors.nameCustom2();
+        final int[] theme = SolegramSelfColors.themeColors();
+        card.themeColor1 = theme[0];
+        card.themeColor2 = theme[1];
     }
 
     private static boolean styleMatches(Card card) {
@@ -644,7 +661,8 @@ public final class SolegramProfileCard {
         return card.profileColor == want.profileColor && card.profileEmoji == want.profileEmoji
             && card.customColor1 == want.customColor1 && card.customColor2 == want.customColor2
             && card.nameColor == want.nameColor && card.nameEmoji == want.nameEmoji
-            && card.nameCustom1 == want.nameCustom1 && card.nameCustom2 == want.nameCustom2;
+            && card.nameCustom1 == want.nameCustom1 && card.nameCustom2 == want.nameCustom2
+            && card.themeColor1 == want.themeColor1 && card.themeColor2 == want.themeColor2;
     }
 
     /** The card for these lookups: only on the UI thread (the cache is not thread-safe; UserObject is asked from
@@ -696,6 +714,42 @@ public final class SolegramProfileCard {
     public static int[] customColorsOf(long userId) {
         final Card c = styleCard(userId);
         return c != null && c.customColor1 != 0 && c.customColor2 != 0 ? new int[]{c.customColor1, c.customColor2} : null;
+    }
+
+    /** Someone's theme accent from their card (top and bottom of a gradient), or null. */
+    @Nullable
+    public static int[] themeColorsOf(long userId) {
+        final Card c = styleCard(userId);
+        return c != null && c.themeColor1 != 0 && c.themeColor2 != 0 ? new int[]{c.themeColor1, c.themeColor2} : null;
+    }
+
+    private static boolean themeWatched;
+    private static long lastThemeSync;
+    private static final Runnable themeSync = () -> {
+        lastThemeSync = android.os.SystemClock.elapsedRealtime();
+        try {
+            syncProfileStyle(org.telegram.messenger.UserConfig.selectedAccount);
+        } catch (Throwable e) {
+            org.telegram.messenger.FileLog.e(e);
+        }
+    };
+
+    /**
+     * The app came to the screen (or the theme changed): the own card follows the theme's colours, so others see the
+     * profile in them. At most about once a minute; nothing is sent when the card already matches. UI thread.
+     */
+    public static void syncThemeSoon() {
+        if (!SolegramConfig.profileCards) {
+            return;
+        }
+        if (!themeWatched) {
+            themeWatched = true;
+            org.telegram.messenger.NotificationCenter.getGlobalInstance().addObserver((id, account, args) -> syncThemeSoon(),
+                org.telegram.messenger.NotificationCenter.didSetNewTheme);
+        }
+        AndroidUtilities.cancelRunOnUIThread(themeSync);
+        final long since = android.os.SystemClock.elapsedRealtime() - lastThemeSync;
+        AndroidUtilities.runOnUIThread(themeSync, lastThemeSync == 0 || since > 60_000 ? 4_000 : 60_000 - since + 4_000);
     }
 
     /** The own profile's colour or pattern changed: the card takes it at once so others see it. UI thread. */

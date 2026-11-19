@@ -688,26 +688,13 @@ public class TranscribeButton {
                 }
                 setLoading(false, true);
                 NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject);
-                // the phone could not: Telegram's own free transcriptions of the week, where some are left
-                if (messageObject.messageOwner != null && canTranscribeTrial(messageObject) && parent != null) {
-                    transcribePressed(messageObject, true, parent.getDelegate());
+                // every language on the phone: Whisper, once its model is here (asked on the person's word)
+                if (com.solegram.messenger.SolegramWhisper.libraryAvailable() && !com.solegram.messenger.SolegramWhisper.modelReady()
+                        && parent != null && parent.getContext() != null) {
+                    sgOfferWhisper(messageObject);
                     return;
                 }
-                final int why = com.solegram.messenger.SolegramVoiceTranscriber.lastFailure;
-                final int text2;
-                if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_LANGUAGE) {
-                    text2 = R.string.SG_TranscribeNoLanguage;
-                } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_NO_RECOGNIZER) {
-                    text2 = R.string.SG_TranscribeNoRecognizer;
-                } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_NO_WORDS) {
-                    text2 = R.string.SG_TranscribeNoWords;
-                } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_FILE) {
-                    text2 = R.string.SG_TranscribeNoFile;
-                } else {
-                    text2 = R.string.SG_TranscribeFailed;
-                }
-                org.telegram.ui.Components.BulletinFactory.global().createSimpleBulletin(R.raw.error,
-                    org.telegram.messenger.LocaleController.getString(text2)).show();
+                sgFailed(messageObject);
                 return;
             }
             openVideoTranscription(messageObject);
@@ -715,6 +702,60 @@ public class TranscribeButton {
             MessagesStorage.getInstance(account).updateMessageVoiceTranscription(messageObject.getDialogId(), messageObject.getId(), text, messageObject.messageOwner);
             finishTranscription(messageObject, 0, text);
         });
+    }
+
+    /** Solegram: the phone could not; Telegram's own free transcriptions of the week where some are left, else why. */
+    private void sgFailed(MessageObject messageObject) {
+        if (messageObject.messageOwner != null && canTranscribeTrial(messageObject) && parent != null) {
+            transcribePressed(messageObject, true, parent.getDelegate());
+            return;
+        }
+        final int why = com.solegram.messenger.SolegramVoiceTranscriber.lastFailure;
+        final int text;
+        if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_LANGUAGE) {
+            text = R.string.SG_TranscribeNoLanguage;
+        } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_NO_RECOGNIZER) {
+            text = R.string.SG_TranscribeNoRecognizer;
+        } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_NO_WORDS) {
+            text = R.string.SG_TranscribeNoWords;
+        } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_FILE) {
+            text = R.string.SG_TranscribeNoFile;
+        } else {
+            text = R.string.SG_TranscribeFailed;
+        }
+        org.telegram.ui.Components.BulletinFactory.global().createSimpleBulletin(R.raw.error,
+            org.telegram.messenger.LocaleController.getString(text)).show();
+    }
+
+    /** Solegram: offers the speech model for every language (once), downloads it, then transcribes again. */
+    private void sgOfferWhisper(MessageObject messageObject) {
+        final android.content.Context context = parent.getContext();
+        new org.telegram.ui.ActionBar.AlertDialog.Builder(context)
+            .setTitle(org.telegram.messenger.LocaleController.getString(R.string.SG_WhisperTitle))
+            .setMessage(org.telegram.messenger.LocaleController.formatString(R.string.SG_WhisperText,
+                org.telegram.messenger.AndroidUtilities.formatFileSize(com.solegram.messenger.SolegramWhisper.MODEL_SIZE)))
+            .setPositiveButton(org.telegram.messenger.LocaleController.getString(R.string.SG_WhisperDownload), (d, w) -> {
+                final org.telegram.ui.ActionBar.AlertDialog progress = new org.telegram.ui.ActionBar.AlertDialog(context, org.telegram.ui.ActionBar.AlertDialog.ALERT_TYPE_LOADING);
+                progress.setMessage(org.telegram.messenger.LocaleController.getString(R.string.SG_WhisperDownloading));
+                progress.setCancelable(true);
+                progress.setCanCancel(true);
+                progress.setOnCancelListener(c -> com.solegram.messenger.SolegramWhisper.cancelDownload());
+                progress.show();
+                com.solegram.messenger.SolegramWhisper.download(progress::setProgress, ok -> {
+                    try {
+                        progress.dismiss();
+                    } catch (Throwable ignore) {
+                    }
+                    if (ok) {
+                        solegramTranscribe(messageObject);
+                    } else {
+                        org.telegram.ui.Components.BulletinFactory.global().createSimpleBulletin(R.raw.error,
+                            org.telegram.messenger.LocaleController.getString(R.string.SG_WhisperFailed)).show();
+                    }
+                });
+            })
+            .setNegativeButton(org.telegram.messenger.LocaleController.getString(R.string.SG_WhisperLater), (d, w) -> sgFailed(messageObject))
+            .show();
     }
 
     private static void transcribePressed(MessageObject messageObject, boolean open, ChatMessageCell.ChatMessageCellDelegate delegate) {

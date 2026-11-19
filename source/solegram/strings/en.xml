@@ -2214,4 +2214,10 @@
     <string name="SG_TranscribeNoRecognizer">This phone has no speech recognizer for apps. Install or turn on the Google app (or "Speech Services by Google") and try again</string>
     <string name="SG_TranscribeNoWords">No words were recognized in this message</string>
     <string name="SG_TranscribeNoFile">The voice message did not download, check the connection and try again</string>
+    <string name="SG_WhisperTitle">Transcription in every language</string>
+    <string name="SG_WhisperText">The phone\'s own speech recognition could not take this message. Solegram can download a speech model (Whisper, %1$s) once: then voice messages in any language are transcribed right on the phone, without the internet, and the sound never leaves it.</string>
+    <string name="SG_WhisperDownload">Download</string>
+    <string name="SG_WhisperLater">Not now</string>
+    <string name="SG_WhisperDownloading">Downloading the speech model…</string>
+    <string name="SG_WhisperFailed">The speech model did not download, check the connection and try again</string>
 </resources>
