@@ -23,6 +23,8 @@ public final class SolegramSelfColors {
     private static long nameEmoji, profileEmoji;
     // own colours of the profile (top, bottom of its gradient); 0: none
     private static int custom1, custom2;
+    // own colours of the name (the name, the reply line's second stripe); 0: none
+    private static int nameCustom1, nameCustom2;
 
     private SolegramSelfColors() {
     }
@@ -39,6 +41,8 @@ public final class SolegramSelfColors {
         profileEmoji = p.getLong("selfProfileEmoji", 0);
         custom1 = p.getInt("selfCustom1", 0);
         custom2 = p.getInt("selfCustom2", 0);
+        nameCustom1 = p.getInt("selfNameCustom1", 0);
+        nameCustom2 = p.getInt("selfNameCustom2", 0);
         loaded = true;
     }
 
@@ -82,6 +86,28 @@ public final class SolegramSelfColors {
         return custom2;
     }
 
+    public static int nameCustom1() {
+        load();
+        return nameCustom1;
+    }
+
+    public static int nameCustom2() {
+        load();
+        return nameCustom2;
+    }
+
+    /** The name's own colours (0, 0: back to the palette colour). */
+    public static void saveNameCustomColors(int c1, int c2) {
+        SolegramConfig.prefs().edit().putInt("selfNameCustom1", c1).putInt("selfNameCustom2", c2).apply();
+        loaded = false;
+    }
+
+    /** The colour id the own name is drawn with when own colours are chosen, else -1. */
+    public static int ownNameCustomId() {
+        load();
+        return nameCustom1 != 0 ? SolegramCustomColors.nameId(nameCustom1, nameCustom2 != 0 ? nameCustom2 : nameCustom1) : -1;
+    }
+
     /** The profile's own colours (0, 0: back to the palette colour). */
     public static void saveCustomColors(int c1, int c2) {
         SolegramConfig.prefs().edit().putInt("selfCustom1", c1).putInt("selfCustom2", c2).apply();
@@ -103,7 +129,7 @@ public final class SolegramSelfColors {
     public static void reset() {
         SolegramConfig.prefs().edit()
             .remove("selfColorsSet").remove("selfNameColor").remove("selfNameEmoji").remove("selfProfileColor").remove("selfProfileEmoji")
-            .remove("selfCustom1").remove("selfCustom2")
+            .remove("selfCustom1").remove("selfCustom2").remove("selfNameCustom1").remove("selfNameCustom2")
             .apply();
         loaded = false;
     }

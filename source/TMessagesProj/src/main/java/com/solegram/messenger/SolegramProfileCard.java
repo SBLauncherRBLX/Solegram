@@ -15,6 +15,7 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.UserObject;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
@@ -75,6 +76,10 @@ public final class SolegramProfileCard {
         public long profileEmoji;
         /** Own colours of the profile (top and bottom of its gradient, ARGB); 0: none, the palette colour is used. */
         public int customColor1, customColor2;
+        /** The name's colour, its emoji (replies), and own colours of the name, chosen in Solegram without Premium. */
+        public int nameColor = -1;
+        public long nameEmoji;
+        public int nameCustom1, nameCustom2;
 
         /** The pinned streak, unless it is more than a day older than its last check. */
         public boolean hasStreak() {
@@ -114,6 +119,15 @@ public final class SolegramProfileCard {
             }
             if (customColor1 != 0 && customColor2 != 0) {
                 sb.append("|px=").append(Integer.toHexString(customColor1)).append('.').append(Integer.toHexString(customColor2));
+            }
+            if (nameColor >= 0) {
+                sb.append("|nc=").append(nameColor);
+            }
+            if (nameEmoji != 0) {
+                sb.append("|ne=").append(nameEmoji);
+            }
+            if (nameCustom1 != 0) {
+                sb.append("|nx=").append(Integer.toHexString(nameCustom1)).append('.').append(Integer.toHexString(nameCustom2 != 0 ? nameCustom2 : nameCustom1));
             }
             if (streakDays > 0) {
                 sb.append("|s=").append(streakDays).append('.').append(streakColor).append('.').append(streakPartner).append('.').append(streakDay);
@@ -183,6 +197,20 @@ public final class SolegramProfileCard {
                         case "pe":
                             c.profileEmoji = Long.parseLong(v);
                             break;
+                        case "nc":
+                            c.nameColor = Math.max(-1, Math.min(1000, Integer.parseInt(v)));
+                            break;
+                        case "ne":
+                            c.nameEmoji = Long.parseLong(v);
+                            break;
+                        case "nx": {
+                            final String[] f = v.split("\\.");
+                            if (f.length == 2) {
+                                c.nameCustom1 = 0xFF000000 | (int) Long.parseLong(f[0], 16);
+                                c.nameCustom2 = 0xFF000000 | (int) Long.parseLong(f[1], 16);
+                            }
+                            break;
+                        }
                         case "px": {
                             final String[] f = v.split("\\.");
                             if (f.length == 2) {
@@ -267,18 +295,65 @@ public final class SolegramProfileCard {
     // region Reading others' cards
 
     private static final class Entry {
+        long userId;
         Card card; // null: known to have none
         long at;
+        /** When the card (or that there is none) was last known, from this run or from the disk (wall time). */
+        long knownAt;
         boolean loading;
         final ArrayList<Runnable> waiting = new ArrayList<>();
     }
 
     private static final LongSparseArray<Entry> cache = new LongSparseArray<>();
 
+    // the cards read are kept on the disk for a few days: names and profiles show others' colours at once
+    private static final long DISK_TTL = 3L * 24 * 60 * 60 * 1000;
+
+    private static android.content.SharedPreferences disk() {
+        return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("solegram_cards", android.content.Context.MODE_PRIVATE);
+    }
+
+    /** The entry of a user, from this run or read back from the disk (null: nothing known). UI thread. */
+    @Nullable
+    private static Entry entry(long userId) {
+        Entry e = cache.get(userId);
+        if (e != null) {
+            return e;
+        }
+        final String saved = disk().getString("c" + userId, null);
+        e = new Entry();
+        e.userId = userId;
+        if (saved != null) {
+            final int bar = saved.indexOf('|');
+            try {
+                e.knownAt = Long.parseLong(saved.substring(0, bar));
+                final String body = saved.substring(bar + 1);
+                e.card = "-".equals(body) ? null : Card.decode(body);
+            } catch (Exception ignore) {
+                e.knownAt = 0;
+                e.card = null;
+            }
+        }
+        cache.put(userId, e);
+        return e;
+    }
+
+    private static void remember(Entry e) {
+        e.knownAt = System.currentTimeMillis();
+        if (e.userId == 0) {
+            return;
+        }
+        final android.content.SharedPreferences prefs = disk();
+        if (prefs.getAll().size() > 1500) {
+            prefs.edit().clear().apply(); // a simple bound: read again when needed
+        }
+        prefs.edit().putString("c" + e.userId, e.knownAt + "|" + (e.card == null ? "-" : e.card.encode())).apply();
+    }
+
     /** The card of a user as last read (null: none or not read yet). UI thread. */
     @Nullable
     public static Card get(long userId) {
-        final Entry e = cache.get(userId);
+        final Entry e = entry(userId);
         return e == null ? null : e.card;
     }
 
@@ -290,9 +365,10 @@ public final class SolegramProfileCard {
         if (!SolegramConfig.profileCards || full == null) {
             return;
         }
-        Entry e = cache.get(userId);
+        Entry e = entry(userId);
         if (e == null) {
             e = new Entry();
+            e.userId = userId;
             cache.put(userId, e);
         }
         if (e.loading) {
@@ -307,6 +383,7 @@ public final class SolegramProfileCard {
             final boolean had = entry.card != null;
             entry.card = null;
             entry.at = SystemClock.elapsedRealtime();
+            remember(entry);
             if (had) {
                 changed.run();
             }
@@ -386,6 +463,7 @@ public final class SolegramProfileCard {
         e.loading = false;
         e.at = SystemClock.elapsedRealtime();
         e.card = card;
+        remember(e);
         final ArrayList<Runnable> run = new ArrayList<>(e.waiting);
         e.waiting.clear();
         for (Runnable r : run) {
@@ -396,6 +474,112 @@ public final class SolegramProfileCard {
     public static void forget(long userId) {
         cache.remove(userId);
     }
+
+    // region others' colours in chats: their cards read gently, one at a time
+    private static final java.util.ArrayDeque<long[]> chatQueue = new java.util.ArrayDeque<>();
+    private static final java.util.HashSet<Long> chatQueued = new java.util.HashSet<>();
+    private static boolean chatBusy;
+    private static long lastRedraw;
+
+    /**
+     * Someone's name is shown in a chat: their card (their Solegram name and profile colours) is read once in a few
+     * days, one person at a time, so names take the colours they chose. UI thread; cheap when already known.
+     */
+    public static void requestForChat(int account, @Nullable TLRPC.User user) {
+        if (user == null || user.self || user.bot || user.id == 0 || !SolegramConfig.profileCards || UserObject.isDeleted(user)) {
+            return;
+        }
+        final Entry e = entry(user.id);
+        if (e != null && (e.loading || e.at != 0 || e.knownAt != 0 && System.currentTimeMillis() - e.knownAt < DISK_TTL)) {
+            return;
+        }
+        if (!chatQueued.add(user.id)) {
+            return;
+        }
+        chatQueue.add(new long[]{account, user.id});
+        pumpChat();
+    }
+
+    private static void pumpChat() {
+        if (chatBusy) {
+            return;
+        }
+        final long[] next = chatQueue.poll();
+        if (next == null) {
+            return;
+        }
+        chatBusy = true;
+        final int account = (int) next[0];
+        final long userId = next[1];
+        final Runnable done = () -> {
+            chatBusy = false;
+            chatQueued.remove(userId);
+            final Card c = get(userId);
+            if (c != null && (c.nameColor >= 0 || c.nameCustom1 != 0 || c.nameEmoji != 0 || c.profileColor >= 0 || c.customColor1 != 0)) {
+                redraw(account);
+            }
+            // gently: a little while before the next person
+            AndroidUtilities.runOnUIThread(SolegramProfileCard::pumpChat, 1200);
+        };
+        final MessagesController mc = MessagesController.getInstance(account);
+        final TLRPC.User user = mc.getUser(userId);
+        if (user == null) {
+            done.run();
+            return;
+        }
+        final TLRPC.UserFull full = mc.getUserFull(userId);
+        final boolean[] finished = {false};
+        final Runnable once = () -> {
+            if (!finished[0]) {
+                finished[0] = true;
+                done.run();
+            }
+        };
+        // never stuck: a request that does not answer lets the next one go
+        AndroidUtilities.runOnUIThread(once, 15000);
+        if (full != null) {
+            loadOrSkip(account, userId, full, once);
+        } else {
+            mc.loadFullUser(user, 0, false, f -> AndroidUtilities.runOnUIThread(() -> {
+                if (f == null) {
+                    once.run();
+                } else {
+                    loadOrSkip(account, userId, f, once);
+                }
+            }));
+        }
+    }
+
+    private static void loadOrSkip(int account, long userId, TLRPC.UserFull full, Runnable done) {
+        final Entry before = entry(userId);
+        final long at = before != null ? before.at : 0;
+        load(account, userId, full, done);
+        final Entry after = entry(userId);
+        // nothing to wait for (no personal channel, or read just now): go on
+        if (after == null || !after.loading && after.at != 0 && after.at != at || full.personal_channel_id == 0) {
+            done.run();
+        }
+    }
+
+    /** Chats redraw names in the colours just read (at most every two seconds). */
+    private static void redraw(int account) {
+        final long now = SystemClock.elapsedRealtime();
+        if (now - lastRedraw < 2000) {
+            AndroidUtilities.cancelRunOnUIThread(redrawLater);
+            AndroidUtilities.runOnUIThread(redrawLater, 2000);
+            redrawAccount = account;
+            return;
+        }
+        lastRedraw = now;
+        org.telegram.messenger.NotificationCenter.getInstance(account).postNotificationName(org.telegram.messenger.NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME);
+    }
+
+    private static int redrawAccount;
+    private static final Runnable redrawLater = () -> {
+        lastRedraw = SystemClock.elapsedRealtime();
+        org.telegram.messenger.NotificationCenter.getInstance(redrawAccount).postNotificationName(org.telegram.messenger.NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME);
+    };
+    // endregion
     // endregion
 
     // region The own card
@@ -448,13 +632,19 @@ public final class SolegramProfileCard {
         }
         card.customColor1 = SolegramSelfColors.customColor1();
         card.customColor2 = SolegramSelfColors.customColor2();
+        card.nameColor = SolegramSelfColors.isSet() ? SolegramSelfColors.nameColor() : -1;
+        card.nameEmoji = SolegramSelfColors.isSet() ? SolegramSelfColors.nameEmoji() : 0;
+        card.nameCustom1 = SolegramSelfColors.nameCustom1();
+        card.nameCustom2 = SolegramSelfColors.nameCustom2();
     }
 
     private static boolean styleMatches(Card card) {
         final Card want = new Card();
         applyLocalStyle(want);
         return card.profileColor == want.profileColor && card.profileEmoji == want.profileEmoji
-            && card.customColor1 == want.customColor1 && card.customColor2 == want.customColor2;
+            && card.customColor1 == want.customColor1 && card.customColor2 == want.customColor2
+            && card.nameColor == want.nameColor && card.nameEmoji == want.nameEmoji
+            && card.nameCustom1 == want.nameCustom1 && card.nameCustom2 == want.nameCustom2;
     }
 
     /** The card for these lookups: only on the UI thread (the cache is not thread-safe; UserObject is asked from
@@ -481,6 +671,24 @@ public final class SolegramProfileCard {
     public static long profileEmojiOf(long userId) {
         final Card c = styleCard(userId);
         return c != null ? c.profileEmoji : 0;
+    }
+
+    /** The name colour id someone chose in Solegram (their own colours, or a palette colour), -1: none / not read. */
+    public static int nameColorOf(long userId) {
+        final Card c = styleCard(userId);
+        if (c == null) {
+            return -1;
+        }
+        if (c.nameCustom1 != 0) {
+            return SolegramCustomColors.nameId(c.nameCustom1, c.nameCustom2 != 0 ? c.nameCustom2 : c.nameCustom1);
+        }
+        return c.nameColor;
+    }
+
+    /** The emoji on someone's replies chosen in Solegram (0: none). */
+    public static long nameEmojiOf(long userId) {
+        final Card c = styleCard(userId);
+        return c != null ? c.nameEmoji : 0;
     }
 
     /** Someone's own profile colours from their card, or null. */

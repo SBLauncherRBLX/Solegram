@@ -2207,4 +2207,7 @@
     <string name="SG_ProfileBackgroundEmoji">Icons on the background</string>
     <string name="SG_ProfilePinGift">Pin a gift</string>
     <string name="SG_CardTapToChangeShort">Chosen</string>
+    <string name="SG_NameOwnColors">Own name colours</string>
+    <string name="SG_NameColorMain">Name</string>
+    <string name="SG_NameColorSecond">Second stripe</string>
 </resources>

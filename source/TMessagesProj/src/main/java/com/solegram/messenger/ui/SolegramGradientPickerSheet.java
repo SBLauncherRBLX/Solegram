@@ -60,6 +60,7 @@ public class SolegramGradientPickerSheet extends BottomSheet {
     private final SvSquare square;
     private final HueBar hueBar;
     private final float[] hsv = new float[3];
+    private final TextView titleView;
 
     public SolegramGradientPickerSheet(Context context, Theme.ResourcesProvider rp, int top, int bottom, Listener listener) {
         super(context, false, rp);
@@ -72,7 +73,7 @@ public class SolegramGradientPickerSheet extends BottomSheet {
         column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(dp(16), dp(4), dp(16), dp(12));
 
-        final TextView title = new TextView(context);
+        final TextView title = titleView = new TextView(context);
         title.setText(getString(R.string.SG_ProfileOwnColors));
         title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         title.setTypeface(AndroidUtilities.bold());
@@ -130,6 +131,14 @@ public class SolegramGradientPickerSheet extends BottomSheet {
 
         setCustomView(column);
         select(0);
+    }
+
+    /** Other words for the sheet (the name's colours: the name and the reply line's second stripe). */
+    public SolegramGradientPickerSheet labels(CharSequence title, CharSequence first, CharSequence second) {
+        titleView.setText(title);
+        chips[0].setText(first);
+        chips[1].setText(second);
+        return this;
     }
 
     private void select(int index) {

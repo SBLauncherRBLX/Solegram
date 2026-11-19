@@ -2207,4 +2207,7 @@
     <string name="SG_ProfileBackgroundEmoji">Значки на фоне</string>
     <string name="SG_ProfilePinGift">Закрепить подарок</string>
     <string name="SG_CardTapToChangeShort">Выбран</string>
+    <string name="SG_NameOwnColors">Свои цвета имени</string>
+    <string name="SG_NameColorMain">Имя</string>
+    <string name="SG_NameColorSecond">Вторая полоска</string>
 </resources>

@@ -2007,6 +2007,15 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture, com
         return onItemClickListener;
     }
 
+    /** Solegram: the listeners as set, to click an item on behalf of a touch that reached the list another way. */
+    public OnItemClickListenerExtended getOnItemClickListenerExtended() {
+        return onItemClickListenerExtended;
+    }
+
+    public OnItemLongClickListenerExtended getOnItemLongClickListenerExtended() {
+        return onItemLongClickListenerExtended;
+    }
+
     public void clickItem(View item, int position) {
         if (onItemClickListener != null) {
             onItemClickListener.onItemClick(item, position);

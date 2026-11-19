@@ -5160,6 +5160,9 @@ public class MessagesController extends BaseController implements NotificationCe
 
         @Nullable
         public PeerColor getColor(int colorId) {
+            if (com.solegram.messenger.SolegramCustomColors.isCustom(colorId)) {
+                return com.solegram.messenger.SolegramCustomColors.get(colorId); // Solegram: own colours
+            }
             return colorsById.get(colorId);
         }
 
@@ -5478,6 +5481,24 @@ public class MessagesController extends BaseController implements NotificationCe
             System.arraycopy(peerColor.colors, 0, peerColor.darkColors, 0, 6);
             peerColor.patternColor = androidx.core.graphics.ColorUtils.blendARGB(bottom, 0xFF000000, 0.25f);
             peerColor.textColor = 0xFFFFFFFF;
+            return peerColor;
+        }
+
+        /** Solegram: a name colour of own colours: the name, and the reply line's second stripe (the same colour: one). */
+        public static PeerColor fromCustomName(int name, int second) {
+            if (name == 0) return null;
+            name |= 0xFF000000;
+            second = second == 0 ? name : second | 0xFF000000;
+            final PeerColor peerColor = new PeerColor();
+            peerColor.id = -1;
+            peerColor.hidden = true;
+            peerColor.colors[0] = name;
+            peerColor.colors[1] = second;
+            peerColor.colors[2] = name;
+            peerColor.colors[3] = name;
+            peerColor.colors[4] = name;
+            peerColor.colors[5] = name;
+            System.arraycopy(peerColor.colors, 0, peerColor.darkColors, 0, 6);
             return peerColor;
         }
 

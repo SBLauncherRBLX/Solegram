@@ -19552,6 +19552,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     if (currentMessageObject.overrideLinkColor >= 0) {
                         colorId = currentMessageObject.overrideLinkColor;
                     } else if (currentMessageObject.isFromUser() && currentUser != null) {
+                        // Solegram: read the sender's Solegram colours once in a while (cheap when known)
+                        com.solegram.messenger.SolegramProfileCard.requestForChat(currentAccount, currentUser);
                         colorId = UserObject.getColorId(currentUser);
                     } else {
                         colorId = ChatObject.getColorId(currentChat);

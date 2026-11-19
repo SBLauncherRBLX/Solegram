@@ -425,10 +425,20 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                                 if (sgOwnPeerColor() != null) {
                                     colorPicker.setSelected(PeerColorGrid.SG_CUSTOM_ID, false);
                                 }
+                            } else if (type == PAGE_NAME && !isChannel) {
+                                final int n1 = com.solegram.messenger.SolegramSelfColors.nameCustom1(), n2 = com.solegram.messenger.SolegramSelfColors.nameCustom2();
+                                colorPicker.sgSetCustom(true, n1, n2 != 0 ? n2 : n1);
+                                if (n1 != 0) {
+                                    colorPicker.setSelected(PeerColorGrid.SG_CUSTOM_ID, false);
+                                }
                             }
                             colorPicker.setOnColorClick(colorId -> {
                                 if (colorId == PeerColorGrid.SG_CUSTOM_ID) {
-                                    sgOpenOwnColors();
+                                    if (type == PAGE_NAME) {
+                                        sgOpenOwnNameColors();
+                                    } else {
+                                        sgOpenOwnColors();
+                                    }
                                     return;
                                 }
                                 if (type == PAGE_PROFILE && !isChannel && com.solegram.messenger.SolegramSelfColors.customColor1() != 0) {
@@ -436,6 +446,11 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                                     com.solegram.messenger.SolegramSelfColors.saveCustomColors(0, 0);
                                     colorPicker.sgSetCustom(true, 0, 0);
                                     com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+                                }
+                                if (type == PAGE_NAME && !isChannel && com.solegram.messenger.SolegramSelfColors.nameCustom1() != 0) {
+                                    com.solegram.messenger.SolegramSelfColors.saveNameCustomColors(0, 0);
+                                    colorPicker.sgSetCustom(true, 0, 0);
+                                    sgNameStyleChanged();
                                 }
                                 selectedColor = colorId;
                                 selectedEmojiCollectible = null;
@@ -1480,7 +1495,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
 
         /** The own profile's own colours, when chosen (they win over the palette colour). */
         private MessagesController.PeerColor sgOwnPeerColor() {
-            if (isChannel || selectedEmojiCollectible != null) {
+            if (isChannel || type != PAGE_PROFILE || selectedEmojiCollectible != null) {
                 return null;
             }
             return MessagesController.PeerColor.fromCustom(com.solegram.messenger.SolegramSelfColors.customColor1(), com.solegram.messenger.SolegramSelfColors.customColor2());
@@ -1517,6 +1532,41 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
             });
             showDialog(sheet);
+        }
+
+        /** Own colours of the name: the name itself and the reply line's second stripe, live on the preview. */
+        private void sgOpenOwnNameColors() {
+            if (getParentActivity() == null) {
+                return;
+            }
+            final MessagesController.PeerColors pcs = MessagesController.getInstance(currentAccount).peerColors;
+            final int base = selectedColor >= 0 && selectedColor < 7
+                ? Theme.getColor(Theme.keys_avatar_nameInMessage[selectedColor], getResourceProvider())
+                : (pcs != null && pcs.getColor(selectedColor) != null ? pcs.getColor(selectedColor).getColor(0, getResourceProvider()) : 0xFF3B82C4);
+            int c1 = com.solegram.messenger.SolegramSelfColors.nameCustom1(), c2 = com.solegram.messenger.SolegramSelfColors.nameCustom2();
+            if (c1 == 0) {
+                c1 = base;
+                c2 = base;
+            } else if (c2 == 0) {
+                c2 = c1;
+            }
+            final com.solegram.messenger.ui.SolegramGradientPickerSheet sheet = new com.solegram.messenger.ui.SolegramGradientPickerSheet(getParentActivity(), getResourceProvider(), c1, c2, (first, second) -> {
+                com.solegram.messenger.SolegramSelfColors.saveNameCustomColors(first, second);
+                if (peerColorPicker != null) {
+                    peerColorPicker.sgSetCustom(true, first, second);
+                    peerColorPicker.setSelected(PeerColorGrid.SG_CUSTOM_ID, true);
+                }
+                updateMessages();
+            }).labels(getString(R.string.SG_NameOwnColors), getString(R.string.SG_NameColorMain), getString(R.string.SG_NameColorSecond));
+            sheet.setOnDismissListener(d -> sgNameStyleChanged());
+            showDialog(sheet);
+        }
+
+        /** The name's look changed: chats redraw names, and the profile card takes it so others see it. */
+        private void sgNameStyleChanged() {
+            updateMessages();
+            getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME);
+            com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
         }
 
         /** The card changed (or was read): the rows and the preview follow it. */
@@ -1652,7 +1702,10 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
 
         public void updateProfilePreview(boolean animated) {
             if (peerColorPicker != null) {
-                peerColorPicker.setSelected(sgOwnPeerColor() != null ? PeerColorGrid.SG_CUSTOM_ID : selectedColor, animated);
+                final boolean sgCustomOn = type == PAGE_NAME
+                    ? !isChannel && com.solegram.messenger.SolegramSelfColors.nameCustom1() != 0
+                    : sgOwnPeerColor() != null;
+                peerColorPicker.setSelected(sgCustomOn ? PeerColorGrid.SG_CUSTOM_ID : selectedColor, animated);
             }
             if (profilePreview != null) {
                 if (selectedEmojiCollectible != null) {
@@ -1699,7 +1752,8 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                         if (msg != null) {
                             msg.notime = true;
                             if (peerColorPicker != null) {
-                                msg.overrideLinkColor = peerColorPicker.getColorId();
+                                msg.overrideLinkColor = peerColorPicker.getColorId() == PeerColorGrid.SG_CUSTOM_ID
+                                    ? com.solegram.messenger.SolegramSelfColors.ownNameCustomId() : peerColorPicker.getColorId();
                             }
                             msg.overrideLinkEmoji = selectedEmoji;
                             msg.overrideLinkPeerColor = selectedPeerCollectible;
@@ -3282,7 +3336,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             final float verticalSeparator = Math.min(iconSize * .315789474f, dp(11.33f));
 
             final int paletteCount = colorsCount;
-            if (sgCustom && type == PAGE_PROFILE) {
+            if (sgCustom && (type == PAGE_PROFILE || type == PAGE_NAME)) {
                 colorsCount++;
             }
             final int rows = (colorsCount + columns - 1) / columns;
@@ -3298,7 +3352,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                         buttons[i].id = order[i];
                         buttons[i].setClose(buttons[i].id < 0);
                         buttons[i].set(Theme.getColor(order[i] < 0 ? Theme.key_avatar_backgroundGray : Theme.keys_avatar_nameInMessage[order[i] % Theme.keys_avatar_nameInMessage.length], resourcesProvider));
-                    } else if (sgCustom && type == PAGE_PROFILE && i == paletteCount) {
+                    } else if (sgCustom && (type == PAGE_PROFILE || type == PAGE_NAME) && i == paletteCount) {
                         sgLook(buttons[i]);
                     } else if (peerColors != null && i >= 0 && i < peerColors.colors.size()) {
                         buttons[i].id = peerColors.colors.get(i).id;

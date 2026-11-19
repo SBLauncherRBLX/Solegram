@@ -1685,8 +1685,36 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         // region Solegram: a tap on a chat always reaches the chat
-        private boolean solegramChatsTouch;
+        private static final int SG_TOUCH_NONE = 0, SG_TOUCH_TAP = 1, SG_TOUCH_LIST = 2;
+        private int solegramChatsTouch;
+        private boolean solegramLongPressed;
+        private float solegramDownX, solegramDownY, solegramLastX, solegramLastY;
+        private View solegramDownCell;
+        private int solegramDownPosition;
         private final android.graphics.RectF solegramTmpRect = new android.graphics.RectF();
+        private final Runnable solegramLongPress = () -> {
+            final ViewPage page = viewPages != null && viewPages.length > 0 ? viewPages[0] : null;
+            if (solegramChatsTouch != SG_TOUCH_TAP || page == null || solegramDownCell == null) {
+                return;
+            }
+            final RecyclerListView.OnItemLongClickListenerExtended l = page.listView.getOnItemLongClickListenerExtended();
+            if (l != null && l.onItemClick(solegramDownCell, solegramDownPosition, solegramDownX - solegramCellX(page), solegramDownY - solegramCellY(page))) {
+                solegramLongPressed = true;
+                solegramDownCell.setPressed(false);
+                try {
+                    performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                } catch (Exception ignore) {
+                }
+            }
+        };
+
+        private float solegramCellX(ViewPage page) {
+            return page.getX() + page.listView.getX() + (solegramDownCell != null ? solegramDownCell.getX() : 0);
+        }
+
+        private float solegramCellY(ViewPage page) {
+            return page.getY() + page.listView.getY() + (solegramDownCell != null ? solegramDownCell.getY() : 0);
+        }
 
         /** Where a header view is really drawn (in this view's coordinates), when it is shown at all. */
         private boolean solegramHeaderAt(View v, float x, float y, float visibleHeight) {
@@ -1698,23 +1726,33 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return x >= v.getX() && x <= v.getX() + v.getWidth() && y >= top && y <= top + h;
         }
 
+        private void solegramForward(MotionEvent ev, DialogsRecyclerView list, ViewPage page) {
+            final float dx = page.getX() + list.getX(), dy = page.getY() + list.getY();
+            ev.offsetLocation(-dx, -dy);
+            list.dispatchTouchEvent(ev);
+            ev.offsetLocation(dx, dy);
+        }
+
         /**
-         * A touch on a chat goes to the chats list, unless a header part that is really drawn there is under it: views
-         * laid over the list (some larger than what they draw, some faded out) took the taps on the top of the first chat.
+         * A touch on a chat near the top of the list, where views of the header lie over the list (some larger than
+         * what they draw, some faded out) and took the taps: unless a header part that is really drawn there is under
+         * the finger, a tap opens the chat, a hold is the list's long press, and a move goes on to the list (scrolling).
          */
         private boolean solegramDispatchToChats(MotionEvent ev) {
             final int action = ev.getActionMasked();
             final ViewPage page = viewPages != null && viewPages.length > 0 ? viewPages[0] : null;
             final DialogsRecyclerView list = page != null ? page.listView : null;
             if (action == MotionEvent.ACTION_DOWN) {
-                solegramChatsTouch = false;
+                solegramChatsTouch = SG_TOUCH_NONE;
+                solegramLongPressed = false;
+                AndroidUtilities.cancelRunOnUIThread(solegramLongPress);
                 if (list == null || searching || searchIsShowed || page.getVisibility() != View.VISIBLE
                         || rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment()
                         || actionBar != null && actionBar.isActionModeShowed() || filterTabsView != null && filterTabsView.isEditing()) {
                     return false;
                 }
                 final float x = ev.getX(), y = ev.getY();
-                // the header's real parts
+                // the header's real parts keep their taps
                 if (solegramHeaderAt(actionBar, x, y, 0)
                         || solegramHeaderAt(dialogStoriesCell, x, y, 0)
                         || solegramHeaderAt(filterTabsView, x, y, dp(36 + 7))
@@ -1724,28 +1762,26 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         || solegramHeaderAt(fragmentSearchField, x, y, 0)) {
                     return false;
                 }
-                // over a chat?
                 final float lx = x - page.getX() - list.getX(), ly = y - page.getY() - list.getY();
-                boolean onChat = false;
+                // only at the top, where the header lies over the list
+                if (ly > list.getPaddingTop() + dp(96)) {
+                    return false;
+                }
+                View cell = null;
                 for (int i = 0; i < list.getChildCount(); i++) {
                     final View child = list.getChildAt(i);
                     if (child instanceof org.telegram.ui.Cells.DialogCell) {
                         solegramTmpRect.set(child.getX(), child.getY(), child.getX() + child.getWidth(), child.getY() + child.getHeight());
                         if (solegramTmpRect.contains(lx, ly)) {
-                            onChat = true;
+                            cell = child;
                             break;
                         }
                     }
                 }
-                if (!onChat) {
+                if (cell == null) {
                     return false;
                 }
-                // only at the top, where the header's views lie over the list (the tab bar, the button, the bulletins
-                // at the bottom keep their taps)
-                if (ly > list.getPaddingTop() + dp(96)) {
-                    return false;
-                }
-                // only when something over the list would otherwise take it: the list answers as usual elsewhere
+                // only when something over the list would otherwise take it
                 View top = null;
                 for (int i = getChildCount() - 1; i >= 0; i--) {
                     final View child = getChildAt(i);
@@ -1761,17 +1797,75 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 if (top == null) {
                     return false;
                 }
-                solegramChatsTouch = true;
+                solegramChatsTouch = SG_TOUCH_TAP;
+                solegramDownCell = cell;
+                solegramDownPosition = list.getChildAdapterPosition(cell);
+                solegramDownX = solegramLastX = x;
+                solegramDownY = solegramLastY = y;
+                cell.drawableHotspotChanged(lx - cell.getX(), ly - cell.getY());
+                cell.setPressed(true);
+                AndroidUtilities.runOnUIThread(solegramLongPress, android.view.ViewConfiguration.getLongPressTimeout());
+                return true;
             }
-            if (!solegramChatsTouch || list == null) {
+            if (solegramChatsTouch == SG_TOUCH_NONE || list == null) {
                 return false;
             }
-            final float dx = page.getX() + list.getX(), dy = page.getY() + list.getY();
-            ev.offsetLocation(-dx, -dy);
-            list.dispatchTouchEvent(ev);
-            ev.offsetLocation(dx, dy);
+            if (solegramChatsTouch == SG_TOUCH_LIST) {
+                solegramForward(ev, list, page);
+                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    solegramChatsTouch = SG_TOUCH_NONE;
+                }
+                return true;
+            }
+            // a tap or a hold so far
+            final float x = ev.getX(), y = ev.getY();
+            if (action == MotionEvent.ACTION_MOVE) {
+                if (solegramLongPressed) {
+                    final RecyclerListView.OnItemLongClickListenerExtended l = list.getOnItemLongClickListenerExtended();
+                    if (l != null) {
+                        l.onMove(x - solegramLastX, y - solegramLastY);
+                    }
+                    solegramLastX = x;
+                    solegramLastY = y;
+                    return true;
+                }
+                final int slop = android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                if (Math.abs(x - solegramDownX) > slop || Math.abs(y - solegramDownY) > slop) {
+                    // a move: the list takes the gesture from where it began (it scrolls as usual)
+                    AndroidUtilities.cancelRunOnUIThread(solegramLongPress);
+                    if (solegramDownCell != null) {
+                        solegramDownCell.setPressed(false);
+                    }
+                    solegramChatsTouch = SG_TOUCH_LIST;
+                    final MotionEvent down = MotionEvent.obtain(ev.getDownTime(), ev.getDownTime(), MotionEvent.ACTION_DOWN, solegramDownX, solegramDownY, 0);
+                    solegramForward(down, list, page);
+                    down.recycle();
+                    solegramForward(ev, list, page);
+                }
+                return true;
+            }
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                solegramChatsTouch = false;
+                AndroidUtilities.cancelRunOnUIThread(solegramLongPress);
+                if (solegramDownCell != null) {
+                    solegramDownCell.setPressed(false);
+                }
+                if (solegramLongPressed) {
+                    final RecyclerListView.OnItemLongClickListenerExtended l = list.getOnItemLongClickListenerExtended();
+                    if (l != null) {
+                        l.onLongClickRelease();
+                    }
+                } else if (action == MotionEvent.ACTION_UP && solegramDownCell != null && solegramDownPosition != RecyclerView.NO_POSITION) {
+                    // a tap: the chat opens, as a tap through the list would open it (no scrolling)
+                    final RecyclerListView.OnItemClickListenerExtended l = list.getOnItemClickListenerExtended();
+                    if (l != null) {
+                        list.playSoundEffect(android.view.SoundEffectConstants.CLICK);
+                        l.onItemClick(solegramDownCell, solegramDownPosition, x - solegramCellX(page), y - solegramCellY(page));
+                    }
+                }
+                solegramChatsTouch = SG_TOUCH_NONE;
+                solegramLongPressed = false;
+                solegramDownCell = null;
+                return true;
             }
             return true;
         }

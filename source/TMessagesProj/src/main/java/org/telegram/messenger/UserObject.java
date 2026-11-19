@@ -212,15 +212,24 @@ public class UserObject {
 
     public static int getColorId(TLRPC.User user) {
         if (user == null) return 0;
+        if (user.self) {
+            // Solegram: the own name in own colours
+            final int own = com.solegram.messenger.SolegramSelfColors.ownNameCustomId();
+            if (own >= 0) return own;
+        }
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.nameColor(); // Solegram: kept on this device
         if (user.color instanceof TLRPC.TL_peerColor && (user.color.flags & 1) != 0) return user.color.color;
+        // Solegram: the name colour someone chose in Solegram without Premium, from their profile card
+        final int sg = user.self ? -1 : com.solegram.messenger.SolegramProfileCard.nameColorOf(user.id);
+        if (sg >= 0) return sg;
         return (int) (user.id % 7);
     }
 
     public static long getEmojiId(TLRPC.User user) {
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.nameEmoji();
         if (user != null && user.color instanceof TLRPC.TL_peerColor && (user.color.flags & 2) != 0) return user.color.background_emoji_id;
-        return 0;
+        // Solegram: the replies' emoji someone chose in Solegram, from their profile card
+        return user != null && !user.self ? com.solegram.messenger.SolegramProfileCard.nameEmojiOf(user.id) : 0;
     }
 
     public static int getProfileColorId(TLRPC.User user) {
