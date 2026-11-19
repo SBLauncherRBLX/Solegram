@@ -231,8 +231,7 @@ public final class SolegramProfileCard {
                             break;
                         }
                         case "tb":
-                            c.themeBase = SolegramProfileTheme.validBase(v) ? v : null;
-                            break;
+                            break; // a theme base from 3.4.1 betas 48-49: not used
                         case "tp": {
                             final String[] f = v.split("\\.");
                             final int n = Math.min(f.length, 32);
@@ -676,20 +675,12 @@ public final class SolegramProfileCard {
         card.nameEmoji = SolegramSelfColors.isSet() ? SolegramSelfColors.nameEmoji() : 0;
         card.nameCustom1 = SolegramSelfColors.nameCustom1();
         card.nameCustom2 = SolegramSelfColors.nameCustom2();
-        final int[] theme = SolegramSelfColors.themeColors();
-        card.themeColor1 = theme[0];
-        card.themeColor2 = theme[1];
-        if (themeTooLong) {
-            card.themeBase = null;
-            card.themePalette = null;
-        } else {
-            card.themeBase = SolegramProfileTheme.baseNow();
-            card.themePalette = SolegramProfileTheme.paletteNow();
-        }
+        // the theme's colours are not carried any more (cards from 3.4.1 betas 48-49 may still hold them: ignored)
+        card.themeColor1 = 0;
+        card.themeColor2 = 0;
+        card.themeBase = null;
+        card.themePalette = null;
     }
-
-    /** The caption had no room for the page's theme in this run: it is left off (not tried again until restart). */
-    private static boolean themeTooLong;
 
     private static boolean styleMatches(Card card) {
         final Card want = new Card();
@@ -702,11 +693,6 @@ public final class SolegramProfileCard {
             && TextUtils.equals(card.themeBase, want.themeBase) && Arrays.equals(card.themePalette, want.themePalette);
     }
 
-    /** Someone's card for drawing their profile page in their theme (UI thread), or null. */
-    @Nullable
-    static Card cardForTheme(long userId) {
-        return styleCard(userId);
-    }
 
     /** The card for these lookups: only on the UI thread (the cache is not thread-safe; UserObject is asked from
      *  other threads too, which then just see no Solegram style). */
@@ -759,44 +745,9 @@ public final class SolegramProfileCard {
         return c != null && c.customColor1 != 0 && c.customColor2 != 0 ? new int[]{c.customColor1, c.customColor2} : null;
     }
 
-    /** Someone's theme accent from their card (top and bottom of a gradient), or null. */
-    @Nullable
-    public static int[] themeColorsOf(long userId) {
-        final Card c = styleCard(userId);
-        return c != null && c.themeColor1 != 0 && c.themeColor2 != 0 ? new int[]{c.themeColor1, c.themeColor2} : null;
-    }
-
-    private static boolean themeWatched;
-    private static long lastThemeSync;
-    private static final Runnable themeSync = () -> {
-        lastThemeSync = android.os.SystemClock.elapsedRealtime();
-        try {
-            syncProfileStyle(org.telegram.messenger.UserConfig.selectedAccount);
-        } catch (Throwable e) {
-            org.telegram.messenger.FileLog.e(e);
-        }
-    };
-
-    /**
-     * The app came to the screen (or the theme changed): the own card follows the theme's colours, so others see the
-     * profile in them. At most about once a minute; nothing is sent when the card already matches. UI thread.
-     */
-    public static void syncThemeSoon() {
-        if (!SolegramConfig.profileCards) {
-            return;
-        }
-        if (!themeWatched) {
-            themeWatched = true;
-            org.telegram.messenger.NotificationCenter.getGlobalInstance().addObserver((id, account, args) -> syncThemeSoon(),
-                org.telegram.messenger.NotificationCenter.didSetNewTheme);
-        }
-        AndroidUtilities.cancelRunOnUIThread(themeSync);
-        final long since = android.os.SystemClock.elapsedRealtime() - lastThemeSync;
-        AndroidUtilities.runOnUIThread(themeSync, lastThemeSync == 0 || since > 60_000 ? 4_000 : 60_000 - since + 4_000);
-    }
-
     /** The own profile's colour or pattern changed: the card takes it at once so others see it. UI thread. */
     public static void syncProfileStyle(int account) {
+        SolegramNameEmojiShare.scheduleSync(); // the colour and background emoji also go into the bio: seen with no banner
         syncMusicEmoji(account, null, true);
     }
 
@@ -851,14 +802,7 @@ public final class SolegramProfileCard {
         final String caption = strip(post.messageOwner.message);
         card.musicEmoji = SolegramConfig.profileMusicEmoji; // the music's pattern goes with the card
         applyLocalStyle(card); // and the profile's colour and pattern emoji chosen without Premium
-        String mark = mark(card.encode());
-        if (caption.length() + mark.length() > mc.maxCaptionLength && card.themePalette != null) {
-            // the theme of the profile page is the first to give way: the rest of the card still fits
-            themeTooLong = true;
-            card.themeBase = null;
-            card.themePalette = null;
-            mark = mark(card.encode());
-        }
+        final String mark = mark(card.encode());
         if (caption.length() + mark.length() > mc.maxCaptionLength) {
             done.run("CAPTION_TOO_LONG");
             return;

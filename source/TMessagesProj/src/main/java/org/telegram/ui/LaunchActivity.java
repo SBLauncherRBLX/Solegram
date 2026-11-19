@@ -7217,7 +7217,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     @Override
     protected void onResume() {
         super.onResume();
-        com.solegram.messenger.SolegramProfileCard.syncThemeSoon(); // Solegram: others see the profile in the theme's colours
+        com.solegram.messenger.SolegramNameEmojiShare.syncOnceOnStart(); // Solegram: the profile's look in the bio for others
         WidgetMedia.onAppPaused(false);
         com.solegram.messenger.SolegramRepeats.tick(); // Solegram: the next copies of repeating messages
         isResumed = true;

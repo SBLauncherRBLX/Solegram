@@ -1369,7 +1369,7 @@
     <string name="SG_PluginAutoDisabled">Plugin %1$s was switched off: it kept failing</string>
     <string name="SG_CardTapBanner">Tap the banner to choose a picture or GIF from your personal channel</string>
     <string name="SG_CardTapToChange">Tap the banner to change it</string>
-    <string name="SG_CardDragHint">Hold a block and move it with your finger. − takes it out of the profile, the blocks below put it back.</string>
+    <string name="SG_CardDragHint">− takes a block out of the profile, the blocks below put it back.</string>
     <string name="SG_TileChannel">Personal channel</string>
     <string name="SG_CardNoChannel">No personal channel yet</string>
     <string name="SG_CardWhenSet">Shown when it is set</string>
@@ -2221,4 +2221,8 @@
     <string name="SG_WhisperDownloading">Downloading the speech model…</string>
     <string name="SG_WhisperFailed">The speech model did not download, check the connection and try again</string>
     <string name="SG_ThemePickColor">Your colour</string>
+    <string name="SG_LastSeenOfferTitle">See when people were online</string>
+    <string name="SG_LastSeenOfferText">Telegram hides other people\'s last seen time from you because yours is hidden. Show your last seen to everyone? Then you will see everyone\'s time right away, without tapping “when?”. You can hide it again in Privacy → Last Seen.</string>
+    <string name="SG_LastSeenOfferYes">Show</string>
+    <string name="SG_LastSeenOfferNo">Leave hidden</string>
 </resources>

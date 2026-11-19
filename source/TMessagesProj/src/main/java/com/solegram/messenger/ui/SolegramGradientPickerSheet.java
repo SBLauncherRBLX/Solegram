@@ -99,7 +99,7 @@ public class SolegramGradientPickerSheet extends BottomSheet {
         hexView.setBackground(hexBg);
         hexView.setTextColor(Color.WHITE);
         preview.addView(hexView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 10, 10));
-        column.addView(preview, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 72));
+        column.addView(preview, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 72, 0, 2, 0, 0));
 
         // which end is being chosen: a centred dot and its name in each pill
         chipRow = new LinearLayout(context);
@@ -125,12 +125,13 @@ public class SolegramGradientPickerSheet extends BottomSheet {
             chipLabels[i] = label;
             chipRow.addView(chip, LayoutHelper.createLinear(0, 44, 1f, i == 0 ? 0 : 5, 0, i == 0 ? 5 : 0, 0));
         }
-        column.addView(chipRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 12));
+        // the gaps stay the same with the pills hidden (one colour): the square keeps its own space above
+        column.addView(chipRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 0));
 
         square = new SvSquare(context);
-        column.addView(square, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 168));
+        column.addView(square, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 168, 0, 14, 0, 0));
         hueBar = new HueBar(context);
-        column.addView(hueBar, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 32, 0, 12, 0, 0));
+        column.addView(hueBar, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 36, 0, 16, 0, 0));
 
         // ready colours
         final LinearLayout swatches = new LinearLayout(context);
@@ -144,14 +145,14 @@ public class SolegramGradientPickerSheet extends BottomSheet {
             dot.setOnClickListener(v -> setEditing(c));
             final FrameLayout cell = new FrameLayout(context);
             cell.addView(dot, LayoutHelper.createFrame(30, 30, Gravity.CENTER));
-            swatches.addView(cell, LayoutHelper.createLinear(0, 40, 1f));
+            swatches.addView(cell, LayoutHelper.createLinear(0, 44, 1f));
         }
-        column.addView(swatches, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 6));
+        column.addView(swatches, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 4));
 
         final ButtonWithCounterView done = new ButtonWithCounterView(context, rp);
         done.setText(getString(R.string.Done), false);
         done.setOnClickListener(v -> dismiss());
-        column.addView(done, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 8, 0, 0));
+        column.addView(done, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 14, 0, 0));
 
         setCustomView(column);
         select(0);

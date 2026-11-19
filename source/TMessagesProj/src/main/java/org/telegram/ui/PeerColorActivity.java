@@ -768,55 +768,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                     return VIEW_TYPE_INFO;
                 }
             });
-            if (type == PAGE_PROFILE && !isChannel) {
-                // Solegram: hold a shown block and move it
-                new ItemTouchHelper(new ItemTouchHelper.Callback() {
-                    private boolean moved;
-
-                    private boolean draggable(int position) {
-                        return sgSection != null && position >= sgTilesStartRow && position < sgTilesStartRow + sgSection.shownCount();
-                    }
-
-                    @Override
-                    public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder holder) {
-                        return draggable(holder.getAdapterPosition()) ? makeMovementFlags(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) : 0;
-                    }
-
-                    @Override
-                    public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder source, @NonNull RecyclerView.ViewHolder target) {
-                        final int from = source.getAdapterPosition(), to = target.getAdapterPosition();
-                        if (!draggable(from) || !draggable(to)) {
-                            return false;
-                        }
-                        sgSection.moved(from - sgTilesStartRow, to - sgTilesStartRow);
-                        listAdapter.notifyItemMoved(from, to);
-                        moved = true;
-                        return true;
-                    }
-
-                    @Override
-                    public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                    }
-
-                    @Override
-                    public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
-                        super.onSelectedChanged(viewHolder, actionState);
-                        if (viewHolder != null && actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
-                            viewHolder.itemView.setTranslationZ(dp(6));
-                        }
-                    }
-
-                    @Override
-                    public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
-                        super.clearView(recyclerView, viewHolder);
-                        viewHolder.itemView.setTranslationZ(0);
-                        if (moved && sgSection != null) {
-                            moved = false;
-                            sgSection.moveDone();
-                        }
-                    }
-                }).attachToRecyclerView(listView);
-            }
+            // Solegram: the profile's blocks keep one order (they are shown or hidden, not moved)
             listView.setOnItemClickListener((view, position) -> {
                 if (view instanceof SetReplyIconCell) {
                     showSelectStatusDialog((SetReplyIconCell) view);
@@ -1656,6 +1608,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 handle.setImageResource(R.drawable.list_reorder);
                 handle.setScaleType(android.widget.ImageView.ScaleType.CENTER);
                 handle.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_stickers_menu, getResourceProvider()), PorterDuff.Mode.MULTIPLY));
+                handle.setVisibility(GONE); // the blocks are not moved any more: no handle
                 addView(handle, LayoutHelper.createFrame(48, 56, Gravity.LEFT | Gravity.CENTER_VERTICAL, 6, 0, 0, 0));
                 final LinearLayout texts = new LinearLayout(context);
                 texts.setOrientation(LinearLayout.VERTICAL);
@@ -1669,7 +1622,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
                 title.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, getResourceProvider()));
                 texts.addView(title, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 1, 0, 0));
-                addView(texts, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.CENTER_VERTICAL, 60, 0, 60, 0));
+                addView(texts, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.CENTER_VERTICAL, 21, 0, 60, 0));
                 eye = new android.widget.ImageView(context);
                 eye.setScaleType(android.widget.ImageView.ScaleType.CENTER);
                 eye.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, getResourceProvider()), PorterDuff.Mode.SRC_IN));
@@ -1681,7 +1634,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
                 value.setText(valueText);
                 title.setText(titleText);
                 eye.setImageResource(shown ? R.drawable.sg_line_eye : R.drawable.sg_line_eye_slash);
-                handle.setVisibility(shown ? VISIBLE : INVISIBLE);
+                // (no drag handle: the blocks keep one order)
                 value.setAlpha(shown ? 1f : .45f);
                 title.setAlpha(shown ? 1f : .45f);
                 invalidate();
@@ -1690,7 +1643,7 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             @Override
             protected void onDraw(Canvas canvas) {
                 if (divider) {
-                    canvas.drawRect(dp(60), getMeasuredHeight() - 1, getMeasuredWidth(), getMeasuredHeight(), Theme.dividerPaint);
+                    canvas.drawRect(dp(21), getMeasuredHeight() - 1, getMeasuredWidth(), getMeasuredHeight(), Theme.dividerPaint);
                 }
             }
 

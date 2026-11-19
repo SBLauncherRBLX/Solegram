@@ -177,14 +177,23 @@ public final class SolegramThemeGenerator {
         }
         final Map<String, Integer> out = new LinkedHashMap<>();
 
-        // the screens: a tinted background, the header and the input bar the same family
-        final int background0 = dark ? hsl(nHue, nTint * 0.8f, darkL) : hsl(nHue, nTint, lightL);
+        // the screens: a tinted background, the header and the input bar the same family; a picked background that
+        // suits this kind of theme (a light colour in a light theme, a dark one in a dark theme) is used exactly
+        final float bgL = background != 0 ? hsl(background)[2] : -1;
+        final boolean exactBg = background != 0 && (dark ? bgL <= 0.4f : bgL >= 0.6f);
+        final int background0 = exactBg ? background | 0xFF000000 : dark ? hsl(nHue, nTint * 0.8f, darkL) : hsl(nHue, nTint, lightL);
         final int menus = dark ? hsl(nHue, nTint * 0.8f, darkL + 0.045f) : hsl(nHue, nTint * 0.6f, Math.min(0.99f, lightL + 0.03f));
         final int text = readable(dark ? hsl(nHue, 0.10f, 0.95f) : hsl(nHue, 0.20f, 0.12f), background0, 7, dark);
         final int secondaryText = readable(dark ? hsl(nHue, 0.10f, 0.64f) : hsl(nHue, 0.13f, 0.47f), background0, 3.6, dark);
 
-        // the accent: bright enough to read on the background, a little darker for yellows in light themes
-        final int accent = underWhite(readable(hsl(hue, style == STYLE_MONO ? Math.max(sat, 0.12f) : sat, dark ? 0.6f : 0.5f - fix), background0, 3, dark), 0.26);
+        // the accent: the picked colour itself (only Mono, a style made to mute colour, works one out); a colour that
+        // would be all but invisible on the background, or carry unreadable white text, moves just as far as it must
+        final int accent;
+        if (style == STYLE_MONO) {
+            accent = underWhite(readable(hsl(hue, Math.max(sat, 0.12f), dark ? 0.6f : 0.5f - fix), background0, 3, dark), 0.26);
+        } else {
+            accent = underWhite(readable(primary | 0xFF000000, background0, 1.6, dark), 0.62);
+        }
 
         out.put("accent", accent);
         out.put("background", background0);
@@ -199,7 +208,9 @@ public final class SolegramThemeGenerator {
 
         out.put("unread", accent);
         out.put("muted", dark ? hsl(nHue, 0.08f, Math.max(0.38f, darkL + 0.26f)) : hsl(nHue, 0.08f, Math.min(0.74f, lightL - 0.2f)));
-        out.put("online", readable(hsl(hue2, Math.max(sat2, 0.5f), dark ? 0.6f : 0.47f - lightnessFix(hue2)), background0, 2.4, dark));
+        out.put("online", secondary != 0 && style != STYLE_MONO
+            ? readable(secondary | 0xFF000000, background0, 1.6, dark) // the picked second colour itself
+            : readable(hsl(hue2, Math.max(sat2, 0.5f), dark ? 0.6f : 0.47f - lightnessFix(hue2)), background0, 2.4, dark));
         out.put("fab", accent);
 
         // the chat: my bubbles pastel (light) or deep (dark), theirs nearly the background; texts readable on them

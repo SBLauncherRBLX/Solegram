@@ -534,10 +534,13 @@ public class SeekBarView extends FrameLayout implements Theme.Colorable {
         final boolean solegramLiquid = com.solegram.messenger.ui.LiquidControls.enabled() && !twoSided;
         float solegramActiveValue = 0, solegramTw = 0, solegramTh = 0, solegramCx = 0;
         boolean solegramClipped = false;
-        // the glass slider's filled part is not the theme's colour: a neutral, a little stronger than the track
+        // the glass slider's track in the theme's accent (its filled part) and a light tint of it (the rest), not grey;
+        // a slider whose screen gave it its own colours keeps them
         final int solegramOuterColor = outerPaint1.getColor();
-        if (solegramLiquid) {
-            outerPaint1.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), 0x80));
+        if (solegramLiquid && solegramOuterColor == themedOuterColor) {
+            final int accent = getThemedColor(Theme.key_featuredStickers_addButton);
+            outerPaint1.setColor(accent);
+            innerPaint1.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(accent, 0x40));
         }
         if (solegramLiquid) {
             thumbX = solegramFollow(thumbX); // the fill, the lens and the glass all follow the thumb as drawn

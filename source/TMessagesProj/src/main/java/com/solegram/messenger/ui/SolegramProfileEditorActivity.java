@@ -298,7 +298,7 @@ public class SolegramProfileEditorActivity extends BaseFragment {
                 applyRows();
             }
         });
-        dragger.attachToRecyclerView(list);
+        // the blocks keep one order: no dragging (dragger stays unattached)
         root.addView(list, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         // the bottom: darkening and save

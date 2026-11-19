@@ -1369,7 +1369,7 @@
     <string name="SG_PluginAutoDisabled">Плагин «%1$s» отключён: он постоянно выдавал ошибки</string>
     <string name="SG_CardTapBanner">Нажмите на баннер, чтобы выбрать картинку или GIF из личного канала</string>
     <string name="SG_CardTapToChange">Нажмите на баннер, чтобы сменить его</string>
-    <string name="SG_CardDragHint">Удерживайте блок и двигайте его пальцем. «−» убирает блок из профиля, блоки ниже возвращают его.</string>
+    <string name="SG_CardDragHint">«−» убирает блок из профиля, блоки ниже возвращают его.</string>
     <string name="SG_TileChannel">Личный канал</string>
     <string name="SG_CardNoChannel">Личного канала пока нет</string>
     <string name="SG_CardWhenSet">Видна, когда заполнена</string>
@@ -2221,4 +2221,8 @@
     <string name="SG_WhisperDownloading">Скачивается модель распознавания…</string>
     <string name="SG_WhisperFailed">Модель распознавания не скачалась, проверь интернет и попробуй снова</string>
     <string name="SG_ThemePickColor">Свой цвет</string>
+    <string name="SG_LastSeenOfferTitle">Видеть, когда люди были в сети</string>
+    <string name="SG_LastSeenOfferText">Telegram скрывает от тебя время захода других, потому что твоё скрыто. Показывать твоё время захода всем? Тогда время всех будет видно сразу, без нажатия на «когда?». Скрыть его снова можно в Конфиденциальность → Последняя активность.</string>
+    <string name="SG_LastSeenOfferYes">Показывать</string>
+    <string name="SG_LastSeenOfferNo">Оставить скрытым</string>
 </resources>

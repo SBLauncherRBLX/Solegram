@@ -147,46 +147,24 @@ public final class SolegramSelfColors {
             c1 = custom1;
             c2 = custom2;
         } else {
-            final int[] own = SolegramProfileCard.customColorsOf(user.id);
-            c1 = own != null ? own[0] : 0;
-            c2 = own != null ? own[1] : 0;
+            // their profile card, else the mark in their bio (seen without a banner)
+            int[] own = SolegramProfileCard.customColorsOf(user.id);
+            if (own == null) {
+                final SolegramNameEmojiShare.ProfileLook look = SolegramNameEmojiShare.profileLookOf(user.id);
+                if (look != null && look.custom1 != 0 && look.custom2 != 0) {
+                    own = new int[]{look.custom1, look.custom2};
+                }
+            }
+            if (own == null) {
+                return null;
+            }
+            c1 = own[0];
+            c2 = own[1];
         }
         if (c1 == 0 || c2 == 0) {
-            // no colour chosen for the profile at all: it shows in the colours of its owner's theme, as they see it
-            if (hasChosenProfileColor(user)) {
-                return null;
-            }
-            final int[] theme = user.self ? themeColors() : SolegramProfileCard.themeColorsOf(user.id);
-            if (theme == null || theme[0] == 0 || theme[1] == 0) {
-                return null;
-            }
-            c1 = theme[0];
-            c2 = theme[1];
+            return null;
         }
         return org.telegram.messenger.MessagesController.PeerColor.fromCustom(c1, c2);
-    }
-
-    /** Whether the profile has a colour picked on purpose (Telegram's, or one chosen in Solegram). */
-    private static boolean hasChosenProfileColor(TLRPC.User user) {
-        if (user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 1) != 0) {
-            return true;
-        }
-        if (user.self) {
-            return isSet() && profileColor() >= 0;
-        }
-        return SolegramProfileCard.profileColorOf(user.id) >= 0;
-    }
-
-    /** The accent of the theme in use now (top and bottom of a gradient, opaque); {0, 0} when there is none. */
-    public static int[] themeColors() {
-        try {
-            final int accent = org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_chats_actionBackground) | 0xFF000000;
-            final int header = org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_actionBarDefault) | 0xFF000000;
-            final int bottom = androidx.core.graphics.ColorUtils.blendARGB(accent, header, 0.45f) | 0xFF000000;
-            return new int[]{accent, bottom};
-        } catch (Throwable e) {
-            return new int[]{0, 0};
-        }
     }
 
     public static boolean isSet() {

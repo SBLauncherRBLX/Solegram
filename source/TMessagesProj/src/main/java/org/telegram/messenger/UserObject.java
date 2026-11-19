@@ -236,8 +236,20 @@ public class UserObject {
         if (user == null) return 0;
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileColor();
         if (user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 1) != 0) return user.profile_color.color;
-        // Solegram: the colour someone chose in Solegram without Premium, from their profile card
-        return com.solegram.messenger.SolegramProfileCard.profileColorOf(user.id);
+        // Solegram: the colour someone chose in Solegram without Premium, from their profile card, else their bio
+        final int card = com.solegram.messenger.SolegramProfileCard.profileColorOf(user.id);
+        if (card >= 0) return card;
+        final com.solegram.messenger.SolegramNameEmojiShare.ProfileLook look = user.self ? null : com.solegram.messenger.SolegramNameEmojiShare.profileLookOf(user.id);
+        return look != null ? look.color : -1;
+    }
+
+    /** Solegram: the background emoji someone chose in Solegram, from their card or else their bio (0: none). */
+    private static long sgProfileEmoji(TLRPC.User user) {
+        if (user == null) return 0;
+        final long card = com.solegram.messenger.SolegramProfileCard.profileEmojiOf(user.id);
+        if (card != 0 || user.self) return card;
+        final com.solegram.messenger.SolegramNameEmojiShare.ProfileLook look = com.solegram.messenger.SolegramNameEmojiShare.profileLookOf(user.id);
+        return look != null ? look.emoji : 0;
     }
 
     public static long getProfileEmojiId(TLRPC.User user) {
@@ -246,14 +258,14 @@ public class UserObject {
         }
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileEmoji();
         if (user != null && user.profile_color != null && (user.profile_color.flags & 2) != 0) return user.profile_color.background_emoji_id;
-        // Solegram: the pattern emoji someone chose in Solegram without Premium, from their profile card
-        return user != null ? com.solegram.messenger.SolegramProfileCard.profileEmojiOf(user.id) : 0;
+        // Solegram: the pattern emoji someone chose in Solegram without Premium, from their profile card or bio
+        return sgProfileEmoji(user);
     }
 
     public static long getOnlyProfileEmojiId(TLRPC.User user) {
         if (com.solegram.messenger.SolegramSelfColors.applies(user)) return com.solegram.messenger.SolegramSelfColors.profileEmoji();
         if (user != null && user.profile_color instanceof TLRPC.TL_peerColor && (user.profile_color.flags & 2) != 0) return user.profile_color.background_emoji_id;
-        return user != null ? com.solegram.messenger.SolegramProfileCard.profileEmojiOf(user.id) : 0;
+        return sgProfileEmoji(user);
     }
 
     public static long getProfileCollectibleId(TLRPC.User user) {

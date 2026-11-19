@@ -31,6 +31,12 @@ import java.util.Iterator;
 public final class SolegramNameEmojiShare {
 
     private static final char START = '⁣';
+    /** The profile's look (colour, own colours, background emoji) has a mark of its own, before the name's. */
+    private static final char START_PROFILE = '\u2064';
+    private static final int PROFILE_VERSION = 1;
+    private static final int PF_COLOR = 1, PF_CUSTOM = 2, PF_EMOJI = 4;
+    private static final int PROFILE_MAX = 2 + 2 + 12 + 16;
+    private static final String KEY_PROFILES = "sharedProfileLooks";
     private static final int DIGITS = 16;
     private static final int LENGTH = DIGITS + 1;
     private static final String KEY_KNOWN = "sharedNameEmoji";
@@ -103,14 +109,222 @@ public final class SolegramNameEmojiShare {
         return id;
     }
 
-    /** The bio without the mark (for showing and editing). */
+    // region The profile's look
+
+    /** Someone's profile look from their bio: a palette colour (-1: none), own colours (0: none), background emoji. */
+    public static final class ProfileLook {
+        public int color = -1;
+        public int custom1, custom2;
+        public long emoji;
+
+        boolean isEmpty() {
+            return color < 0 && (custom1 == 0 || custom2 == 0) && emoji == 0;
+        }
+
+        String encode() {
+            return color + "," + Integer.toHexString(custom1) + "," + Integer.toHexString(custom2) + "," + emoji;
+        }
+
+        static ProfileLook decode(String v) {
+            try {
+                final String[] f = v.split(",");
+                final ProfileLook l = new ProfileLook();
+                l.color = Integer.parseInt(f[0]);
+                l.custom1 = (int) Long.parseLong(f[1], 16);
+                l.custom2 = (int) Long.parseLong(f[2], 16);
+                l.emoji = Long.parseLong(f[3]);
+                return l;
+            } catch (Throwable e) {
+                return null;
+            }
+        }
+    }
+
+    private static void digits(StringBuilder sb, long value, int count) {
+        for (int i = count - 1; i >= 0; i--) {
+            sb.append((char) (0xFE00 + (int) ((value >>> (i * 4)) & 0xF)));
+        }
+    }
+
+    /** The own profile's look as a mark (the colour and background emoji chosen in Solegram), or "". */
+    public static String ownProfileMark() {
+        int flags = 0;
+        final int color = SolegramSelfColors.isSet() ? SolegramSelfColors.profileColor() : -1;
+        final long emoji = SolegramSelfColors.isSet() ? SolegramSelfColors.profileEmoji() : 0;
+        final int c1 = SolegramSelfColors.customColor1(), c2 = SolegramSelfColors.customColor2();
+        if (c1 != 0 && c2 != 0) {
+            flags |= PF_CUSTOM;
+        } else if (color >= 0 && color < 256) {
+            flags |= PF_COLOR;
+        }
+        if (emoji != 0) {
+            flags |= PF_EMOJI;
+        }
+        if (flags == 0) {
+            return "";
+        }
+        final StringBuilder sb = new StringBuilder(1 + PROFILE_MAX);
+        sb.append(START_PROFILE);
+        digits(sb, PROFILE_VERSION, 1);
+        digits(sb, flags, 1);
+        if ((flags & PF_COLOR) != 0) {
+            digits(sb, color, 2);
+        }
+        if ((flags & PF_CUSTOM) != 0) {
+            digits(sb, c1 & 0xFFFFFF, 6);
+            digits(sb, c2 & 0xFFFFFF, 6);
+        }
+        if ((flags & PF_EMOJI) != 0) {
+            digits(sb, emoji, 16);
+        }
+        return sb.toString();
+    }
+
+    /** The profile look in a bio, or null. */
+    @androidx.annotation.Nullable
+    public static ProfileLook readProfile(String about) {
+        if (about == null) {
+            return null;
+        }
+        final int at = about.lastIndexOf(START_PROFILE);
+        if (at < 0) {
+            return null;
+        }
+        int pos = at + 1;
+        final long[] v = new long[1];
+        if (!readDigits(about, pos, 1, v) || v[0] != PROFILE_VERSION) {
+            return null;
+        }
+        pos++;
+        if (!readDigits(about, pos, 1, v)) {
+            return null;
+        }
+        final int flags = (int) v[0];
+        pos++;
+        final ProfileLook look = new ProfileLook();
+        if ((flags & PF_COLOR) != 0) {
+            if (!readDigits(about, pos, 2, v)) {
+                return null;
+            }
+            look.color = (int) v[0];
+            pos += 2;
+        }
+        if ((flags & PF_CUSTOM) != 0) {
+            if (!readDigits(about, pos, 6, v)) {
+                return null;
+            }
+            look.custom1 = 0xFF000000 | (int) v[0]; // opaque only
+            if (!readDigits(about, pos + 6, 6, v)) {
+                return null;
+            }
+            look.custom2 = 0xFF000000 | (int) v[0];
+            pos += 12;
+        }
+        if ((flags & PF_EMOJI) != 0) {
+            if (!readDigits(about, pos, 16, v)) {
+                return null;
+            }
+            look.emoji = v[0];
+        }
+        return look.isEmpty() ? null : look;
+    }
+
+    private static boolean readDigits(String s, int from, int count, long[] out) {
+        if (from + count > s.length()) {
+            return false;
+        }
+        long value = 0;
+        for (int i = 0; i < count; i++) {
+            final char c = s.charAt(from + i);
+            if (c < 0xFE00 || c > 0xFE0F) {
+                return false;
+            }
+            value = (value << 4) | (c - 0xFE00);
+        }
+        out[0] = value;
+        return true;
+    }
+
+    // other users' looks: user id -> look (null entry: known to have none)
+    private static java.util.HashMap<Long, ProfileLook> looks;
+
+    private static synchronized java.util.HashMap<Long, ProfileLook> looks() {
+        if (looks == null) {
+            looks = new java.util.HashMap<>();
+            try {
+                final JSONObject o = new JSONObject(SolegramConfig.prefs().getString(KEY_PROFILES, "{}"));
+                final Iterator<String> keys = o.keys();
+                while (keys.hasNext()) {
+                    final String k = keys.next();
+                    final ProfileLook l = ProfileLook.decode(o.getString(k));
+                    if (l != null) {
+                        looks.put(Long.parseLong(k), l);
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }
+        return looks;
+    }
+
+    private static synchronized void saveLooks() {
+        try {
+            final JSONObject o = new JSONObject();
+            int n = 0;
+            for (java.util.Map.Entry<Long, ProfileLook> e : looks().entrySet()) {
+                if (e.getValue() != null && n++ < MAX_KNOWN) {
+                    o.put(String.valueOf(e.getKey()), e.getValue().encode());
+                }
+            }
+            SolegramConfig.prefs().edit().putString(KEY_PROFILES, o.toString()).apply();
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    /** Someone's profile look shared in their bio, or null (none, or their profile was not read yet). */
+    @androidx.annotation.Nullable
+    public static synchronized ProfileLook profileLookOf(long userId) {
+        return looks().get(userId);
+    }
+
+    /** Notes the look in a loaded bio; true when it changed. */
+    private static boolean onProfileLook(long userId, String about) {
+        final ProfileLook now = readProfile(about);
+        synchronized (SolegramNameEmojiShare.class) {
+            final ProfileLook was = looks().get(userId);
+            final String a = was == null ? null : was.encode(), b = now == null ? null : now.encode();
+            if (TextUtils.equals(a, b)) {
+                return false;
+            }
+            if (now == null) {
+                looks().remove(userId);
+            } else {
+                looks().put(userId, now);
+            }
+            saveLooks();
+            return true;
+        }
+    }
+    // endregion
+
+    /** The bio without the marks (for showing and editing). */
     public static String strip(String about) {
-        if (about == null || about.indexOf(START) < 0) {
+        if (about == null || about.indexOf(START) < 0 && about.indexOf(START_PROFILE) < 0) {
             return about;
         }
         final StringBuilder out = new StringBuilder(about.length());
         for (int i = 0; i < about.length(); i++) {
             final char c = about.charAt(i);
+            if (c == START_PROFILE) {
+                int j = i + 1;
+                while (j < about.length() && about.charAt(j) >= 0xFE00 && about.charAt(j) <= 0xFE0F && j - i <= PROFILE_MAX) {
+                    j++;
+                }
+                i = j - 1;
+                continue;
+            }
             if (c == START) {
                 int j = i + 1;
                 while (j < about.length() && about.charAt(j) >= 0xFE00 && about.charAt(j) <= 0xFE0F && j - i <= DIGITS + SolegramNameEffect.MARK_DIGITS) {
@@ -131,18 +345,23 @@ public final class SolegramNameEmojiShare {
         return enabled() && (id != 0 || effect != 0) ? mark(id, effect) : "";
     }
 
-    /** A bio the user wrote, with the mark put back when it fits the account's limit. */
+    /** A bio the user wrote, with the marks put back when they fit the account's limit (the profile's look first). */
     public static String withMark(int account, String bio) {
         final String base = strip(bio == null ? "" : bio);
         final String mark = ownMark();
-        if (mark.isEmpty()) {
-            return base;
-        }
+        final String look = ownProfileMark();
         final int limit = MessagesController.getInstance(account).getAboutLimit();
-        if (base.codePointCount(0, base.length()) + mark.length() > limit) {
-            return base;
+        final int len = base.codePointCount(0, base.length());
+        if (len + look.length() + mark.length() <= limit) {
+            return base + look + mark; // the name's mark stays last, where every Solegram reads it
         }
-        return base + mark;
+        if (!look.isEmpty() && len + look.length() <= limit) {
+            return base + look;
+        }
+        if (!mark.isEmpty() && len + mark.length() <= limit) {
+            return base + mark;
+        }
+        return base;
     }
 
     /** Whether the mark does not fit after this bio. */
@@ -191,6 +410,10 @@ public final class SolegramNameEmojiShare {
     public static void onUserFull(int account, TLRPC.User user, TLRPC.UserFull full) {
         if (user == null || full == null || user.self || user.bot) {
             return;
+        }
+        if (onProfileLook(user.id, full.about)) {
+            // the profile's colour or background emoji is new or gone: profiles and lists draw it again
+            AndroidUtilities.runOnUIThread(() -> NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_NAME));
         }
         final long id = read(full.about);
         if (SolegramNameEffect.onRead(user.id, readEffect(full.about))) {
@@ -304,6 +527,19 @@ public final class SolegramNameEmojiShare {
     // endregion
 
     // region The own bio
+
+    private static boolean startSynced;
+
+    /** Once a run: a profile look chosen before the bio could carry it gets into the bio. */
+    public static void syncOnceOnStart() {
+        if (startSynced) {
+            return;
+        }
+        startSynced = true;
+        if (!ownProfileMark().isEmpty() || !ownMark().isEmpty()) {
+            scheduleSync();
+        }
+    }
 
     /** After the emoji or the setting changed (and when the app starts): the bio of every account gets its mark. */
     public static void scheduleSync() {

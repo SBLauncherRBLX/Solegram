@@ -2594,10 +2594,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (lastFragment instanceof ChatActivity && ((ChatActivity) lastFragment).themeDelegate != null && ((ChatActivity) lastFragment).themeDelegate.getCurrentTheme() != null && !((ChatActivity) lastFragment).themeDelegate.isGiftTheme()) {
             resourcesProvider = lastFragment.getResourceProvider();
         }
-        if (resourcesProvider == null && userId != 0) {
-            // Solegram: someone's profile page in the colours of their own theme (from their profile card)
-            resourcesProvider = com.solegram.messenger.SolegramProfileTheme.providerFor(userId, userId == getUserConfig().getClientUserId());
-        }
         ActionBar actionBar = new ActionBar(context, resourcesProvider) {
             @Override
             public boolean onTouchEvent(MotionEvent event) {
@@ -2700,10 +2696,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         BaseFragment lastFragment = parentLayout.getLastFragment();
         if (lastFragment instanceof ChatActivity && ((ChatActivity) lastFragment).themeDelegate != null && ((ChatActivity) lastFragment).themeDelegate.getCurrentTheme() != null && !((ChatActivity) lastFragment).themeDelegate.isGiftTheme()) {
             resourcesProvider = lastFragment.getResourceProvider();
-        }
-        if (resourcesProvider == null && userId != 0) {
-            // Solegram: someone's profile page in the colours of their own theme (from their profile card)
-            resourcesProvider = com.solegram.messenger.SolegramProfileTheme.providerFor(userId, userId == getUserConfig().getClientUserId());
         }
         searchTransitionOffset = 0;
         searchTransitionProgress = 1f;
@@ -11468,7 +11460,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     channelDividerRow = rowCount++;
                 }
                 infoStartRow = rowCount;
-                for (String sgTile : sgLayout != null ? sgLayout.order : java.util.Arrays.asList(com.solegram.messenger.SolegramProfileCard.TILES)) {
+                for (String sgTile : com.solegram.messenger.SolegramProfileCard.TILES) { // one order for everyone: blocks are hidden, not moved
                     if (sgLayout != null && !sgLayout.shown(sgTile)) {
                         continue;
                     }
@@ -12226,6 +12218,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         getMessagesController().reloadUser(getDialogId());
                     }, resourcesProvider);
                 } : null);
+                if (hiddenStatusButton) {
+                    sgOfferLastSeen(); // Solegram: once, so the time shows without "when?"
+                }
                 Drawable leftIcon = currentEncryptedChat != null ? getLockIconDrawable() : null;
                 boolean rightIconIsPremium = false, rightIconIsStatus = false;
                 nameTextView.setRightDrawableOutside(false);
@@ -16720,6 +16715,41 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
 
     private ShowDrawable showStatusButton;
+
+    /**
+     * Solegram: someone's last seen is hidden only because the own one is. Asked once (never again, whatever the
+     * answer): showing the own last seen to everyone makes everyone's show, with no "when?" to tap.
+     */
+    private void sgOfferLastSeen() {
+        final android.content.SharedPreferences prefs = com.solegram.messenger.SolegramConfig.prefs();
+        if (prefs.getBoolean("lastSeenAsked", false) || getParentActivity() == null) {
+            return;
+        }
+        prefs.edit().putBoolean("lastSeenAsked", true).apply();
+        AndroidUtilities.runOnUIThread(() -> {
+            if (getParentActivity() == null || isFinishing()) {
+                return;
+            }
+            showDialog(new AlertDialog.Builder(getParentActivity(), resourcesProvider)
+                .setTitle(LocaleController.getString(R.string.SG_LastSeenOfferTitle))
+                .setMessage(LocaleController.getString(R.string.SG_LastSeenOfferText))
+                .setPositiveButton(LocaleController.getString(R.string.SG_LastSeenOfferYes), (d, w) -> {
+                    final org.telegram.tgnet.tl.TL_account.setPrivacy req = new org.telegram.tgnet.tl.TL_account.setPrivacy();
+                    req.key = new TLRPC.TL_inputPrivacyKeyStatusTimestamp();
+                    req.rules.add(new TLRPC.TL_inputPrivacyValueAllowAll());
+                    getConnectionsManager().sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+                        if (err != null) {
+                            BulletinFactory.global().showForError(err);
+                            return;
+                        }
+                        BulletinFactory.global().createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.PremiumLastSeenSet)).show();
+                        getMessagesController().reloadUser(getDialogId());
+                    }));
+                })
+                .setNegativeButton(LocaleController.getString(R.string.SG_LastSeenOfferNo), null)
+                .create());
+        }, 600);
+    }
 
     public ShowDrawable getShowStatusButton() {
         if (showStatusButton == null) {
