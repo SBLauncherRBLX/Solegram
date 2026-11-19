@@ -1034,6 +1034,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         sheetContainer = new LayoutContainer(parentActivity);
         hasSheetsAnimator.setParent(sheetContainer);
         addView(sheetContainer);
+        solegramPlaceDock(); // Solegram: the side dock stays over the screens
         layoutParams = (LayoutParams) sheetContainer.getLayoutParams();
         layoutParams.width = LayoutHelper.MATCH_PARENT;
         layoutParams.height = LayoutHelper.MATCH_PARENT;
@@ -1702,7 +1703,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                     int dx = Math.max(0, (int) (ev.getX() - startedTrackingX));
                     int dy = Math.abs((int) ev.getY() - startedTrackingY);
                     velocityTracker.addMovement(ev);
-                    if (!transitionAnimationInProgress && !inPreviewMode && maybeStartTracking && !startedTracking && dx >= AndroidUtilities.getPixelsInCM(0.4f, true) && Math.abs(dx) / 3 > dy) {
+                    if (!transitionAnimationInProgress && !inPreviewMode && maybeStartTracking && !startedTracking && !solegramTwoFingers && !solegramDockGesture && dx >= AndroidUtilities.getPixelsInCM(0.4f, true) && Math.abs(dx) / 3 > dy) {
                         BaseFragment currentFragment = fragmentsStack.get(fragmentsStack.size() - 1);
                         if (currentFragment.canBeginSlide() && findScrollingChild(this, ev.getX(), ev.getY()) == null) {
                             startedTrackingX = (int) ev.getX();
@@ -1734,7 +1735,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                     velocityTracker.addMovement(ev);
                     velocityTracker.computeCurrentVelocity(1000);
                     BaseFragment currentFragment = fragmentsStack.get(fragmentsStack.size() - 1);
-                    if (!inPreviewMode && !transitionAnimationPreviewMode && !startedTracking && currentFragment.isSwipeBackEnabled(ev)) {
+                    if (!inPreviewMode && !transitionAnimationPreviewMode && !startedTracking && !solegramTwoFingers && !solegramDockGesture && currentFragment.isSwipeBackEnabled(ev)) {
                         float velX = velocityTracker.getXVelocity();
                         float velY = velocityTracker.getYVelocity();
                         if (velX >= 3500 && velX > Math.abs(velY) && currentFragment.canBeginSlide()) {
@@ -3740,6 +3741,9 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     private boolean tabsEvents;
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (solegramDockTouch(ev)) {
+            return true; // two fingers to the right: the chat goes into the side dock, the screen got a cancel
+        }
         final boolean tabs = ev.getY() > getHeight() - getBottomTabsHeight(true) - systemAndDisplayInsets.bottom;
 
         BaseFragment.AttachedSheet lastSheet = null;
@@ -3767,6 +3771,135 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         }
         return super.dispatchTouchEvent(ev);
     }
+
+    // region Solegram side dock
+
+    /** The side dock (SolegramChatDock): over the screens, under whatever opens over them. */
+    @Nullable
+    private View solegramDock;
+    private boolean solegramTwoFingers, solegramDockGesture;
+    private int solegramPointer0, solegramPointer1;
+    private float solegramX0, solegramY0, solegramX1, solegramY1;
+
+    public void solegramSetDock(View dock) {
+        solegramDock = dock;
+        AndroidUtilities.removeFromParent(dock);
+        addView(dock, new LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        solegramPlaceDock();
+    }
+
+    /** Right above the screen in front (so above the one behind it too), below the sheets' layer and later overlays. */
+    private void solegramPlaceDock() {
+        final View dock = solegramDock;
+        if (dock == null || dock.getParent() != this || containerView == null || containerView.getParent() != this) {
+            return;
+        }
+        if (indexOfChild(dock) == indexOfChild(containerView) + 1) {
+            return;
+        }
+        detachViewFromParent(dock);
+        attachViewToParent(dock, Math.min(indexOfChild(containerView) + 1, getChildCount()), dock.getLayoutParams());
+        dock.requestLayout();
+        invalidate();
+    }
+
+    @Override
+    public void bringChildToFront(View child) {
+        super.bringChildToFront(child);
+        if (child != solegramDock && solegramDock != null) {
+            solegramPlaceDock();
+        }
+    }
+
+    /**
+     * Two fingers drawn together to the right across a chat put it into the side dock. A pinch (the fingers come
+     * closer or apart), a scroll (up or down), a single finger (swipe back) and a touch that started on the dock stay
+     * what they are. Once it is recognized the screen gets a cancel, and the rest of the touch is the dock's.
+     */
+    private boolean solegramDockTouch(MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                solegramTwoFingers = false;
+                solegramDockGesture = false;
+                return false;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (!solegramDockGesture) {
+                    solegramTwoFingers = ev.getPointerCount() == 2 && !startedTracking && !animationInProgress && !transitionAnimationInProgress
+                        && solegramCanDockTop();
+                    if (solegramTwoFingers) {
+                        solegramPointer0 = ev.getPointerId(0);
+                        solegramPointer1 = ev.getPointerId(1);
+                        solegramX0 = ev.getX(0);
+                        solegramY0 = ev.getY(0);
+                        solegramX1 = ev.getX(1);
+                        solegramY1 = ev.getY(1);
+                        maybeStartTracking = false; // two fingers are not a swipe back
+                    }
+                }
+                return solegramDockGesture;
+            case MotionEvent.ACTION_MOVE:
+                if (solegramDockGesture) {
+                    return true;
+                }
+                if (solegramTwoFingers) {
+                    final int i0 = ev.findPointerIndex(solegramPointer0), i1 = ev.findPointerIndex(solegramPointer1);
+                    if (i0 < 0 || i1 < 0) {
+                        solegramTwoFingers = false;
+                        return false;
+                    }
+                    final float dx0 = ev.getX(i0) - solegramX0, dy0 = ev.getY(i0) - solegramY0;
+                    final float dx1 = ev.getX(i1) - solegramX1, dy1 = ev.getY(i1) - solegramY1;
+                    final float spreadDown = (float) Math.hypot(solegramX1 - solegramX0, solegramY1 - solegramY0);
+                    final float spreadNow = (float) Math.hypot(ev.getX(i1) - ev.getX(i0), ev.getY(i1) - ev.getY(i0));
+                    final float spread = Math.abs(spreadNow - spreadDown);
+                    if (spread > dp(40) || dx0 < -dp(16) || dx1 < -dp(16) || Math.abs(dy0) > dp(48) && Math.abs(dy0) > dx0 || Math.abs(dy1) > dp(48) && Math.abs(dy1) > dx1) {
+                        solegramTwoFingers = false; // a pinch, a scroll, the other way: not this
+                        return false;
+                    }
+                    if (dx0 > dp(64) && dx1 > dp(64) && Math.abs(dy0) < dx0 * 0.6f && Math.abs(dy1) < dx1 * 0.6f) {
+                        solegramTwoFingers = false;
+                        if (!solegramCanDockTop()) {
+                            return false;
+                        }
+                        solegramDockGesture = true;
+                        final MotionEvent cancel = MotionEvent.obtain(ev);
+                        cancel.setAction(MotionEvent.ACTION_CANCEL);
+                        super.dispatchTouchEvent(cancel);
+                        cancel.recycle();
+                        onTouchEvent(null);
+                        final BaseFragment last = getLastFragment();
+                        if (last instanceof org.telegram.ui.ChatActivity) {
+                            ((org.telegram.ui.ChatActivity) last).solegramDockByGesture((ev.getX(i0) + ev.getX(i1)) / 2f, (ev.getY(i0) + ev.getY(i1)) / 2f);
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            case MotionEvent.ACTION_POINTER_UP:
+                if (!solegramDockGesture) {
+                    solegramTwoFingers = false;
+                }
+                return solegramDockGesture;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL: {
+                final boolean consumed = solegramDockGesture;
+                solegramTwoFingers = false;
+                solegramDockGesture = false;
+                return consumed;
+            }
+        }
+        return solegramDockGesture;
+    }
+
+    private boolean solegramCanDockTop() {
+        if (inPreviewMode || inActionMode || fragmentsStack == null || fragmentsStack.isEmpty() || !main) {
+            return false;
+        }
+        final BaseFragment last = getLastFragment();
+        return last instanceof org.telegram.ui.ChatActivity && last.getLastSheet() == null && ((org.telegram.ui.ChatActivity) last).solegramCanDock();
+    }
+
+    // endregion
 
     @Override
     public void setWindow(Window window) {

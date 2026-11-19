@@ -848,7 +848,7 @@ public final class QrScanOverlay extends FrameLayout {
             node.setPosition(0, 0, w, h);
             final int thickness = dp(11); // the glass settings are applied by LiquidGlassEffect
             final float rr = Math.min(radius, Math.min(w, h) / 2f);
-            fx.update(w, h, 0, 0, rr, rr, rr, rr, thickness, 0.75f, 1.5f, 0x5C5C5C63, 0, 0, 1);
+            fx.update(w, h, 0, 0, rr, rr, rr, rr, thickness, com.solegram.messenger.ui.SolegramCameraUi.GLASS_INTENSITY, 1.5f, 0x295C5C63, 0, 0, 1); // the camera's glass
             // the camera's sharp picture under the glass (refraction, no blur), as on Solegram's camera
             final android.view.TextureView texture = cameraView.getTextureView();
             if (texture == null || !texture.isAvailable()) {
@@ -889,7 +889,7 @@ public final class QrScanOverlay extends FrameLayout {
             if (sgRimShader == null || sgRimTop != rect.top || sgRimBottom != rect.bottom) {
                 sgRimTop = rect.top;
                 sgRimBottom = rect.bottom;
-                sgRimShader = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom, 0x6BFFFFFF, 0x24FFFFFF, android.graphics.Shader.TileMode.CLAMP);
+                sgRimShader = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom, 0x8CFFFFFF, 0x33FFFFFF, android.graphics.Shader.TileMode.CLAMP);
             }
             sgStroke.setShader(sgRimShader);
             sgStroke.setStrokeWidth(dpf2(1f));
@@ -909,7 +909,7 @@ public final class QrScanOverlay extends FrameLayout {
             if (sgRimShader == null || sgRimTop != rect.top || sgRimBottom != rect.bottom) {
                 sgRimTop = rect.top;
                 sgRimBottom = rect.bottom;
-                sgRimShader = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom, 0x6BFFFFFF, 0x24FFFFFF, android.graphics.Shader.TileMode.CLAMP);
+                sgRimShader = new android.graphics.LinearGradient(0, rect.top, 0, rect.bottom, 0x8CFFFFFF, 0x33FFFFFF, android.graphics.Shader.TileMode.CLAMP);
             }
             sgStroke.setShader(sgRimShader);
             sgStroke.setStrokeWidth(dpf2(1f));

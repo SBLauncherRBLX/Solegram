@@ -767,6 +767,23 @@ public final class SolegramCameraUi {
 
     // region Glass
 
+    /** The camera's glass (and the QR scanners'): a light blur, a strong lens, a thin veil, a bright rim. */
+    static final float GLASS_BLUR_DP = 2.5f;
+    public static final float GLASS_INTENSITY = 1f;
+
+    /** The glass' colours: a thin neutral veil (the lens shows), the light rim and soft shadow of the app's glass. */
+    static BlurredBackgroundProvider glassProvider(boolean selected) {
+        return new BlurredBackgroundProviderBuilder(null)
+            .setBackgroundColor((r, isDark) -> Color.argb(Math.round(255 * Math.max(0.08f, Math.min(0.30f, (selected ? 0.26f : 0.16f) * SolegramGlass.alpha(true) / 0.85f))),
+                selected ? 0xA0 : 0x5C, selected ? 0xA0 : 0x5C, selected ? 0xA6 : 0x63))
+            .setStrokeColorTop(SolegramGlass.highlight(0x8CFFFFFF, true), SolegramGlass.highlight(0x8CFFFFFF, true))
+            .setStrokeColorBottom(SolegramGlass.highlight(0x33FFFFFF, false), SolegramGlass.highlight(0x33FFFFFF, false))
+            .setShadowColor(0x30000000, 0x30000000)
+            .setShadowLayer(dpf2(6f), 0, dpf2(1.5f))
+            .setStrokeWidth(dpf2(1.1f), dpf2(0.8f))
+            .build();
+    }
+
     /** Background of a round control: live liquid glass over the preview, or a clean dark circle; nothing over it. */
     Drawable background(View view, int radius) {
         if (glass != null) {
@@ -797,7 +814,9 @@ public final class SolegramCameraUi {
                 }
                 // no hash: a camera frame changes every time, the recording is one reference anyway
             });
-            final float radius = dpf2(9f); // a fixed light blur: the camera picture under the buttons stays readable as glass
+            // the app's liquid glass: a clear lens over the picture (only a breath of blur), so the camera is seen bent
+            // through the button's edges rather than smeared under a grey disc
+            final float radius = dpf2(GLASS_BLUR_DP);
             if (SolegramGlass.vibrancy()) {
                 source.setBlur(radius, RenderNodeEffects.getSaturationX2RenderEffect());
             } else {
@@ -806,20 +825,23 @@ public final class SolegramCameraUi {
             factory = new BlurredBackgroundDrawableViewFactory(source);
             factory.setSourceRootView(new ViewPositionWatcher(root), root);
             factory.setLiquidGlassEffectAllowed(true);
-            // a neutral grey body rather than a dark one: over the black bars a dark tint was black, a flat circle;
-            // grey reads as glass there and still lets the white icons stand out over a bright scene
-            provider = new BlurredBackgroundProviderBuilder(null)
-                .setBackgroundColor((r, isDark) -> Color.argb(Math.round(255 * Math.max(0.22f, Math.min(0.42f, 0.36f * SolegramGlass.alpha(true) / 0.85f))), 0x5C, 0x5C, 0x63))
-                .setStrokeColorTop(0x6BFFFFFF, 0x6BFFFFFF)
-                .setStrokeColorBottom(0x24FFFFFF, 0x24FFFFFF)
-                .setShadowColor(0x38000000, 0x38000000)
-                .setShadowLayer(dpf2(6f), 0, dpf2(1.5f))
-                .setStrokeWidth(dpf2(1f), dpf2(0.8f))
-                .build();
+            provider = glassProvider(false);
+            selectedProvider = glassProvider(true);
         }
 
+        private final BlurredBackgroundProvider selectedProvider;
+
         BlurredBackgroundDrawable create(View view) {
-            return factory.create(view, provider);
+            final BlurredBackgroundDrawable drawable = factory.create(view, provider);
+            drawable.setIntensity(GLASS_INTENSITY);
+            return drawable;
+        }
+
+        /** A drop inside a switch (the current zoom step, photo or video): a little brighter than the buttons. */
+        BlurredBackgroundDrawable createSelected(View view) {
+            final BlurredBackgroundDrawable drawable = factory.create(view, selectedProvider);
+            drawable.setIntensity(GLASS_INTENSITY);
+            return drawable;
         }
 
         void sync(int width, int height) {
@@ -1647,9 +1669,17 @@ public final class SolegramCameraUi {
 
         private static final int CHIP = 34, DOT = 26, PAD = 4, GAP = 6;
 
+        @Nullable
+        private BlurredBackgroundDrawable chipGlass;
+
         ZoomPill(Context context) {
             super(context);
             setBackground(background(this, dp(CHIP + PAD * 2) / 2));
+            if (glass != null) {
+                chipGlass = glass.createSelected(this);
+                chipGlass.setRadius(dp(CHIP) / 2f);
+                chipGlass.setCallback(this);
+            }
             chipPaint.setColor(0x8F000000);
             dotPaint.setColor(0x47000000);
             textPaint.setTypeface(AndroidUtilities.bold());
@@ -1736,7 +1766,14 @@ public final class SolegramCameraUi {
             }
             // the current step's circle glides to it
             final float c = AndroidUtilities.lerp(chipCenter(0), chipCenter(Math.max(0, count - 1)), count > 1 ? pos / (count - 1) : 0);
-            canvas.drawCircle(vertical ? across : c, vertical ? c : across, dp(CHIP) / 2f, chipPaint);
+            if (chipGlass != null) {
+                // a drop of the glass gliding along the pill
+                final float cx = vertical ? across : c, cy = vertical ? c : across, r = dp(CHIP) / 2f;
+                chipGlass.setBounds((int) (cx - r), (int) (cy - r), (int) (cx + r), (int) (cy + r));
+                chipGlass.draw(canvas);
+            } else {
+                canvas.drawCircle(vertical ? across : c, vertical ? c : across, dp(CHIP) / 2f, chipPaint);
+            }
             for (int i = 0; i < count; i++) {
                 final boolean current = i == sel;
                 label.setLength(0);
@@ -1893,7 +1930,15 @@ public final class SolegramCameraUi {
                 .setDampingRatio(0.78f));
             spring.setMinimumVisibleChange(0.002f);
             spring.addUpdateListener((animation, value, velocity) -> invalidate());
+            if (glass != null) {
+                selectedGlass = glass.createSelected(this);
+                selectedGlass.setCallback(this);
+            }
         }
+
+        /** The current mode's word sits on a drop of glass (it stretches as the words glide). */
+        @Nullable
+        private BlurredBackgroundDrawable selectedGlass;
 
         /** Landscape: the words run upwards beside the shutter. */
         public void setVertical(boolean value) {
@@ -1922,6 +1967,16 @@ public final class SolegramCameraUi {
         @Override
         protected void onDraw(Canvas canvas) {
             final float t = Math.max(-0.2f, Math.min(1.2f, position.getValue()));
+            if (selectedGlass != null && getAlpha() > 0f) {
+                final float tt = Math.max(0f, Math.min(1f, t));
+                final float length = AndroidUtilities.lerp(widths[0], widths[1], tt) + dp(28);
+                final float thick = Math.min(vertical ? getWidth() : getHeight(), dp(28));
+                final float cx = getWidth() / 2f, cy = getHeight() / 2f;
+                final float halfW = (vertical ? thick : length) / 2f, halfH = (vertical ? length : thick) / 2f;
+                selectedGlass.setRadius(thick / 2f);
+                selectedGlass.setBounds((int) (cx - halfW), (int) (cy - halfH), (int) (cx + halfW), (int) (cy + halfH));
+                selectedGlass.draw(canvas);
+            }
             canvas.save();
             if (vertical) {
                 // drawn as across, turned so it reads upwards: "along" is up the panel

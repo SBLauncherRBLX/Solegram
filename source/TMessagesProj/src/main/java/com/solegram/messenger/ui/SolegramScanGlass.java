@@ -74,6 +74,9 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
                 continue;
             }
             final BlurredBackgroundDrawable glassBody = liquid && glass.factory != null ? glass.factory.create(button, glass.provider) : null;
+            if (glassBody != null) {
+                glassBody.setIntensity(SolegramCameraUi.GLASS_INTENSITY);
+            }
             final LayerDrawable body;
             if (glassBody != null) {
                 body = new LayerDrawable(new Drawable[]{glassBody});
@@ -120,7 +123,7 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
                 drawPreview(canvas);
             }
         });
-        final float radius = dpf2(18f);
+        final float radius = dpf2(SolegramCameraUi.GLASS_BLUR_DP); // the camera's clear lens
         if (SolegramGlass.vibrancy()) {
             source.setBlur(radius, RenderNodeEffects.getSaturationX2RenderEffect());
         } else {
@@ -129,14 +132,7 @@ public final class SolegramScanGlass implements ViewTreeObserver.OnPreDrawListen
         factory = new BlurredBackgroundDrawableViewFactory(source);
         factory.setSourceRootView(new ViewPositionWatcher(root), root);
         factory.setLiquidGlassEffectAllowed(true);
-        provider = new BlurredBackgroundProviderBuilder(null)
-            .setBackgroundColor((r, isDark) -> Color.argb(Math.round(255 * Math.max(0.22f, Math.min(0.42f, 0.36f * SolegramGlass.alpha(true) / 0.85f))), 0x5C, 0x5C, 0x63))
-            .setStrokeColorTop(0x6BFFFFFF, 0x6BFFFFFF)
-            .setStrokeColorBottom(0x24FFFFFF, 0x24FFFFFF)
-            .setShadowColor(0x38000000, 0x38000000)
-            .setShadowLayer(dpf2(6f), 0, dpf2(1.5f))
-            .setStrokeWidth(dpf2(1f), dpf2(0.8f))
-            .build();
+        provider = SolegramCameraUi.glassProvider(false);
     }
 
     @Override

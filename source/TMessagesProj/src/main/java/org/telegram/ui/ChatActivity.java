@@ -32210,6 +32210,8 @@ public class ChatActivity extends BaseFragment implements
                 flags |= ActionBarPopupWindow.ActionBarPopupWindowLayout.FLAG_USE_SWIPEBACK;
             }
 
+            solegramQuickPill = null;
+            solegramPendingTranslate = null;
             ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout = new ActionBarPopupWindow.ActionBarPopupWindowLayout(getParentActivity(), R.drawable.popup_fixed_alert4, themeDelegate, flags);
             popupLayout.setMinimumWidth(AndroidUtilities.dp(200));
             Rect backgroundPaddings = new Rect();
@@ -33118,7 +33120,7 @@ public class ChatActivity extends BaseFragment implements
                                         translateEnabled && !RestrictedLanguagesSelectActivity.getRestrictedLanguages().contains(fromLang[0]) ||
                                         (currentChat != null && (currentChat.has_link || ChatObject.isPublic(currentChat)) || selectedObject.messageOwner.fwd_from != null) && ("uk".equals(fromLang[0]) || "ru".equals(fromLang[0]))
                                     )) {
-                                        cell.setVisibility(View.VISIBLE);
+                                        solegramShowLateItem(cell); // Solegram: behind More, if the menu is compact
                                     }
                                     waitForLangDetection.set(false);
                                     if (onLangDetectionDone.get() != null) {
@@ -33207,9 +33209,14 @@ public class ChatActivity extends BaseFragment implements
                         }
                     }
                 }
-                // Solegram: the actions two in a row, in a wider panel
-                solegramGridMenu();
-                // Solegram: a long menu shows the main actions and "More"; More opens it again with everything
+                // Solegram: "Translate" while the message's language is still being found
+                final int sgTranslateIndex = options.indexOf(OPTION_TRANSLATE);
+                solegramPendingTranslate = waitForLangDetection.get() && sgTranslateIndex >= 0 && sgTranslateIndex < scrimPopupWindowItems.length
+                    && scrimPopupWindowItems[sgTranslateIndex] != null && scrimPopupWindowItems[sgTranslateIndex].getVisibility() != View.VISIBLE
+                    ? scrimPopupWindowItems[sgTranslateIndex] : null;
+                // Solegram: reply, forward, copy and pin as icons in a pill of their own beside the menu
+                solegramQuickPill = solegramBuildQuickPill(options, icons, items);
+                // Solegram: the menu shows its first four actions and "More"; More opens the rest
                 solegramCompactMenu(popupLayout, options);
                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.video_processing_pending) {
                     popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
@@ -33505,6 +33512,9 @@ public class ChatActivity extends BaseFragment implements
             ReactionsContainerLayout finalReactionsLayout1 = reactionsLayout;
             if (reactionsLayout != null) {
                 reactionsLayout.setParentLayout(scrimPopupContainerLayout);
+            }
+            if (solegramQuickPill != null && solegramQuickPill.getParent() == null && popupLayout.getParent() == scrimPopupContainerLayout) {
+                scrimPopupContainerLayout.solegramSetSidePill(solegramQuickPill); // Solegram: to the right of the menu
             }
             scrimPopupWindow = new ActionBarPopupWindow(scrimPopupContainerLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT) {
                 @Override
@@ -33915,89 +33925,196 @@ public class ChatActivity extends BaseFragment implements
         closeMenu(true);
     }
 
+    // region Solegram side dock
+
+    /** Solegram: this chat can go into the side dock (an ordinary chat, not a thread, a preview or a picker). */
+    public boolean solegramCanDock() {
+        return chatMode == MODE_DEFAULT && dialog_id != 0 && !inPreviewMode && !inBubbleMode && !isInsideContainer
+            && threadMessageId == 0 && !isTopic && !isComments && !isReport() && fragmentView != null
+            && (pinchToZoomHelper == null || !pinchToZoomHelper.isInOverlayMode())
+            && scrimPopupWindow == null
+            && (chatActivityEnterView == null || !chatActivityEnterView.isRecordingAudioVideo());
+    }
+
+    /** Solegram: two fingers drew this chat to the right: it goes into the side dock and the chat closes. */
+    public void solegramDockByGesture(float x, float y) {
+        if (!solegramCanDock() || getParentActivity() == null) {
+            return;
+        }
+        if (!com.solegram.messenger.ui.SolegramChatDock.dock(this, x, y)) {
+            return; // the dock is full: the chat stays
+        }
+        if (chatActivityEnterView != null) {
+            AndroidUtilities.hideKeyboard(chatActivityEnterView.getEditField());
+        }
+        if (parentLayout != null && parentLayout.getFragmentStack().size() > 1) {
+            finishFragment();
+        }
+    }
+
+    // endregion
+
     // region Solegram compact message menu
 
-    private static final int SOLEGRAM_MENU_MAX = 6;
+    /** The menu shows this many of its actions, then "More" (when there are more than one past them). */
+    private static final int SOLEGRAM_MENU_SHOWN = 4;
 
     /** How much taller the compact message menu gets with "More" (0: not compact); reserved when it is placed. */
     private int solegramMenuGrow;
     @Nullable
     private ActionBarPopupWindow.ActionBarPopupWindowLayout solegramMenuPanel;
+    /** Reply, forward, copy, pin: icons in a pill of their own beside the menu (null: none in this menu). */
+    @Nullable
+    private LinearLayout solegramQuickPill;
+    /** The "Translate" row while the message's language is still being found (it may show up after the menu is made). */
+    @Nullable
+    private ActionBarMenuSubItem solegramPendingTranslate;
+    /** The pending "Translate" row went behind "More": it shows when More opens (if the language allows it). */
+    private boolean solegramPendingTranslateHidden, solegramPendingTranslateReady;
+
+    private static boolean solegramIsQuickOption(int option) {
+        return option == OPTION_REPLY || option == OPTION_FORWARD || option == OPTION_COPY || option == OPTION_PIN || option == OPTION_UNPIN;
+    }
 
     /**
-     * A message menu longer than {@link #SOLEGRAM_MENU_MAX} rows shows only the main actions (reply, copy, edit,
-     * forward, delete, then the first ones up to four) and a "More" row; the rest follow More, hidden. The menu is
-     * placed for its full size from the start (the panel just shows less of it), so More only opens the panel: the
-     * window never moves, and nothing under the glass jumps.
+     * Solegram: reply, forward, copy and pin leave the list: they are round icons in a pill of their own, to the right
+     * of the menu (in that order). A tap on one is a tap on its row (the row stays, hidden). Nothing moves when the
+     * menu would have no rows left.
      */
-    private void solegramCompactMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<Integer> options) {
-        solegramMenuGrow = 0;
-        solegramMenuPanel = null;
-        if (!com.solegram.messenger.SolegramConfig.shortMenus || scrimPopupWindowItems == null) {
-            return;
+    @Nullable
+    private LinearLayout solegramBuildQuickPill(ArrayList<Integer> options, ArrayList<Integer> icons, ArrayList<CharSequence> items) {
+        if (scrimPopupWindowItems == null || getParentActivity() == null) {
+            return null;
         }
-        final int n = Math.min(scrimPopupWindowItems.length, options.size());
-        int visible = 0;
-        for (int a = 0; a < n; a++) {
-            if (scrimPopupWindowItems[a] != null && scrimPopupWindowItems[a].getVisibility() == View.VISIBLE) {
-                visible++;
-            }
-        }
-        if (visible <= (solegramMenuInGrid() ? SOLEGRAM_MENU_MAX * 2 : SOLEGRAM_MENU_MAX)) {
-            return;
-        }
-        final boolean[] keep = new boolean[n];
-        int kept = 0;
+        final int n = Math.min(scrimPopupWindowItems.length, Math.min(options.size(), Math.min(icons.size(), items.size())));
+        int rest = solegramPendingTranslate != null ? 1 : 0;
+        final ArrayList<Integer> quick = new ArrayList<>();
         for (int a = 0; a < n; a++) {
             final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
             if (cell == null || cell.getVisibility() != View.VISIBLE) {
                 continue;
             }
-            final int option = options.get(a);
-            if (option == OPTION_REPLY || option == OPTION_COPY || option == OPTION_EDIT || option == OPTION_FORWARD
-                    || option == OPTION_DELETE || option == OPTION_WELCOME_REVERT) {
-                keep[a] = true;
-                kept++;
+            if (solegramIsQuickOption(options.get(a))) {
+                quick.add(a);
+            } else {
+                rest++;
             }
         }
-        // a message without most of those (a service message, a channel post): its first actions
-        for (int a = 0; a < n && kept < 4; a++) {
-            final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
-            if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a]) {
-                keep[a] = true;
-                kept++;
+        if (quick.isEmpty() || rest == 0) {
+            return null;
+        }
+        // reply, forward, copy, pin (or unpin)
+        final int[] order = {OPTION_REPLY, OPTION_FORWARD, OPTION_COPY, OPTION_PIN, OPTION_UNPIN};
+        final Context context = getParentActivity();
+        final LinearLayout pill = new LinearLayout(context);
+        pill.setOrientation(LinearLayout.VERTICAL);
+        final Drawable shadow = ContextCompat.getDrawable(context, R.drawable.popup_fixed_alert4).mutate();
+        shadow.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
+        pill.setBackground(com.solegram.messenger.ui.SolegramLiveGlass.menuPanel(pill, shadow, themeDelegate));
+        ThemeBind.drawableColorFilter(pill, shadow, Theme.key_actionBarDefaultSubmenuBackground, getResourceProvider(), PorterDuff.Mode.MULTIPLY);
+        final Rect padding = new Rect();
+        shadow.getPadding(padding);
+        pill.setPadding(padding.left + dp(4), padding.top + dp(4), padding.right + dp(4), padding.bottom + dp(4));
+        final int iconColor = com.solegram.messenger.SolegramIcons.menuIconColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon), themeDelegate);
+        final int selector = getThemedColor(Theme.key_listSelector);
+        for (int option : order) {
+            for (int a : quick) {
+                if (options.get(a) != option) {
+                    continue;
+                }
+                final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
+                final ImageView button = new ImageView(context);
+                button.setScaleType(ImageView.ScaleType.CENTER);
+                button.setImageResource(icons.get(a));
+                button.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
+                button.setBackground(Theme.createRadSelectorDrawable(selector, 22, 22));
+                button.setContentDescription(items.get(a));
+                button.setOnClickListener(v -> {
+                    if (cell.isEnabled()) {
+                        cell.callOnClick();
+                    }
+                });
+                // a long press names the action, as a toolbar's icons do
+                button.setOnLongClickListener(v -> {
+                    final CharSequence label = items.get(a);
+                    if (!TextUtils.isEmpty(label)) {
+                        android.widget.Toast.makeText(context, label, android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
+                });
+                pill.addView(button, LayoutHelper.createLinear(44, 44));
+                cell.setVisibility(View.GONE);
             }
         }
-        final ArrayList<View> hidden = new ArrayList<>();
-        ViewGroup rows = null;
-        for (int a = 0; a < n; a++) {
-            final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
-            if (cell != null && cell.getVisibility() == View.VISIBLE && !keep[a] && cell.getParent() instanceof ViewGroup) {
-                rows = (ViewGroup) cell.getParent();
-                hidden.add(cell);
-            }
+        return pill;
+    }
+
+    /** Solegram: the language detection allowed "Translate" after the menu was made. */
+    private void solegramShowLateItem(ActionBarMenuSubItem cell) {
+        if (cell == solegramPendingTranslate && solegramPendingTranslateHidden) {
+            solegramPendingTranslateReady = true; // behind More: it opens with the rest
+        } else {
+            cell.setVisibility(View.VISIBLE);
         }
-        if (hidden.isEmpty() || rows == null) {
+    }
+
+    /**
+     * The message menu shows its first {@link #SOLEGRAM_MENU_SHOWN} actions and a "More" row; the rest follow More,
+     * hidden (a menu with only one past them shows it). The menu is placed for its full size from the start (the panel
+     * just shows less of it), so More only opens the panel: the window never moves, and nothing under the glass jumps.
+     */
+    private void solegramCompactMenu(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, ArrayList<Integer> options) {
+        solegramMenuGrow = 0;
+        solegramMenuPanel = null;
+        solegramPendingTranslateHidden = false;
+        solegramPendingTranslateReady = false;
+        if (scrimPopupWindowItems == null) {
             return;
         }
+        final int n = Math.min(scrimPopupWindowItems.length, options.size());
+        final ArrayList<View> shown = new ArrayList<>();
+        for (int a = 0; a < n; a++) {
+            final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
+            if (cell != null && cell != solegramPendingTranslate && cell.getVisibility() == View.VISIBLE && cell.getParent() instanceof ViewGroup) {
+                shown.add(cell);
+            }
+        }
+        final boolean pendingRow = solegramPendingTranslate != null && solegramPendingTranslate.getParent() instanceof ViewGroup;
+        if (shown.size() + (pendingRow ? 1 : 0) <= SOLEGRAM_MENU_SHOWN + 1) {
+            return;
+        }
+        final ArrayList<View> hidden = new ArrayList<>(shown.subList(Math.min(SOLEGRAM_MENU_SHOWN, shown.size()), shown.size()));
+        if (pendingRow) {
+            // a "Translate" still unknown goes behind More: showing up later it moves nothing that is shown
+            hidden.add(solegramPendingTranslate);
+            solegramPendingTranslateHidden = true;
+        }
+        final ViewGroup rows = (ViewGroup) hidden.get(hidden.size() - 1).getParent();
         final ActionBarMenuSubItem more = new ActionBarMenuSubItem(getParentActivity(), false, true, themeDelegate);
         more.setMinimumWidth(AndroidUtilities.dp(200));
         more.setTextAndIcon(getString(R.string.SG_MenuMore), R.drawable.ic_ab_other);
-        if (rows instanceof com.solegram.messenger.ui.SolegramMenuGrid) {
-            com.solegram.messenger.ui.SolegramMenuGrid.style(more);
-        }
-        rows.addView(more); // with the rows (in the grid, as one of its tiles)
+        rows.addView(more);
         // the hidden rows go after More: opening adds rows at the end, the shown ones never move
         for (int i = 0; i < hidden.size(); i++) {
             final View row = hidden.get(i);
-            rows.removeView(row);
+            if (row.getParent() instanceof ViewGroup) {
+                ((ViewGroup) row.getParent()).removeView(row);
+            }
             rows.addView(row);
         }
-        // the full size and the compact one
+        // the full size (a "Translate" still unknown counted in) and the compact one
         final int spec = View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST);
         more.setVisibility(View.GONE);
+        final ActionBarMenuSubItem pending = solegramPendingTranslate;
+        final boolean pendingWasGone = pending != null && pending.getVisibility() != View.VISIBLE;
+        if (pendingWasGone) {
+            pending.setVisibility(View.VISIBLE);
+        }
         popupLayout.measure(spec, spec);
         final int full = popupLayout.getMeasuredHeight();
+        if (pendingWasGone) {
+            pending.setVisibility(View.GONE);
+        }
         for (int i = 0; i < hidden.size(); i++) {
             hidden.get(i).setVisibility(View.GONE);
         }
@@ -34057,8 +34174,12 @@ public class ChatActivity extends BaseFragment implements
         final int grow = popupLayout.subtractBackgroundHeight;
         final boolean up = solegramMenuGrowsUp;
         more.setVisibility(View.GONE);
-        for (int i = 0; i < hidden.size(); i++) {
+        for (int i = hidden.size() - 1; i >= 0; i--) {
             final View item = hidden.get(i);
+            if (item == solegramPendingTranslate && solegramPendingTranslateHidden && !solegramPendingTranslateReady) {
+                hidden.remove(i); // the language did not allow it
+                continue;
+            }
             item.setVisibility(View.VISIBLE);
             item.setAlpha(0f);
         }
@@ -34128,8 +34249,17 @@ public class ChatActivity extends BaseFragment implements
             reactionsLayout = null;
         }
         final int spec = View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST);
+        // a "Translate" still unknown (shown in place when it comes): its room is kept
+        final View pending = solegramPendingTranslateHidden ? null : solegramPendingTranslate;
+        final boolean reserve = pending != null && pending.getVisibility() != View.VISIBLE;
+        if (reserve) {
+            pending.setVisibility(View.VISIBLE);
+        }
         container.measure(spec, spec);
         container.layout(0, 0, container.getMeasuredWidth(), container.getMeasuredHeight());
+        if (reserve) {
+            pending.setVisibility(View.GONE);
+        }
         // what is seen of the window (its shadows left out), in the window's coordinates
         final RectF panel = new RectF(), pill = new RectF(), seen = new RectF();
         solegramMenuPanelRect(popupLayout, panel, false);
@@ -34193,7 +34323,7 @@ public class ChatActivity extends BaseFragment implements
         final float width = chatListView.getMeasuredWidth();
         float left;
         if (v instanceof ChatMessageCell && Math.abs(message.centerX() - width / 2f) > dp(8)) {
-            left = message.centerX() > width / 2f ? message.right - panel.right : message.left - panel.left;
+            left = message.centerX() > width / 2f ? message.right - seen.right : message.left - panel.left;
         } else {
             left = message.centerX() - seen.centerX();
         }
@@ -34268,33 +34398,6 @@ public class ChatActivity extends BaseFragment implements
         } else {
             out.union(r);
         }
-    }
-
-    /** Solegram: puts the message menu's actions into two columns (SolegramMenuGrid), when that is on. */
-    private void solegramGridMenu() {
-        if (!com.solegram.messenger.ui.SolegramMenuGrid.enabled() || scrimPopupWindowItems == null || chatListView == null) {
-            return;
-        }
-        ViewGroup rows = null;
-        for (ActionBarMenuSubItem item : scrimPopupWindowItems) {
-            if (item != null && item.getParent() instanceof ViewGroup) {
-                rows = (ViewGroup) item.getParent();
-                break;
-            }
-        }
-        final int windowWidth = chatListView.getMeasuredWidth() > 0 ? chatListView.getMeasuredWidth() : AndroidUtilities.displaySize.x;
-        com.solegram.messenger.ui.SolegramMenuGrid.apply(rows, scrimPopupWindowItems, com.solegram.messenger.ui.SolegramMenuGrid.availableWidth(windowWidth));
-    }
-
-    private boolean solegramMenuInGrid() {
-        if (scrimPopupWindowItems != null) {
-            for (ActionBarMenuSubItem item : scrimPopupWindowItems) {
-                if (item != null) {
-                    return item.getParent() instanceof com.solegram.messenger.ui.SolegramMenuGrid;
-                }
-            }
-        }
-        return false;
     }
 
     /** The top of {@code view} in the coordinates of {@code ancestor}. */

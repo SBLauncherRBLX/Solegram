@@ -557,6 +557,19 @@ public abstract class BaseFragment {
     }
 
     @Nullable
+    /** Solegram: a menu of this screen's header (in its overlay) or a sheet drawn inside the screen is open. */
+    public boolean solegramHasOpenOverlay() {
+        if (simpleMenuOverlay != null && simpleMenuOverlay.isOpened()) {
+            return true;
+        }
+        if (simpleMenuOverlayHost != null && simpleMenuOverlayHost != this && simpleMenuOverlayHost.simpleMenuOverlay != null
+                && simpleMenuOverlayHost.simpleMenuOverlay.isOpened()) {
+            return true;
+        }
+        final AttachedSheet sheet = getLastSheet();
+        return sheet != null && sheet.attachedToParent();
+    }
+
     public SimpleActionBarMenuOverlay getSimpleMenuOverlay() {
         if (simpleMenuOverlayHost != null && simpleMenuOverlayHost.fragmentView != null) {
             return simpleMenuOverlayHost.getSimpleMenuOverlay();

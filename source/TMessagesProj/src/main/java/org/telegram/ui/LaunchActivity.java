@@ -541,6 +541,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         });
         actionBarLayout.setDelegate(this);
+        if (actionBarLayout instanceof ActionBarLayout) {
+            // Solegram: the side dock of chats (two fingers to the right in a chat), over every screen
+            com.solegram.messenger.ui.SolegramChatDock.attach((ActionBarLayout) actionBarLayout);
+        }
         Theme.loadWallpaper(true);
 
         checkCurrentAccount();

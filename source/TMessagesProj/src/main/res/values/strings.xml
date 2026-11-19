@@ -13834,7 +13834,6 @@
     <string name="SG_ShapeProgressInfo">Loading as Material 3 shapes that flow into one another; a percentage fills them as a sector.</string>
     <string name="SG_PlayerProgressWave">Wave</string>
     <string name="SG_MenuMore">More</string>
-    <string name="SG_ShortMenus">Short message menu</string>
     <string name="SG_MusicEmojiNeedsCard">To let others see this emoji, make a profile card: Solegram → “Profile banner and tiles”. For now only you can see it.</string>
     <string name="SG_HdrAppearance">Avatar shape, icons, font and animations: set how Solegram looks.</string>
     <string name="SG_HdrChats">Sticker size, message behaviour and the small things that make chatting easier.</string>
@@ -13894,6 +13893,9 @@
     <string name="SG_LastSeenOfferText">Telegram hides other people\'s last seen time from you because yours is hidden. Show your last seen to everyone? Then you will see everyone\'s time right away, without tapping “when?”. You can hide it again in Privacy → Last Seen.</string>
     <string name="SG_LastSeenOfferYes">Show</string>
     <string name="SG_LastSeenOfferNo">Leave hidden</string>
-    <string name="SG_GridMenus">Message menu in two columns</string>
+    <string name="SG_DockFull">The side dock already has 3 chats. To take one out, press and hold it.</string>
+    <string name="SG_DockHint">The chat is in the side dock on the right: open it from any screen. To take it out, press and hold it.</string>
+    <string name="SG_DockRemoved">Chat taken out of the side dock</string>
+    <string name="SG_DockUndo">Undo</string>
     <!-- SOLEGRAM END -->
 </resources>
