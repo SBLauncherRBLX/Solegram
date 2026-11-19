@@ -13894,5 +13894,6 @@
     <string name="SG_LastSeenOfferText">Telegram hides other people\'s last seen time from you because yours is hidden. Show your last seen to everyone? Then you will see everyone\'s time right away, without tapping “when?”. You can hide it again in Privacy → Last Seen.</string>
     <string name="SG_LastSeenOfferYes">Show</string>
     <string name="SG_LastSeenOfferNo">Leave hidden</string>
+    <string name="SG_GridMenus">Message menu in two columns</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -33207,6 +33207,8 @@ public class ChatActivity extends BaseFragment implements
                         }
                     }
                 }
+                // Solegram: the actions two in a row, in a wider panel
+                solegramGridMenu();
                 // Solegram: a long menu shows the main actions and "More"; More opens it again with everything
                 solegramCompactMenu(popupLayout, options);
                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.video_processing_pending) {
@@ -33601,6 +33603,14 @@ public class ChatActivity extends BaseFragment implements
             } else {
                 popupY = inBubbleMode ? 0 : AndroidUtilities.statusBarHeight;
             }
+            // Solegram: the menu next to the message, below or above it, never over it (the chat moves to make room)
+            solegramMenuPlacedAbove = false;
+            final int[] solegramPlaced = optionsView == null ? solegramPlaceMenuByMessage(v, scrimPopupContainerLayout, popupLayout, isReactionsAvailable ? reactionsLayout : null) : null;
+            if (solegramPlaced != null) {
+                popupX = solegramPlaced[0];
+                popupY = solegramPlaced[1];
+                scrimPopupWindow.setClippingEnabled(false); // placed to fit as it is: the window must not be pushed onto the message
+            }
             // Solegram: liquid menu - it flows out of the message: the reactions above it, the menu below (placed there)
             final SolegramMenuLiquid liquidMenu = optionsView == null ? solegramCreateMenuLiquid(v, scrimPopupContainerLayout, popupLayout, isReactionsAvailable ? reactionsLayout : null, scrimPopupWindow) : null;
             if (liquidMenu != null) {
@@ -33933,7 +33943,7 @@ public class ChatActivity extends BaseFragment implements
                 visible++;
             }
         }
-        if (visible <= SOLEGRAM_MENU_MAX) {
+        if (visible <= (solegramMenuInGrid() ? SOLEGRAM_MENU_MAX * 2 : SOLEGRAM_MENU_MAX)) {
             return;
         }
         final boolean[] keep = new boolean[n];
@@ -33973,7 +33983,10 @@ public class ChatActivity extends BaseFragment implements
         final ActionBarMenuSubItem more = new ActionBarMenuSubItem(getParentActivity(), false, true, themeDelegate);
         more.setMinimumWidth(AndroidUtilities.dp(200));
         more.setTextAndIcon(getString(R.string.SG_MenuMore), R.drawable.ic_ab_other);
-        popupLayout.addView(more);
+        if (rows instanceof com.solegram.messenger.ui.SolegramMenuGrid) {
+            com.solegram.messenger.ui.SolegramMenuGrid.style(more);
+        }
+        rows.addView(more); // with the rows (in the grid, as one of its tiles)
         // the hidden rows go after More: opening adds rows at the end, the shown ones never move
         for (int i = 0; i < hidden.size(); i++) {
             final View row = hidden.get(i);
@@ -34017,9 +34030,13 @@ public class ChatActivity extends BaseFragment implements
      */
     private boolean solegramMenuGrowsUp;
 
+    /** The menu was placed above the message by solegramPlaceMenuByMessage. */
+    private boolean solegramMenuPlacedAbove;
+
     private void solegramPlaceCompactMenu(View container, @Nullable SolegramMenuLiquid liquidMenu) {
         solegramMenuGrowsUp = false;
-        if (solegramMenuGrow <= 0 || liquidMenu == null || liquidMenu.arrangement != SOLEGRAM_MENU_ABOVE) {
+        final boolean above = liquidMenu != null ? liquidMenu.arrangement == SOLEGRAM_MENU_ABOVE : solegramMenuPlacedAbove;
+        if (solegramMenuGrow <= 0 || !above) {
             return;
         }
         solegramMenuGrowsUp = true;
@@ -34093,6 +34110,191 @@ public class ChatActivity extends BaseFragment implements
             }
         });
         open.start();
+    }
+
+    /**
+     * Solegram: places the message menu (the reactions with it) next to the message: below it, or above it when there is
+     * no room below, so it never covers the message. When neither side has room, the chat moves just enough for one
+     * side to have it (to the message's end or its start, whichever is nearer). Returns the window's position, or null
+     * to keep Telegram's (a menu taller than the screen, a message not in the list).
+     */
+    @Nullable
+    private int[] solegramPlaceMenuByMessage(View v, ChatScrimPopupContainerLayout container, ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout, @Nullable ReactionsContainerLayout reactionsLayout) {
+        if (fragmentView == null || contentView == null || chatListView == null || isInsideContainer || inBubbleMode || inPreviewMode
+                || v == null || v.getParent() != chatListView || popupLayout.getParent() != container) {
+            return null;
+        }
+        if (reactionsLayout != null && reactionsLayout.getParent() != container) {
+            reactionsLayout = null;
+        }
+        final int spec = View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST);
+        container.measure(spec, spec);
+        container.layout(0, 0, container.getMeasuredWidth(), container.getMeasuredHeight());
+        // what is seen of the window (its shadows left out), in the window's coordinates
+        final RectF panel = new RectF(), pill = new RectF(), seen = new RectF();
+        solegramMenuPanelRect(popupLayout, panel, false);
+        panel.offset(popupLayout.getX(), popupLayout.getY());
+        seen.set(panel);
+        if (reactionsLayout != null) {
+            reactionsLayout.solegramGetPillRect(pill);
+            pill.offset(reactionsLayout.getX(), reactionsLayout.getY());
+            if (pill.width() > 0 && pill.height() > 0) {
+                seen.union(pill);
+            }
+        }
+        for (int i = 0; i < container.getChildCount(); i++) {
+            final View child = container.getChildAt(i);
+            if (child != popupLayout && child != reactionsLayout && child.getVisibility() == View.VISIBLE && child.getHeight() > 0) {
+                seen.union(child.getLeft() + dp(6), child.getTop() + dp(6), child.getRight() - dp(6), child.getBottom() - dp(6));
+            }
+        }
+        if (seen.isEmpty()) {
+            return null;
+        }
+        final float gap = dp(10);
+        final float topLimit = AndroidUtilities.statusBarHeight + dp(8);
+        final float bottomLimit = contentView.getMeasuredHeight() - windowInsetsStateHolder.getCurrentMaxBottomInset() - dp(8);
+        if (seen.height() + gap > bottomLimit - topLimit) {
+            return null; // taller than the screen: Telegram's way (it scrolls inside)
+        }
+        final RectF message = new RectF();
+        if (!solegramMessageRect(v, message)) {
+            return null;
+        }
+        float top = solegramMenuTopByMessage(message, seen, gap, topLimit, bottomLimit);
+        if (Float.isNaN(top)) {
+            // no room on either side: the chat moves (the message's nearer end comes out from under where the menu goes)
+            final float up = message.bottom - (bottomLimit - gap - seen.height());
+            final float down = topLimit + gap + seen.height() - message.top;
+            final boolean first = up <= down;
+            for (int attempt = 0; attempt < 2 && Float.isNaN(top); attempt++) {
+                final boolean scrollUp = attempt == 0 ? first : !first;
+                if (attempt == 1 && !solegramMessageRect(v, message)) {
+                    break;
+                }
+                final float by = scrollUp ? message.bottom - (bottomLimit - gap - seen.height()) : topLimit + gap + seen.height() - message.top;
+                if (by > 0) {
+                    chatListView.scrollBy(0, (int) Math.ceil(scrollUp ? by : -by));
+                }
+                if (v.getParent() != chatListView || !solegramMessageRect(v, message)) {
+                    return null;
+                }
+                top = solegramMenuTopByMessage(message, seen, gap, topLimit, bottomLimit);
+            }
+        }
+        if (Float.isNaN(top)) {
+            // the chat could not move enough (a message as tall as the screen at the chat's very start and end):
+            // the side with more room, as near the message as the screen lets it be
+            final float visTop = Math.max(message.top, topLimit), visBottom = Math.min(message.bottom, bottomLimit);
+            final boolean below = bottomLimit - visBottom >= visTop - topLimit;
+            top = below ? bottomLimit - seen.bottom : topLimit - seen.top;
+        }
+        // across: to the message's side (an outgoing message's menu on the right), on the screen
+        final float width = chatListView.getMeasuredWidth();
+        float left;
+        if (v instanceof ChatMessageCell && Math.abs(message.centerX() - width / 2f) > dp(8)) {
+            left = message.centerX() > width / 2f ? message.right - panel.right : message.left - panel.left;
+        } else {
+            left = message.centerX() - seen.centerX();
+        }
+        left = Math.min(left, width - dp(6) - seen.right);
+        left = Math.max(left, dp(6) - seen.left);
+        solegramMenuPlacedAbove = top + seen.centerY() < message.centerY();
+        final int[] location = new int[2];
+        fragmentView.getLocationInWindow(location);
+        return new int[]{Math.round(left) + location[0], Math.round(top) + location[1]};
+    }
+
+    /** Where the window's top goes for the menu to be below the message, or else above it; NaN: neither has room. */
+    private float solegramMenuTopByMessage(RectF message, RectF seen, float gap, float topLimit, float bottomLimit) {
+        // the part of the message on screen (the list clips the rest)
+        final float listTop = chatListView.getY() + chatListViewPaddingTop - chatListViewPaddingVisibleOffset - dp(4);
+        final float listBottom = contentView.getMeasuredHeight() - windowInsetsStateHolder.getCurrentMaxBottomInset() - inputIslandHeightCurrent - dp(9);
+        final float visTop = Math.max(message.top, listTop), visBottom = Math.min(message.bottom, listBottom);
+        if (visBottom <= visTop) {
+            return Float.NaN;
+        }
+        final float below = visBottom + gap - seen.top;
+        if (below + seen.bottom <= bottomLimit) {
+            return below;
+        }
+        final float above = visTop - gap - seen.bottom;
+        if (above + seen.top >= topLimit) {
+            return above;
+        }
+        return Float.NaN;
+    }
+
+    /** Solegram: the message as seen (its bubble, a sticker's picture; a whole album), in fragment view coordinates. */
+    private boolean solegramMessageRect(View v, RectF out) {
+        out.setEmpty();
+        if (v instanceof ChatMessageCell) {
+            final ChatMessageCell cell = (ChatMessageCell) v;
+            final MessageObject.GroupedMessages group = cell.getCurrentMessagesGroup();
+            if (group == null) {
+                solegramAddMessageRect(cell, out);
+            } else {
+                for (int i = 0, n = chatListView.getChildCount(); i < n; i++) {
+                    final View child = chatListView.getChildAt(i);
+                    if (child instanceof ChatMessageCell && ((ChatMessageCell) child).getCurrentMessagesGroup() == group) {
+                        solegramAddMessageRect((ChatMessageCell) child, out);
+                    }
+                }
+                if (out.isEmpty()) {
+                    solegramAddMessageRect(cell, out);
+                }
+            }
+        } else {
+            final float x = chatListView.getX() + v.getX(), y = chatListView.getY() + v.getY();
+            out.set(x, y, x + v.getWidth(), y + v.getHeight());
+        }
+        return out.width() > 1 && out.height() > 1;
+    }
+
+    private void solegramAddMessageRect(ChatMessageCell cell, RectF out) {
+        if (solegramAddCellBubble(cell, out)) {
+            return;
+        }
+        final float x = chatListView.getX() + cell.getX(), y = chatListView.getY() + cell.getY();
+        final ImageReceiver image = cell.getPhotoImage();
+        final RectF r = new RectF();
+        if (image != null && image.getVisible() && image.getImageWidth() > 1 && image.getImageHeight() > 1) {
+            r.set(x + image.getImageX(), y + image.getImageY(), x + image.getImageX2(), y + image.getImageY2());
+        } else {
+            r.set(x, y, x + cell.getWidth(), y + cell.getHeight());
+        }
+        if (out.isEmpty()) {
+            out.set(r);
+        } else {
+            out.union(r);
+        }
+    }
+
+    /** Solegram: puts the message menu's actions into two columns (SolegramMenuGrid), when that is on. */
+    private void solegramGridMenu() {
+        if (!com.solegram.messenger.ui.SolegramMenuGrid.enabled() || scrimPopupWindowItems == null || chatListView == null) {
+            return;
+        }
+        ViewGroup rows = null;
+        for (ActionBarMenuSubItem item : scrimPopupWindowItems) {
+            if (item != null && item.getParent() instanceof ViewGroup) {
+                rows = (ViewGroup) item.getParent();
+                break;
+            }
+        }
+        final int windowWidth = chatListView.getMeasuredWidth() > 0 ? chatListView.getMeasuredWidth() : AndroidUtilities.displaySize.x;
+        com.solegram.messenger.ui.SolegramMenuGrid.apply(rows, scrimPopupWindowItems, com.solegram.messenger.ui.SolegramMenuGrid.availableWidth(windowWidth));
+    }
+
+    private boolean solegramMenuInGrid() {
+        if (scrimPopupWindowItems != null) {
+            for (ActionBarMenuSubItem item : scrimPopupWindowItems) {
+                if (item != null) {
+                    return item.getParent() instanceof com.solegram.messenger.ui.SolegramMenuGrid;
+                }
+            }
+        }
+        return false;
     }
 
     /** The top of {@code view} in the coordinates of {@code ancestor}. */

@@ -2225,4 +2225,5 @@
     <string name="SG_LastSeenOfferText">Telegram скрывает от тебя время захода других, потому что твоё скрыто. Показывать твоё время захода всем? Тогда время всех будет видно сразу, без нажатия на «когда?». Скрыть его снова можно в Конфиденциальность → Последняя активность.</string>
     <string name="SG_LastSeenOfferYes">Показывать</string>
     <string name="SG_LastSeenOfferNo">Оставить скрытым</string>
+    <string name="SG_GridMenus">Меню сообщений в два столбца</string>
 </resources>

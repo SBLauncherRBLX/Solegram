@@ -273,6 +273,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_PREMIUM_STICKERS = 4245;
     private static final int ID_MENTION_CARDS = 4246;
     private static final int ID_SHORT_MENUS = 4255;
+    private static final int ID_GRID_MENUS = 4290;
     private static final int ID_FREE_TRANSCRIBE = 4256;
     private static final int ID_NAME_EFFECT = 4247;
     private static final int ID_VOICE_PREVIEW = 4248;
@@ -533,6 +534,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asCheck(ID_PREMIUM_STICKERS, getString(R.string.SG_PremiumStickersShare)).setChecked(com.solegram.messenger.SolegramPremiumStickers.enabled()));
         items.add(UItem.asCheck(ID_MENTION_CARDS, getString(R.string.SG_MentionCards)).setChecked(SolegramConfig.mentionCards));
         items.add(UItem.asCheck(ID_SHORT_MENUS, getString(R.string.SG_ShortMenus)).setChecked(SolegramConfig.shortMenus));
+        items.add(UItem.asCheck(ID_GRID_MENUS, getString(R.string.SG_GridMenus)).setChecked(SolegramConfig.gridMenus));
         items.add(UItem.asCheck(ID_FREE_TRANSCRIBE, getString(R.string.SG_FreeTranscribe)).setChecked(SolegramConfig.freeTranscribe));
         items.add(UItem.asCheck(ID_VOICE_PREVIEW, getString(R.string.SG_VoicePreview)).setChecked(SolegramConfig.voicePreview));
         items.add(UItem.asCheck(ID_VOICE_EFFECTS, getString(R.string.SG_VoiceFxSetting)).setChecked(SolegramConfig.voiceEffects));
@@ -2927,6 +2929,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_SHORT_MENUS:
                 toggleCheck(view, "shortMenus");
+                return;
+            case ID_GRID_MENUS:
+                toggleCheck(view, "gridMenus");
                 return;
             case ID_FREE_TRANSCRIBE:
                 toggleCheck(view, "freeTranscribe");
