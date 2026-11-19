@@ -2775,8 +2775,11 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                 if (packIndex >= 0 && packIndex < packs.size()) {
                     EmojiView.EmojiPack pack = packs.get(packIndex);
                     if (pack != null) {
-                        button.set(pack.set.title, !pack.free && !UserConfig.getInstance(currentAccount).isPremium(), pack.installed, e -> {
-                            if (!pack.free && !UserConfig.getInstance(currentAccount).isPremium()) {
+                        // Solegram: the name and profile emoji are free here, so their packs carry no lock
+                        final boolean sgPackLocked = !pack.free && !UserConfig.getInstance(currentAccount).isPremium()
+                            && type != TYPE_SET_REPLY_ICON && type != TYPE_SET_REPLY_ICON_BOTTOM && type != TYPE_CHAT_REACTIONS;
+                        button.set(pack.set.title, sgPackLocked, pack.installed, e -> {
+                            if (sgPackLocked) {
                                 BaseFragment fragment = LaunchActivity.getLastFragment();
                                 if (fragment != null) {
                                     fragment.showDialog(new PremiumFeatureBottomSheet(baseFragment, getContext(), currentAccount, PremiumPreviewFragment.PREMIUM_FEATURE_ANIMATED_EMOJI, false));
