@@ -86,7 +86,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
     private static SolegramChatDock instance;
 
     private final ActionBarLayout root;
-    private final LinearLayout pill;
+    private final Pill pill;
     private final ArrayList<Long> dialogs = new ArrayList<>();
     private int account = -1;
     /** The account's user the list belongs to (another login in the same slot has its own). */
@@ -110,7 +110,7 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
         setClipChildren(false);
         setClipToPadding(false);
 
-        pill = new LinearLayout(context);
+        pill = new Pill(context);
         pill.setOrientation(LinearLayout.VERTICAL);
         pill.setClipChildren(false);
         pill.setClipToPadding(false);
@@ -377,12 +377,17 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
         if (value) {
             pill.setVisibility(VISIBLE);
         }
+        if (value && pill.getAlpha() <= 0f) {
+            // it grows out of its corner (the top right, by the header)
+            pill.setScaleX(0.6f);
+            pill.setScaleY(0.6f);
+        }
         pill.animate()
             .alpha(value ? 1f : 0f)
-            .scaleX(value ? 1f : 0.85f)
-            .scaleY(value ? 1f : 0.85f)
-            .setDuration(value ? 260 : 160)
-            .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
+            .scaleX(value ? 1f : 0.6f)
+            .scaleY(value ? 1f : 0.6f)
+            .setDuration(value ? 420 : 280)
+            .setInterpolator(value ? CubicBezierInterpolator.EASE_OUT_QUINT : CubicBezierInterpolator.EASE_OUT)
             .setUpdateListener(a -> shownProgress = pill.getAlpha())
             .withEndAction(() -> {
                 shownProgress = pill.getAlpha();
@@ -407,9 +412,24 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
         final Item item = new Item(getContext(), did);
         final LinearLayout.LayoutParams lp = LayoutHelper.createLinear(AVATAR, AVATAR);
         lp.topMargin = index > 0 ? dp(GAP) : 0;
-        pill.addView(item, Math.min(index, pill.getChildCount()), lp);
+        final int at = Math.min(index, pill.getChildCount());
+        pill.addView(item, at, lp);
         fixMargins();
+        // the ones after it make room smoothly (the pill grows with them)
+        shift(at + 1, -(dp(AVATAR) + dp(GAP)));
         return item;
+    }
+
+    /** The places from {@code from} on were moved by {@code by} in the layout: they glide there from where they were. */
+    private void shift(int from, float by) {
+        if (pill.getVisibility() != VISIBLE || pill.getAlpha() <= 0f) {
+            return;
+        }
+        for (int i = from; i < pill.getChildCount(); i++) {
+            final View child = pill.getChildAt(i);
+            child.setTranslationY(child.getTranslationY() + by);
+            child.animate().translationY(0).setDuration(360).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        }
     }
 
     private void fixMargins() {
@@ -636,9 +656,15 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
         } catch (Throwable ignore) {
         }
         item.animate().cancel();
-        item.animate().alpha(0f).scaleX(0.4f).scaleY(0.4f).setDuration(180).withEndAction(() -> {
+        if (dialogs.isEmpty()) {
+            setShown(false); // the last one: the whole pill goes with it
+        }
+        item.animate().alpha(0f).scaleX(0.4f).scaleY(0.4f).setDuration(170).withEndAction(() -> {
+            final int at = pill.indexOfChild(item);
             pill.removeView(item);
             fixMargins();
+            // the ones after it close the gap smoothly, the pill shrinks with them
+            shift(Math.max(0, at), dp(AVATAR) + dp(GAP));
         }).start();
         final BaseFragment last = LaunchActivity.getLastFragment();
         if (last != null) {
@@ -660,6 +686,67 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
     }
 
     // endregion
+
+    /**
+     * The pill: its height changes smoothly when a chat comes or goes (the glass follows it), and what is in it stays
+     * inside its rounded glass.
+     */
+    private final class Pill extends LinearLayout {
+        private float shownHeight = -1;
+        private int targetHeight = -1;
+        @Nullable
+        private android.animation.ValueAnimator heightAnimator;
+        private final android.graphics.Path clip = new android.graphics.Path();
+
+        Pill(Context context) {
+            super(context);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            final int target = getMeasuredHeight();
+            final boolean animate = getVisibility() == VISIBLE && getAlpha() > 0f && isAttachedToWindow() && shownHeight >= 0;
+            if (!animate) {
+                if (heightAnimator != null) {
+                    heightAnimator.cancel();
+                    heightAnimator = null;
+                }
+                shownHeight = target;
+                targetHeight = target;
+            } else if (target != targetHeight) {
+                targetHeight = target;
+                if (heightAnimator != null) {
+                    heightAnimator.cancel();
+                }
+                final float from = shownHeight;
+                final android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofFloat(0f, 1f);
+                animator.addUpdateListener(a -> {
+                    shownHeight = AndroidUtilities.lerp(from, target, (float) a.getAnimatedValue());
+                    requestLayout();
+                });
+                animator.setDuration(360);
+                animator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                heightAnimator = animator;
+                animator.start();
+            }
+            setMeasuredDimension(getMeasuredWidth(), Math.round(shownHeight));
+        }
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            // the glass is inset by its shadow: the avatars stay within it while it grows or shrinks
+            final float inset = dp(GLASS_PAD);
+            final float radius = Math.max(0, shapeRadius);
+            clip.rewind();
+            AndroidUtilities.rectTmp.set(inset, inset, getWidth() - inset, getHeight() - inset);
+            clip.addRoundRect(AndroidUtilities.rectTmp, radius, radius, android.graphics.Path.Direction.CW);
+            canvas.save();
+            canvas.clipPath(clip);
+            super.dispatchDraw(canvas);
+            canvas.restore();
+        }
+    }
 
     /** A chat in the dock: its picture, a dot for unread messages, a ring while it is open. */
     private final class Item extends FrameLayout {

@@ -34025,10 +34025,10 @@ public class ChatActivity extends BaseFragment implements
                 }
                 final ActionBarMenuSubItem cell = scrimPopupWindowItems[a];
                 final ImageView button = new ImageView(context);
-                // every icon in the same 22dp box, whatever its own size
+                // every icon's drawing (its empty margins cut off) in the same 20dp box, whatever its own size
                 button.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                button.setPadding(dp(11), dp(11), dp(11), dp(11));
-                button.setImageResource(icons.get(a));
+                button.setPadding(dp(12), dp(12), dp(12), dp(12));
+                button.setImageDrawable(solegramTrimmedIcon(context, icons.get(a)));
                 button.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
                 button.setBackground(Theme.createRadSelectorDrawable(selector, 22, 22));
                 button.setContentDescription(items.get(a));
@@ -34050,6 +34050,54 @@ public class ChatActivity extends BaseFragment implements
             }
         }
         return pill;
+    }
+
+    /**
+     * Solegram: an icon without the empty margins its file has around the drawing (the reply and forward arrows have
+     * wide ones, copy and pin almost none), so that icons fitted into the same box look the same size.
+     */
+    private Drawable solegramTrimmedIcon(Context context, int res) {
+        final Drawable drawable = ContextCompat.getDrawable(context, res);
+        if (drawable == null) {
+            return null;
+        }
+        final int w = drawable.getIntrinsicWidth(), h = drawable.getIntrinsicHeight();
+        if (w <= 0 || h <= 0 || w > dp(64) || h > dp(64)) {
+            return drawable;
+        }
+        try {
+            final int scale = 3; // drawn larger: it is scaled into its box without getting blurry
+            final Bitmap full = Bitmap.createBitmap(w * scale, h * scale, Bitmap.Config.ARGB_8888);
+            final Drawable copy = drawable.mutate();
+            copy.setBounds(0, 0, w * scale, h * scale);
+            copy.draw(new Canvas(full));
+            final int fw = full.getWidth(), fh = full.getHeight();
+            final int[] pixels = new int[fw * fh];
+            full.getPixels(pixels, 0, fw, 0, 0, fw, fh);
+            int left = fw, top = fh, right = -1, bottom = -1;
+            for (int y = 0; y < fh; y++) {
+                for (int x = 0; x < fw; x++) {
+                    if ((pixels[y * fw + x] >>> 24) > 24) {
+                        if (x < left) left = x;
+                        if (x > right) right = x;
+                        if (y < top) top = y;
+                        if (y > bottom) bottom = y;
+                    }
+                }
+            }
+            if (right < left || bottom < top) {
+                full.recycle();
+                return ContextCompat.getDrawable(context, res);
+            }
+            final Bitmap cropped = Bitmap.createBitmap(full, left, top, right - left + 1, bottom - top + 1);
+            if (cropped != full) {
+                full.recycle();
+            }
+            return new android.graphics.drawable.BitmapDrawable(context.getResources(), cropped);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return ContextCompat.getDrawable(context, res);
+        }
     }
 
     /** Solegram: the icons' pill opens with the menu: it grows out of the menu's side, its icons come in one by one. */
