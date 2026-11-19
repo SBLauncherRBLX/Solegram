@@ -13310,7 +13310,7 @@
     <string name="SG_WalletSendTapGift">Gift by a tap of the phones</string>
     <string name="SG_SettingsFeatures">Solegram features</string>
     <string name="SG_SettingsWalletSub">Stars, gifts, collection and savings goals</string>
-    <string name="SG_SettingsMovedInfo">The other Solegram settings sit in Telegram\'s sections of the same kind: look, glass, main screen, chats and filters in Chat settings; privacy, anti-scam and security in Privacy and security; reminders, background work and sound in Notifications and sounds; browser, camera, proxy and maps in Data and storage. SoleWallet, profile, now playing and AI are in the main settings list.</string>
+    <string name="SG_SettingsMovedInfo">The other Solegram settings sit in Telegram\'s sections of the same kind: look, glass, main screen, chats and filters in Chat settings; privacy, anti-scam and security in Privacy and security; reminders, background work and sound in Notifications and sounds; browser, camera, proxy and maps in Data and storage. Profile, now playing and AI are in the main settings list.</string>
     <string name="SG_Studio">Solegram Studio</string>
     <string name="SG_StudioSub">Records the app by scenes, for trailers and screenshots</string>
     <string name="SG_StudioInfo">Studio plays scenes by itself: each starts on the main screen with the folder you choose, opens screens, scrolls and taps like a finger, records each scene into its own video and takes frames. Before recording, Android asks once to allow screen capture. Choose a folder without private chats.</string>
@@ -13640,7 +13640,7 @@
     <string name="SG_GestureActionSaved">Open Saved Messages</string>
     <string name="SG_GestureActionLink">Open a link</string>
     <string name="SG_GestureActionArchive">Open the archive</string>
-    <string name="SG_GestureActionWallet">Open SoleWallet</string>
+    <string name="SG_GestureActionWallet">Open wallet</string>
     <string name="SG_GestureActionSettings">Open settings</string>
     <string name="SG_GestureActionLock">Lock the app</string>
     <string name="SG_GestureLinkAsk">A t.me link or any web address.</string>
@@ -13879,5 +13879,9 @@
     <string name="SG_NameOwnColors">Own name colours</string>
     <string name="SG_NameColorMain">Name</string>
     <string name="SG_NameColorSecond">Second stripe</string>
+    <string name="SG_TranscribeNoLanguage">The phone has no speech recognition for this language yet. Its download has started: try again in a minute, or install the language in Settings → System → Languages → Speech recognition (Google "Speech Recognition &amp; Synthesis")</string>
+    <string name="SG_TranscribeNoRecognizer">This phone has no speech recognizer for apps. Install or turn on the Google app (or "Speech Services by Google") and try again</string>
+    <string name="SG_TranscribeNoWords">No words were recognized in this message</string>
+    <string name="SG_TranscribeNoFile">The voice message did not download, check the connection and try again</string>
     <!-- SOLEGRAM END -->
 </resources>

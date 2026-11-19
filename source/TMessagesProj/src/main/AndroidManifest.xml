@@ -18,9 +18,6 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera2" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />
-    <!-- SoleWallet: gifts and Stars by a tap of the phones (NFC), optional (a QR code works without it) -->
-    <uses-feature android:name="android.hardware.nfc" android:required="false" />
-    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
 
     <uses-permission android:name="android.permission.READ_CLIPBOARD"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -51,7 +48,6 @@
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS"/>
     <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS"/>
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -1089,8 +1085,6 @@
 
         <!-- Solegram music in the profile: Android shows the players' media sessions only to an app with
              notification access; notifications themselves are not used -->
-        <!-- SoleWallet: the receiving phone answers a tap as a card under the wallet's private AID
-             (only while unlocked and SoleWallet is open) -->
         <!-- Solegram Studio (betas): records the screen while it plays a scene the person started (Android's capture dialog first) -->
         <activity
             android:name="com.solegram.messenger.studio.StudioCaptureActivity"
@@ -1102,18 +1096,6 @@
             android:name="com.solegram.messenger.studio.StudioRecordService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
-
-        <service
-            android:name="com.solegram.messenger.wallet.tap.WalletTapService"
-            android:exported="true"
-            android:permission="android.permission.BIND_NFC_SERVICE">
-            <intent-filter>
-                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.nfc.cardemulation.host_apdu_service"
-                android:resource="@xml/wallet_tap_apdu_service" />
-        </service>
 
         <service
             android:name=".AuthenticatorService"

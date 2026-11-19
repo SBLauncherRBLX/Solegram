@@ -257,48 +257,12 @@ public class StudioActivity extends BaseFragment {
         if (running || list.isEmpty() || getParentActivity() == null) {
             return;
         }
-        // the Studio can't type the wallet's code: the person opens the wallet once, then starts again
-        for (SolegramStudio.Scene s : list) {
-            if (SolegramStudio.needsWallet(s) && !com.solegram.messenger.wallet.SoleWallet.isUnlocked(currentAccount)) {
-                presentFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
-                AndroidUtilities.runOnUIThread(() -> {
-                    final BaseFragment now = LaunchActivity.getSafeLastFragment();
-                    if (now != null) {
-                        BulletinFactory.of(now).createSimpleBulletin(R.raw.info, getString(R.string.SG_StudioUnlockWallet)).show();
-                    }
-                }, 400);
-                // once the person has opened it, the Studio comes back and goes on by itself
-                waitForWallet(list, record, android.os.SystemClock.elapsedRealtime() + 180_000);
-                return;
-            }
-        }
         if (record && !StudioRecordService.ready()) {
             // Android asks the person once (the whole screen or one app); the scenes start when the recorder is ready
             StudioCaptureActivity.request(getParentActivity(), () -> run(list, true), this::showError);
             return;
         }
         run(list, record);
-    }
-
-    private void waitForWallet(ArrayList<SolegramStudio.Scene> list, boolean record, long until) {
-        AndroidUtilities.runOnUIThread(() -> {
-            if (isFinishing() || getParentActivity() == null || android.os.SystemClock.elapsedRealtime() > until) {
-                return;
-            }
-            if (!com.solegram.messenger.wallet.SoleWallet.isUnlocked(currentAccount)) {
-                waitForWallet(list, record, until);
-                return;
-            }
-            // back to the Studio: close what lies above it (the wallet), then start
-            for (int i = 0; i < 8; i++) {
-                final BaseFragment top = LaunchActivity.getSafeLastFragment();
-                if (top == null || top == this) {
-                    break;
-                }
-                top.finishFragment(false);
-            }
-            AndroidUtilities.runOnUIThread(() -> start(list, record), 500);
-        }, 500);
     }
 
     private void showError(String why) {

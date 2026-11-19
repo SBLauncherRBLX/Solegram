@@ -64,18 +64,6 @@ public final class SolegramStudio {
         running = on;
     }
 
-    /** Whether a scene opens the wallet or its collection (they need the wallet unlocked first). */
-    static boolean needsWallet(Scene s) {
-        for (int i = 0; s.steps != null && i < s.steps.length(); i++) {
-            final JSONObject o = s.steps.optJSONObject(i);
-            final String open = o == null ? null : o.optString("open", null);
-            if ("wallet".equals(open) || "vault".equals(open)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // ------------------------------------------------------------------ scenes
 
     public static final class Scene {
@@ -87,14 +75,6 @@ public final class SolegramStudio {
     public static ArrayList<Scene> builtIn() {
         final ArrayList<Scene> list = new ArrayList<>();
         try {
-            list.add(scene("wallet", "SoleWallet", "["
-                + "{\"open\":\"wallet\"},{\"wait\":1600},"
-                + "{\"swipe\":[0.25,0.25,0.8,0.25,500]},{\"wait\":1200},{\"tap\":[0.5,0.25]},{\"wait\":1400},"
-                + "{\"shot\":\"wallet-card\"},{\"swipe\":[0.5,0.8,0.5,0.35,700]},{\"wait\":1200},{\"shot\":\"wallet-goals\"},"
-                + "{\"back\":true},{\"wait\":800}]"));
-            list.add(scene("collection", "SoleWallet — Collection", "["
-                + "{\"open\":\"vault\"},{\"wait\":2500},{\"shot\":\"collection\"},"
-                + "{\"swipe\":[0.5,0.8,0.5,0.4,700]},{\"wait\":1200},{\"back\":true},{\"wait\":800}]"));
             list.add(scene("music", "Music", "["
                 + "{\"open\":\"music\"},{\"wait\":1800},{\"shot\":\"music\"},"
                 + "{\"swipe\":[0.5,0.8,0.5,0.4,700]},{\"wait\":1200},{\"back\":true},{\"wait\":800}]"));
@@ -201,10 +181,6 @@ public final class SolegramStudio {
             case "chats":
                 home();
                 return true;
-            case "wallet":
-                return f.presentFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
-            case "vault":
-                return f.presentFragment(new com.solegram.messenger.wallet.SoleVaultActivity());
             case "music":
                 return f.presentFragment(new com.solegram.messenger.ui.SolegramMusicActivity(null));
             case "player":

@@ -1641,7 +1641,7 @@
     <string name="SG_WalletSendTapGift">Подарок касанием телефонов</string>
     <string name="SG_SettingsFeatures">Возможности Solegram</string>
     <string name="SG_SettingsWalletSub">Звёзды, подарки, коллекция и копилки</string>
-    <string name="SG_SettingsMovedInfo">Остальные настройки Solegram лежат в похожих по смыслу разделах Telegram: оформление, стекло, главный экран, чаты и фильтры — в «Настройках чатов»; приватность, защита от мошенников и безопасность — в «Конфиденциальности»; напоминания, фоновая работа и звук — в «Уведомлениях и звуках»; браузер, камера, прокси и карты — в «Данных и памяти». SoleWallet, профиль, музыка и ИИ — в общем списке настроек.</string>
+    <string name="SG_SettingsMovedInfo">Остальные настройки Solegram лежат в похожих по смыслу разделах Telegram: оформление, стекло, главный экран, чаты и фильтры — в «Настройках чатов»; приватность, защита от мошенников и безопасность — в «Конфиденциальности»; напоминания, фоновая работа и звук — в «Уведомлениях и звуках»; браузер, камера, прокси и карты — в «Данных и памяти». Профиль, музыка и ИИ — в общем списке настроек.</string>
     <string name="SG_Studio">Solegram Studio</string>
     <string name="SG_StudioSub">Запись приложения по сценам — для трейлеров и скриншотов</string>
     <string name="SG_StudioInfo">Студия сама проигрывает сцены: каждая начинается на главном экране с выбранной папкой, открывает экраны, листает и нажимает как палец, записывает сцену в отдельное видео и делает кадры. Перед записью Android один раз спросит разрешение на запись экрана. Выберите папку без личных переписок.</string>
@@ -1971,7 +1971,7 @@
     <string name="SG_GestureActionSaved">Открыть «Избранное»</string>
     <string name="SG_GestureActionLink">Открыть ссылку</string>
     <string name="SG_GestureActionArchive">Открыть архив</string>
-    <string name="SG_GestureActionWallet">Открыть SoleWallet</string>
+    <string name="SG_GestureActionWallet">Открыть кошелёк</string>
     <string name="SG_GestureActionSettings">Открыть настройки</string>
     <string name="SG_GestureActionLock">Заблокировать приложение</string>
     <string name="SG_GestureLinkAsk">Ссылка t.me или любой веб-адрес.</string>
@@ -2210,4 +2210,8 @@
     <string name="SG_NameOwnColors">Свои цвета имени</string>
     <string name="SG_NameColorMain">Имя</string>
     <string name="SG_NameColorSecond">Вторая полоска</string>
+    <string name="SG_TranscribeNoLanguage">На телефоне пока нет распознавания речи для этого языка. Загрузка уже началась: попробуй через минуту или установи язык в Настройки → Система → Языки → Распознавание речи (Google «Распознавание и синтез речи»)</string>
+    <string name="SG_TranscribeNoRecognizer">На этом телефоне нет распознавания речи для приложений. Установи или включи приложение Google («Speech Services by Google») и попробуй снова</string>
+    <string name="SG_TranscribeNoWords">В этом сообщении не удалось разобрать слова</string>
+    <string name="SG_TranscribeNoFile">Голосовое не скачалось, проверь интернет и попробуй снова</string>
 </resources>

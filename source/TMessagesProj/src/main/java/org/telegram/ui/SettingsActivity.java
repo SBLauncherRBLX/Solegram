@@ -803,7 +803,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(UItem.asShadow(null));
         // Solegram's own features, which Telegram's settings have no place for (the rest sit in Telegram's sections)
         items.add(UItem.asHeader(getString(R.string.SG_SettingsFeatures)));
-        items.add(SettingCell.Factory.of(106, 0xFFFFB443, 0xFFF2762E, R.drawable.msg_payment_card, "SoleWallet", getString(R.string.SG_SettingsWalletSub)));
         items.add(SettingCell.Factory.of(102, 0xFFB57BFF, 0xFF7C4DFF, R.drawable.msg_openprofile, getString(R.string.SG_ProfilePage), getString(R.string.SG_ProfilePageSub)));
         items.add(SettingCell.Factory.of(103, 0xFFFF8FA3, 0xFFE8506B, R.drawable.msg_tone_on, getString(R.string.SG_NowPlaying), getString(R.string.SG_NowPlayingSub)));
         items.add(SettingCell.Factory.of(104, 0xFF9C8CFF, 0xFF5E5CE6, R.drawable.sg_sls_feature_ai, getString(R.string.SG_AiPage), getString(R.string.SG_AiPageSub)));
@@ -956,9 +955,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             case 104:
                 presentSettingFragment(new com.solegram.messenger.ui.SolegramSettingsActivity(com.solegram.messenger.ui.SolegramSettingsActivity.PAGE_AI));
                 break;
-            case 106:
-                presentSettingFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
-                break;
             case 108:
                 presentSettingFragment(new com.solegram.messenger.ui.SolegramGesturesActivity());
                 break;
@@ -1003,11 +999,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 presentSettingFragment(new TONIntroActivity());
                 break;
             case 25:
-                if (com.solegram.messenger.wallet.SoleWalletActivity.moneyLocked(currentAccount)) {
-                    com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(this);
-                } else {
-                    presentSettingFragment(new WalletActivity());
-                }
+                presentSettingFragment(new WalletActivity());
                 break;
             case 15:
                 presentSettingFragment(new PremiumPreviewFragment(PremiumPreviewFragment.FEATURES_BUSINESS, "settings"));

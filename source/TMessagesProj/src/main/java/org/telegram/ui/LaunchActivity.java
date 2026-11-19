@@ -7221,7 +7221,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         com.solegram.messenger.SolegramRepeats.tick(); // Solegram: the next copies of repeating messages
         isResumed = true;
         com.solegram.messenger.BackgroundConnection.ensureRunning(this);
-        com.solegram.messenger.wallet.tap.WalletTap.onAppResumed(); // Solegram: a fresh contact token for SoleWallet's next tap
         com.solegram.messenger.SolegramBadges.refreshIfStale(); // Solegram: the badges list, now and then
         com.solegram.messenger.SolegramRefreshRate.apply(getWindow()); // Solegram: the screen's fastest refresh rate (120 Hz where there is one)
         com.solegram.messenger.SolegramGestures.onResume(); // Solegram: motion shortcuts, only while the app is on the screen

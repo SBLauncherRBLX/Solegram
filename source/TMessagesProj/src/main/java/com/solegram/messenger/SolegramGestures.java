@@ -418,6 +418,30 @@ public final class SolegramGestures implements SensorEventListener {
         });
     }
 
+    /** A firm tap felt in the hand: the gesture was taken. */
+    private static void hapticContact(@androidx.annotation.Nullable android.view.View view) {
+        if (SolegramConfig.disableVibration) {
+            return;
+        }
+        try {
+            final android.os.Vibrator vibrator = (android.os.Vibrator) org.telegram.messenger.ApplicationLoader.applicationContext.getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            if (vibrator != null && vibrator.hasVibrator()) {
+                if (android.os.Build.VERSION.SDK_INT >= 29) {
+                    vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_HEAVY_CLICK));
+                } else if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(28, 255));
+                } else {
+                    vibrator.vibrate(28);
+                }
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+        if (view != null) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS, android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+        }
+    }
+
     private static void run(int gesture) {
         final BaseFragment last = LaunchActivity.getSafeLastFragment();
         if (last == null || last.getParentActivity() == null) {
@@ -427,7 +451,7 @@ public final class SolegramGestures implements SensorEventListener {
         if (SharedConfig.passcodeHash.length() > 0 && SharedConfig.appLocked) {
             return;
         }
-        com.solegram.messenger.wallet.tap.WalletTap.hapticContact(last.getFragmentView());
+        hapticContact(last.getFragmentView());
         final int account = UserConfig.selectedAccount;
         final Bundle args = new Bundle();
         switch (actionOf(gesture)) {
@@ -460,7 +484,7 @@ public final class SolegramGestures implements SensorEventListener {
                 last.presentFragment(new DialogsActivity(args));
                 break;
             case ACTION_WALLET:
-                last.presentFragment(new com.solegram.messenger.wallet.SoleWalletActivity());
+                last.presentFragment(new org.telegram.ui.Wallet.WalletActivity()); // Telegram's wallet
                 break;
             case ACTION_SETTINGS:
                 last.presentFragment(new org.telegram.ui.SettingsActivity());

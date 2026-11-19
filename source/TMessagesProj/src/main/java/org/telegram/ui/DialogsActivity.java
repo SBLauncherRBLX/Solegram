@@ -14347,12 +14347,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         if (getMessagesController().config.walletAvailable.get()) {
             io.add(R.drawable.ic_gram, LocaleController.getString(R.string.WalletAttachMoney), () -> {
-                // Solegram: Telegram's wallet opens behind SoleWallet's code
-                if (com.solegram.messenger.SolegramConfig.unifiedWallet) {
-                    com.solegram.messenger.wallet.SoleWalletActivity.openTelegramWallet(this);
-                } else {
-                    presentFragment(new WalletActivity());
-                }
+                presentFragment(new WalletActivity());
             });
         } else {
             TLRPC.TL_attachMenuBots menuBots = MediaDataController.getInstance(UserConfig.selectedAccount).getAttachMenuBots();

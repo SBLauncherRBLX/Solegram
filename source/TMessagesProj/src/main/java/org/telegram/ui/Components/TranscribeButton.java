@@ -688,8 +688,26 @@ public class TranscribeButton {
                 }
                 setLoading(false, true);
                 NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.voiceTranscriptionUpdate, messageObject);
+                // the phone could not: Telegram's own free transcriptions of the week, where some are left
+                if (messageObject.messageOwner != null && canTranscribeTrial(messageObject) && parent != null) {
+                    transcribePressed(messageObject, true, parent.getDelegate());
+                    return;
+                }
+                final int why = com.solegram.messenger.SolegramVoiceTranscriber.lastFailure;
+                final int text2;
+                if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_LANGUAGE) {
+                    text2 = R.string.SG_TranscribeNoLanguage;
+                } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_NO_RECOGNIZER) {
+                    text2 = R.string.SG_TranscribeNoRecognizer;
+                } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_NO_WORDS) {
+                    text2 = R.string.SG_TranscribeNoWords;
+                } else if (why == com.solegram.messenger.SolegramVoiceTranscriber.FAIL_FILE) {
+                    text2 = R.string.SG_TranscribeNoFile;
+                } else {
+                    text2 = R.string.SG_TranscribeFailed;
+                }
                 org.telegram.ui.Components.BulletinFactory.global().createSimpleBulletin(R.raw.error,
-                    org.telegram.messenger.LocaleController.getString(R.string.SG_TranscribeFailed)).show();
+                    org.telegram.messenger.LocaleController.getString(text2)).show();
                 return;
             }
             openVideoTranscription(messageObject);

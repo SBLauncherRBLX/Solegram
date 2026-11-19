@@ -614,7 +614,7 @@ public class SolegramConfig {
         hideContactsTab = p.getBoolean("hideContactsTab", false);
         hideProfileTab = p.getBoolean("hideProfileTab", false);
         tabsSearchButton = p.getBoolean("tabsSearchButton", false);
-        unifiedWallet = p.getBoolean("unifiedWallet", true);
+        unifiedWallet = false; // SoleWallet is gone: Telegram's wallet has its own item in the settings again
         savedInMenu = p.getBoolean("savedInMenu", true);
         feedInsteadOfContacts = p.getBoolean("feedInsteadOfContacts", true);
         contactsSwipe = p.getBoolean("contactsSwipe", true);

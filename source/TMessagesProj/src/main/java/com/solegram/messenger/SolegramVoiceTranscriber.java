@@ -57,28 +57,124 @@ public final class SolegramVoiceTranscriber {
         return SpeechRecognizer.isOnDeviceRecognitionAvailable(ctx) || SpeechRecognizer.isRecognitionAvailable(ctx);
     }
 
-    /** {@code done} gets the text (UI thread), or null when it could not be done. */
+    /** Why the last transcription failed (read on the UI thread when {@code done} got null). */
+    public static final int FAIL_NONE = 0, FAIL_NO_RECOGNIZER = 1, FAIL_LANGUAGE = 2, FAIL_NO_WORDS = 3, FAIL_FILE = 4, FAIL_OTHER = 5;
+    public static int lastFailure = FAIL_NONE;
+
+    /** The rate the speech recognizers take best (the message's own 48 kHz is resampled to it). */
+    private static final int RATE = 16000;
+
+    /** {@code done} gets the text (UI thread), or null when it could not be done ({@link #lastFailure} says why). */
     public static void transcribe(MessageObject message, Utilities.Callback<String> done) {
+        lastFailure = FAIL_NONE;
         if (Build.VERSION.SDK_INT < 33 || message == null || message.getDocument() == null) {
+            lastFailure = FAIL_NO_RECOGNIZER;
             done.run(null);
             return;
         }
         // its own thread: waiting for the file and decoding take a while, the shared queues are not held
         new Thread(() -> {
+            int fail = FAIL_FILE;
             try {
                 final File file = waitForFile(message);
                 if (file != null) {
                     final Pcm pcm = decode(file);
                     if (pcm != null && pcm.data.length > 0) {
-                        recognize(pcm, done);
+                        final Pcm ready = resample(pcm, RATE);
+                        AndroidUtilities.runOnUIThread(() -> recognizeAll(ready, done));
                         return;
                     }
                 }
             } catch (Throwable e) {
                 FileLog.e(e);
+                fail = FAIL_OTHER;
             }
-            AndroidUtilities.runOnUIThread(() -> done.run(null));
+            final int f = fail;
+            AndroidUtilities.runOnUIThread(() -> {
+                lastFailure = f;
+                done.run(null);
+            });
         }, "sgTranscribe").start();
+    }
+
+    /** One way of recognizing: which recognizer, in which language (null: the recognizer's own). */
+    private static final class Attempt {
+        final boolean onDevice;
+        final String language;
+
+        Attempt(boolean onDevice, String language) {
+            this.onDevice = onDevice;
+            this.language = language;
+        }
+    }
+
+    /**
+     * The ways this phone has, tried one after another until one gives words: the on-device recognizer and the
+     * phone's usual one, each in the app's language, then the phone's, then its own default.
+     */
+    @RequiresApi(33)
+    private static void recognizeAll(Pcm pcm, Utilities.Callback<String> done) {
+        final Context ctx = ApplicationLoader.applicationContext;
+        final ArrayList<String> languages = new ArrayList<>();
+        try {
+            languages.add(LocaleController.getInstance().getCurrentLocale().toLanguageTag());
+        } catch (Throwable ignore) {
+        }
+        final String system = java.util.Locale.getDefault().toLanguageTag();
+        if (!languages.contains(system)) {
+            languages.add(system);
+        }
+        final ArrayList<Attempt> attempts = new ArrayList<>();
+        boolean onDevice = false, regular = false;
+        try {
+            onDevice = SpeechRecognizer.isOnDeviceRecognitionAvailable(ctx);
+        } catch (Throwable ignore) {
+        }
+        try {
+            regular = SpeechRecognizer.isRecognitionAvailable(ctx);
+        } catch (Throwable ignore) {
+        }
+        for (String language : languages) {
+            if (onDevice) {
+                attempts.add(new Attempt(true, language));
+            }
+            if (regular) {
+                attempts.add(new Attempt(false, language));
+            }
+        }
+        if (regular) {
+            attempts.add(new Attempt(false, null));
+        }
+        if (attempts.isEmpty()) {
+            lastFailure = FAIL_NO_RECOGNIZER;
+            done.run(null);
+            return;
+        }
+        next(pcm, attempts, 0, FAIL_NO_WORDS, done);
+    }
+
+    @RequiresApi(33)
+    private static void next(Pcm pcm, ArrayList<Attempt> attempts, int index, int fail, Utilities.Callback<String> done) {
+        if (index >= attempts.size()) {
+            lastFailure = fail;
+            done.run(null);
+            return;
+        }
+        final Attempt attempt = attempts.get(index);
+        recognize(pcm, attempt, (text, error) -> {
+            if (!TextUtils.isEmpty(text)) {
+                lastFailure = FAIL_NONE;
+                done.run(text);
+                return;
+            }
+            // a missing language beats "no words" as the reason shown, the person can fix it
+            final int f = fail == FAIL_LANGUAGE || error == FAIL_LANGUAGE ? FAIL_LANGUAGE : error != FAIL_NONE ? error : fail;
+            next(pcm, attempts, index + 1, f, done);
+        });
+    }
+
+    private interface AttemptDone {
+        void run(@Nullable String text, int error);
     }
 
     /** The message's file: the one on the phone, else asked for and waited for (up to 20 s). */
@@ -211,112 +307,175 @@ public final class SolegramVoiceTranscriber {
         }
     }
 
-    /** The PCM through Android's speech recognizer, in one segmented session that ends with the sound. */
+    /** 16-bit mono PCM to another rate (linear, plenty for speech). */
+    private static Pcm resample(Pcm in, int rate) {
+        if (in.sampleRate == rate || in.sampleRate <= 0) {
+            return in;
+        }
+        final ByteBuffer src = ByteBuffer.wrap(in.data).order(ByteOrder.LITTLE_ENDIAN);
+        final int n = in.data.length / 2;
+        final int m = (int) ((long) n * rate / in.sampleRate);
+        final ByteBuffer dst = ByteBuffer.allocate(m * 2).order(ByteOrder.LITTLE_ENDIAN);
+        final double step = (double) in.sampleRate / rate;
+        for (int i = 0; i < m; i++) {
+            final double pos = i * step;
+            final int a = Math.min(n - 1, (int) pos);
+            final int b = Math.min(n - 1, a + 1);
+            final double t = pos - a;
+            final double v = src.getShort(a * 2) * (1 - t) + src.getShort(b * 2) * t;
+            dst.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(v))));
+        }
+        final Pcm out = new Pcm();
+        out.data = dst.array();
+        out.sampleRate = rate;
+        return out;
+    }
+
+    /** The PCM through one speech recognizer, in one segmented session that ends with the sound (UI thread). */
     @RequiresApi(33)
-    private static void recognize(Pcm pcm, Utilities.Callback<String> done) throws Exception {
-        final ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
-        AndroidUtilities.runOnUIThread(() -> {
-            final Context ctx = ApplicationLoader.applicationContext;
-            final SpeechRecognizer recognizer;
-            try {
-                recognizer = SpeechRecognizer.isOnDeviceRecognitionAvailable(ctx)
-                    ? SpeechRecognizer.createOnDeviceSpeechRecognizer(ctx)
-                    : SpeechRecognizer.createSpeechRecognizer(ctx);
-            } catch (Throwable e) {
-                FileLog.e(e);
-                closeQuietly(pipe);
-                done.run(null);
+    private static void recognize(Pcm pcm, Attempt attempt, AttemptDone done) {
+        final Context ctx = ApplicationLoader.applicationContext;
+        final ParcelFileDescriptor[] pipe;
+        final SpeechRecognizer recognizer;
+        try {
+            pipe = ParcelFileDescriptor.createPipe();
+        } catch (Throwable e) {
+            FileLog.e(e);
+            done.run(null, FAIL_OTHER);
+            return;
+        }
+        try {
+            recognizer = attempt.onDevice ? SpeechRecognizer.createOnDeviceSpeechRecognizer(ctx) : SpeechRecognizer.createSpeechRecognizer(ctx);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            closeQuietly(pipe);
+            done.run(null, FAIL_NO_RECOGNIZER);
+            return;
+        }
+        final Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        if (attempt.language != null) {
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, attempt.language);
+        }
+        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, attempt.onDevice);
+        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pipe[0]);
+        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1);
+        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT);
+        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, pcm.sampleRate);
+        intent.putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_AUDIO_SOURCE);
+
+        final ArrayList<String> parts = new ArrayList<>();
+        final boolean[] finished = {false};
+        final int[] error = {FAIL_NONE};
+        final Runnable finish = () -> {
+            if (finished[0]) {
                 return;
             }
-            final ArrayList<String> parts = new ArrayList<>();
-            final boolean[] finished = {false};
-            final Runnable finish = () -> {
-                if (finished[0]) {
+            finished[0] = true;
+            try {
+                recognizer.destroy();
+            } catch (Throwable ignore) {
+            }
+            closeQuietly(pipe);
+            done.run(parts.isEmpty() ? null : TextUtils.join(" ", parts).trim(), parts.isEmpty() ? (error[0] != FAIL_NONE ? error[0] : FAIL_NO_WORDS) : FAIL_NONE);
+        };
+        // a long message still ends: as long as the sound and half a minute more at most
+        final long seconds = pcm.data.length / 2L / Math.max(1, pcm.sampleRate);
+        AndroidUtilities.runOnUIThread(finish, (seconds + 30) * 1000L);
+        recognizer.setRecognitionListener(new RecognitionListener() {
+            @Override public void onReadyForSpeech(Bundle params) { }
+            @Override public void onBeginningOfSpeech() { }
+            @Override public void onRmsChanged(float rmsdB) { }
+            @Override public void onBufferReceived(byte[] buffer) { }
+            @Override public void onEndOfSpeech() { }
+            @Override public void onPartialResults(Bundle partialResults) { }
+            @Override public void onEvent(int eventType, Bundle params) { }
+
+            @Override
+            public void onError(int code) {
+                // "no match" for a quiet part of a long message is not the end of it
+                if ((code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) && !parts.isEmpty()) {
                     return;
                 }
-                finished[0] = true;
+                if (code == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE || code == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED) {
+                    error[0] = FAIL_LANGUAGE;
+                    if (attempt.onDevice && code == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE) {
+                        // the language can be had: the phone fetches it, the next try works offline
+                        try {
+                            final SpeechRecognizer loader = SpeechRecognizer.createOnDeviceSpeechRecognizer(ctx);
+                            final Intent download = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                            download.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                            if (attempt.language != null) {
+                                download.putExtra(RecognizerIntent.EXTRA_LANGUAGE, attempt.language);
+                            }
+                            loader.triggerModelDownload(download);
+                            AndroidUtilities.runOnUIThread(() -> {
+                                try {
+                                    loader.destroy();
+                                } catch (Throwable ignore) {
+                                }
+                            }, 5000);
+                        } catch (Throwable e) {
+                            FileLog.e(e);
+                        }
+                    }
+                } else if (code != SpeechRecognizer.ERROR_NO_MATCH && code != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                    error[0] = FAIL_OTHER;
+                }
+                finish.run();
+            }
+
+            @Override
+            public void onResults(Bundle results) {
+                add(results);
+                finish.run();
+            }
+
+            @Override
+            public void onSegmentResults(Bundle segmentResults) {
+                add(segmentResults);
+            }
+
+            @Override
+            public void onEndOfSegmentedSession() {
+                finish.run();
+            }
+
+            private void add(Bundle b) {
+                final ArrayList<String> list = b == null ? null : b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (list != null && !list.isEmpty() && !TextUtils.isEmpty(list.get(0))) {
+                    parts.add(list.get(0));
+                }
+            }
+        });
+        try {
+            recognizer.startListening(intent);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            error[0] = FAIL_OTHER;
+            finish.run();
+            return;
+        }
+        // the sound into the pipe, off the UI thread, about 4x faster than it plays; closing it ends the session
+        new Thread(() -> {
+            try (OutputStream os = new FileOutputStream(pipe[1].getFileDescriptor())) {
+                final int chunk = pcm.sampleRate / 10 * 2; // 100 ms
+                for (int off = 0; off < pcm.data.length && !finished[0]; off += chunk) {
+                    os.write(pcm.data, off, Math.min(chunk, pcm.data.length - off));
+                    Thread.sleep(25);
+                }
+                os.flush();
+            } catch (Throwable e) {
+                if (!finished[0]) {
+                    FileLog.e(e);
+                }
+            } finally {
                 try {
-                    recognizer.destroy();
+                    pipe[1].close();
                 } catch (Throwable ignore) {
                 }
-                closeQuietly(pipe);
-                done.run(parts.isEmpty() ? null : TextUtils.join(" ", parts).trim());
-            };
-            // a long message still ends: as long as the sound and a minute more at most
-            final long seconds = pcm.data.length / 2L / Math.max(1, pcm.sampleRate);
-            AndroidUtilities.runOnUIThread(finish, (seconds + 60) * 1000L);
-            recognizer.setRecognitionListener(new RecognitionListener() {
-                @Override public void onReadyForSpeech(Bundle params) { }
-                @Override public void onBeginningOfSpeech() { }
-                @Override public void onRmsChanged(float rmsdB) { }
-                @Override public void onBufferReceived(byte[] buffer) { }
-                @Override public void onEndOfSpeech() { }
-                @Override public void onPartialResults(Bundle partialResults) { }
-                @Override public void onEvent(int eventType, Bundle params) { }
-
-                @Override
-                public void onError(int error) {
-                    // "no match" for a quiet part of a long message is not the end of it
-                    if (error == SpeechRecognizer.ERROR_NO_MATCH && !parts.isEmpty()) {
-                        return;
-                    }
-                    finish.run();
-                }
-
-                @Override
-                public void onResults(Bundle results) {
-                    add(results);
-                    finish.run();
-                }
-
-                @Override
-                public void onSegmentResults(Bundle segmentResults) {
-                    add(segmentResults);
-                }
-
-                @Override
-                public void onEndOfSegmentedSession() {
-                    finish.run();
-                }
-
-                private void add(Bundle b) {
-                    final ArrayList<String> list = b == null ? null : b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                    if (list != null && !list.isEmpty() && !TextUtils.isEmpty(list.get(0))) {
-                        parts.add(list.get(0));
-                    }
-                }
-            });
-            final Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, LocaleController.getInstance().getCurrentLocale().toLanguageTag());
-            intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pipe[0]);
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1);
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT);
-            intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, pcm.sampleRate);
-            intent.putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_AUDIO_SOURCE);
-            try {
-                recognizer.startListening(intent);
-            } catch (Throwable e) {
-                FileLog.e(e);
-                finish.run();
-                return;
             }
-            // the sound into the pipe, off the UI thread; closing it ends the session
-            new Thread(() -> {
-                try (OutputStream os = new FileOutputStream(pipe[1].getFileDescriptor())) {
-                    os.write(pcm.data);
-                    os.flush();
-                } catch (Throwable e) {
-                    FileLog.e(e);
-                } finally {
-                    try {
-                        pipe[1].close();
-                    } catch (Throwable ignore) {
-                    }
-                }
-            }, "sgTranscribePipe").start();
-        });
+        }, "sgTranscribePipe").start();
     }
 
     private static void closeQuietly(ParcelFileDescriptor[] pipe) {
