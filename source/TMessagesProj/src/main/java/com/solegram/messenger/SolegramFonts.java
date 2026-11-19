@@ -29,6 +29,25 @@ public final class SolegramFonts {
     }
 
     /** Where the chosen font's files live. */
+    /** Deletes the fonts downloaded or picked in 3.4.1 betas 41-50 (custom fonts are gone). */
+    static void deleteCustom() {
+        new Thread(() -> {
+            try {
+                final File d = new File(ApplicationLoader.applicationContext.getFilesDir(), "solegram_fonts");
+                final File[] files = d.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        //noinspection ResultOfMethodCallIgnored
+                        f.delete();
+                    }
+                }
+                //noinspection ResultOfMethodCallIgnored
+                d.delete();
+            } catch (Throwable ignore) {
+            }
+        }, "sgFontsCleanup").start();
+    }
+
     public static File dir() {
         final File d = new File(ApplicationLoader.applicationContext.getFilesDir(), "solegram_fonts");
         if (!d.exists()) {

@@ -52,6 +52,19 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
         addView(pill, new LayoutParams(0, 0));
     }
 
+    /** How much wider than the menu's own column the pill makes this layout (0: no pill, or it fits in the margin). */
+    private int solegramSidePillReserve() {
+        final View pill = solegramSidePill;
+        if (pill == null || pill.getParent() != this || popupWindowLayout == null || popupWindowLayout.getParent() != this || pill.getVisibility() == GONE) {
+            return 0;
+        }
+        pill.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+        final LayoutParams plp = (LayoutParams) popupWindowLayout.getLayoutParams();
+        // the pill's right edge past the menu's: its width less the shadows that overlap, plus the 8dp of air
+        final int extra = pill.getMeasuredWidth() - solegramShadow.right - solegramShadow.left + dp(8);
+        return Math.max(0, extra - plp.rightMargin);
+    }
+
     /** Where the pill's left goes: 8dp of air between the two panels (their shadows overlap). */
     private int solegramSidePillLeft(int popupLeft, int popupWidth) {
         return popupLeft + popupWidth - solegramShadow.right - solegramShadow.left + dp(8);
@@ -95,6 +108,13 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        // Solegram: the room of the icons' pill is kept first, so the menu is measured narrower when it must be and the
+        // pill never ends past the window's edge (the window gives no more width than it measured with)
+        final int sgReserve = solegramSidePillReserve();
+        final int sgMode = MeasureSpec.getMode(widthMeasureSpec), sgSize = MeasureSpec.getSize(widthMeasureSpec);
+        if (sgReserve > 0 && sgMode != MeasureSpec.UNSPECIFIED) {
+            widthMeasureSpec = MeasureSpec.makeMeasureSpec(Math.max(0, sgSize - sgReserve), sgMode);
+        }
         if (maxHeight != 0) {
             heightMeasureSpec = MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST);
         }
@@ -183,6 +203,9 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }
         solegramMeasureSidePill();
+        if (sgReserve > 0 && sgMode != MeasureSpec.UNSPECIFIED && getMeasuredWidth() > sgSize) {
+            setMeasuredDimension(sgSize, getMeasuredHeight());
+        }
         maxHeight = getMeasuredHeight();
     }
 

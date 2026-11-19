@@ -500,7 +500,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asShadow(getString(R.string.SG_AvatarCornersInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_Interface)));
-        items.add(UItem.asButton(ID_SYSTEM_FONT, getString(R.string.SG_Font), solegramFontValue()));
+        items.add(UItem.asButtonCheck(ID_SYSTEM_FONT, getString(R.string.SG_SystemFont), getString(R.string.SG_SystemFontInfo)).setChecked("system".equals(SolegramConfig.appFont)));
         if (Build.VERSION.SDK_INT >= 31) {
             items.add(UItem.asButtonCheck(ID_MONET, getString(R.string.SG_Monet), getString(R.string.SG_MonetInfo)).setChecked(SolegramConfig.monetAccent));
         }
@@ -908,17 +908,6 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {"DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat", "https://platform.deepseek.com/api_keys"},
     };
 
-    /** The current app font, as shown on the settings row. */
-    private String solegramFontValue() {
-        if ("system".equals(SolegramConfig.appFont)) {
-            return getString(R.string.SG_SystemFont);
-        }
-        if ("custom".equals(SolegramConfig.appFont)) {
-            return android.text.TextUtils.isEmpty(SolegramConfig.appFontName) ? getString(R.string.SG_FontCustom) : SolegramConfig.appFontName;
-        }
-        return getString(R.string.SG_FontDefault);
-    }
-
     private String aiPresetName() {
         for (String[] p : AI_PRESETS) {
             if (p[1].equals(SolegramConfig.aiBaseUrl)) {
@@ -1025,7 +1014,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_MAIN, 0, R.string.SG_SettingsTitle, 0},
         {PAGE_APPEARANCE, 0, R.string.SG_Appearance, -1},
         {PAGE_APPEARANCE, 0, R.string.SG_IconPack, 18},
-        {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_Font, -1},
+        {PAGE_APPEARANCE, ID_SYSTEM_FONT, R.string.SG_SystemFont, -1},
         {PAGE_MAIN_SCREEN, ID_MAIN_TITLE, R.string.SG_MainTitle, -1},
         {PAGE_MAIN_SCREEN, ID_TITLE_EMOJI, R.string.SG_TitleEmoji, -1},
         {PAGE_PREMIUM, ID_NAME_EMOJI, R.string.SG_NameEmoji, -1},
@@ -2678,7 +2667,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 });
                 return;
             case ID_SYSTEM_FONT:
-                presentFragment(new SolegramFontsActivity());
+                // the phone's own font or the bundled one (custom fonts were removed)
+                SolegramConfig.setAppFont("system".equals(SolegramConfig.appFont) ? "" : "system", "");
+                listView.adapter.update(true);
+                restartBulletin();
                 return;
             case ID_CENTER_TITLE:
                 toggleCheck(view, "centerTitle");

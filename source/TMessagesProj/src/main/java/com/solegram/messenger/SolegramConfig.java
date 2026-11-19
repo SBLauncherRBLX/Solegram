@@ -436,6 +436,14 @@ public class SolegramConfig {
         avatarCorners = clamp(p.getInt("avatarCorners", 100), 0, 100);
         useSystemFont = p.getBoolean("useSystemFont", false);
         appFont = p.getString("appFont", useSystemFont && !p.contains("appFont") ? "system" : "");
+        if (!appFont.isEmpty() && !"system".equals(appFont)) {
+            // custom fonts were removed (3.4.1-beta51): back to the bundled font, the downloaded files go
+            appFont = "";
+            useSystemFont = false;
+            p.edit().putString("appFont", "").remove("appFontName").putBoolean("useSystemFont", false)
+                .putString("appFontToken", Long.toString(System.currentTimeMillis())).apply();
+            SolegramFonts.deleteCustom();
+        }
         appFontName = p.getString("appFontName", "");
         appFontToken = p.getString("appFontToken", "");
         centerTitle = p.getBoolean("centerTitle", false);
