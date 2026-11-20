@@ -7136,7 +7136,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             windowView.invalidate();
         });
         sgShapeBar.setVisibility(View.GONE);
-        containerView.addView(sgShapeBar, containerView.indexOfChild(actionBar), LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 48, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, (int) (AndroidUtilities.statusBarHeight / AndroidUtilities.density) + 62, 0, 0));
+        containerView.addView(sgShapeBar, containerView.indexOfChild(actionBar), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 12, (int) (AndroidUtilities.statusBarHeight / AndroidUtilities.density) + 62, 12, 0));
         cutOutBtn = new BlurButton();
         cutOutBtn.setRad(18);
         cutOutBtn.wrapContentDynamic();

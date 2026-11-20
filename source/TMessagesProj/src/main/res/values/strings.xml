@@ -13907,5 +13907,6 @@
     <string name="SG_StickerShapeHeart">Heart</string>
     <string name="SG_StickerShapeStar">Star</string>
     <string name="SG_StickerShapeSquircle">Soft square</string>
+    <string name="SG_StickerShapeMaterial">Material You shape</string>
     <!-- SOLEGRAM END -->
 </resources>

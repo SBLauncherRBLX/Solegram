@@ -2457,6 +2457,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameLeft += namePaddingEnd;
             }
         }
+        // Solegram: the streak's room comes out of the name's own (the fade, the badges and the clip all follow it)
+        final com.solegram.messenger.SolegramStreak.Span sgStreak = !isForumCell() && !isSavedDialog && currentDialogFolderId == 0 ? com.solegram.messenger.SolegramStreak.span(currentAccount, currentDialogId) : null;
+        if (sgStreak != null && !LocaleController.isRTL) { // drawn left to right only
+            nameWidth = Math.max(0, nameWidth - sgStreak.width(Theme.dialogs_namePaint[paintIndex]));
+        }
         try {
             int ellipsizeWidth = nameWidth - dp(12);
             if (ellipsizeWidth < 0) {
@@ -2466,10 +2471,6 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 nameString = ((String) nameString).replace('\n', ' ');
             }
             CharSequence nameStringFinal = nameString;
-            final com.solegram.messenger.SolegramStreak.Span sgStreak = !isForumCell() && !isSavedDialog && currentDialogFolderId == 0 ? com.solegram.messenger.SolegramStreak.span(currentAccount, currentDialogId) : null;
-            if (sgStreak != null) {
-                ellipsizeWidth = Math.max(0, ellipsizeWidth - sgStreak.width(Theme.dialogs_namePaint[paintIndex]));
-            }
             if (nameLayoutEllipsizeByGradient) {
                 nameLayoutFits = nameStringFinal.length() == TextUtils.ellipsize(nameStringFinal, Theme.dialogs_namePaint[paintIndex], ellipsizeWidth, TextUtils.TruncateAt.END).length();
                 ellipsizeWidth += dp(48);
@@ -4686,7 +4687,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
             // Solegram: the streak, last of all by the name
             if (sgStreakSpan != null && nameLayout != null && nameLayout.getLineCount() > 0 && !LocaleController.isRTL) {
-                float end = nameLeft + nameLayoutTranslateX + nameLayout.getLineRight(0);
+                // the name as seen: a name faded out by a gradient is laid out wider than its room
+                float end = nameLeft + nameLayoutTranslateX + Math.min(nameLayout.getLineRight(0), nameLayoutEllipsizeByGradient && !nameLayoutFits ? nameWidth : Float.MAX_VALUE);
                 if (drawVerified) {
                     final int mark = solegramBadge != null ? solegramBadge.getIntrinsicWidth() : Theme.dialogs_verifiedDrawable.getIntrinsicWidth();
                     end = Math.max(end, sgStatusAfterBadge ? nameMuteLeft - dp(2) + dp(25) + mark : nameMuteLeft - dp(1) + mark);
@@ -4697,8 +4699,23 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 } else if (dialogMuted || drawUnmute || isHiddenInCommunity || dialogMutedProgress > 0) {
                     end = Math.max(end, nameMuteLeft + Theme.dialogs_muteDrawable.getIntrinsicWidth());
                 }
+                // never over the check marks, the clock or the time
+                float limit = timeLeft - dp(4);
+                if (drawClock) {
+                    limit = Math.min(limit, clockDrawLeft - dp(4));
+                }
+                if (drawCheck2) {
+                    limit = Math.min(limit, (drawCheck1 ? Math.min(checkDrawLeft, halfCheckDrawLeft) : checkDrawLeft) - dp(4));
+                } else if (drawCheck1) {
+                    limit = Math.min(limit, halfCheckDrawLeft - dp(4));
+                }
+                final float streakWidth = sgStreakSpan.width(Theme.dialogs_namePaint[paintIndex]);
+                float x = end - dp(3);
+                if (x + streakWidth > limit) {
+                    x = Math.max(nameLeft, limit - streakWidth);
+                }
                 final int baseline = nameTop + nameLayout.getLineBaseline(0);
-                sgStreakSpan.draw(canvas, " ", 0, 1, end - dp(3), nameTop, baseline, nameTop + nameLayout.getHeight(), Theme.dialogs_namePaint[paintIndex]);
+                sgStreakSpan.draw(canvas, " ", 0, 1, x, nameTop, baseline, nameTop + nameLayout.getHeight(), Theme.dialogs_namePaint[paintIndex]);
             }
 
             if (drawReorder || reorderIconProgress != 0) {

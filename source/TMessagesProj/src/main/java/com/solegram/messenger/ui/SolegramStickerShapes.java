@@ -32,7 +32,133 @@ import org.telegram.messenger.LocaleController;
 public final class SolegramStickerShapes {
 
     public static final int ROUNDED = 0, CIRCLE = 1, HEART = 2, STAR = 3, SQUIRCLE = 4;
-    private static final int[] ORDER = {ROUNDED, CIRCLE, HEART, STAR, SQUIRCLE};
+    /** Material You shapes: the loading indicator's ({@link SolegramShapeProgress}, 100 + its index) and more (200+). */
+    private static final int LOADING = 100, MORE = 200;
+    private static final int COOKIE_6 = MORE, COOKIE_12 = MORE + 1, CLOVER_8 = MORE + 2, VERY_SUNNY = MORE + 3,
+        DIAMOND = MORE + 4, GEM = MORE + 5, TRIANGLE = MORE + 6, OVAL = MORE + 7;
+    private static final int[] ORDER;
+
+    static {
+        final int loading = SolegramShapeProgress.shapeCount();
+        final int[] more = {COOKIE_6, COOKIE_12, CLOVER_8, VERY_SUNNY, DIAMOND, GEM, TRIANGLE, OVAL};
+        ORDER = new int[5 + loading + more.length];
+        int k = 0;
+        for (int shape : new int[]{ROUNDED, CIRCLE, HEART, STAR, SQUIRCLE}) {
+            ORDER[k++] = shape;
+        }
+        for (int i = 0; i < loading; i++) {
+            ORDER[k++] = LOADING + i;
+        }
+        for (int shape : more) {
+            ORDER[k++] = shape;
+        }
+    }
+
+    // region Material You shapes: the radius at evenly spread angles (0 = to the right, clockwise), the largest 1
+
+    private static final int RADIAL_POINTS = 240;
+    private static final android.util.SparseArray<float[]> radials = new android.util.SparseArray<>();
+
+    private interface Radius {
+        double at(double a);
+    }
+
+    private static float[] radial(Radius f, double rot) {
+        final float[] r = new float[RADIAL_POINTS];
+        float max = 0;
+        for (int i = 0; i < RADIAL_POINTS; i++) {
+            r[i] = (float) f.at(i * 2 * Math.PI / RADIAL_POINTS - rot);
+            max = Math.max(max, r[i]);
+        }
+        for (int i = 0; i < RADIAL_POINTS; i++) {
+            r[i] /= max;
+        }
+        return r;
+    }
+
+    /** A superformula outline (rounded polygons). */
+    private static Radius superformula(double m, double n1, double n2, double n3) {
+        return a -> Math.pow(Math.pow(Math.abs(Math.cos(m * a / 4)), n2) + Math.pow(Math.abs(Math.sin(m * a / 4)), n3), -1 / n1);
+    }
+
+    /** A regular polygon with its corners rounded by smoothing its radius round the circle. */
+    private static float[] smoothPolygon(int sides, double rot, int window) {
+        final double seg = 2 * Math.PI / sides;
+        float[] r = new float[RADIAL_POINTS];
+        for (int i = 0; i < RADIAL_POINTS; i++) {
+            final double a = i * 2 * Math.PI / RADIAL_POINTS - rot;
+            final double t = ((a % seg) + seg) % seg - seg / 2;
+            r[i] = (float) (Math.cos(seg / 2) / Math.cos(t));
+        }
+        for (int pass = 0; pass < 3; pass++) {
+            final float[] next = new float[RADIAL_POINTS];
+            for (int i = 0; i < RADIAL_POINTS; i++) {
+                float sum = 0;
+                for (int k = -window; k <= window; k++) {
+                    sum += r[Math.floorMod(i + k, RADIAL_POINTS)];
+                }
+                next[i] = sum / (2 * window + 1);
+            }
+            r = next;
+        }
+        float max = 0;
+        for (float v : r) {
+            max = Math.max(max, v);
+        }
+        for (int i = 0; i < RADIAL_POINTS; i++) {
+            r[i] /= max;
+        }
+        return r;
+    }
+
+    /** The radius array of a Material shape, or null for the other shapes. */
+    private static float[] radialOf(int shape) {
+        if (shape < LOADING) {
+            return null;
+        }
+        float[] r = radials.get(shape);
+        if (r != null) {
+            return r;
+        }
+        if (shape < MORE) {
+            r = SolegramShapeProgress.shape(shape - LOADING);
+        } else {
+            final double up = -Math.PI / 2;
+            switch (shape) {
+                case COOKIE_6: r = radial(a -> 1 + 0.10 * Math.cos(6 * a), up); break;
+                case COOKIE_12: r = radial(a -> 1 + 0.055 * Math.cos(12 * a), up); break;
+                case CLOVER_8: r = radial(a -> 0.78 + 0.22 * Math.pow(Math.abs(Math.cos(4 * a)), 0.6), up); break;
+                case VERY_SUNNY: r = radial(a -> 1 + 0.045 * Math.cos(16 * a), up); break;
+                case DIAMOND: r = radial(a -> Math.pow(Math.pow(Math.abs(Math.cos(a)), 1.35) + Math.pow(Math.abs(Math.sin(a)), 1.35), -1 / 1.35), 0); break;
+                case GEM: r = smoothPolygon(6, up, 6); break;
+                case TRIANGLE: r = radial(superformula(3, 4.5, 8, 8), Math.PI / 2); break;
+                case OVAL: r = radial(a -> 1 / Math.sqrt(Math.pow(Math.cos(a - Math.PI / 4), 2) + Math.pow(Math.sin(a - Math.PI / 4) / 0.72, 2)), 0); break;
+                default: return null;
+            }
+        }
+        radials.put(shape, r);
+        return r;
+    }
+
+    /** A radius array as a closed path in the square {@code r} (smoothed through the points' midpoints). */
+    private static void radialPath(float[] radius, RectF r, Path out) {
+        final int n = radius.length;
+        final float cx = r.centerX(), cy = r.centerY(), half = Math.min(r.width(), r.height()) / 2f;
+        final float[] xs = new float[n], ys = new float[n];
+        for (int i = 0; i < n; i++) {
+            final double a = i * 2 * Math.PI / n;
+            xs[i] = cx + (float) Math.cos(a) * radius[i] * half;
+            ys[i] = cy + (float) Math.sin(a) * radius[i] * half;
+        }
+        out.moveTo((xs[n - 1] + xs[0]) / 2f, (ys[n - 1] + ys[0]) / 2f);
+        for (int i = 0; i < n; i++) {
+            final int next = (i + 1) % n;
+            out.quadTo(xs[i], ys[i], (xs[i] + xs[next]) / 2f, (ys[i] + ys[next]) / 2f);
+        }
+        out.close();
+    }
+
+    // endregion
 
     /** The shape of the sticker being made now. */
     public static int current = ROUNDED;
@@ -48,6 +174,11 @@ public final class SolegramStickerShapes {
     /** The outline of {@code shape} in {@code r} (a square); {@code roundedRadius} is the rounded square's corner. */
     public static void path(int shape, RectF r, float roundedRadius, Path out) {
         out.rewind();
+        final float[] radius = radialOf(shape);
+        if (radius != null) {
+            radialPath(radius, r, out);
+            return;
+        }
         final float w = r.width(), h = r.height();
         final float cx = r.centerX(), cy = r.centerY();
         switch (shape) {
@@ -165,26 +296,32 @@ public final class SolegramStickerShapes {
 
     /** The row of shapes to choose from (a translucent pill with a glyph per shape). */
     @SuppressLint("ViewConstructor")
-    public static final class Bar extends LinearLayout {
+    public static final class Bar extends android.widget.HorizontalScrollView {
         private final Runnable onChanged;
+        private final LinearLayout row;
 
         public Bar(Context context, Runnable onChanged) {
             super(context);
             this.onChanged = onChanged;
-            setOrientation(HORIZONTAL);
-            setGravity(Gravity.CENTER);
-            setPadding(dp(6), dp(4), dp(6), dp(4));
+            setHorizontalScrollBarEnabled(false);
+            setFillViewport(true);
+            setOverScrollMode(OVER_SCROLL_NEVER);
             final GradientDrawable bg = new GradientDrawable();
             bg.setColor(0x66000000);
             bg.setCornerRadius(dp(24));
             setBackground(bg);
+            row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER);
+            row.setPadding(dp(6), dp(4), dp(6), dp(4));
+            addView(row, new android.widget.FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT, Gravity.CENTER));
             for (int shape : ORDER) {
                 final Chip chip = new Chip(context, shape);
                 chip.setOnClickListener(v -> {
                     if (current != shape) {
                         current = shape;
-                        for (int i = 0; i < getChildCount(); i++) {
-                            getChildAt(i).invalidate();
+                        for (int i = 0; i < row.getChildCount(); i++) {
+                            row.getChildAt(i).invalidate();
                         }
                         try {
                             v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
@@ -193,7 +330,7 @@ public final class SolegramStickerShapes {
                         onChanged.run();
                     }
                 });
-                addView(chip, new LayoutParams(dp(40), dp(40)));
+                row.addView(chip, new LinearLayout.LayoutParams(dp(40), dp(40)));
             }
         }
 
@@ -235,7 +372,8 @@ public final class SolegramStickerShapes {
             case HEART: return R.string.SG_StickerShapeHeart;
             case STAR: return R.string.SG_StickerShapeStar;
             case SQUIRCLE: return R.string.SG_StickerShapeSquircle;
-            default: return R.string.SG_StickerShapeRounded;
+            case ROUNDED: return R.string.SG_StickerShapeRounded;
+            default: return R.string.SG_StickerShapeMaterial;
         }
     }
 }

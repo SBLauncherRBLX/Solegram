@@ -2492,5 +2492,6 @@
     <string name="SG_StickerShapeHeart">Сердце</string>
     <string name="SG_StickerShapeStar">Звезда</string>
     <string name="SG_StickerShapeSquircle">Мягкий квадрат</string>
+    <string name="SG_StickerShapeMaterial">Форма Material You</string>
     <!-- SOLEGRAM END -->
 </resources>
