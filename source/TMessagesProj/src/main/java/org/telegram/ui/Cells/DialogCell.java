@@ -4705,9 +4705,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     limit = Math.min(limit, clockDrawLeft - dp(4));
                 }
                 if (drawCheck2) {
-                    limit = Math.min(limit, (drawCheck1 ? Math.min(checkDrawLeft, halfCheckDrawLeft) : checkDrawLeft) - dp(4));
-                } else if (drawCheck1) {
-                    limit = Math.min(limit, halfCheckDrawLeft - dp(4));
+                    // two checks: checkDrawLeft/halfCheckDrawLeft; one check: checkDrawLeft1 (Telegram keeps them apart)
+                    limit = Math.min(limit, (drawCheck1 ? Math.min(checkDrawLeft, halfCheckDrawLeft) : checkDrawLeft1) - dp(4));
                 }
                 final float streakWidth = sgStreakSpan.width(Theme.dialogs_namePaint[paintIndex]);
                 float x = end - dp(3);

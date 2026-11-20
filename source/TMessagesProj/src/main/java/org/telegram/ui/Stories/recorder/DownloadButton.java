@@ -370,6 +370,7 @@ public class DownloadButton extends ImageView {
         private final Paint greyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         private final ButtonBounce cancelButton = new ButtonBounce(this);
+        private com.solegram.messenger.ui.SolegramShapeProgress sgShapeProgress;
 
         private RLottieDrawable lottieDrawable;
 
@@ -494,12 +495,25 @@ public class DownloadButton extends ImageView {
             final float cy = prepareRect.top + dp(21 + 27);
             final float r = dp(25);
 
-            greyPaint.setAlpha((int) (0x33 * alpha));
-            canvas.drawCircle(cx, cy, r, greyPaint);
-            AndroidUtilities.rectTmp.set(cx - r, cy - r, cx + r, cy + r);
+            if (com.solegram.messenger.ui.SolegramShapeProgress.enabled()) {
+                // Solegram: the app's loading look: a Material shape filled as a sector as it goes
+                if (sgShapeProgress == null) {
+                    sgShapeProgress = new com.solegram.messenger.ui.SolegramShapeProgress();
+                }
+                sgShapeProgress.setIndeterminate(progress <= 0.001f);
+                sgShapeProgress.setProgress(progress);
+                sgShapeProgress.drawButton(canvas, cx, cy, r + dp(3), androidx.core.graphics.ColorUtils.setAlphaComponent(0xFFFFFFFF, (int) (0x2E * alpha)),
+                    androidx.core.graphics.ColorUtils.setAlphaComponent(0xFFFFFFFF, (int) (0x5C * alpha)), 1f);
+                invalidate();
+            } else {
+                greyPaint.setAlpha((int) (0x33 * alpha));
+                canvas.drawCircle(cx, cy, r, greyPaint);
+                AndroidUtilities.rectTmp.set(cx - r, cy - r, cx + r, cy + r);
+                whitePaint.setAlpha((int) (0xFF * alpha));
+                whitePaint.setStrokeWidth(dp(4));
+                canvas.drawArc(AndroidUtilities.rectTmp, -90, progress * 360, false, whitePaint);
+            }
             whitePaint.setAlpha((int) (0xFF * alpha));
-            whitePaint.setStrokeWidth(dp(4));
-            canvas.drawArc(AndroidUtilities.rectTmp, -90, progress * 360, false, whitePaint);
 
             final float cancelButtonScale = cancelButton.getScale(.15f);
             canvas.save();
