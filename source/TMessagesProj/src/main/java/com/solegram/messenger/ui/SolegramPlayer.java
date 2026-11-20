@@ -461,7 +461,30 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
             final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
             AndroidUtilities.runOnUIThread(() -> SolegramMusicActivity.addToPlaylist(org.telegram.ui.LaunchActivity.getLastFragment(), getContext(), mo), SolegramIconMotion.MENU_DELAY);
         });
-        bottom.addView(addButton, LayoutHelper.createFrame(44, 44, Gravity.CENTER));
+        bottom.addView(addButton, LayoutHelper.createFrame(44, 44, Gravity.CENTER, 0, 0, 30, 0));
+        // pins the track to the own profile: first in its music, so the profile shows it
+        final ImageView pinButton = iconButton(context, R.drawable.msg_pin, 24);
+        pinButton.setContentDescription(getString(R.string.SG_PlayerPinToProfile));
+        pinButton.setOnClickListener(v -> {
+            SolegramIconMotion.play(v, SolegramIconMotion.POP);
+            final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
+            final int account = mo != null ? mo.currentAccount : org.telegram.messenger.UserConfig.selectedAccount;
+            pinButton.setEnabled(false);
+            com.solegram.messenger.SolegramProfileMusicPin.pin(account, mo, error -> {
+                pinButton.setEnabled(true);
+                if (root == null) {
+                    return;
+                }
+                if (error == null) {
+                    org.telegram.ui.Components.BulletinFactory.of(root, null)
+                        .createSimpleBulletin(R.raw.contact_check, getString(R.string.SG_PlayerPinnedToProfile)).show();
+                } else {
+                    org.telegram.ui.Components.BulletinFactory.of(root, null)
+                        .createErrorBulletin(getString(R.string.SG_PlayerPinFailed)).show();
+                }
+            });
+        });
+        bottom.addView(pinButton, LayoutHelper.createFrame(44, 44, Gravity.CENTER, 30, 0, 0, 0));
         content.addView(bottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 6, 0, 0));
 
         updateModes();

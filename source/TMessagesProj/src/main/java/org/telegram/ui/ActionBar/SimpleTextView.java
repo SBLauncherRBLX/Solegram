@@ -819,7 +819,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
                     width -= rightDrawableWidth;
                     width -= drawablePadding;
                 }
-                if (sgTrailing != null) {
+                if (sgTrailing != null && !rightDrawableOutside) { // outside: getMaxTextWidth keeps its room
                     width -= sgTrailingWidth();
                 }
             }
@@ -947,11 +947,25 @@ public class SimpleTextView extends View implements Drawable.Callback {
         if (sgTrailing != null && layout != null && layout.getLineCount() > 0 && !rightDrawableHidden) {
             // Solegram: after the text and both right drawables
             int x = textOffsetX + textWidth + (int) -scrollingOffset;
-            if (rightDrawable != null && !rightDrawableOutside && !rightDrawableInside) {
-                x += drawablePadding + (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
-            }
-            if (rightDrawable2 != null && !rightDrawableOutside && !rightDrawableInside) {
-                x += drawablePadding + (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
+            if (rightDrawableOutside) {
+                // the outside drawables (a check, a status) stop at the text's room: the streak goes after them, never on them
+                int end = x;
+                int dx = Math.min(textOffsetX + textWidth + drawablePadding + (int) -scrollingOffset, getMaxTextWidth() - paddingRight + drawablePadding);
+                if (rightDrawable != null) {
+                    end = dx + (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
+                    dx = end + drawablePadding;
+                }
+                if (rightDrawable2 != null) {
+                    end = dx + (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
+                }
+                x = Math.max(x, end);
+            } else {
+                if (rightDrawable != null && !rightDrawableInside) {
+                    x += drawablePadding + (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
+                }
+                if (rightDrawable2 != null && !rightDrawableInside) {
+                    x += drawablePadding + (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
+                }
             }
             if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL ||
                     (gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT) {
@@ -1015,9 +1029,13 @@ public class SimpleTextView extends View implements Drawable.Callback {
         }
 
         if (layout != null) {
+            final int sgGlow = sgNameEffect != null ? sgNameEffect.overflow() : 0; // Solegram: the glow's halo
+            if (sgGlow > 0 && getParent() instanceof android.view.ViewGroup && ((android.view.ViewGroup) getParent()).getClipChildren()) {
+                ((android.view.ViewGroup) getParent()).setClipChildren(false);
+            }
             if (leftDrawableOutside || rightDrawableOutside || ellipsizeByGradient || paddingRight > 0) {
                 canvas.save();
-                canvas.clipRect(textOffsetX, 0, getMaxTextWidth() - paddingRight - dp(rightDrawable != null && !(rightDrawable instanceof AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable) && rightDrawableOutside ? 2 : 0), getMeasuredHeight());
+                canvas.clipRect(textOffsetX - sgGlow, -sgGlow, getMaxTextWidth() - paddingRight - dp(rightDrawable != null && !(rightDrawable instanceof AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable) && rightDrawableOutside ? 2 : 0) + (ellipsizeByGradient ? 0 : sgGlow), getMeasuredHeight() + sgGlow);
             }
             Emoji.emojiDrawingUseAlpha = usaAlphaForEmoji;
             if (wrapBackgroundDrawable != null) {
@@ -1196,7 +1214,8 @@ public class SimpleTextView extends View implements Drawable.Callback {
     }
 
     public int getMaxTextWidth() {
-        return getMeasuredWidth() - (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0);
+        return getMeasuredWidth() - (rightDrawableOutside && rightDrawable != null ? rightDrawable.getIntrinsicWidth() + drawablePadding : 0) - (rightDrawableOutside && rightDrawable2 != null ? rightDrawable2.getIntrinsicWidth() + drawablePadding : 0)
+            - (rightDrawableOutside && sgTrailing != null ? sgTrailingWidth() : 0); // Solegram: the streak goes after the outside drawables
     }
 
     public float getExactWidth() {

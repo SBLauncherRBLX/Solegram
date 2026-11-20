@@ -2228,4 +2228,14 @@
     <string name="SG_DockHint">The chat is in the side dock on the right: open it from any screen. To take it out, press and hold it.</string>
     <string name="SG_DockRemoved">Chat taken out of the side dock</string>
     <string name="SG_DockUndo">Undo</string>
+    <string name="SG_PlayerPinToProfile">Pin to profile</string>
+    <string name="SG_PlayerPinnedToProfile">The track is pinned to your profile</string>
+    <string name="SG_PlayerPinFailed">Couldn\'t pin the track to your profile</string>
+    <string name="SG_CreateGif">Make a GIF</string>
+    <string name="SG_GifNeedsDownload">Wait until the video has downloaded</string>
+    <string name="SG_StickerShapeRounded">Usual shape</string>
+    <string name="SG_StickerShapeCircle">Circle</string>
+    <string name="SG_StickerShapeHeart">Heart</string>
+    <string name="SG_StickerShapeStar">Star</string>
+    <string name="SG_StickerShapeSquircle">Soft square</string>
 </resources>

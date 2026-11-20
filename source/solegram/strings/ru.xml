@@ -2228,4 +2228,14 @@
     <string name="SG_DockHint">Чат в боковой панели справа: открывайте его отсюда с любого экрана. Чтобы убрать, удерживайте его.</string>
     <string name="SG_DockRemoved">Чат убран из боковой панели</string>
     <string name="SG_DockUndo">Вернуть</string>
+    <string name="SG_PlayerPinToProfile">Закрепить в профиле</string>
+    <string name="SG_PlayerPinnedToProfile">Трек закреплён в вашем профиле</string>
+    <string name="SG_PlayerPinFailed">Не удалось закрепить трек в профиле</string>
+    <string name="SG_CreateGif">Сделать гифку</string>
+    <string name="SG_GifNeedsDownload">Сначала дождитесь, пока видео загрузится</string>
+    <string name="SG_StickerShapeRounded">Обычная форма</string>
+    <string name="SG_StickerShapeCircle">Круг</string>
+    <string name="SG_StickerShapeHeart">Сердце</string>
+    <string name="SG_StickerShapeStar">Звезда</string>
+    <string name="SG_StickerShapeSquircle">Мягкий квадрат</string>
 </resources>

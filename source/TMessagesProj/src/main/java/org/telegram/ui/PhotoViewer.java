@@ -2187,6 +2187,11 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private final static int gallery_menu_report = 23;
     private final static int gallery_menu_chromecast = 24;
     private final static int gallery_menu_create_sticker = 25;
+    private final static int gallery_menu_sg_gif = 9301; // Solegram: a GIF from a video of the chat
+    // Solegram: the sticker's shape (its row and the dim round it), and "make a sticker" for a photo of the gallery
+    private com.solegram.messenger.ui.SolegramStickerShapes.Overlay sgShapeOverlay;
+    private com.solegram.messenger.ui.SolegramStickerShapes.Bar sgShapeBar;
+    private ImageView sgStickerItem;
     private final static int gallery_menu_delete2 = 26;
 
     private final static int ads_sponsor_info = 101;
@@ -5171,6 +5176,27 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                         ads.stop();
                         ads = null;
                     }
+                } else if (id == gallery_menu_sg_gif) {
+                    // Solegram: the video in the editor (trim it to the moment), sound off: it goes to this chat as a GIF
+                    if (currentMessageObject == null || currentMessageObject.messageOwner == null || parentChatActivity == null) return;
+                    String path = null;
+                    if (!TextUtils.isEmpty(currentMessageObject.messageOwner.attachPath) && new File(currentMessageObject.messageOwner.attachPath).exists()) {
+                        path = currentMessageObject.messageOwner.attachPath;
+                    }
+                    if (TextUtils.isEmpty(path)) {
+                        final File file = FileLoader.getInstance(currentAccount).getPathToMessage(currentMessageObject.messageOwner, true);
+                        if (file != null && file.exists()) {
+                            path = file.getAbsolutePath();
+                        }
+                    }
+                    if (TextUtils.isEmpty(path)) {
+                        BulletinFactory.of(containerView, resourcesProvider).createSimpleBulletin(R.raw.info, getString(R.string.SG_GifNeedsDownload)).show();
+                        return;
+                    }
+                    final ChatActivity chat = parentChatActivity;
+                    final String finalPath = path;
+                    closePhoto(false, false);
+                    AndroidUtilities.runOnUIThread(() -> chat.solegramOpenGifEditor(finalPath), 250);
                 } else if (id == gallery_menu_create_sticker) {
                     if (parentFragment == null || placeProvider == null) return;
                     if (currentMessageObject == null || currentMessageObject.messageOwner == null) return;
@@ -5925,6 +5951,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         menuItem.addSubItem(gallery_menu_savegif, R.drawable.msg_gif, getString(R.string.SaveToGIFs)).setColors(0xfffafafa, 0xfffafafa);
         menuItem.addSubItem(gallery_menu_showinchat, R.drawable.msg_message, getString(R.string.ShowInChat)).setColors(0xfffafafa, 0xfffafafa);
         menuItem.addSubItem(gallery_menu_create_sticker, R.drawable.msg_sticker, getString(R.string.CreateSticker)).setColors(0xfffafafa, 0xfffafafa);
+        menuItem.addSubItem(gallery_menu_sg_gif, R.drawable.msg_gif, getString(R.string.SG_CreateGif)).setColors(0xfffafafa, 0xfffafafa);
         menuItem.addSubItem(gallery_menu_reply, R.drawable.menu_reply, getString(R.string.Reply)).setColors(0xfffafafa, 0xfffafafa);
         menuItem.addSubItem(gallery_menu_report, R.drawable.msg_report, getString(R.string.ReportProfilePhoto)).setColors(0xfffafafa, 0xfffafafa);
         menuItem.addSubItem(gallery_menu_share, R.drawable.msg_shareout, getString(R.string.ShareFile)).setColors(0xfffafafa, 0xfffafafa);
@@ -7098,6 +7125,18 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
         stickerMakerView.setCurrentAccount(currentAccount);
         containerView.addView(stickerMakerView, containerView.indexOfChild(actionBar) - 1, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, 0, 0, 0, 0));
+        // Solegram: the sticker's shape: the dim round it over the photo, and the row of shapes at the top
+        sgShapeOverlay = new com.solegram.messenger.ui.SolegramStickerShapes.Overlay(activityContext, containerView,
+            () -> isVisible && sendPhotoType == SELECT_TYPE_STICKER && (currentEditMode == EDIT_MODE_NONE || currentEditMode == EDIT_MODE_STICKER_MASK || currentEditMode == EDIT_MODE_PAINT));
+        containerView.addView(sgShapeOverlay, containerView.indexOfChild(stickerMakerBackgroundView) + 1, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, 0, 0, 0, 0));
+        sgShapeBar = new com.solegram.messenger.ui.SolegramStickerShapes.Bar(activityContext, () -> {
+            sgShapeOverlay.invalidate();
+            stickerMakerBackgroundView.invalidate();
+            containerView.invalidate();
+            windowView.invalidate();
+        });
+        sgShapeBar.setVisibility(View.GONE);
+        containerView.addView(sgShapeBar, containerView.indexOfChild(actionBar), LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 48, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, (int) (AndroidUtilities.statusBarHeight / AndroidUtilities.density) + 62, 0, 0));
         cutOutBtn = new BlurButton();
         cutOutBtn.setRad(18);
         cutOutBtn.wrapContentDynamic();
@@ -7624,6 +7663,16 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         });
         paintItem.setContentDescription(getString("AccDescrPhotoEditor", R.string.AccDescrPhotoEditor));
 
+        // Solegram: a sticker from a photo of the gallery, in Telegram's sticker editor (cut out, shape, emoji, text)
+        sgStickerItem = new ImageView(parentActivity);
+        sgStickerItem.setScaleType(ImageView.ScaleType.CENTER);
+        sgStickerItem.setImageResource(R.drawable.msg_sticker);
+        sgStickerItem.setColorFilter(new PorterDuffColorFilter(0xffffffff, PorterDuff.Mode.SRC_IN));
+        sgStickerItem.setBackground(Theme.createInsetRoundRectDrawable(0x10FFFFFF, dp(22), dp(4), dp(6)));
+        sgStickerItem.setVisibility(View.GONE);
+        sgStickerItem.setContentDescription(getString(R.string.CreateSticker));
+        sgStickerItem.setOnClickListener(v -> solegramStickerFromGallery());
+
         compressItem = new VideoCompressButton(parentActivity);
         compressItem.setTag(1);
         compressItem.setBackground(Theme.createInsetRoundRectDrawable(0x10FFFFFF, dp(22), dp(4), dp(6)));
@@ -7671,6 +7720,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         tuneItem.setImageResource(R.drawable.media_settings);
         tuneItem.setBackground(Theme.createInsetRoundRectDrawable(0x10FFFFFF, dp(22), dp(4), dp(6)));
         itemsLayout.addView(tuneItem, LayoutHelper.createLinear(48, 48));
+        itemsLayout.addView(sgStickerItem, LayoutHelper.createLinear(48, 48));
         tuneItem.setOnClickListener(v -> {
             if (v.getAlpha() < .9f) return;
             cancelStickerClippingMode();
@@ -8142,7 +8192,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                         RectF clipRect = new RectF();
                         clipRect.set(0, 0, canvasBitmap.getWidth(), canvasBitmap.getHeight());
                         int r = canvasBitmap.getWidth() / 8;
-                        clipPath.addRoundRect(clipRect, r, r, Path.Direction.CW);
+                        // Solegram: the chosen shape (Telegram's rounded square by default)
+                        com.solegram.messenger.ui.SolegramStickerShapes.path(com.solegram.messenger.ui.SolegramStickerShapes.current, clipRect, r, clipPath);
                         canvas.clipPath(clipPath);
 
                         int containerWidth = getContainerViewWidth();
@@ -14009,6 +14060,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         menuItem.hideSubItem(gallery_menu_showall);
         menuItem.hideSubItem(gallery_menu_showinchat);
         menuItem.hideSubItem(gallery_menu_create_sticker);
+        menuItem.hideSubItem(gallery_menu_sg_gif);
         menuItem.hideSubItem(gallery_menu_reply);
         menuItem.hideSubItem(gallery_menu_report);
         menuItem.hideSubItem(gallery_menu_share);
@@ -14157,6 +14209,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             if (slideshowMessageId == 0) {
                 imagesArr.add(messageObject);
                 menuItem.setSubItemShown(gallery_menu_create_sticker, !noforwards && messageObject.isPhoto() && !messageObject.isLivePhoto());
+                menuItem.setSubItemShown(gallery_menu_sg_gif, !noforwards && solegramGifShown(messageObject));
                 if (messageObject.eventId != 0) {
                     needSearchImageInArr = false;
                 } else if (currentAnimation != null) {
@@ -14250,6 +14303,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             }
             MessageObject openingObject = imagesArr.get(index);
             menuItem.setSubItemShown(gallery_menu_create_sticker, !noforwards && openingObject.isPhoto());
+            menuItem.setSubItemShown(gallery_menu_sg_gif, !noforwards && solegramGifShown(openingObject));
             if (!openingObject.scheduled && !openingObject.isQuickReply() && !openingObject.isSponsored() && (parentChatActivity == null || !parentChatActivity.isThreadChat())) {
                 opennedFromMedia = parentChatActivity == null;
                 if (parentFragment instanceof ProfileActivity) {
@@ -14294,6 +14348,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             topCaptionEdit.setAddPhotoVisible(sendPhotoType != SELECT_TYPE_NO_SELECT && (sendPhotoType == 2 || sendPhotoType == 5) && placeProvider.canCaptureMorePhotos(), false);
             menuItem.setVisibility(View.GONE);
             menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+            menuItem.setSubItemShown(gallery_menu_sg_gif, false);
             imagesArrLocals.addAll(photos);
             Object obj = imagesArrLocals.get(index);
             boolean allowCaption;
@@ -15018,6 +15073,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                             paintItem.setTag(1);
                         }
                     }
+                    if (sgStickerItem != null) {
+                        sgStickerItem.setVisibility(View.GONE); // a video: no sticker
+                    }
                     if (isLivePhoto && object instanceof MediaController.PhotoEntry) {
                         final MediaController.PhotoEntry entry = (MediaController.PhotoEntry) object;
                         compressItem.setVisibility(sendPhotoTypeIsGif || sendPhotoTypeIsPollMedia || sendPhotoType == SELECT_TYPE_QR ? View.GONE : View.VISIBLE);
@@ -15067,6 +15125,10 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                         cropItem.setVisibility(sendPhotoType != SELECT_TYPE_AVATAR ? View.VISIBLE : View.GONE);
                         rotateItem.setVisibility(sendPhotoType != SELECT_TYPE_AVATAR ? View.GONE : View.VISIBLE);
                         mirrorItem.setVisibility(sendPhotoType != SELECT_TYPE_AVATAR ? View.GONE : View.VISIBLE);
+                    }
+                    if (sgStickerItem != null) {
+                        sgStickerItem.setVisibility(sendPhotoType == 0 && !isAnimation && !isDocumentsPicker && parentChatActivity != null
+                            && object instanceof MediaController.PhotoEntry && !((MediaController.PhotoEntry) object).isVideo ? View.VISIBLE : View.GONE);
                     }
                     if (animated) {
                         actionBar.beginDelayedTransition();
@@ -15330,7 +15392,66 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         return originalSticker;
     }
 
+    /** Solegram: the GIF item is for a video of a chat (not a round one, not a GIF already). */
+    private boolean solegramGifShown(MessageObject messageObject) {
+        return messageObject != null && messageObject.isVideo() && !messageObject.isRoundVideo() && !messageObject.isGif()
+            && parentChatActivity != null && messageObject.getId() > 0;
+    }
+
+    /** Solegram: the editor's sound button off, so the video goes as a GIF (tried until the video is open). */
+    public void solegramMuteForGif() {
+        solegramMuteForGif(0);
+    }
+
+    private void solegramMuteForGif(int attempt) {
+        if (!isVisible || muteButton == null) {
+            return;
+        }
+        if (!isCurrentVideo) {
+            if (attempt < 10) {
+                AndroidUtilities.runOnUIThread(() -> solegramMuteForGif(attempt + 1), 150);
+            }
+            return;
+        }
+        if (!muteVideo) {
+            muteButton.callOnClick();
+        }
+    }
+
+    /** Solegram: the current photo of the gallery opens in the sticker editor. */
+    private void solegramStickerFromGallery() {
+        if (isCaptionOpen() || placeProvider == null || parentChatActivity == null || currentIndex < 0 || currentIndex >= imagesArrLocals.size()) {
+            return;
+        }
+        final Object object = imagesArrLocals.get(currentIndex);
+        if (!(object instanceof MediaController.PhotoEntry) || ((MediaController.PhotoEntry) object).isVideo) {
+            return;
+        }
+        final MediaController.PhotoEntry source = (MediaController.PhotoEntry) object;
+        if (TextUtils.isEmpty(source.path) || !new File(source.path).exists()) {
+            return;
+        }
+        final ChatActivity chatActivity = parentChatActivity;
+        final ArrayList<Object> photos = new ArrayList<>();
+        photos.add(new MediaController.PhotoEntry(0, 0, 0, source.path, source.orientation, false, 0, 0, 0));
+        openPhotoForSelect(photos, 0, SELECT_TYPE_STICKER, false, new EmptyPhotoViewerProvider() {
+            @Override
+            public boolean allowCaption() {
+                return false;
+            }
+
+            @Override
+            public boolean isEditingSticker() {
+                return true;
+            }
+        }, chatActivity);
+        enableStickerMode(null, null, false, null);
+        prepareSegmentImage();
+        ContentPreviewViewer.getInstance().setStickerSetForCustomSticker(null);
+    }
+
     public void enableStickerMode(TLRPC.Document originalDocument, TLRPC.Document document, boolean empty, Utilities.Callback2<String, TLRPC.InputDocument> customHandler) {
+        com.solegram.messenger.ui.SolegramStickerShapes.current = com.solegram.messenger.ui.SolegramStickerShapes.ROUNDED; // Solegram
         originalSticker = originalDocument;
         replacedSticker = document;
         stickerEmpty = empty;
@@ -15416,6 +15537,22 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             }
         }
         stickerMakerView.setTag(show ? 1 : null);
+        if (sgShapeBar != null) {
+            final boolean shapes = show && sendPhotoType == SELECT_TYPE_STICKER && !stickerEmpty;
+            if (shapes != (sgShapeBar.getVisibility() == View.VISIBLE)) {
+                sgShapeBar.animate().cancel();
+                if (shapes) {
+                    sgShapeBar.setVisibility(View.VISIBLE);
+                    sgShapeBar.setAlpha(animated ? 0f : 1f);
+                    sgShapeBar.animate().alpha(1f).setDuration(animated ? 200 : 0).start();
+                } else if (animated) {
+                    sgShapeBar.animate().alpha(0f).setDuration(150).withEndAction(() -> sgShapeBar.setVisibility(View.GONE)).start();
+                } else {
+                    sgShapeBar.setVisibility(View.GONE);
+                }
+            }
+            sgShapeOverlay.invalidate();
+        }
         boolean buttonShow = show && !cutOutBtn.isUndoCutState() && !stickerEmpty;
         if (!animated) {
             cutOutBtn.animate().setListener(null).cancel();
@@ -15733,12 +15870,14 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 videoItem.setVisibility(View.VISIBLE);
                 menuItem.showSubItem(gallery_menu_speed);
                 menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+                menuItem.setSubItemShown(gallery_menu_sg_gif, false);
                 speedGap.setVisibility(menuItem.getVisibleSubItemsCount() > 1 ? View.VISIBLE : View.GONE);
             } else {
                 speedItem.setVisibility(View.GONE);
                 videoItem.setVisibility(View.GONE);
                 speedGap.setVisibility(View.GONE);
                 menuItem.setSubItemShown(gallery_menu_create_sticker, !noforwards && currentMessageObject != null && currentMessageObject.isPhoto() && !currentMessageObject.isLivePhoto());
+                menuItem.setSubItemShown(gallery_menu_sg_gif, !noforwards && solegramGifShown(currentMessageObject));
                 menuItem.checkHideMenuItem();
             }
             updateQualityItems();
@@ -15749,6 +15888,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             }
             currentSecureDocument = secureDocuments.get(index);
             menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+            menuItem.setSubItemShown(gallery_menu_sg_gif, false);
         } else if (!imagesArrLocations.isEmpty()) {
             if (index < 0 || index >= imagesArrLocations.size()) {
                 closePhoto(false, false);
@@ -15762,6 +15902,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             currentFileLocation = imagesArrLocations.get(index);
             currentFileLocationVideo = imagesArrLocationsVideo.get(index);
             menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+            menuItem.setSubItemShown(gallery_menu_sg_gif, false);
         } else if (!imagesArrLocals.isEmpty()) {
             if (index < 0 || index >= imagesArrLocals.size()) {
                 closePhoto(false, false);
@@ -15863,6 +16004,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 cropTransform.setViewTransform(false, previousCropPx, previousCropPy, previousCropRotation, previousCropOrientation, previousCropScale, 1.0f, 1.0f, previousCropPw, previousCropPh, 0, 0, previousCropMirrored);
             }
             menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+            menuItem.setSubItemShown(gallery_menu_sg_gif, false);
         } else if (pageBlocksAdapter != null) {
             if (currentIndex < 0 || currentIndex >= pageBlocksAdapter.getItemsCount()) {
                 closePhoto(false, false);
@@ -15873,8 +16015,10 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             currentPageBlock = pageBlock;
             isVideo = pageBlocksAdapter.isVideo(currentIndex) || pageBlocksAdapter.isHardwarePlayer(currentIndex);
             menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+            menuItem.setSubItemShown(gallery_menu_sg_gif, false);
         } else {
             menuItem.setSubItemShown(gallery_menu_create_sticker, false);
+            menuItem.setSubItemShown(gallery_menu_sg_gif, false);
         }
         setMenuItemIcon(false, true);
 

@@ -234,6 +234,11 @@ public final class SolegramNameEffect {
             color = PALETTE[Math.min(PALETTE.length - 1, colorOf(effect))];
         }
 
+        /** How far the effect draws outside the text (the glow's halo): clips round the name keep this much room. */
+        public int overflow() {
+            return kind == GLOW ? AndroidUtilities.dp(14) : 0;
+        }
+
         private static boolean animate() {
             return LiteMode.isEnabled(LiteMode.FLAGS_ANIMATED_EMOJI);
         }

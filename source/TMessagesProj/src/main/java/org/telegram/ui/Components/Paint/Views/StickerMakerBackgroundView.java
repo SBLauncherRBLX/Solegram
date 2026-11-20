@@ -32,8 +32,8 @@ public class StickerMakerBackgroundView extends View {
         AndroidUtilities.rectTmp.set(inset, inset, inset + width, inset + width);
         AndroidUtilities.rectTmp.offset(0, (height - AndroidUtilities.rectTmp.height()) / 2);
         float rx = width / 7f;
-        path.rewind();
-        path.addRoundRect(AndroidUtilities.rectTmp, rx, rx, Path.Direction.CW);
+        // Solegram: the shape chosen for the sticker (Telegram's rounded square by default)
+        com.solegram.messenger.ui.SolegramStickerShapes.path(com.solegram.messenger.ui.SolegramStickerShapes.current, AndroidUtilities.rectTmp, rx, path);
         canvas.clipPath(path);
 
         int singleRectSize = dp(10);

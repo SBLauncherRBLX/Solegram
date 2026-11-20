@@ -20653,6 +20653,15 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    /** Solegram: a video of this chat in the editor with its sound off: trimmed to the moment, it goes here as a GIF. */
+    public void solegramOpenGifEditor(String videoPath) {
+        if (getParentActivity() == null || TextUtils.isEmpty(videoPath)) {
+            return;
+        }
+        openVideoEditor(videoPath, null);
+        AndroidUtilities.runOnUIThread(() -> PhotoViewer.getInstance().solegramMuteForGif(), 300);
+    }
+
     public void openVideoEditor(String videoPath, CharSequence caption) {
         if (getParentActivity() != null) {
             final Bitmap thumb = SendMessagesHelper.createVideoThumbnail(videoPath, MediaStore.Video.Thumbnails.MINI_KIND);

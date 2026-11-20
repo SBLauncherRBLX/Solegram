@@ -4243,7 +4243,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         fadePaintBack.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
                     }
                     canvas.saveLayerAlpha(0, 0, getMeasuredWidth(), getMeasuredHeight(), 255, Canvas.ALL_SAVE_FLAG);
-                    canvas.clipRect(nameLeft, 0, nameLeft + nameWidth, getMeasuredHeight());
+                    // Solegram: a glowing name keeps its halo at the start (the fade at the end stays)
+                    canvas.clipRect(nameLeft - (currentDialogId > 0 ? dp(14) : 0), 0, nameLeft + nameWidth, getMeasuredHeight());
                 }
                 if (currentDialogFolderId != 0) {
                     Theme.dialogs_namePaint[paintIndex].setColor(Theme.dialogs_namePaint[paintIndex].linkColor = Theme.getColor(Theme.key_chats_nameArchived, resourcesProvider));
