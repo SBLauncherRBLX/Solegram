@@ -268,7 +268,15 @@ public final class SolegramNameEmojiShare {
         return looks;
     }
 
-    private static synchronized void saveLooks() {
+    /** Written once a burst of reads is over (each one used to rewrite the whole settings file). */
+    private static void saveLooks() {
+        org.telegram.messenger.AndroidUtilities.cancelRunOnUIThread(SAVELOOKS_LATER);
+        org.telegram.messenger.AndroidUtilities.runOnUIThread(SAVELOOKS_LATER, 3000);
+    }
+
+    private static final Runnable SAVELOOKS_LATER = () -> org.telegram.messenger.Utilities.globalQueue.postRunnable(SolegramNameEmojiShare::saveLooksNow);
+
+    private static synchronized void saveLooksNow() {
         try {
             final JSONObject o = new JSONObject();
             int n = 0;
@@ -390,7 +398,15 @@ public final class SolegramNameEmojiShare {
         return known;
     }
 
-    private static synchronized void saveKnown() {
+    /** Written once a burst of reads is over (each one used to rewrite the whole settings file). */
+    private static void saveKnown() {
+        org.telegram.messenger.AndroidUtilities.cancelRunOnUIThread(SAVEKNOWN_LATER);
+        org.telegram.messenger.AndroidUtilities.runOnUIThread(SAVEKNOWN_LATER, 3000);
+    }
+
+    private static final Runnable SAVEKNOWN_LATER = () -> org.telegram.messenger.Utilities.globalQueue.postRunnable(SolegramNameEmojiShare::saveKnownNow);
+
+    private static synchronized void saveKnownNow() {
         try {
             final JSONObject o = new JSONObject();
             final LongSparseArray<Long> map = known();

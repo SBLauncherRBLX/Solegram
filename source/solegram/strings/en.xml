@@ -2239,4 +2239,9 @@
     <string name="SG_StickerShapeStar">Star</string>
     <string name="SG_StickerShapeSquircle">Soft square</string>
     <string name="SG_StickerShapeMaterial">Material You shape</string>
+    <string name="SG_SecPrivacy">Privacy</string>
+    <string name="SG_SecCleanLinks">Clean tracking from links</string>
+    <string name="SG_SecCleanLinksInfo">Removes tracking tags from links you send and open: utm, fbclid, the si of YouTube and Spotify and others. The link itself works as before.</string>
+    <string name="SG_SecStripMeta">Remove metadata from photos and videos</string>
+    <string name="SG_SecStripMetaInfo">Photos and videos sent as files or in original quality go without location, phone model and capture date. The file on your phone is not changed.</string>
 </resources>

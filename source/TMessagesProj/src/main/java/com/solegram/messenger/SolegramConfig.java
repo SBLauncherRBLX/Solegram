@@ -42,6 +42,10 @@ public class SolegramConfig {
     public static boolean secureRecents;
     /** Security: opening an .apk or a program file asks first (always for installers, other types from non-contacts). */
     public static boolean warnDangerousFiles = true;
+    /** Privacy: tracking parameters (utm_*, fbclid, YouTube's and Spotify's si...) are taken out of links sent and opened. */
+    public static boolean cleanLinks = true;
+    /** Privacy: photos and videos sent as files go without GPS, phone model and capture dates. */
+    public static boolean stripFileMetadata = true;
     public static boolean monetAccent;
     public static boolean showSeconds;
     public static boolean disableVibration;
@@ -452,6 +456,8 @@ public class SolegramConfig {
         hidePhoneNumber = p.getBoolean("hidePhoneNumber", false);
         secureRecents = p.getBoolean("secureRecents", false);
         warnDangerousFiles = p.getBoolean("warnDangerousFiles", true);
+        cleanLinks = p.getBoolean("cleanLinks", true);
+        stripFileMetadata = p.getBoolean("stripFileMetadata", true);
         monetAccent = p.getBoolean("monetAccent", false);
         showSeconds = p.getBoolean("showSeconds", false);
         disableVibration = p.getBoolean("disableVibration", false);
@@ -907,6 +913,8 @@ public class SolegramConfig {
             case "cameraControls":
             case "reminderAi":
             case "warnDangerousFiles":
+            case "cleanLinks":
+            case "stripFileMetadata":
                 return true;
             default:
                 return false;
@@ -927,7 +935,8 @@ public class SolegramConfig {
     // a settings file somebody sent may only make protection stronger: these switches are taken from it only when they
     // turn protection on (or, for the plugins' payments, off); the trusted sites and the scam sensitivity stay
     private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode",
-        "pluginsScanBeforeInstall", "pluginsSecurityV2", "scamAccounts", "scamLinks", "scamNano", "warnDangerousFiles", "secureRecents");
+        "pluginsScanBeforeInstall", "pluginsSecurityV2", "scamAccounts", "scamLinks", "scamNano", "warnDangerousFiles", "secureRecents",
+        "cleanLinks", "stripFileMetadata");
     private static final java.util.List<String> PROTECTION_OFF = java.util.Arrays.asList("pluginsAllowPayments");
     private static final java.util.List<String> PROTECTION_KEPT = java.util.Arrays.asList("scamTrustedSites", "scamSensitivity", "adBlockAllowed");
 

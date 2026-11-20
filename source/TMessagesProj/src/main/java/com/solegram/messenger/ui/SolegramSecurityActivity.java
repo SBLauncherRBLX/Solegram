@@ -62,6 +62,8 @@ public class SolegramSecurityActivity extends UniversalFragment {
     private static final int ID_RECENTS = 1;
     private static final int ID_NOTIF_PREVIEW = 2;
     private static final int ID_WARN_FILES = 3;
+    private static final int ID_CLEAN_LINKS = 90;
+    private static final int ID_STRIP_METADATA = 91;
     private static final int ID_CHECKUP = 4;
     private static final int ID_HIDDEN_CHATS = 5;
 
@@ -164,6 +166,13 @@ public class SolegramSecurityActivity extends UniversalFragment {
         items.add(UItem.asHeader(getString(R.string.SG_SecFiles)));
         items.add(UItem.asButtonCheck(ID_WARN_FILES, getString(R.string.SG_SecWarnFiles), getString(R.string.SG_SecWarnFilesInfo))
             .setChecked(SolegramConfig.warnDangerousFiles));
+        items.add(UItem.asShadow(null));
+
+        items.add(UItem.asHeader(getString(R.string.SG_SecPrivacy)));
+        items.add(UItem.asButtonCheck(ID_CLEAN_LINKS, getString(R.string.SG_SecCleanLinks), getString(R.string.SG_SecCleanLinksInfo))
+            .setChecked(SolegramConfig.cleanLinks));
+        items.add(UItem.asButtonCheck(ID_STRIP_METADATA, getString(R.string.SG_SecStripMeta), getString(R.string.SG_SecStripMetaInfo))
+            .setChecked(SolegramConfig.stripFileMetadata));
         items.add(UItem.asShadow(null));
 
         items.add(tile(UItem.asButton(ID_CHECKUP, R.drawable.outline_shield_check, getString(R.string.SG_SecCheckup)), TILE_GREEN)
@@ -277,6 +286,13 @@ public class SolegramSecurityActivity extends UniversalFragment {
             }
             case ID_WARN_FILES: {
                 final boolean value = SolegramConfig.toggle("warnDangerousFiles");
+                setCheckedAnimated(view, value);
+                item.setChecked(value);
+                return;
+            }
+            case ID_CLEAN_LINKS:
+            case ID_STRIP_METADATA: {
+                final boolean value = SolegramConfig.toggle(item.id == ID_CLEAN_LINKS ? "cleanLinks" : "stripFileMetadata");
                 setCheckedAnimated(view, value);
                 item.setChecked(value);
                 return;

@@ -383,6 +383,8 @@ public class Browser {
         if (!keepWebAuthTokens) {
             uri = withoutWebAuthTokens(uri);
         }
+        // Solegram: a web link opens without its tracking parameters
+        uri = com.solegram.messenger.SolegramPrivacy.cleanUri(uri);
         final int currentAccount = UserConfig.selectedAccount;
         boolean[] forceBrowser = new boolean[]{false};
         boolean internalUri = isInternalUri(uri, forceBrowser);

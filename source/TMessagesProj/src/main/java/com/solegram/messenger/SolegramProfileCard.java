@@ -543,10 +543,21 @@ public final class SolegramProfileCard {
         if (chatBusy) {
             return;
         }
-        final long[] next = chatQueue.poll();
-        if (next == null) {
+        final long[] head = chatQueue.peek();
+        if (head == null) {
             return;
         }
+        // a message on its way goes first: names wait (and nothing is read while the app is not on screen)
+        if (org.telegram.messenger.ApplicationLoader.mainInterfacePaused
+            || org.telegram.messenger.SendMessagesHelper.getInstance((int) head[0]).isSendingAnyMessage()) {
+            chatBusy = true;
+            AndroidUtilities.runOnUIThread(() -> {
+                chatBusy = false;
+                pumpChat();
+            }, org.telegram.messenger.ApplicationLoader.mainInterfacePaused ? 5000 : 1500);
+            return;
+        }
+        final long[] next = chatQueue.poll();
         chatBusy = true;
         final int account = (int) next[0];
         final long userId = next[1];

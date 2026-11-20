@@ -172,6 +172,18 @@ public final class SolegramNameEffect {
                 return false;
             }
             known().put(userId, effect);
+        }
+        // written once a burst of reads is over (a chat full of new names used to rewrite the settings file per name)
+        org.telegram.messenger.AndroidUtilities.cancelRunOnUIThread(SAVE_KNOWN);
+        org.telegram.messenger.AndroidUtilities.runOnUIThread(SAVE_KNOWN, 3000);
+        return true;
+    }
+
+    private static final Runnable SAVE_KNOWN = () -> org.telegram.messenger.Utilities.globalQueue.postRunnable(SolegramNameEffect::saveKnown);
+
+    private static void saveKnown() {
+        final String json;
+        synchronized (SolegramNameEffect.class) {
             try {
                 final JSONObject o = new JSONObject();
                 final LongSparseArray<Integer> map = known();
@@ -180,12 +192,13 @@ public final class SolegramNameEffect {
                         o.put(String.valueOf(map.keyAt(i)), (int) map.valueAt(i));
                     }
                 }
-                SolegramConfig.prefs().edit().putString(KEY_KNOWN, o.toString()).apply();
+                json = o.toString();
             } catch (Throwable e) {
                 FileLog.e(e);
+                return;
             }
         }
-        return true;
+        SolegramConfig.prefs().edit().putString(KEY_KNOWN, json).apply();
     }
 
     /** The effect on a user's name: the own one from the settings, others' as their bio says. */

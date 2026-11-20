@@ -4458,6 +4458,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (sendMessageParams == null) {
             return;
         }
+        // Solegram: links go without their tracking parameters (before the Premium mark, which counts on the final text)
+        com.solegram.messenger.SolegramPrivacy.cleanOutgoing(sendMessageParams);
         // Solegram: Premium emoji without Premium travel in an invisible mark, for Solegram users
         com.solegram.messenger.SolegramPremiumStickers.prepareOutgoing(currentAccount, sendMessageParams);
         // Solegram: a repeat without Premium is kept on this device (the server would refuse it)
@@ -9513,6 +9515,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 extension = null;
             }
         }
+        // Solegram: a photo or video sent as a file goes without where, when and with what phone it was taken
+        final String sgClean = com.solegram.messenger.SolegramPrivacy.strippedCopy(path);
+        if (sgClean != null) {
+            path = sgClean;
+        }
         final File f = new File(path);
         if (!f.exists() || f.length() == 0) {
             return ERROR_TYPE_UNSUPPORTED;
@@ -11513,6 +11520,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                 File cacheFile = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), fileName);
                                 SharedConfig.saveConfig();
                                 path = cacheFile.getAbsolutePath();
+                            } else if (info.isVideo) {
+                                // Solegram: a video in its original quality goes as it is, so without its metadata
+                                final String sgClean = com.solegram.messenger.SolegramPrivacy.strippedCopy(path);
+                                if (sgClean != null) {
+                                    path = sgClean;
+                                }
                             }
                             final TLRPC.TL_document videoFinal = document;
                             final String parentFinal = parentObject;
@@ -12324,6 +12337,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     File cacheFile = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), fileName);
                     SharedConfig.saveConfig();
                     path = cacheFile.getAbsolutePath();
+                } else {
+                    // Solegram: a video in its original quality goes as it is, so without its metadata
+                    final String sgClean = com.solegram.messenger.SolegramPrivacy.strippedCopy(path);
+                    if (sgClean != null) {
+                        path = sgClean;
+                    }
                 }
 
                 final TLRPC.TL_document videoFinal = document;

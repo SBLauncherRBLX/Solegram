@@ -2493,5 +2493,10 @@
     <string name="SG_StickerShapeStar">Звезда</string>
     <string name="SG_StickerShapeSquircle">Мягкий квадрат</string>
     <string name="SG_StickerShapeMaterial">Форма Material You</string>
+    <string name="SG_SecPrivacy">Приватность</string>
+    <string name="SG_SecCleanLinks">Чистить ссылки от слежки</string>
+    <string name="SG_SecCleanLinksInfo">Убирать из отправляемых и открываемых ссылок метки слежки: utm, fbclid, si у YouTube и Spotify и другие. Сама ссылка работает как раньше.</string>
+    <string name="SG_SecStripMeta">Удалять метаданные из фото и видео</string>
+    <string name="SG_SecStripMetaInfo">Фото и видео, отправленные файлом или в исходном качестве, уходят без геопозиции, модели телефона и даты съёмки. Файл на телефоне не меняется.</string>
     <!-- SOLEGRAM END -->
 </resources>

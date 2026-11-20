@@ -77,6 +77,9 @@ public class SolegramGradientPickerSheet extends BottomSheet {
         final LinearLayout column = new LinearLayout(context);
         column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(dp(16), dp(4), dp(16), dp(12));
+        // the round thumbs of the square and the hue bar reach past their edges: they are drawn whole, never cut
+        column.setClipChildren(false);
+        column.setClipToPadding(false);
 
         final TextView title = titleView = new TextView(context);
         title.setText(getString(R.string.SG_ProfileOwnColors));
@@ -233,6 +236,7 @@ public class SolegramGradientPickerSheet extends BottomSheet {
     private class SvSquare extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint thumb = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
         private float shaderHue = -1;
         private int shaderW, shaderH;
@@ -258,7 +262,6 @@ public class SolegramGradientPickerSheet extends BottomSheet {
             }
             canvas.drawRoundRect(rect, dp(14), dp(14), paint);
             final float x = hsv[1] * getWidth(), y = (1 - hsv[2]) * getHeight();
-            final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
             fill.setColor(Color.HSVToColor(hsv));
             canvas.drawCircle(x, y, dp(11), fill);
             canvas.drawCircle(x, y, dp(11), thumb);
@@ -281,6 +284,7 @@ public class SolegramGradientPickerSheet extends BottomSheet {
     private class HueBar extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint thumb = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
         private int shaderW;
 
@@ -295,7 +299,7 @@ public class SolegramGradientPickerSheet extends BottomSheet {
         protected void onDraw(Canvas canvas) {
             final float h = dp(14);
             final float top = (getHeight() - h) / 2f;
-            rect.set(dp(2), top, getWidth() - dp(2), top + h);
+            rect.set(0, top, getWidth(), top + h);
             if (shaderW != getWidth()) {
                 shaderW = getWidth();
                 final int[] hues = new int[7];
@@ -306,8 +310,8 @@ public class SolegramGradientPickerSheet extends BottomSheet {
                 paint.setShader(new LinearGradient(rect.left, 0, rect.right, 0, hues, null, Shader.TileMode.CLAMP));
             }
             canvas.drawRoundRect(rect, h / 2f, h / 2f, paint);
-            final float x = rect.left + hsv[0] / 360f * rect.width();
-            final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+            // the thumb's centre stays over the bar's rounded ends
+            final float x = h / 2f + hsv[0] / 360f * (getWidth() - h);
             fill.setColor(Color.HSVToColor(new float[]{hsv[0], 1f, 1f}));
             canvas.drawCircle(x, getHeight() / 2f, dp(12), fill);
             canvas.drawCircle(x, getHeight() / 2f, dp(12), thumb);
@@ -318,8 +322,8 @@ public class SolegramGradientPickerSheet extends BottomSheet {
             if (getParent() != null) {
                 getParent().requestDisallowInterceptTouchEvent(true);
             }
-            final float w = Math.max(1, getWidth() - dp(4));
-            hsv[0] = Math.max(0, Math.min(359.9f, (e.getX() - dp(2)) / w * 360f));
+            final float w = Math.max(1, getWidth() - dp(14));
+            hsv[0] = Math.max(0, Math.min(359.9f, (e.getX() - dp(7)) / w * 360f));
             // a grey or black colour has no hue to show: lift it so the hue can be seen
             if (hsv[1] < 0.15f) {
                 hsv[1] = 0.6f;
