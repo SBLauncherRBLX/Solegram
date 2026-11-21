@@ -2448,6 +2448,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     /** The music's line grows (down and to the sides, still glass) into a small card of the song. */
     private void sgOpenMusicPeek() {
+        if (sgMusicCatcher != null && sgMusicCatcher.getParent() != fragmentView) {
+            sgCloseMusicCard(true); // left from a screen built before (a rotation): forgotten
+        }
         if (sgMusicCatcher != null || musicView == null || musicView.isExpanded() || !(fragmentView instanceof ViewGroup) || getParentActivity() == null) {
             return;
         }
@@ -2560,8 +2563,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             });
         final View catcher = new View(getContext()) {
-            private boolean onCard;
-
             @Override
             public boolean onTouchEvent(MotionEvent e) {
                 final android.graphics.RectF r = new android.graphics.RectF();
@@ -2569,15 +2570,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     musicView.getCardBoundsOnScreen(r);
                 }
                 if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    onCard = r.contains(e.getRawX(), e.getRawY());
-                } else if (e.getActionMasked() == MotionEvent.ACTION_UP) {
-                    if (onCard && r.contains(e.getRawX(), e.getRawY())) {
-                        if (musicView != null) {
-                            musicView.tapCard(e.getRawX(), e.getRawY());
-                        }
-                    } else if (!onCard) {
+                    if (!r.contains(e.getRawX(), e.getRawY())) {
+                        // a touch anywhere else closes the card and goes on to the profile (a scroll scrolls at once)
                         sgCloseMusicCard(false);
+                        return false;
                     }
+                    return true;
+                }
+                if (e.getActionMasked() == MotionEvent.ACTION_UP && r.contains(e.getRawX(), e.getRawY()) && musicView != null) {
+                    musicView.tapCard(e.getRawX(), e.getRawY());
                 }
                 return true;
             }
@@ -2955,6 +2956,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     @Override
     public View createView(Context context) {
         com.solegram.messenger.SolegramGestures.addShakeHandler(sgShakeHandler); // also as a tab, which may not get onResume
+        sgMusicCatcher = null; // a screen built anew (two panes after a turn): no card left from the old one
         Theme.createProfileResources(context);
         Theme.createChatResources(context, false);
         BaseFragment lastFragment = parentLayout.getLastFragment();
@@ -9707,6 +9709,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        sgCloseMusicCard(true); // a turn of the phone lays the header out anew: the music's card closes
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onConfigurationChanged(newConfig);
         }
@@ -10303,6 +10306,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onPause() {
+        sgCloseMusicCard(true); // the card does not outlive the screen being in front
         sgStatsResumed = false;
         AndroidUtilities.cancelRunOnUIThread(sgStatsTick);
         if (sgShake != null) {
@@ -10366,11 +10370,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     @Override
     public boolean onBackPressed(boolean invoked) {
         // Solegram: the music's card goes back into its line first
-        if (sgMusicCatcher != null) {
+        if (sgMusicCatcher != null && sgMusicCatcher.getParent() == fragmentView) {
             if (invoked) {
                 sgCloseMusicCard(false);
             }
             return false;
+        } else if (sgMusicCatcher != null) {
+            sgCloseMusicCard(true);
         }
         // the old onBackPressed() was no override anymore: the selection and the reordering ignored the back
         if (!super.onBackPressed(invoked)) {

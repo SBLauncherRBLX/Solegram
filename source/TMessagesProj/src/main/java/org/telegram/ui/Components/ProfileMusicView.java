@@ -309,6 +309,66 @@ public class ProfileMusicView extends View {
         return AndroidUtilities.formatShortDuration((int) (Math.max(0, ms) / 1000));
     }
 
+    // the wave of the card's progress, as the player's (SolegramCometProgress, STYLE_WAVE)
+    private final Paint waveStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path wavePath = new Path();
+    private float waveAmount, wavePhase;
+    private long waveLast;
+
+    private void drawWave(Canvas canvas, float left, float right, float cy, float progress, boolean playing, float a) {
+        final long now = android.os.SystemClock.elapsedRealtime();
+        final float dt = waveLast == 0 ? 16 : Math.min(64, now - waveLast);
+        waveLast = now;
+        final float target = playing ? 1f : 0f;
+        waveAmount = target > waveAmount ? Math.min(1, waveAmount + dt / 400f) : Math.max(0, waveAmount - dt / 500f);
+        final float eased = waveAmount * waveAmount * (3 - 2 * waveAmount);
+        final float wavelength = dp(26);
+        wavePhase = (wavePhase + dp(30) * dt / 1000f * eased) % (wavelength * 1000);
+        final float amp = dp(2.2f) * eased;
+        final float stroke = dp(3);
+        final float gap = dp(5);
+        final float x = left + (right - left) * progress;
+
+        waveStroke.setStyle(Paint.Style.STROKE);
+        waveStroke.setStrokeCap(Paint.Cap.ROUND);
+        waveStroke.setStrokeJoin(Paint.Join.ROUND);
+        waveStroke.setStrokeWidth(stroke);
+        // the rest: a faint straight line
+        if (x + gap < right) {
+            waveStroke.setColor(Theme.multAlpha(textColor, 0.24f * a));
+            canvas.drawLine(x + gap, cy, right, cy, waveStroke);
+        }
+        // the played part: the wave, flat where it meets the start and the head
+        final float end = x - gap;
+        if (end > left) {
+            waveStroke.setColor(Theme.multAlpha(textColor, a));
+            wavePath.rewind();
+            final float step = dp(1.5f), flatEnd = dp(12), flatStart = dp(8);
+            for (float px = left; ; px += step) {
+                final float at = Math.min(px, end);
+                final float fade = Math.min(1, (end - at) / flatEnd) * Math.min(1, (at - left) / flatStart);
+                final float y = cy + (float) Math.sin((at - wavePhase) / wavelength * Math.PI * 2) * amp * fade;
+                if (at == left) {
+                    wavePath.moveTo(at, y);
+                } else {
+                    wavePath.lineTo(at, y);
+                }
+                if (at >= end) {
+                    break;
+                }
+            }
+            canvas.drawPath(wavePath, waveStroke);
+        }
+        // the head: a small upright bar
+        cardBarPaint.setColor(Theme.multAlpha(textColor, a));
+        final float hh = dp(12), hw = dp(3);
+        AndroidUtilities.rectTmp.set(x - hw / 2f, cy - hh / 2f, x + hw / 2f, cy + hh / 2f);
+        canvas.drawRoundRect(AndroidUtilities.rectTmp, hw / 2f, hw / 2f, cardBarPaint);
+        if (waveAmount > 0 && waveAmount < 1) {
+            invalidate(); // lying down / rising
+        }
+    }
+
     /** The card's content in its final place {@code r}. */
     private void drawCard(Canvas canvas, RectF r, float a) {
         final Card c = card;
@@ -354,17 +414,12 @@ public class ProfileMusicView extends View {
         y += dp(20);
         cardArtist.draw(canvas, tx, y, textColor, 0.7f * a);
 
-        // how far it played, and the times
+        // how far it played: the player's wave (swaying while it plays, straight on pause), and the times
         final float barY = cy + dp(CARD_COVER) - dp(14);
         final float barRight = tx + w;
         final float played = c.progress();
-        cardBarPaint.setColor(Theme.multAlpha(textColor, 0.22f * a));
-        AndroidUtilities.rectTmp.set(tx, barY - dp(2), barRight, barY + dp(2));
-        canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(2), dp(2), cardBarPaint);
+        drawWave(canvas, tx, barRight, barY, played >= 0 ? Utilities.clamp01(played) : 0f, c.playing(), a);
         if (played >= 0) {
-            cardBarPaint.setColor(Theme.multAlpha(textColor, a));
-            AndroidUtilities.rectTmp.set(tx, barY - dp(2), tx + (barRight - tx) * Utilities.clamp01(played), barY + dp(2));
-            canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(2), dp(2), cardBarPaint);
             final long duration = c.durationMs();
             if (duration > 0) {
                 final Text left = new Text(cardTime((long) (duration * Utilities.clamp01(played))), 11);
@@ -770,8 +825,10 @@ public class ProfileMusicView extends View {
         canvas.restore();
 
         canvas.restore();
-        if (state != null && state.playing() || card != null && card.playing()) {
-            postInvalidateDelayed(50); // the bars and the progress move
+        if (card != null && card.playing()) {
+            postInvalidateOnAnimation(); // the card's wave sways
+        } else if (state != null && state.playing()) {
+            postInvalidateDelayed(66); // the pill's bars and its progress move
         }
     }
 }
