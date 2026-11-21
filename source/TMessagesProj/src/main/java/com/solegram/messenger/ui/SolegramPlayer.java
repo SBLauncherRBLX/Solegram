@@ -586,11 +586,11 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
             top = Math.max(wi.getSystemWindowInsetTop(), landscape ? 0 : top);
             right = wi.getSystemWindowInsetRight();
             bottom = wi.getSystemWindowInsetBottom();
-            if (Build.VERSION.SDK_INT >= 28 && wi.getDisplayCutout() != null) {
-                left = Math.max(left, wi.getDisplayCutout().getSafeInsetLeft());
-                right = Math.max(right, wi.getDisplayCutout().getSafeInsetRight());
-                top = Math.max(top, wi.getDisplayCutout().getSafeInsetTop());
-            }
+            // the side strip of a small camera hole is used, as on the other screens (AndroidUtilities.getDefaultWindowInsets)
+            final androidx.core.graphics.Insets def = AndroidUtilities.getDefaultWindowInsets(androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(wi, root), false);
+            left = def.left;
+            right = def.right;
+            top = Math.max(top, def.top);
         }
         if (landscape) {
             content.setPadding(dp(24) + left, top + dp(4), dp(24) + right, bottom + dp(12));

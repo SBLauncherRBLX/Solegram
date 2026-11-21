@@ -6919,9 +6919,10 @@ public class AndroidUtilities {
 
     public static Insets getDefaultWindowInsets(WindowInsetsCompat insets, boolean withIme) {
         final int insetsType = WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout();
-        final Insets systemInsets = Insets.max(
+        Insets systemInsets = Insets.max(
             insets.getInsetsIgnoringVisibility(insetsType),
             insets.getInsets(insetsType));
+        systemInsets = solegramWithoutSideHole(insets, systemInsets);
 
         if (withIme) {
             final Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
@@ -6929,6 +6930,41 @@ public class AndroidUtilities {
         }
 
         return systemInsets;
+    }
+
+    /**
+     * Solegram: on its side a phone with a small camera hole had a whole empty strip along that edge (the hole's
+     * "safe" inset is the full height). A side inset that only comes from a small hole is dropped: the screens use
+     * that strip, only the tiny hole sits over it. A real notch (a big cutout) and the system bars still count.
+     */
+    private static Insets solegramWithoutSideHole(WindowInsetsCompat insets, Insets all) {
+        try {
+            if (all.left == 0 && all.right == 0) {
+                return all;
+            }
+            final androidx.core.view.DisplayCutoutCompat cutout = insets.getDisplayCutout();
+            if (cutout == null) {
+                return all;
+            }
+            final Insets bars = Insets.max(
+                insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars()),
+                insets.getInsets(WindowInsetsCompat.Type.systemBars()));
+            final int sideLength = Math.max(1, Math.min(displaySize.x, displaySize.y));
+            boolean leftSmall = true, rightSmall = true;
+            for (android.graphics.Rect r : cutout.getBoundingRects()) {
+                final boolean small = r.height() < sideLength * 0.25f && r.width() < sideLength * 0.25f;
+                if (r.left < displaySize.x / 2) {
+                    leftSmall &= small;
+                } else {
+                    rightSmall &= small;
+                }
+            }
+            final int left = leftSmall ? bars.left : all.left;
+            final int right = rightSmall ? bars.right : all.right;
+            return left == all.left && right == all.right ? all : Insets.of(left, all.top, right, all.bottom);
+        } catch (Throwable e) {
+            return all;
+        }
     }
 
     public static void setViewLayoutMargins(View v, int l, int t, int r, int b) {

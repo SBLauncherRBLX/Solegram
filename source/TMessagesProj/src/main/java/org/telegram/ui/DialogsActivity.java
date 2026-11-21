@@ -293,14 +293,27 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private static final boolean TMP_DISABLE_TOPICS_TWO_COLUMNS = false;
 
     // Solegram: an iOS-like floating tab bar - a little taller, narrower, and lifted off the bottom edge
-    public static final int MAIN_TABS_HEIGHT = 60;
-    public static final int MAIN_TABS_MARGIN = 8;
+    // (not constants any more: a phone on its side in two panes gets a smaller bar, see solegramUpdateTabsSize)
+    public static int MAIN_TABS_HEIGHT = 60;
+    public static int MAIN_TABS_MARGIN = 8;
     /** Extra space between the tab bar and the bottom of the screen. */
-    public static final int MAIN_TABS_LIFT = 10;
+    public static int MAIN_TABS_LIFT = 10;
     /** The bar itself with its margins (without the lift). */
-    public static final int MAIN_TABS_BAR_HEIGHT = MAIN_TABS_HEIGHT + MAIN_TABS_MARGIN * 2;
+    public static int MAIN_TABS_BAR_HEIGHT = MAIN_TABS_HEIGHT + MAIN_TABS_MARGIN * 2;
     /** All the room the tab bar takes at the bottom, lift included (list paddings and the like). */
-    public static final int MAIN_TABS_HEIGHT_WITH_MARGINS = MAIN_TABS_BAR_HEIGHT + MAIN_TABS_LIFT;
+    public static int MAIN_TABS_HEIGHT_WITH_MARGINS = MAIN_TABS_BAR_HEIGHT + MAIN_TABS_LIFT;
+
+    /**
+     * Solegram: a phone on its side (two panes) has little height: the tab bar of the chats' pane is smaller there
+     * (its icons and labels fit: they sit at the top of a tab). Called before the screens are built for the layout.
+     */
+    public static void solegramUpdateTabsSize(boolean compact) {
+        MAIN_TABS_HEIGHT = compact ? 48 : 60;
+        MAIN_TABS_MARGIN = compact ? 5 : 8;
+        MAIN_TABS_LIFT = compact ? 6 : 10;
+        MAIN_TABS_BAR_HEIGHT = MAIN_TABS_HEIGHT + MAIN_TABS_MARGIN * 2;
+        MAIN_TABS_HEIGHT_WITH_MARGINS = MAIN_TABS_BAR_HEIGHT + MAIN_TABS_LIFT;
+    }
     public static final int FILTER_TABS_HEIGHT = 36;
     public static final int SEARCH_TABS_HEIGHT = 36 + 7 + 7;
     public static final int SEARCH_FIELD_HEIGHT = 48;

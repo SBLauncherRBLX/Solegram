@@ -530,6 +530,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 setVisibility(GONE);
             }
         });
+        DialogsActivity.solegramUpdateTabsSize(AndroidUtilities.isTablet() && !AndroidUtilities.isTabletByScreen());
         setupActionBarLayout();
         drawerLayoutContainer.setParentActionBarLayout(actionBarLayout);
         actionBarLayout.setDrawerLayoutContainer(drawerLayoutContainer);
@@ -7380,6 +7381,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 }
             }
 
+            // Solegram: the smaller tab bar of a phone on its side (two panes), the usual one otherwise
+            DialogsActivity.solegramUpdateTabsSize(AndroidUtilities.isTablet() && !AndroidUtilities.isTabletByScreen());
             setupActionBarLayout();
             actionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
             if (AndroidUtilities.isTablet()) {
