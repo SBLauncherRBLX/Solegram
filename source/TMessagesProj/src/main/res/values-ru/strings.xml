@@ -2510,5 +2510,6 @@
     <string name="SG_StatsFmHint">имя или ссылка</string>
     <string name="SG_StatsFmNotFound">Такой профиль stats.fm не найден</string>
     <string name="SG_StatsFmLinked">stats.fm привязан: %1$s</string>
+    <string name="SG_StatsFmPlayingNow">Сейчас играет</string>
     <!-- SOLEGRAM END -->
 </resources>

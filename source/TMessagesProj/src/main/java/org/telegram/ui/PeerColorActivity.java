@@ -1139,6 +1139,22 @@ public class PeerColorActivity extends BaseFragment implements NotificationCente
             }
 
             public int getColor() {
+                // Solegram: own colours (the profile's gradient, the name's colour) and Solegram's colour ids: the icons
+                // take that colour too, not Telegram's first palette colour
+                if (!isChannel && selectedEmojiCollectible == null) {
+                    if (type == PAGE_PROFILE && com.solegram.messenger.SolegramSelfColors.customColor1() != 0) {
+                        return com.solegram.messenger.SolegramSelfColors.customColor1() | 0xFF000000;
+                    }
+                    if (type == PAGE_NAME && com.solegram.messenger.SolegramSelfColors.nameCustom1() != 0) {
+                        return com.solegram.messenger.SolegramSelfColors.nameCustom1() | 0xFF000000;
+                    }
+                }
+                if (com.solegram.messenger.SolegramCustomColors.isCustom(selectedColor)) {
+                    final MessagesController.PeerColor custom = com.solegram.messenger.SolegramCustomColors.get(selectedColor);
+                    if (custom != null) {
+                        return custom.getColor1();
+                    }
+                }
                 if (selectedColor < 0) {
                     if (AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_actionBarDefault)) > .8f) {
                         return Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourceProvider);

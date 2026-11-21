@@ -2523,5 +2523,6 @@
     <string name="SG_StatsFmHint">name or link</string>
     <string name="SG_StatsFmNotFound">No such stats.fm profile</string>
     <string name="SG_StatsFmLinked">stats.fm linked: %1$s</string>
+    <string name="SG_StatsFmPlayingNow">Playing now</string>
     <!-- SOLEGRAM END -->
 </resources>

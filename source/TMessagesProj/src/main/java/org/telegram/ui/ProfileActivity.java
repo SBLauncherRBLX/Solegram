@@ -2415,6 +2415,142 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     // region Solegram: stats.fm in the music's line
 
+    /** The line with stats.fm's track: artist bold, then the title, and "Playing now" while it plays there. */
+    private void sgApplyStatsLine() {
+        final com.solegram.messenger.SolegramStatsFm.Track t = sgStatsTrack;
+        if (musicView == null || t == null) {
+            return;
+        }
+        final boolean noArtist = TextUtils.isEmpty(t.artist);
+        musicView.setText(noArtist ? t.title : t.artist, noArtist ? "" : " - " + t.title);
+        musicView.setBadge(t.playing && !t.ended() ? getString(R.string.SG_StatsFmPlayingNow) : null);
+    }
+
+    @Nullable
+    private com.solegram.messenger.ui.SolegramMusicPeek sgMusicPeek;
+
+    /** The music's line grows into a small card of the song; a tap on it opens the player, one elsewhere closes it. */
+    private void sgOpenMusicPeek() {
+        if (sgMusicPeek != null || musicView == null || !(fragmentView instanceof ViewGroup) || getParentActivity() == null) {
+            return;
+        }
+        final com.solegram.messenger.SolegramStatsFm.Track stats = sgStatsTrack;
+        if (stats == null && (userInfo == null || userInfo.saved_music == null)) {
+            return;
+        }
+        final com.solegram.messenger.ui.SolegramProfileMusic music = stats == null ? sgMusic() : null;
+        if (music != null) {
+            music.setDocument(userInfo.saved_music); // its cover loads now if it has not yet
+        }
+        final android.graphics.RectF line = new android.graphics.RectF();
+        musicView.getButtonBoundsOnScreen(line);
+        sgMusicPeek = com.solegram.messenger.ui.SolegramMusicPeek.show((ViewGroup) fragmentView, line, musicView.getPillRadius(),
+            new com.solegram.messenger.ui.SolegramMusicPeek.Source() {
+                @Override
+                public String title() {
+                    if (stats != null) {
+                        return stats.title;
+                    }
+                    final CharSequence t = ProfileMusicView.getTitle(userInfo != null ? userInfo.saved_music : null);
+                    return t != null ? t.toString() : getString(R.string.AudioUnknownTitle);
+                }
+
+                @Override
+                public String artist() {
+                    if (stats != null) {
+                        return stats.artist;
+                    }
+                    final CharSequence a = ProfileMusicView.getAuthor(userInfo != null ? userInfo.saved_music : null);
+                    return !TextUtils.isEmpty(a) ? a.toString() : getString(R.string.AudioUnknownArtist);
+                }
+
+                @Override
+                public float progress() {
+                    if (stats != null) {
+                        return stats.progress();
+                    }
+                    final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
+                    return sgPlaysSavedMusic(mo) ? mo.audioProgress : 0f;
+                }
+
+                @Override
+                public long durationMs() {
+                    if (stats != null) {
+                        return stats.durationMs;
+                    }
+                    return userInfo != null && userInfo.saved_music != null ? (long) (MessageObject.getDocumentDuration(userInfo.saved_music) * 1000) : 0;
+                }
+
+                @Override
+                public boolean playing() {
+                    if (stats != null) {
+                        return stats.playing && !stats.ended();
+                    }
+                    final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
+                    return sgPlaysSavedMusic(mo) && !MediaController.getInstance().isMessagePaused();
+                }
+
+                @Override
+                public boolean controls() {
+                    return stats == null;
+                }
+
+                @Override
+                public void playPause() {
+                    final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
+                    if (sgPlaysSavedMusic(mo)) {
+                        if (MediaController.getInstance().isMessagePaused()) {
+                            MediaController.getInstance().playMessage(mo);
+                        } else {
+                            MediaController.getInstance().pauseMessage(mo);
+                        }
+                    } else {
+                        sgPlayProfileMusic(false);
+                    }
+                }
+
+                @Override
+                public void open() {
+                    final com.solegram.messenger.ui.SolegramMusicPeek peek = sgMusicPeek;
+                    if (stats != null) {
+                        if (getParentActivity() != null) {
+                            org.telegram.messenger.browser.Browser.openUrl(getParentActivity(), stats.url());
+                        }
+                        if (peek != null) {
+                            peek.close(null);
+                        }
+                        return;
+                    }
+                    sgPlayProfileMusic(true);
+                    if (peek != null) {
+                        peek.dismissNow(); // under the player: back at the line when it closes
+                    }
+                }
+
+                @Nullable
+                @Override
+                public android.graphics.Bitmap cover() {
+                    if (music == null) {
+                        return null;
+                    }
+                    final com.solegram.messenger.SolegramNowPlaying.Track t = music.track();
+                    return t != null ? t.art : null;
+                }
+
+                @Nullable
+                @Override
+                public String coverUrl() {
+                    return stats != null ? stats.cover : null;
+                }
+
+                @Nullable
+                @Override
+                public CharSequence badge() {
+                    return stats != null && stats.playing && !stats.ended() ? getString(R.string.SG_StatsFmPlayingNow) : null;
+                }
+            }, () -> sgMusicPeek = null);
+    }
+
     @Nullable
     private com.solegram.messenger.SolegramStatsFm.Track sgStatsTrack;
     private boolean sgStatsResumed;
@@ -2477,8 +2613,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         final boolean sameShape = (was == null) == (track == null);
         if (sameShape && musicView != null) {
             // the same line, a new track or new progress: only its text
-            final boolean noArtist = TextUtils.isEmpty(track.artist);
-            musicView.setText(noArtist ? track.title : track.artist, noArtist ? "" : " - " + track.title);
+            sgApplyStatsLine();
             musicView.invalidate();
             return;
         }
@@ -4094,48 +4229,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     return sgPlaysSavedMusic(mo) && !MediaController.getInstance().isMessagePaused();
                 }
             });
-            musicView.setOnClickListener(v -> {
-                if (sgStatsTrack != null) {
-                    // the track on stats.fm
-                    if (getParentActivity() != null) {
-                        org.telegram.messenger.browser.Browser.openUrl(getParentActivity(), sgStatsTrack.url());
-                    }
-                    return;
-                }
-                if (savedMusicList == null) {
-                    if (
-                        MediaController.getInstance().currentSavedMusicList != null &&
-                        MediaController.getInstance().currentSavedMusicList.currentAccount == currentAccount &&
-                        MediaController.getInstance().currentSavedMusicList.dialogId == getDialogId()) {
-                        savedMusicList = MediaController.getInstance().currentSavedMusicList;
-                    } else {
-                        savedMusicList = new MessagesController.SavedMusicList(currentAccount, getDialogId());
-                        if (userInfo != null && userInfo.saved_music != null) {
-                            savedMusicList.setup(userInfo.saved_music);
-                        }
-                    }
-                }
-                if (!savedMusicList.list.isEmpty()) {
-                    boolean sameList = false;
-                    if (
-                        MediaController.getInstance().currentSavedMusicList != savedMusicList ||
-                        !MediaController.getInstance().isPlayingMessage(savedMusicList.list.get(0))
-                    ) {
-                        MediaController.getInstance().cleanup();
-                    } else {
-                        sameList = true;
-                    }
-                    MediaController.getInstance().currentSavedMusicList = savedMusicList;
-                    MediaController.getInstance().getPlaylist().clear();
-                    MediaController.getInstance().getPlaylist().addAll(savedMusicList.list);
-                    if (!sameList) MediaController.getInstance().playMessage(savedMusicList.list.get(0));
-                    if (com.solegram.messenger.SolegramConfig.newPlayer && getParentActivity() != null) {
-                        com.solegram.messenger.ui.SolegramPlayer.open(getParentActivity(), getResourceProvider());
-                    } else {
-                        showDialog(new AudioPlayerAlert(getContext(), getResourceProvider()));
-                    }
-                }
-            });
+            // Solegram: the line opens into a small card of the song first (the player from there)
+            musicView.setOnClickListener(v -> sgOpenMusicPeek());
 
             actionsView = new ProfileActionsView(context, dp(74));
             setActionsMode();
@@ -10234,6 +10329,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public boolean onBackPressed(boolean invoked) {
+        // Solegram: the music's card goes back into its line first
+        if (sgMusicPeek != null) {
+            if (invoked) {
+                sgMusicPeek.close(null);
+            }
+            return false;
+        }
         // the old onBackPressed() was no override anymore: the selection and the reordering ignored the back
         if (!super.onBackPressed(invoked)) {
             return false;
@@ -12002,11 +12104,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
         if (musicView != null) {
             if (sgStatsTrack != null) {
-                // Solegram: stats.fm's track (artist bold, then the title, as Telegram's line has it)
-                final boolean noArtist = TextUtils.isEmpty(sgStatsTrack.artist);
-                musicView.setText(noArtist ? sgStatsTrack.title : sgStatsTrack.artist, noArtist ? "" : " - " + sgStatsTrack.title);
+                sgApplyStatsLine(); // Solegram: stats.fm's track
             } else if (userInfo != null) {
                 musicView.setMusicDocument(userInfo.saved_music);
+                musicView.setBadge(null);
             }
             musicView.setVisibility(hasMusic ? View.VISIBLE : View.GONE);
             if (hasBalance) {

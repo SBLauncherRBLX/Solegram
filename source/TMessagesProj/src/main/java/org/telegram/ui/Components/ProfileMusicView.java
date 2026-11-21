@@ -66,6 +66,11 @@ public class ProfileMusicView extends View {
 
     private final RectF rect = new RectF();
 
+    /** The pill's corner radius now. */
+    public float getPillRadius() {
+        return rect.height() / 2f;
+    }
+
     public void getButtonBoundsOnScreen(RectF bounds) {
         int[] location = new int[2];
         getLocationOnScreen(location);
@@ -129,6 +134,15 @@ public class ProfileMusicView extends View {
     private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float pillCenterY;
     private long barsStart;
+
+    @Nullable
+    private Text badge;
+
+    /** A small word before the track ("Playing now"), null: none. */
+    public void setBadge(@Nullable CharSequence text) {
+        badge = TextUtils.isEmpty(text) ? null : new Text(text.toString().toUpperCase(), 10, AndroidUtilities.bold());
+        invalidate();
+    }
 
     public void setState(@Nullable State state) {
         this.state = state;
@@ -317,10 +331,11 @@ public class ProfileMusicView extends View {
     }
 
     protected float getContentWidth(float maxWidth) {
-        final float textWidth = Math.max(0, maxWidth - dp(16) - dp(22) - dp(6));
+        final float badgeWidth = badge != null ? badge.getWidth() + dp(7) : 0;
+        final float textWidth = Math.max(0, maxWidth - dp(16) - dp(22) - dp(6) - badgeWidth);
         this.author.ellipsize(textWidth * 0.6f);
         this.title.ellipsize(Math.max(0, textWidth - this.author.getWidth()));
-        return dp(22) + this.author.getWidth() + this.title.getWidth() + dp(6);
+        return dp(22) + badgeWidth + this.author.getWidth() + this.title.getWidth() + dp(6);
     }
 
     protected void drawContent(Canvas canvas, float alpha) {
@@ -351,6 +366,10 @@ public class ProfileMusicView extends View {
         }
 
         canvas.translate(dp(22), 0);
+        if (badge != null) {
+            badge.draw(canvas, 0, cy, textColor, 0.65f * alpha);
+            canvas.translate(badge.getWidth() + dp(7), 0);
+        }
         this.author.draw(canvas, 0, cy, textColor, alpha);
         canvas.translate(this.author.getWidth(), 0);
         this.title.draw(canvas, 0, cy, textColor, 0.6f * alpha);
