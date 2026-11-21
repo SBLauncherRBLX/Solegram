@@ -81,6 +81,32 @@ public final class SolegramGlass {
         return Math.max(0.05f, SolegramConfig.glassBlur / 100f);
     }
 
+    /**
+     * How much smaller than the screen the glass may read what is under it without showing pixels: the largest power of
+     * two (they keep the 16 px grid of the glass positions) at which the blur still spans {@code minSigmaPx} of the
+     * small picture's pixels. A weak blur (the default 40% too) gets the full resolution: a quarter or a half made the
+     * clear glass look pixelated, the more so where the lens magnifies by its edge.
+     */
+    public static int smoothDownsample(float radiusPx, float minSigmaPx, int cap) {
+        final float sigma = 0.57735f * Math.max(0f, radiusPx) + 0.5f;
+        int d = 1;
+        while (d * 2 <= cap && sigma / (d * 2) >= minSigmaPx) {
+            d *= 2;
+        }
+        return d;
+    }
+
+    /** Clear glass (it refracts, so it is looked at closely): no visible pixels; weak phones accept a little more. */
+    public static int clearGlassDownsample(float radiusPx) {
+        final boolean weak = org.telegram.messenger.SharedConfig.getDevicePerformanceClass() == org.telegram.messenger.SharedConfig.PERFORMANCE_CLASS_LOW;
+        return smoothDownsample(radiusPx, weak ? 1.5f : 3f, 4);
+    }
+
+    /** Frosted glass and blurs: their strong blur hides more, up to {@code cap}. */
+    public static int frostedDownsample(float radiusPx, int cap) {
+        return smoothDownsample(radiusPx, 2.5f, cap);
+    }
+
     public static boolean vibrancy() {
         return SolegramConfig.glassVibrancy;
     }

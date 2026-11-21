@@ -429,9 +429,12 @@ public class DownscaleScrollableNoiseSuppressor {
                 // Solegram: blur amount and colour vibrancy follow the glass settings.
                 final float blurScale = com.solegram.messenger.SolegramGlass.blurScale();
                 final boolean vibrancy = com.solegram.messenger.SolegramGlass.vibrancy();
+                // Solegram: Telegram read the clear glass at a quarter of the screen: pixelated under the lens.
+                // Now as small as the blur allows without visible pixels (the default blur: full resolution).
+                final int glassScale = com.solegram.messenger.SolegramGlass.clearGlassDownsample(dpf2(6f) * blurScale);
                 if (simpleMode) {
                     renderNodesForGlass = new DownscaledRenderNode("glass", 0, true);
-                    renderNodesForGlass.setScale(4, 4);
+                    renderNodesForGlass.setScale(glassScale, glassScale);
                     if (vibrancy) {
                         renderNodesForGlass.setPrimaryEffectBlur(dpf2(6f) * blurScale, RenderNodeEffects.getSaturationX3RenderEffect());
                     } else {
@@ -439,23 +442,26 @@ public class DownscaleScrollableNoiseSuppressor {
                     }
                 } else {
                     renderNodesForGlass = new DownscaledRenderNode("glass", 1, true);
-                    renderNodesForGlass.setScale(4, 4);
+                    renderNodesForGlass.setScale(glassScale, glassScale);
                     renderNodesForGlass.setPrimaryEffectBlur(dpf2(6f) * blurScale);
                     if (vibrancy) {
                         renderNodesForGlass.setSecondaryEffect(0, RenderNodeEffects.getSaturationX3RenderEffect());
                     }
                 }
                 renderNodesForBlur = new DownscaledRenderNode("blur", 0);
-                renderNodesForBlur.setScale(8, 8);
+                final int blurDown = com.solegram.messenger.SolegramGlass.frostedDownsample(dpf2(40 - 1.66f) * blurScale, 8);
+                renderNodesForBlur.setScale(blurDown, blurDown);
                 renderNodesForBlur.setPrimaryEffectBlur(dpf2(40 - 1.66f) * blurScale);
             } else if (simpleMode) {
                 renderNodesForBlur = new DownscaledRenderNode("blur", 0);
-                renderNodesForBlur.setScale(allowNoiseSuppress ? 16 : 8, allowNoiseSuppress ? 16 : 8);
+                final int blurDown = com.solegram.messenger.SolegramGlass.frostedDownsample(dpf2(40) * com.solegram.messenger.SolegramGlass.blurScale(), allowNoiseSuppress ? 16 : 8);
+                renderNodesForBlur.setScale(blurDown, blurDown);
                 renderNodesForBlur.setPrimaryEffectBlur(dpf2(40) * com.solegram.messenger.SolegramGlass.blurScale(), RenderNodeEffects.getSaturationX3RenderEffect());
                 renderNodesForGlass = null;
             } else {
                 renderNodesForBlur = new DownscaledRenderNode("blur", 1);
-                renderNodesForBlur.setScale(8, 8);
+                final int blurDown = com.solegram.messenger.SolegramGlass.frostedDownsample(dpf2(40) * com.solegram.messenger.SolegramGlass.blurScale(), 8);
+                renderNodesForBlur.setScale(blurDown, blurDown);
                 renderNodesForBlur.setPrimaryEffectBlur(dpf2(40) * com.solegram.messenger.SolegramGlass.blurScale());
                 renderNodesForBlur.setSecondaryEffect(0, RenderNodeEffects.getSaturationX3RenderEffect());
                 renderNodesForGlass = null;

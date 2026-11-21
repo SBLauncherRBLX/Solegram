@@ -57,7 +57,7 @@ public class GlassCaptureSourceCanvas {
     // dense screens at a quarter of the work per frame
     private static final int GLASS_DOWNSAMPLE = 2;
     private static final ColorFilter IDENTITY_FILTER = new ColorMatrixColorFilter(new ColorMatrix());
-    private static final int FROSTED_GLASS_DOWNSAMPLE = 10;
+    private static final int FROSTED_GLASS_DOWNSAMPLE = 8; // Solegram: a power of two, the most the blur may allow
 
     private final ArrayList<Position> positions = new ArrayList<>();
 
@@ -116,8 +116,11 @@ public class GlassCaptureSourceCanvas {
             return;
         }
         this.allowDownsample = allowDownsample;
-        glassDownsample = allowDownsample ? GLASS_DOWNSAMPLE : 1;
-        frostedGlassDownsample = allowDownsample ? FROSTED_GLASS_DOWNSAMPLE : 1;
+        // Solegram: as small as the blur allows without visible pixels (a weak blur is read at full resolution)
+        glassDownsample = allowDownsample ? Math.min(GLASS_DOWNSAMPLE, com.solegram.messenger.SolegramGlass.clearGlassDownsample(
+            dpf2(7) * com.solegram.messenger.SolegramGlass.blurScale())) : 1;
+        frostedGlassDownsample = allowDownsample ? com.solegram.messenger.SolegramGlass.frostedDownsample(
+            dpf2(36) * com.solegram.messenger.SolegramGlass.blurScale(), FROSTED_GLASS_DOWNSAMPLE) : 1;
         normalizationDownsample = Math.max(glassDownsample, frostedGlassDownsample);
         for (int a = 0; a < positionsCount; a++) {
             positions.get(a).setDownsamples(
