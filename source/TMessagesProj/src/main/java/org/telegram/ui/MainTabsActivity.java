@@ -417,6 +417,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 viewPager.scrollToPosition(position);
             });
 
+            tabs[index].setIconOnly(DialogsActivity.MAIN_TABS_COMPACT); // Solegram: no labels on the small bar
             tabsView.addView(tabs[index]);
             tabsView.setViewVisible(view, true, false);
         }

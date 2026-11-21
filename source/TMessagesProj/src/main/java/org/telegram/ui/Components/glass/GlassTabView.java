@@ -517,7 +517,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         icon.setScaleX(rest * scaleX);
         icon.setScaleY(rest * scaleY);
         icon.setRotation(rotation);
-        icon.setTranslationY(dy);
+        icon.setTranslationY(sgIconRestY + dy); // Solegram: around its place (centred when the label is hidden)
     }
     // endregion
 
@@ -831,8 +831,36 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         }
     }
 
+    // Solegram: the small tab bar of a phone on its side shows the icons only, centred in the tab
+    private boolean iconOnly;
+    private float sgIconRestY;
+
+    public void setIconOnly(boolean iconOnly) {
+        if (this.iconOnly == iconOnly) {
+            return;
+        }
+        this.iconOnly = iconOnly;
+        textView.setVisibility(iconOnly ? GONE : VISIBLE);
+        requestLayout();
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        // the icon's middle is 16dp from the top (with its label under it); alone it goes to the tab's middle
+        final float shift = iconOnly ? (bottom - top) / 2f - dp(16) : 0;
+        sgIconRestY = shift;
+        imageView.setTranslationY(shift);
+        if (backupImageView != null) {
+            backupImageView.setTranslationY(shift);
+        }
+    }
+
     @Override
     public float measureTextWidth() {
+        if (iconOnly) {
+            return dp(30);
+        }
         return defaultTextPaint.measureText(textView.getText().toString());
     }
 
@@ -840,6 +868,9 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
 
     @Override
     public float measureTextWidth(float textSizeDp) {
+        if (iconOnly) {
+            return dp(30);
+        }
         if (scaledTextPaint == null) {
             scaledTextPaint = new TextPaint(defaultTextPaint);
         }

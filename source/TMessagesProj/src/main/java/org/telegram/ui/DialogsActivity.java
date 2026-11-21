@@ -295,6 +295,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     // Solegram: an iOS-like floating tab bar - a little taller, narrower, and lifted off the bottom edge
     // (not constants any more: a phone on its side in two panes gets a smaller bar, see solegramUpdateTabsSize)
     public static int MAIN_TABS_HEIGHT = 60;
+    /** Solegram: the small bar of a phone on its side: icons only, no labels (they did not fit). */
+    public static boolean MAIN_TABS_COMPACT;
     public static int MAIN_TABS_MARGIN = 8;
     /** Extra space between the tab bar and the bottom of the screen. */
     public static int MAIN_TABS_LIFT = 10;
@@ -308,6 +310,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
      * (its icons and labels fit: they sit at the top of a tab). Called before the screens are built for the layout.
      */
     public static void solegramUpdateTabsSize(boolean compact) {
+        MAIN_TABS_COMPACT = compact;
         MAIN_TABS_HEIGHT = compact ? 48 : 60;
         MAIN_TABS_MARGIN = compact ? 5 : 8;
         MAIN_TABS_LIFT = compact ? 6 : 10;
