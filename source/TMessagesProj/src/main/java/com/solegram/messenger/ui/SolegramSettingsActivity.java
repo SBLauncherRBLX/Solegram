@@ -172,6 +172,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_MAIN_TITLE = 113;
     private static final int ID_SMOOTH_TRANSITIONS = 114;
     private static final int ID_LANDSCAPE_SPLIT = 4300;
+    private static final int ID_CLEAN_LINKS = 4301;
+    private static final int ID_STRIP_METADATA = 4302;
     private static final int ID_PRESS_SCALE = 115;
     private static final int ID_FLUID_TOUCH = 199;
     private static final int ID_ANIMATE_LISTS = 116;
@@ -1111,6 +1113,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_GHOST, ID_SAVE_DELETED, R.string.SG_SaveDeleted, 6},
         {PAGE_GHOST, ID_SAVE_EDITS, R.string.SG_SaveEdits, 6},
         {PAGE_GHOST, ID_HIDE_PHONE, R.string.SG_HidePhone, -1},
+        {PAGE_GHOST, ID_CLEAN_LINKS, R.string.SG_SecCleanLinks, -1},
+        {PAGE_GHOST, ID_STRIP_METADATA, R.string.SG_SecStripMeta, -1},
         {PAGE_CAMERA, 0, R.string.SG_Camera, 7},
         {PAGE_CAMERA, ID_CAMERA_ENHANCE, R.string.SG_CameraEnhance, 7},
         {PAGE_CAMERA, ID_CAMERA_HD, R.string.SG_CameraHd, 7},
@@ -2014,6 +2018,14 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asHeader(getString(R.string.SG_Profiles)));
         items.add(UItem.asCheck(ID_HIDE_PHONE, getString(R.string.SG_HidePhone)).setChecked(SolegramConfig.hidePhoneNumber));
         items.add(UItem.asShadow(null));
+
+        // no traces in what is sent: tracking tags of links, the place and phone in photos and videos
+        items.add(UItem.asHeader(getString(R.string.SG_PrivacyTraces)));
+        items.add(UItem.asButtonCheck(ID_CLEAN_LINKS, getString(R.string.SG_SecCleanLinks), getString(R.string.SG_SecCleanLinksInfo))
+            .setChecked(SolegramConfig.cleanLinks));
+        items.add(UItem.asButtonCheck(ID_STRIP_METADATA, getString(R.string.SG_SecStripMeta), getString(R.string.SG_SecStripMetaInfo))
+            .setChecked(SolegramConfig.stripFileMetadata));
+        items.add(UItem.asShadow(null));
     }
 
     private void fillGeneral(ArrayList<UItem> items) {
@@ -2487,6 +2499,12 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_SMOOTH_TRANSITIONS:
                 toggleCheck(view, "smoothTransitions");
+                return;
+            case ID_CLEAN_LINKS:
+                toggleCheck(view, "cleanLinks");
+                return;
+            case ID_STRIP_METADATA:
+                toggleCheck(view, "stripFileMetadata");
                 return;
             case ID_LANDSCAPE_SPLIT:
                 toggleCheck(view, "landscapeSplit");
