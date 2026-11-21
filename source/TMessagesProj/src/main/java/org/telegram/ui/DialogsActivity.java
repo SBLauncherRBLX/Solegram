@@ -2706,6 +2706,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (waitingForDialogsAnimationEnd(parentPage) || parentLayout != null && parentLayout.isInPreviewMode() || rightSlidingDialogContainer.hasFragment() || communityId != 0) {
                 return 0;
             }
+            // Solegram: a row still hidden under the header (the hidden archive) is not swiped by a finger on the header
+            if (recyclerView instanceof RecyclerListView && viewHolder.itemView.getY() + viewHolder.itemView.getHeight()
+                <= recyclerView.getPaddingTop() + (int) scrollYOffset + dp(4)) {
+                return 0;
+            }
             if (swipingFolder && swipeFolderBack) {
                 if (viewHolder.itemView instanceof DialogCell) {
                     ((DialogCell) viewHolder.itemView).swipeCanceled = true;
@@ -4631,6 +4636,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             viewPage.listView.setOnItemClickListener((view, position, x, y) -> {
                 if (view instanceof GraySectionCell)
                     return;
+                if (solegramUnderHeader(viewPage.listView, view, x, y)) {
+                    return; // Solegram: a tap on the header's glass is not a tap on the row hidden under it (the archive)
+                }
                 if (view instanceof DialogCell && ((DialogCell) view).isBlocked()) {
                     showPremiumBlockedToast(view, ((DialogCell) view).getDialogId());
                     return;
@@ -4697,6 +4705,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             viewPage.listView.setOnItemLongClickListener(new RecyclerListView.OnItemLongClickListenerExtended() {
                 @Override
                 public boolean onItemClick(View view, int position, float x, float y) {
+                    if (solegramUnderHeader(viewPage.listView, view, x, y)) {
+                        return false; // Solegram: not the row under the header's glass
+                    }
                     if (view instanceof DialogCell && ((DialogCell) view).isBlocked()) {
                         showPremiumBlockedToast(view, ((DialogCell) view).getDialogId());
                         return true;
@@ -8543,6 +8554,24 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
             });
         }
+    }
+
+    /**
+     * Solegram: the list runs under the glass header, and the hidden archive row waits right above the first chat, so
+     * under the header. A touch on the header's free space fell through to it and opened the archive nobody saw. Rows
+     * are touched only where they are below the header.
+     */
+    private boolean solegramUnderHeader(RecyclerListView listView, View view, float x, float y) {
+        // where the header ends now: it slides up with the list (as the top glow follows it)
+        final int top = listView.getPaddingTop() + (int) scrollYOffset;
+        if (top <= 0 || view == null) {
+            return false;
+        }
+        if (x == 0 && y == 0) {
+            // a click without a point (accessibility): the row must show at least a little below the header
+            return view.getY() + view.getHeight() <= top + dp(4);
+        }
+        return view.getY() + y < top;
     }
 
     private void onItemClick(View view, int position, RecyclerListView.Adapter adapter, float x, float y) {
