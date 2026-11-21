@@ -172,6 +172,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_MAIN_TITLE = 113;
     private static final int ID_SMOOTH_TRANSITIONS = 114;
     private static final int ID_LANDSCAPE_SPLIT = 4300;
+    private static final int ID_STATS_FM = 4303;
+    private static final int ID_STATS_FM_UNLINK = 4304;
     private static final int ID_CLEAN_LINKS = 4301;
     private static final int ID_STRIP_METADATA = 4302;
     private static final int ID_PRESS_SCALE = 115;
@@ -1094,8 +1096,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_CHATS, ID_LOCAL_REPEATS, R.string.SG_LocalRepeats, -1},
         {PAGE_CHATS, ID_SAVE_STORIES, R.string.SG_SaveStories, -1},
         {PAGE_CHATS, ID_SKIP_SILENCE, R.string.SG_SkipSilence, -1},
-        {PAGE_MUSIC, ID_NP_BG_BLUR, R.string.SG_ProfileMusicSection, 4},
-        {PAGE_MUSIC, ID_NP_PATTERN, R.string.SG_NowPlayingPattern, 4},
+        {PAGE_MUSIC, ID_STATS_FM, R.string.SG_StatsFm, 4},
         {PAGE_MAIN_SCREEN, 0, R.string.SG_MainScreen, -1},
         {PAGE_MAIN_SCREEN, ID_REMEMBER_FOLDER, R.string.SG_RememberFolder, -1},
         {PAGE_MAIN_SCREEN, ID_MARK_ALL_READ, R.string.SG_MarkAllReadInMenu, -1},
@@ -1497,57 +1498,44 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asButtonCheck(ID_NEW_PLAYER, getString(R.string.SG_NewPlayer), getString(R.string.SG_NewPlayerInfo)).setChecked(SolegramConfig.newPlayer));
         items.add(tile(UItem.asButton(ID_MUSIC_TAB, R.drawable.files_music, getString(R.string.SG_MusicTab), getString(com.solegram.messenger.SolegramTabs.current().contains(com.solegram.messenger.SolegramTabs.MUSIC) ? R.string.SG_TabInBar : R.string.SG_TabNotInBar)), TILE_PINK));
         items.add(UItem.asShadow(null));
-        // music on the profile (Telegram's own): Solegram's card, as a profile shows it
-        // one look: the island in Telegram's style
-        {
-            if (nowPlayingPreview == null) {
-                nowPlayingPreview = new SolegramNowPlayingView(getContext(), getResourceProvider());
-                nowPlayingPreview.setPinned(true);
-                nowPlayingPreview.setOnClickListener(v -> {
-                    // the own music plays here; the sample only shows the look
-                    final org.telegram.tgnet.TLRPC.Document own = previewMusic != null ? previewMusic.getDocument() : null;
-                    if (own == null) {
-                        return;
-                    }
-                    final org.telegram.messenger.MessageObject now = org.telegram.messenger.MediaController.getInstance().getPlayingMessageObject();
-                    if (now != null && now.getDocument() != null && now.getDocument().id == own.id) {
-                        if (org.telegram.messenger.MediaController.getInstance().isMessagePaused()) {
-                            org.telegram.messenger.MediaController.getInstance().playMessage(now);
-                        } else {
-                            org.telegram.messenger.MediaController.getInstance().pauseMessage(now);
-                        }
-                        return;
-                    }
-                    final org.telegram.messenger.MessagesController.SavedMusicList list = new org.telegram.messenger.MessagesController.SavedMusicList(currentAccount, getUserConfig().getClientUserId());
-                    list.setup(own);
-                    org.telegram.messenger.MediaController.getInstance().cleanup();
-                    org.telegram.messenger.MediaController.getInstance().currentSavedMusicList = list;
-                    org.telegram.messenger.MediaController.getInstance().getPlaylist().clear();
-                    org.telegram.messenger.MediaController.getInstance().getPlaylist().addAll(list.list);
-                    org.telegram.messenger.MediaController.getInstance().playMessage(list.list.get(0));
-                });
-            }
-            nowPlayingPreview.styleChanged();
-            nowPlayingPreview.setPatternEmoji(SolegramConfig.profileMusicEmoji);
-            updateMusicPreview();
-            items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPreview)));
-            items.add(UItem.asCustom(nowPlayingPreview));
-            items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicPreviewInfo)));
+        // the music on the profile: a glass line under the status (Telegram's own music, or what plays on stats.fm)
+        items.add(UItem.asHeader(getString(R.string.SG_StatsFmHeader)));
+        final String statsFm = com.solegram.messenger.SolegramStatsFm.clean(SolegramConfig.statsFmUser);
+        items.add(tile(UItem.asButton(ID_STATS_FM, R.drawable.files_music, getString(R.string.SG_StatsFm),
+            statsFm != null ? statsFm : getString(R.string.SG_StatsFmNone)), TILE_GREEN));
+        if (statsFm != null) {
+            items.add(UItem.asButton(ID_STATS_FM_UNLINK, R.drawable.msg_delete, getString(R.string.SG_StatsFmUnlink)).red());
         }
+        items.add(UItem.asShadow(getString(R.string.SG_StatsFmInfo)));
+    }
 
-        // its background, the emoji round the cover, the progress
-        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingBackground)));
-        items.add(UItem.asRadio(ID_NP_BG_BLUR, getString(R.string.SG_NowPlayingBackgroundBlur)).setChecked(SolegramConfig.nowPlayingBlurBackground));
-        items.add(UItem.asRadio(ID_NP_BG_COLORS, getString(R.string.SG_NowPlayingBackgroundColors)).setChecked(!SolegramConfig.nowPlayingBlurBackground));
-        items.add(UItem.asShadow(getString(R.string.SG_ProfileMusicInfo)));
-        items.add(UItem.asHeader(getString(R.string.SG_NowPlayingPattern)));
-        items.add(UItem.asButton(ID_NP_PATTERN, R.drawable.msg2_smile_status, getString(R.string.SG_NowPlayingPatternPick),
-            getString(SolegramConfig.profileMusicEmoji != 0 ? R.string.SG_TitleEmojiSet : R.string.SG_TitleEmojiNone)));
-        if (SolegramConfig.profileMusicEmoji != 0) {
-            items.add(UItem.asButton(ID_NP_PATTERN_RESET, R.drawable.msg_reset, getString(R.string.SG_NowPlayingPatternReset)));
-        }
-        items.add(UItem.asCheck(ID_NP_PROGRESS, getString(R.string.SG_NowPlayingProgress)).setChecked(SolegramConfig.nowPlayingProgress));
-        items.add(UItem.asShadow(getString(R.string.SG_NowPlayingPatternInfo)));
+    /** Links a stats.fm profile: its name or link is checked with stats.fm, then saved and put on the own card. */
+    private void linkStatsFm() {
+        askText(getString(R.string.SG_StatsFm), getString(R.string.SG_StatsFmAsk), SolegramConfig.statsFmUser,
+            getString(R.string.SG_StatsFmHint), value -> {
+                final String id = com.solegram.messenger.SolegramStatsFm.clean(value);
+                if (id == null) {
+                    if (!TextUtils.isEmpty(value)) {
+                        BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.error, getString(R.string.SG_StatsFmNotFound)).show();
+                    }
+                    return;
+                }
+                com.solegram.messenger.SolegramStatsFm.check(id, name -> {
+                    if (name == null) {
+                        BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.error, getString(R.string.SG_StatsFmNotFound)).show();
+                        return;
+                    }
+                    SolegramConfig.putString("statsFmUser", id);
+                    // on the own card, so everyone with Solegram sees it
+                    com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "statsFmUser");
+                    if (listView != null && listView.adapter != null) {
+                        listView.adapter.update(true);
+                    }
+                    BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.done,
+                        LocaleController.formatString(R.string.SG_StatsFmLinked, TextUtils.isEmpty(name) ? id : name)).show();
+                });
+            });
     }
 
     /** The music on the own profile for the preview (its cover is loaded, it plays here), else a sample. */
@@ -2505,6 +2493,17 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_STRIP_METADATA:
                 toggleCheck(view, "stripFileMetadata");
+                return;
+            case ID_STATS_FM:
+                linkStatsFm();
+                return;
+            case ID_STATS_FM_UNLINK:
+                SolegramConfig.putString("statsFmUser", "");
+                com.solegram.messenger.SolegramProfileCard.syncProfileStyle(currentAccount);
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.solegramSettingsChanged, "statsFmUser");
+                if (listView != null && listView.adapter != null) {
+                    listView.adapter.update(true);
+                }
                 return;
             case ID_LANDSCAPE_SPLIT:
                 toggleCheck(view, "landscapeSplit");

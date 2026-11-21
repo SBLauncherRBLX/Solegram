@@ -73,7 +73,7 @@ public class ProfileBalanceView extends ProfileMusicView {
 
     @Override
     protected void drawContent(Canvas canvas, float alpha) {
-        final float cy = getHeight() / 2f;
+        final float cy = pillCenterY();
         canvas.translate(0, -dp(20) * ejectProgress);
         label.draw(canvas, 0, cy, textColor, 0.85f * alpha);
         canvas.translate(label.getWidth() + dp(4), 0);

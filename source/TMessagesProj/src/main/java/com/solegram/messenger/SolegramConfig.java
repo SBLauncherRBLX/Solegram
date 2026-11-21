@@ -189,6 +189,8 @@ public class SolegramConfig {
     public static int nowPlayingStyle = 0;
     /** How profiles show their music: Solegram's card in one of its looks (0..2, as nowPlayingStyle) or 3, Telegram's line under the photo. */
     public static int profileMusicStyle = 0;
+    /** The linked stats.fm profile name ("" none): what plays there shows in the profile's music line. */
+    public static String statsFmUser = "";
     /** The music island's background: the cover blurred (true) or its colours. */
     public static boolean nowPlayingBlurBackground = true;
     /** The emoji spreading out from the cover on the own profile's music (0: none chosen). */
@@ -562,7 +564,9 @@ public class SolegramConfig {
         nowPlayingShareBio = p.getBoolean("nowPlayingShareBio", false);
         // one look only: the island in Telegram's style (4); the other cards and Telegram's plain line are gone
         nowPlayingStyle = 4;
-        profileMusicStyle = 4;
+        // the music is a line of its own under the status (Telegram's place), in Solegram's glass look
+        profileMusicStyle = 3;
+        statsFmUser = p.getString("statsFmUser", "");
         nowPlayingBlurBackground = p.getBoolean("nowPlayingBlurBackground", true);
         profileMusicEmoji = p.getLong("profileMusicEmoji", 0);
         nowPlayingVinyl = p.getBoolean("nowPlayingVinyl", false);

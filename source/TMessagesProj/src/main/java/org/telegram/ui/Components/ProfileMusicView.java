@@ -38,6 +38,7 @@ import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
+import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 
 public class ProfileMusicView extends View {
@@ -102,11 +103,45 @@ public class ProfileMusicView extends View {
                 MeasureSpec.EXACTLY
             ),
             MeasureSpec.makeMeasureSpec(
-                dp(37),
+                dp(VIEW_HEIGHT),
                 MeasureSpec.EXACTLY
             )
         );
     }
+
+    // Solegram: a bigger pill, a line of its own under the status (the row is ROW_HEIGHT tall in the header)
+    public static final int ROW_HEIGHT = 34;
+    private static final int VIEW_HEIGHT = 44;
+    private static final int PILL_TOP = 13;
+    private static final int PILL_HEIGHT = 26;
+
+    /** What plays, for the progress and the bars: null for a pill without music (the balance). */
+    public interface State {
+        /** 0..1 of the track played, or a negative number when it is not known. */
+        float progress();
+
+        boolean playing();
+    }
+
+    @Nullable
+    private State state;
+    private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float pillCenterY;
+    private long barsStart;
+
+    public void setState(@Nullable State state) {
+        this.state = state;
+        invalidate();
+    }
+
+    /** The middle of the pill, where its content lines up. */
+    protected float pillCenterY() {
+        return pillCenterY > 0 ? pillCenterY : getHeight() / 2f;
+    }
+
+    @Nullable
+    private BlurredBackgroundColorProvider glassColors;
 
     protected int textColor = Color.WHITE;
     protected boolean hasProfileColor;
@@ -215,8 +250,9 @@ public class ProfileMusicView extends View {
     }
 
     public void setText(CharSequence author, CharSequence title) {
-        this.author = new Text(author, 11, AndroidUtilities.bold());
-        this.title = new Text(title, 11);
+        // Solegram: bigger, as the pill is (the first part bold, the second dimmer)
+        this.author = new Text(author, 13, AndroidUtilities.bold());
+        this.title = new Text(title, 13);
 
         setContentDescription(getString(R.string.AccDescrProfileMusic) + " " + author + " — " + title);
     }
@@ -228,8 +264,14 @@ public class ProfileMusicView extends View {
 
     /** The pill on glass, see {@link ProfileButtonsGlass#actionsFactory}. */
     public void setGlassFactory(@Nullable BlurredBackgroundDrawableViewFactory factory) {
-        if (trailingView != null) trailingView.setGlassFactory(factory);
-        glass = factory != null ? factory.create(this, ProfileButtonsGlass.NO_COLORS) : null;
+        setGlassFactory(factory, null);
+    }
+
+    /** The pill on glass with a rim and a shadow of {@code colors} (null: none). */
+    public void setGlassFactory(@Nullable BlurredBackgroundDrawableViewFactory factory, @Nullable BlurredBackgroundColorProvider colors) {
+        if (trailingView != null) trailingView.setGlassFactory(factory, colors);
+        glassColors = colors;
+        glass = factory != null ? factory.create(this, colors != null ? colors : ProfileButtonsGlass.NO_COLORS) : null;
         glassRadius = 0;
         invalidate();
     }
@@ -255,7 +297,7 @@ public class ProfileMusicView extends View {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        final float alpha = Utilities.clamp01((currentHeight) / dp(21));
+        final float alpha = Utilities.clamp01((currentHeight) / dp(ROW_HEIGHT - 4));
         if (alpha <= 0) return false;
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             bounce.setPressed(rect.contains(event.getX(), event.getY()));
@@ -275,28 +317,43 @@ public class ProfileMusicView extends View {
     }
 
     protected float getContentWidth(float maxWidth) {
-        final float textWidth = Math.max(0, maxWidth - dp(16) - dp(16.6f) - dp(8));
-        this.author.ellipsize(textWidth / 2f);
+        final float textWidth = Math.max(0, maxWidth - dp(16) - dp(22) - dp(6));
+        this.author.ellipsize(textWidth * 0.6f);
         this.title.ellipsize(Math.max(0, textWidth - this.author.getWidth()));
-        return dp(16.6f) + this.author.getWidth() + this.title.getWidth() + dp(8);
+        return dp(22) + this.author.getWidth() + this.title.getWidth() + dp(6);
     }
 
     protected void drawContent(Canvas canvas, float alpha) {
-        final float cy = getHeight() / 2f;
+        final float cy = pillCenterY();
 
-        final int iconSz = dp(13);
-        icon.setBounds(0, (int) cy - iconSz / 2, iconSz, (int) cy + iconSz / 2);
-        icon.draw(canvas);
+        // Solegram: while it plays, three bars dance in place of the note
+        final boolean playing = state != null && state.playing();
+        if (playing) {
+            if (barsStart == 0) {
+                barsStart = android.os.SystemClock.elapsedRealtime();
+            }
+            final float t = (android.os.SystemClock.elapsedRealtime() - barsStart) / 1000f;
+            barPaint.setColor(Theme.multAlpha(textColor, alpha));
+            final float w = dpf2(2.6f), gap = dpf2(2.2f), max = dp(13), min = dp(4);
+            for (int i = 0; i < 3; i++) {
+                final float k = 0.5f + 0.5f * (float) Math.sin(t * (5.2f + i * 1.7f) + i * 1.9f);
+                final float h = min + (max - min) * k;
+                final float x = dpf2(1) + i * (w + gap);
+                AndroidUtilities.rectTmp.set(x, cy - h / 2f, x + w, cy + h / 2f);
+                canvas.drawRoundRect(AndroidUtilities.rectTmp, w / 2f, w / 2f, barPaint);
+            }
+        } else {
+            barsStart = 0;
+            final int iconSz = dp(15);
+            icon.setBounds(0, (int) cy - iconSz / 2, iconSz, (int) cy + iconSz / 2);
+            icon.setAlpha((int) (0xFF * alpha));
+            icon.draw(canvas);
+        }
 
-        canvas.translate(dp(16.6f), 0);
+        canvas.translate(dp(22), 0);
         this.author.draw(canvas, 0, cy, textColor, alpha);
         canvas.translate(this.author.getWidth(), 0);
-        this.title.draw(canvas, 0, cy, textColor, 0.85f * alpha);
-        canvas.translate(this.title.getWidth(), 0);
-
-        arrowPaint.setStrokeWidth(dpf2(1.16f));
-        canvas.translate(dpf2(4.8f), cy);
-        canvas.drawPath(arrowPath, arrowPaint);
+        this.title.draw(canvas, 0, cy, textColor, 0.6f * alpha);
     }
 
     private boolean hasVisibleCompanion() {
@@ -305,14 +362,14 @@ public class ProfileMusicView extends View {
     }
 
     private float getPillWidth(float maxWidth) {
-        return dp(16) + getContentWidth(maxWidth);
+        return dp(20) + getContentWidth(maxWidth);
     }
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         if (this.author == null || this.title == null) return;
 
-        final float alpha = Utilities.clamp01((currentHeight) / dp(21));
+        final float alpha = Utilities.clamp01((currentHeight) / dp(ROW_HEIGHT - 4));
         final float scale = bounce.getScale(0.02f);
         if (alpha <= 0) {
             if (glass != null) {
@@ -340,7 +397,8 @@ public class ProfileMusicView extends View {
             left = (getWidth() - containerWidth) / 2f;
         }
 
-        rect.set(left, dp(10), left + containerWidth, dp(10) + dp(17) * alpha);
+        rect.set(left, dp(PILL_TOP), left + containerWidth, dp(PILL_TOP) + dp(PILL_HEIGHT) * alpha);
+        pillCenterY = rect.centerY();
         canvas.save();
         canvas.scale(scale, scale, rect.centerX(), getHeight() / 2f);
 
@@ -382,11 +440,21 @@ public class ProfileMusicView extends View {
 
         canvas.save();
         canvas.clipPath(clipPath);
-        canvas.translate(rect.left + dp(8), 0);
+        // Solegram: the part already played is lighter, as on the player's line
+        final float progress = state != null ? state.progress() : -1f;
+        if (progress >= 0f) {
+            progressPaint.setColor(textColor == Color.BLACK ? 0x14000000 : 0x2EFFFFFF);
+            progressPaint.setAlpha((int) (progressPaint.getAlpha() * alpha));
+            canvas.drawRect(rect.left, rect.top, rect.left + rect.width() * Utilities.clamp01(progress), rect.bottom, progressPaint);
+        }
+        canvas.translate(rect.left + dp(10), 0);
         drawContent(canvas, alpha);
 
         canvas.restore();
 
         canvas.restore();
+        if (state != null && state.playing()) {
+            postInvalidateDelayed(50); // the bars and the progress move
+        }
     }
 }

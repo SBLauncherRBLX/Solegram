@@ -1,6 +1,7 @@
 package org.telegram.ui.Components;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
@@ -87,6 +88,37 @@ public final class ProfileButtonsGlass {
 
     /** The action buttons and the music pills: no lens, the buttons are flat. */
     public final BlurredBackgroundDrawableViewFactory actionsFactory;
+    /**
+     * Solegram: the action buttons and the music's line as real glass, as the rest of the app has it: the lens bends
+     * what is under them (the header's colour and pattern, the photo), with a rim and a soft shadow, tinted with the
+     * buttons' colour.
+     */
+    public final BlurredBackgroundDrawableViewFactory actionsGlassFactory;
+    /** The rim and the shadow of {@link #actionsGlassFactory}. */
+    public static final BlurredBackgroundColorProvider GLASS_COLORS = new BlurredBackgroundColorProvider() {
+        @Override
+        public int getShadowColor() {
+            return 0x18000000;
+        }
+
+        @Override
+        public int getBackgroundColor() {
+            return 0;
+        }
+
+        @Override
+        public int getStrokeColorTop() {
+            return 0x40FFFFFF;
+        }
+
+        @Override
+        public int getStrokeColorBottom() {
+            return 0x1AFFFFFF;
+        }
+    };
+    @Nullable
+    private final GlassSource clearSource;
+    private final Paint tintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     /** The header's buttons: the lens of the simple screens, their glass once the header is one. */
     public final BlurredBackgroundDrawableViewFactory headerFactory;
     /** The menus of the header's buttons: the glass of the button going over to the frosted glass of the open menu. */
@@ -106,9 +138,11 @@ public final class ProfileButtonsGlass {
             simpleGlass.setCaptureIgnoresBlurSetting(true);
             captureCanvas = simpleGlass.getCaptureSourceCanvas();
             photoSource = captureCanvas != null ? getFilteredSource(captureCanvas) : null;
+            clearSource = captureCanvas != null ? getClearSource(captureCanvas) : null;
         } else {
             captureCanvas = null;
             photoSource = null;
+            clearSource = null;
         }
 
         actionsSource = new Source(null);
@@ -116,6 +150,8 @@ public final class ProfileButtonsGlass {
 
         // the action buttons (call, video, mute, message...) and the music pills are flat, as Telegram has them: no lens
         actionsFactory = createFactory(engine, actionsSource);
+        actionsGlassFactory = createFactory(engine, new LensSource());
+        actionsGlassFactory.setLiquidGlassEffectAllowed(true);
         headerFactory = createFactory(engine, headerSource);
         headerFactory.setLiquidGlassEffectAllowed(true);
 
@@ -135,6 +171,11 @@ public final class ProfileButtonsGlass {
     @RequiresApi(api = Build.VERSION_CODES.S)
     private static GlassSource getFilteredSource(Object captureCanvas) {
         return ((GlassCaptureSourceCanvas) captureCanvas).getSource(GlassCaptureSourceCanvas.SourceIndex.FROSTED_FILTERED);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private static GlassSource getClearSource(Object captureCanvas) {
+        return ((GlassCaptureSourceCanvas) captureCanvas).getSource(GlassCaptureSourceCanvas.SourceIndex.GLASS);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.S)
@@ -377,6 +418,45 @@ public final class ProfileButtonsGlass {
                 fillPaint.setColor(Theme.multAlpha(buttonColor, alpha));
                 canvas.drawRect(left - outset, top - outset, right + outset, bottom + outset, fillPaint);
             }
+        }
+    }
+
+    /** What {@link #actionsGlassFactory} bends: the clear capture of what is under the button, tinted. */
+    private final class LensSource implements GlassSource, BlurredBackgroundDrawableViewFactory.DrawableOwner {
+        private final Paint dimPaint = new Paint();
+
+        @Override
+        public BlurredBackgroundDrawable createDrawable() {
+            return new BlurredBackgroundDrawable(this);
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas, float left, float top, float right, float bottom) {
+            final boolean live = clearSource != null && canvas.isHardwareAccelerated();
+            if (live) {
+                clearSource.draw(canvas, left, top, right, bottom);
+            }
+            if (photoProgress > 0) {
+                // over the photo a little darker, so the white icons read
+                dimPaint.setColor(Theme.multAlpha(0xFF000000, (1f - PHOTO_BRIGHTNESS) * 0.7f * photoProgress));
+                canvas.drawRect(left, top, right, bottom, dimPaint);
+            }
+            final float fill = 1f - photoProgress;
+            if (fill <= 0) {
+                return;
+            }
+            if (!live) {
+                // no capture (before Android 12): the flat button it was
+                actionsSource.drawFill(canvas, left, top, right, bottom, fill, 0);
+                return;
+            }
+            // the buttons' colour as a tint: never so opaque that nothing shows through
+            int color = buttonColor;
+            if (Color.alpha(color) > 0x8C) {
+                color = androidx.core.graphics.ColorUtils.setAlphaComponent(color, 0x8C);
+            }
+            tintPaint.setColor(Theme.multAlpha(color, fill));
+            canvas.drawRect(left, top, right, bottom, tintPaint);
         }
     }
 }

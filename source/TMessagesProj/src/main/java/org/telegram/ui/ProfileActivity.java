@@ -2399,16 +2399,108 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private void sgLoadCard() {
         if (userId == 0 || userInfo == null || !com.solegram.messenger.SolegramConfig.profileCards) {
+            sgRefreshStatsFm();
             return;
         }
         final long uid = userId;
         sgApplyCard(com.solegram.messenger.SolegramProfileCard.get(uid));
+        sgRefreshStatsFm();
         com.solegram.messenger.SolegramProfileCard.load(currentAccount, uid, userInfo, () -> {
             if (!isFinishing() && fragmentView != null) {
                 sgApplyCard(com.solegram.messenger.SolegramProfileCard.get(uid));
+                sgRefreshStatsFm(); // the card may link a stats.fm
             }
         });
     }
+
+    // region Solegram: stats.fm in the music's line
+
+    @Nullable
+    private com.solegram.messenger.SolegramStatsFm.Track sgStatsTrack;
+    private boolean sgStatsResumed;
+    private final Runnable sgStatsTick = this::sgRefreshStatsFm;
+
+    /** The profile's own music plays now. */
+    private boolean sgPlaysSavedMusic(@Nullable MessageObject mo) {
+        return mo != null && mo.getDocument() != null && userInfo != null && userInfo.saved_music != null
+            && mo.getDocument().id == userInfo.saved_music.id;
+    }
+
+    /** The stats.fm linked to this profile: the own setting, else the person's Solegram card. */
+    @Nullable
+    private String sgStatsFmId() {
+        if (userId == 0) {
+            return null;
+        }
+        if (userId == getUserConfig().getClientUserId()) {
+            return com.solegram.messenger.SolegramStatsFm.clean(com.solegram.messenger.SolegramConfig.statsFmUser);
+        }
+        if (!com.solegram.messenger.SolegramConfig.profileCards) {
+            return null;
+        }
+        final com.solegram.messenger.SolegramProfileCard.Card card = com.solegram.messenger.SolegramProfileCard.get(userId);
+        return card != null ? com.solegram.messenger.SolegramStatsFm.clean(card.statsFm) : null;
+    }
+
+    /** Asks stats.fm what plays (a fresh answer is reused), then again in a while as long as the profile is open. */
+    private void sgRefreshStatsFm() {
+        AndroidUtilities.cancelRunOnUIThread(sgStatsTick);
+        final String id = sgStatsFmId();
+        if (id == null) {
+            sgSetStatsTrack(null);
+            return;
+        }
+        com.solegram.messenger.SolegramStatsFm.current(id, track -> {
+            if (isFinishing() || fragmentView == null) {
+                return;
+            }
+            sgSetStatsTrack(track);
+            if (sgStatsResumed) {
+                // sooner when the track is about to end: the next one shows soon after it starts
+                long next = 20_000;
+                if (track != null && track.playing && track.durationMs > 0) {
+                    final long left = (long) ((1f - track.progress()) * track.durationMs);
+                    next = Math.max(4_000, Math.min(next, left + 2_000));
+                }
+                AndroidUtilities.cancelRunOnUIThread(sgStatsTick);
+                AndroidUtilities.runOnUIThread(sgStatsTick, next);
+            }
+        });
+    }
+
+    private void sgSetStatsTrack(@Nullable com.solegram.messenger.SolegramStatsFm.Track track) {
+        final com.solegram.messenger.SolegramStatsFm.Track was = sgStatsTrack;
+        if (was == null && track == null) {
+            return;
+        }
+        sgStatsTrack = track;
+        final boolean sameShape = (was == null) == (track == null);
+        if (sameShape && musicView != null) {
+            // the same line, a new track or new progress: only its text
+            final boolean noArtist = TextUtils.isEmpty(track.artist);
+            musicView.setText(noArtist ? track.title : track.artist, noArtist ? "" : " - " + track.title);
+            musicView.invalidate();
+            return;
+        }
+        // the line comes or goes: the header gets or loses its room
+        updateRowsIds();
+        if (listAdapter != null) {
+            if (listView != null && listView.isComputingLayout()) {
+                listView.post(() -> {
+                    if (listAdapter != null && listView != null && !listView.isComputingLayout()) {
+                        listAdapter.notifyDataSetChanged();
+                    }
+                });
+            } else {
+                listAdapter.notifyDataSetChanged();
+            }
+        }
+        if (fragmentView != null) {
+            fragmentView.requestLayout();
+        }
+    }
+
+    // endregion
 
     /** A post picked for the profile: opened in its channel. */
     private void sgOpenPost(MessageObject post) {
@@ -2536,6 +2628,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.solegramNowPlayingChanged);
         AndroidUtilities.cancelRunOnUIThread(sgMusicChanged);
+        AndroidUtilities.cancelRunOnUIThread(sgStatsTick);
         if (sgMusic != null) {
             sgMusic.detach();
         }
@@ -3981,7 +4074,34 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (userInfo != null && userInfo.saved_music != null) {
                 musicView.setMusicDocument(userInfo.saved_music);
             }
+            // Solegram: the line shows what plays, moving on by itself (its progress, dancing bars)
+            musicView.setState(new ProfileMusicView.State() {
+                @Override
+                public float progress() {
+                    if (sgStatsTrack != null) {
+                        return sgStatsTrack.progress();
+                    }
+                    final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
+                    return sgPlaysSavedMusic(mo) ? mo.audioProgress : -1f;
+                }
+
+                @Override
+                public boolean playing() {
+                    if (sgStatsTrack != null) {
+                        return sgStatsTrack.playing && !sgStatsTrack.ended();
+                    }
+                    final MessageObject mo = MediaController.getInstance().getPlayingMessageObject();
+                    return sgPlaysSavedMusic(mo) && !MediaController.getInstance().isMessagePaused();
+                }
+            });
             musicView.setOnClickListener(v -> {
+                if (sgStatsTrack != null) {
+                    // the track on stats.fm
+                    if (getParentActivity() != null) {
+                        org.telegram.messenger.browser.Browser.openUrl(getParentActivity(), sgStatsTrack.url());
+                    }
+                    return;
+                }
                 if (savedMusicList == null) {
                     if (
                         MediaController.getInstance().currentSavedMusicList != null &&
@@ -6345,7 +6465,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int getActionsExtraHeight(boolean withPills) {
         if (userId != 0 && imageUpdater != null && !myProfile)
             return 0;
-        return dp(74 + (withPills && (hasMusic || hasBalance) ? 25 : 0));
+        return dp(74 + (withPills && (hasMusic || hasBalance) ? ProfileMusicView.ROW_HEIGHT : 0));
     }
 
     private int getHeaderExtraHeight() {
@@ -6746,7 +6866,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return dp(needInsetForStories() ? 24 : 38);
             }
         }
-        return dp(50);
+        // Solegram: the "avatar corners" setting, as everywhere else (a circle only at 100%)
+        return Math.round(dp(50) * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f);
     }
 
     private void updateTtlIcon() {
@@ -8256,7 +8377,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             buttonsGlass.setButtonColor(topView.btnColor, topView.hasColorById);
         }
         buttonsGlass.setPhotoProgress(buttonsPhotoProgress);
-        // Solegram: the action buttons (call, video, mute, message...) and the music pill are flat, without glass
+        // Solegram: the action buttons (call, video, mute, message...) and the music's line are real glass now,
+        // with the lens, the rim and the shadow of the rest of the app
+        if (actionsView != null) {
+            actionsView.setGlassFactory(buttonsGlass.actionsGlassFactory, ProfileButtonsGlass.GLASS_COLORS);
+        }
+        if (musicView != null) {
+            musicView.setGlassFactory(buttonsGlass.actionsGlassFactory, ProfileButtonsGlass.GLASS_COLORS);
+        }
         simpleActionBar.setButtonsGlass(buttonsGlass.headerFactory);
         simpleActionBar.setMenuGlassStroke(false);
         glass.setViews(contentView, simpleActionBar, resourcesProvider);
@@ -9992,6 +10120,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         // Solegram: a shake here drops the header (the easter egg), the shake shortcut waits outside the profile
         com.solegram.messenger.SolegramGestures.addShakeHandler(sgShakeHandler);
         super.onResume();
+        sgStatsResumed = true;
+        if (userInfo != null) {
+            sgRefreshStatsFm(); // what plays on stats.fm, while the profile is open
+        }
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onResume();
         }
@@ -10040,6 +10172,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onPause() {
+        sgStatsResumed = false;
+        AndroidUtilities.cancelRunOnUIThread(sgStatsTick);
         if (sgShake != null) {
             sgShake.restoreNow();
             sgShake = null;
@@ -11357,6 +11491,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (userInfo != null && userInfo.saved_music != null && (imageUpdater == null || myProfile) && !com.solegram.messenger.ui.SolegramProfileMusic.cardOn()) {
                 hasMusic = true;
             }
+            // Solegram: what plays on the linked stats.fm shows in the same line
+            if (sgStatsTrack != null && (imageUpdater == null || myProfile)) {
+                hasMusic = true;
+            }
 
             if (emptyRow < 0 && emptyRow2 < 0) {
                 if (hasMusic || hasBalance || peerColor != null || actionsView == null) {
@@ -11863,7 +12001,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             actionsView.set(ProfileActionsView.KEY_JOIN, hasJoinRow);
         }
         if (musicView != null) {
-            if (userInfo != null) {
+            if (sgStatsTrack != null) {
+                // Solegram: stats.fm's track (artist bold, then the title, as Telegram's line has it)
+                final boolean noArtist = TextUtils.isEmpty(sgStatsTrack.artist);
+                musicView.setText(noArtist ? sgStatsTrack.title : sgStatsTrack.artist, noArtist ? "" : " - " + sgStatsTrack.title);
+            } else if (userInfo != null) {
                 musicView.setMusicDocument(userInfo.saved_music);
             }
             musicView.setVisibility(hasMusic ? View.VISIBLE : View.GONE);
@@ -12018,10 +12160,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             float vh = avatarContainer.getHeight() * avatarContainer.getScaleY();
             actionsView.clipHeight = avatarContainer.getY() + vh;
             actionsView.setAlpha(avatarAnimationProgress);
-            actionsView.updatePosition(listView.getMeasuredWidth(), dp(74));
+            // Solegram: the music's line is above the buttons, under the status
+            actionsView.updatePosition(listView.getMeasuredWidth() + dp(hasMusic || hasBalance ? ProfileMusicView.ROW_HEIGHT : 0), dp(74));
         } else {
             actionsView.clipHeight = -1;
-            float bottom = extraHeight + newTop - dp(hasMusic || hasBalance ? 25 : 0);
+            float bottom = extraHeight + newTop;
             float height = Math.min(dp(74), bottom - newTop);
             actionsView.updatePosition(bottom - height, height);
         }
@@ -12048,16 +12191,17 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 //            float vh = avatarContainer.getHeight() * avatarContainer.getScaleY();
 //            musicView.clipHeight = avatarContainer.getY() + vh;
             musicView.setAlpha(avatarAnimationProgress);
-            musicView.updatePosition(listView.getMeasuredWidth() + dp(74), getActionsExtraHeight() - dp(74));
+            musicView.updatePosition(listView.getMeasuredWidth(), getActionsExtraHeight() - dp(74));
         } else {
             if (openAnimationInProgress) {
                 musicView.setAlpha(avatarAnimationProgress);
             }
 
 //            musicView.clipHeight = -1;
-            float bottom = extraHeight + newTop + dp(74);
-            float height = Math.min(getActionsExtraHeight(), bottom - newTop);
-            musicView.updatePosition(bottom - height, height - dp(74));
+            // Solegram: a line of its own under the status, above the buttons; it folds away after them
+            final float rowBottom = extraHeight + newTop - dp(74);
+            final float height = Math.max(0, Math.min(getActionsExtraHeight() - dp(74), extraHeight - dp(74)));
+            musicView.updatePosition(rowBottom - height, height);
         }
     }
 

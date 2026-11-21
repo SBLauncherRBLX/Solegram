@@ -2501,5 +2501,14 @@
     <string name="SG_LandscapeSplit">Два окна, как на компьютере</string>
     <string name="SG_LandscapeSplitInfo">Когда телефон повёрнут набок, чаты остаются слева, а открытый чат — справа.</string>
     <string name="SG_PrivacyTraces">Следы в ссылках и файлах</string>
+    <string name="SG_StatsFmHeader">Музыка в профиле</string>
+    <string name="SG_StatsFm">stats.fm</string>
+    <string name="SG_StatsFmNone">Не привязан</string>
+    <string name="SG_StatsFmUnlink">Отвязать stats.fm</string>
+    <string name="SG_StatsFmInfo">Музыка показывается строкой под статусом профиля. Привяжите stats.fm, и там будет видно, что вы слушаете сейчас в Spotify или Apple Music. Другие пользователи Solegram тоже это увидят, если у вас есть баннер профиля. В stats.fm должен быть открыт показ текущего трека.</string>
+    <string name="SG_StatsFmAsk">Имя профиля stats.fm или ссылка на него</string>
+    <string name="SG_StatsFmHint">имя или ссылка</string>
+    <string name="SG_StatsFmNotFound">Такой профиль stats.fm не найден</string>
+    <string name="SG_StatsFmLinked">stats.fm привязан: %1$s</string>
     <!-- SOLEGRAM END -->
 </resources>

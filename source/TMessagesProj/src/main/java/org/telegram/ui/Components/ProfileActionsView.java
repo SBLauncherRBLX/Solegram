@@ -156,6 +156,15 @@ public class ProfileActionsView extends View {
 
     /** The buttons on glass, see {@link ProfileButtonsGlass#actionsFactory}. */
     public void setGlassFactory(@Nullable BlurredBackgroundDrawableViewFactory factory) {
+        setGlassFactory(factory, null);
+    }
+
+    @Nullable
+    private org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider glassColors;
+
+    /** The buttons on glass with a rim and a shadow of {@code colors} (null: none). */
+    public void setGlassFactory(@Nullable BlurredBackgroundDrawableViewFactory factory, @Nullable org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider colors) {
+        glassColors = colors;
         glassFactory = factory;
         glass.clear();
         glassUsed = 0;
@@ -164,7 +173,7 @@ public class ProfileActionsView extends View {
 
     private void drawGlass(Canvas canvas, RectF rect, float radius, float alpha) {
         if (glassUsed == glass.size()) {
-            glass.add(glassFactory.create(this, ProfileButtonsGlass.NO_COLORS).setRadius(radius));
+            glass.add(glassFactory.create(this, glassColors != null ? glassColors : ProfileButtonsGlass.NO_COLORS).setRadius(radius));
         }
         final BlurredBackgroundDrawable drawable = glass.get(glassUsed++);
         drawable.setBounds((int) rect.left, (int) rect.top, (int) Math.ceil(rect.right), (int) Math.ceil(rect.bottom));

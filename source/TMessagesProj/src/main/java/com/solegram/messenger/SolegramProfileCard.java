@@ -87,6 +87,9 @@ public final class SolegramProfileCard {
          *  null: none. */
         public String themeBase;
         public int[] themePalette;
+        /** The linked stats.fm profile (what plays now shows on the profile for everyone with Solegram). null: none. */
+        @Nullable
+        public String statsFm;
 
         /** The pinned streak, unless it is more than a day older than its last check. */
         public boolean hasStreak() {
@@ -150,6 +153,9 @@ public final class SolegramProfileCard {
             }
             if (streakDays > 0) {
                 sb.append("|s=").append(streakDays).append('.').append(streakColor).append('.').append(streakPartner).append('.').append(streakDay);
+            }
+            if (SolegramStatsFm.clean(statsFm) != null) {
+                sb.append("|sf=").append(SolegramStatsFm.clean(statsFm));
             }
             return sb.toString();
         }
@@ -221,6 +227,9 @@ public final class SolegramProfileCard {
                             break;
                         case "ne":
                             c.nameEmoji = Long.parseLong(v);
+                            break;
+                        case "sf":
+                            c.statsFm = SolegramStatsFm.clean(v);
                             break;
                         case "nx": {
                             final String[] f = v.split("\\.");
@@ -784,7 +793,8 @@ public final class SolegramProfileCard {
             }
             return;
         }
-        if (card.musicEmoji == SolegramConfig.profileMusicEmoji && styleMatches(card)) {
+        if (card.musicEmoji == SolegramConfig.profileMusicEmoji && styleMatches(card)
+            && TextUtils.equals(SolegramStatsFm.clean(card.statsFm), SolegramStatsFm.clean(SolegramConfig.statsFmUser))) {
             return;
         }
         final TLRPC.Chat channel = mc.getChat(-card.post.getDialogId());
@@ -812,6 +822,7 @@ public final class SolegramProfileCard {
         edit.id = post.getId();
         final String caption = strip(post.messageOwner.message);
         card.musicEmoji = SolegramConfig.profileMusicEmoji; // the music's pattern goes with the card
+        card.statsFm = SolegramStatsFm.clean(SolegramConfig.statsFmUser); // and the linked stats.fm
         applyLocalStyle(card); // and the profile's colour and pattern emoji chosen without Premium
         final String mark = mark(card.encode());
         if (caption.length() + mark.length() > mc.maxCaptionLength) {

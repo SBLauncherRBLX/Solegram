@@ -2247,4 +2247,13 @@
     <string name="SG_LandscapeSplit">Two panes, like on a computer</string>
     <string name="SG_LandscapeSplitInfo">With the phone on its side, the chats stay on the left and the open chat is on the right.</string>
     <string name="SG_PrivacyTraces">Traces in links and files</string>
+    <string name="SG_StatsFmHeader">Music on the profile</string>
+    <string name="SG_StatsFm">stats.fm</string>
+    <string name="SG_StatsFmNone">Not linked</string>
+    <string name="SG_StatsFmUnlink">Unlink stats.fm</string>
+    <string name="SG_StatsFmInfo">Music shows as a line under the profile status. Link stats.fm to show what you are listening to on Spotify or Apple Music right now. Other Solegram users see it too if you have a profile banner. Showing the current track must be allowed in stats.fm.</string>
+    <string name="SG_StatsFmAsk">Your stats.fm profile name or link</string>
+    <string name="SG_StatsFmHint">name or link</string>
+    <string name="SG_StatsFmNotFound">No such stats.fm profile</string>
+    <string name="SG_StatsFmLinked">stats.fm linked: %1$s</string>
 </resources>
