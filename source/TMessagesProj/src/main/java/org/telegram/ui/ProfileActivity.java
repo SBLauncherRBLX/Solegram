@@ -2426,12 +2426,29 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         musicView.setBadge(t.playing && !t.ended() ? getString(R.string.SG_StatsFmPlayingNow) : null);
     }
 
+    /** Over the profile while the music's card is open: a tap on the card goes to it, anywhere else closes it. */
     @Nullable
-    private com.solegram.messenger.ui.SolegramMusicPeek sgMusicPeek;
+    private View sgMusicCatcher;
 
-    /** The music's line grows into a small card of the song; a tap on it opens the player, one elsewhere closes it. */
+    private void sgCloseMusicCard(boolean now) {
+        if (sgMusicCatcher != null) {
+            if (sgMusicCatcher.getParent() instanceof ViewGroup) {
+                ((ViewGroup) sgMusicCatcher.getParent()).removeView(sgMusicCatcher);
+            }
+            sgMusicCatcher = null;
+        }
+        if (musicView != null) {
+            if (now) {
+                musicView.collapseNow();
+            } else {
+                musicView.collapse(null);
+            }
+        }
+    }
+
+    /** The music's line grows (down and to the sides, still glass) into a small card of the song. */
     private void sgOpenMusicPeek() {
-        if (sgMusicPeek != null || musicView == null || !(fragmentView instanceof ViewGroup) || getParentActivity() == null) {
+        if (sgMusicCatcher != null || musicView == null || musicView.isExpanded() || !(fragmentView instanceof ViewGroup) || getParentActivity() == null) {
             return;
         }
         final com.solegram.messenger.SolegramStatsFm.Track stats = sgStatsTrack;
@@ -2442,10 +2459,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (music != null) {
             music.setDocument(userInfo.saved_music); // its cover loads now if it has not yet
         }
-        final android.graphics.RectF line = new android.graphics.RectF();
-        musicView.getButtonBoundsOnScreen(line);
-        sgMusicPeek = com.solegram.messenger.ui.SolegramMusicPeek.show((ViewGroup) fragmentView, line, musicView.getPillRadius(),
-            new com.solegram.messenger.ui.SolegramMusicPeek.Source() {
+        musicView.expand(
+            new ProfileMusicView.Card() {
                 @Override
                 public String title() {
                     if (stats != null) {
@@ -2511,20 +2526,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                 @Override
                 public void open() {
-                    final com.solegram.messenger.ui.SolegramMusicPeek peek = sgMusicPeek;
                     if (stats != null) {
                         if (getParentActivity() != null) {
                             org.telegram.messenger.browser.Browser.openUrl(getParentActivity(), stats.url());
                         }
-                        if (peek != null) {
-                            peek.close(null);
-                        }
+                        sgCloseMusicCard(false);
                         return;
                     }
                     sgPlayProfileMusic(true);
-                    if (peek != null) {
-                        peek.dismissNow(); // under the player: back at the line when it closes
-                    }
+                    sgCloseMusicCard(true); // under the player: back at the line when it closes
                 }
 
                 @Nullable
@@ -2548,7 +2558,32 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 public CharSequence badge() {
                     return stats != null && stats.playing && !stats.ended() ? getString(R.string.SG_StatsFmPlayingNow) : null;
                 }
-            }, () -> sgMusicPeek = null);
+            });
+        final View catcher = new View(getContext()) {
+            private boolean onCard;
+
+            @Override
+            public boolean onTouchEvent(MotionEvent e) {
+                final android.graphics.RectF r = new android.graphics.RectF();
+                if (musicView != null) {
+                    musicView.getCardBoundsOnScreen(r);
+                }
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    onCard = r.contains(e.getRawX(), e.getRawY());
+                } else if (e.getActionMasked() == MotionEvent.ACTION_UP) {
+                    if (onCard && r.contains(e.getRawX(), e.getRawY())) {
+                        if (musicView != null) {
+                            musicView.tapCard(e.getRawX(), e.getRawY());
+                        }
+                    } else if (!onCard) {
+                        sgCloseMusicCard(false);
+                    }
+                }
+                return true;
+            }
+        };
+        sgMusicCatcher = catcher;
+        ((ViewGroup) fragmentView).addView(catcher, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
     }
 
     @Nullable
@@ -2590,7 +2625,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (isFinishing() || fragmentView == null) {
                 return;
             }
-            sgSetStatsTrack(track);
+            // only what plays right now: paused or stopped there, the line shows the pinned song at once
+            sgSetStatsTrack(track != null && track.playing && !track.ended() ? track : null);
             if (sgStatsResumed) {
                 // sooner when the track is about to end: the next one shows soon after it starts
                 long next = 20_000;
@@ -10330,9 +10366,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     @Override
     public boolean onBackPressed(boolean invoked) {
         // Solegram: the music's card goes back into its line first
-        if (sgMusicPeek != null) {
+        if (sgMusicCatcher != null) {
             if (invoked) {
-                sgMusicPeek.close(null);
+                sgCloseMusicCard(false);
             }
             return false;
         }

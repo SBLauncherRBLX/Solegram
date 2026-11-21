@@ -108,7 +108,7 @@ public class ProfileMusicView extends View {
                 MeasureSpec.EXACTLY
             ),
             MeasureSpec.makeMeasureSpec(
-                dp(VIEW_HEIGHT),
+                dp(VIEW_HEIGHT + CARD_HEIGHT),
                 MeasureSpec.EXACTLY
             )
         );
@@ -119,6 +119,282 @@ public class ProfileMusicView extends View {
     private static final int VIEW_HEIGHT = 44;
     private static final int PILL_TOP = 13;
     private static final int PILL_HEIGHT = 26;
+    /** The pill opened into the song's card: it grows down and to the sides (the room below is the buttons'). */
+    private static final int CARD_HEIGHT = 100;
+    private static final int CARD_PAD = 12;
+    private static final int CARD_COVER = 76;
+    private static final int CARD_BUTTON = 44;
+
+    /** What the opened card shows and does. */
+    public interface Card {
+        String title();
+
+        String artist();
+
+        float progress();
+
+        long durationMs();
+
+        boolean playing();
+
+        /** The button plays and pauses here; false: it opens the track's page. */
+        boolean controls();
+
+        void playPause();
+
+        void open();
+
+        @Nullable
+        android.graphics.Bitmap cover();
+
+        @Nullable
+        String coverUrl();
+
+        @Nullable
+        CharSequence badge();
+    }
+
+    @Nullable
+    private Card card;
+    private float expand;
+    @Nullable
+    private android.animation.ValueAnimator expandAnimator;
+    private final RectF shape = new RectF();
+    private final RectF cardRect = new RectF();
+    private final RectF cardButton = new RectF();
+    private org.telegram.messenger.ImageReceiver cardCover;
+    private android.graphics.Bitmap cardCoverSet;
+    private PlayPauseDrawable cardPlayPause;
+    private Drawable cardOpenIcon;
+    private Text cardTitle, cardArtist, cardBadge;
+    private float cardTextWidth = -1;
+    private final Paint cardBarPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint cardButtonPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    public boolean isExpanded() {
+        return card != null;
+    }
+
+    /** Opens the pill into the song's card, smoothly (down and to the sides, still glass). */
+    public void expand(Card card) {
+        this.card = card;
+        cardTextWidth = -1;
+        if (cardCover == null) {
+            cardCover = new org.telegram.messenger.ImageReceiver(this);
+            cardCover.setRoundRadius(dp(14));
+            cardPlayPause = new PlayPauseDrawable(16);
+            cardPlayPause.setCallback(this);
+            cardOpenIcon = getContext().getResources().getDrawable(R.drawable.msg_openin).mutate();
+            if (isAttachedToWindow()) {
+                cardCover.onAttachedToWindow();
+            }
+        }
+        cardCoverSet = null;
+        cardCover.clearImage();
+        if (card.cover() == null && !TextUtils.isEmpty(card.coverUrl())) {
+            cardCover.setImage(org.telegram.messenger.ImageLocation.getForPath(card.coverUrl()), "200_200", null, null, null, 0, null, null, 1);
+        }
+        animateExpand(1f, null);
+    }
+
+    /** Back into the pill; {@code end} once it is a pill again. */
+    public void collapse(@Nullable Runnable end) {
+        if (card == null) {
+            if (end != null) end.run();
+            return;
+        }
+        animateExpand(0f, () -> {
+            card = null;
+            if (end != null) end.run();
+        });
+    }
+
+    /** At once (the player opened over it). */
+    public void collapseNow() {
+        if (expandAnimator != null) {
+            expandAnimator.cancel();
+        }
+        expand = 0;
+        card = null;
+        invalidate();
+        if (trailingView != null) trailingView.invalidate();
+    }
+
+    private void animateExpand(float to, @Nullable Runnable end) {
+        if (expandAnimator != null) {
+            expandAnimator.cancel();
+        }
+        final android.animation.ValueAnimator a = android.animation.ValueAnimator.ofFloat(expand, to);
+        expandAnimator = a;
+        a.addUpdateListener(v -> {
+            expand = (float) v.getAnimatedValue();
+            invalidate();
+            if (trailingView != null) trailingView.invalidate();
+        });
+        // a soft spring-like ease, the same both ways
+        a.setInterpolator(new android.view.animation.PathInterpolator(0.22f, 1f, 0.36f, 1f));
+        a.setDuration(to > expand ? 520 : 420);
+        a.addListener(new android.animation.AnimatorListenerAdapter() {
+            private boolean cancelled;
+
+            @Override
+            public void onAnimationCancel(android.animation.Animator animation) {
+                cancelled = true;
+            }
+
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                if (!cancelled && end != null) {
+                    end.run();
+                }
+            }
+        });
+        a.start();
+    }
+
+    /** The card on the screen (for the taps around it). */
+    public void getCardBoundsOnScreen(RectF out) {
+        final int[] location = new int[2];
+        getLocationOnScreen(location);
+        out.set(shape);
+        out.offset(location[0], location[1]);
+    }
+
+    /** A tap on the card at a point on the screen: its button plays/pauses (or opens), elsewhere it opens. */
+    public void tapCard(float screenX, float screenY) {
+        final Card c = card;
+        if (c == null) {
+            return;
+        }
+        final int[] location = new int[2];
+        getLocationOnScreen(location);
+        final float x = screenX - location[0], y = screenY - location[1];
+        if (expand > 0.6f && cardButton.contains(x, y)) {
+            if (c.controls()) {
+                c.playPause();
+                invalidate();
+            } else {
+                c.open();
+            }
+        } else {
+            c.open();
+        }
+    }
+
+    @Override
+    protected boolean verifyDrawable(@NonNull Drawable who) {
+        return who == cardPlayPause || super.verifyDrawable(who);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (cardCover != null) {
+            cardCover.onAttachedToWindow();
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (cardCover != null) {
+            cardCover.onDetachedFromWindow();
+        }
+        if (expandAnimator != null) {
+            expandAnimator.cancel();
+        }
+    }
+
+    private static String cardTime(long ms) {
+        return AndroidUtilities.formatShortDuration((int) (Math.max(0, ms) / 1000));
+    }
+
+    /** The card's content in its final place {@code r}. */
+    private void drawCard(Canvas canvas, RectF r, float a) {
+        final Card c = card;
+        if (c == null || a <= 0) {
+            return;
+        }
+        final float w = r.width() - dp(CARD_PAD) * 2 - dp(CARD_COVER) - dp(12) - dp(CARD_BUTTON) - dp(10);
+        if (w != cardTextWidth) {
+            cardTextWidth = w;
+            cardTitle = new Text(c.title(), 16, AndroidUtilities.bold()).ellipsize(w);
+            cardArtist = new Text(c.artist(), 14).ellipsize(w);
+            final CharSequence b = c.badge();
+            cardBadge = b != null ? new Text(b.toString().toUpperCase(), 10, AndroidUtilities.bold()).ellipsize(w) : null;
+        }
+        final float cx = r.left + dp(CARD_PAD), cy = r.top + dp(CARD_PAD);
+        final android.graphics.Bitmap bitmap = c.cover();
+        if (bitmap != null && bitmap != cardCoverSet) {
+            cardCoverSet = bitmap;
+            cardCover.setImageBitmap(bitmap);
+        }
+        cardCover.setImageCoords(cx, cy, dp(CARD_COVER), dp(CARD_COVER));
+        cardCover.setAlpha(a);
+        if (cardCover.hasImageSet()) {
+            cardCover.draw(canvas);
+        } else {
+            cardBarPaint.setColor(Theme.multAlpha(textColor, 0.12f * a));
+            AndroidUtilities.rectTmp.set(cx, cy, cx + dp(CARD_COVER), cy + dp(CARD_COVER));
+            canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(14), dp(14), cardBarPaint);
+            final int s = dp(28);
+            icon.setBounds((int) (cx + dp(CARD_COVER) / 2f - s / 2f), (int) (cy + dp(CARD_COVER) / 2f - s / 2f), (int) (cx + dp(CARD_COVER) / 2f + s / 2f), (int) (cy + dp(CARD_COVER) / 2f + s / 2f));
+            icon.setAlpha((int) (0x99 * a));
+            icon.draw(canvas);
+        }
+        final float tx = cx + dp(CARD_COVER) + dp(12);
+        float y = cy + dp(9);
+        if (cardBadge != null) {
+            cardBadge.draw(canvas, tx, y, textColor, 0.65f * a);
+            y += dp(17);
+        } else {
+            y += dp(3);
+        }
+        cardTitle.draw(canvas, tx, y, textColor, a);
+        y += dp(20);
+        cardArtist.draw(canvas, tx, y, textColor, 0.7f * a);
+
+        // how far it played, and the times
+        final float barY = cy + dp(CARD_COVER) - dp(14);
+        final float barRight = tx + w;
+        final float played = c.progress();
+        cardBarPaint.setColor(Theme.multAlpha(textColor, 0.22f * a));
+        AndroidUtilities.rectTmp.set(tx, barY - dp(2), barRight, barY + dp(2));
+        canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(2), dp(2), cardBarPaint);
+        if (played >= 0) {
+            cardBarPaint.setColor(Theme.multAlpha(textColor, a));
+            AndroidUtilities.rectTmp.set(tx, barY - dp(2), tx + (barRight - tx) * Utilities.clamp01(played), barY + dp(2));
+            canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(2), dp(2), cardBarPaint);
+            final long duration = c.durationMs();
+            if (duration > 0) {
+                final Text left = new Text(cardTime((long) (duration * Utilities.clamp01(played))), 11);
+                final Text right = new Text(cardTime(duration), 11);
+                left.draw(canvas, tx, barY + dp(11), textColor, 0.6f * a);
+                right.draw(canvas, barRight - right.getWidth(), barY + dp(11), textColor, 0.6f * a);
+            }
+        }
+
+        // play / pause, or open the track's page
+        final float bx = r.right - dp(CARD_PAD) - dp(CARD_BUTTON), by = r.centerY() - dp(CARD_BUTTON) / 2f;
+        cardButton.set(bx, by, bx + dp(CARD_BUTTON), by + dp(CARD_BUTTON));
+        final int buttonColor = textColor == Color.BLACK ? Color.BLACK : Color.WHITE;
+        final int glyphColor = textColor == Color.BLACK ? Color.WHITE : 0xFF111111;
+        cardButtonPaint.setColor(Theme.multAlpha(buttonColor, a));
+        canvas.drawCircle(cardButton.centerX(), cardButton.centerY(), dp(CARD_BUTTON) / 2f, cardButtonPaint);
+        final int s = c.controls() ? dp(26) : dp(22);
+        final Drawable glyph;
+        if (c.controls()) {
+            cardPlayPause.setColor(glyphColor);
+            cardPlayPause.setPause(c.playing(), true);
+            glyph = cardPlayPause;
+        } else {
+            cardOpenIcon.setColorFilter(new PorterDuffColorFilter(glyphColor, PorterDuff.Mode.SRC_IN));
+            glyph = cardOpenIcon;
+        }
+        glyph.setAlpha((int) (0xFF * a));
+        glyph.setBounds((int) cardButton.centerX() - s / 2, (int) cardButton.centerY() - s / 2, (int) cardButton.centerX() + s / 2, (int) cardButton.centerY() + s / 2);
+        glyph.draw(canvas);
+    }
 
     /** What plays, for the progress and the bars: null for a pill without music (the balance). */
     public interface State {
@@ -312,7 +588,7 @@ public class ProfileMusicView extends View {
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         final float alpha = Utilities.clamp01((currentHeight) / dp(ROW_HEIGHT - 4));
-        if (alpha <= 0) return false;
+        if (alpha <= 0 || card != null) return false; // opened, the taps go through the profile's catcher
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             bounce.setPressed(rect.contains(event.getX(), event.getY()));
         } else if (event.getAction() == MotionEvent.ACTION_MOVE && bounce.isPressed()) {
@@ -388,8 +664,11 @@ public class ProfileMusicView extends View {
     protected void onDraw(@NonNull Canvas canvas) {
         if (this.author == null || this.title == null) return;
 
-        final float alpha = Utilities.clamp01((currentHeight) / dp(ROW_HEIGHT - 4));
-        final float scale = bounce.getScale(0.02f);
+        float alpha = Utilities.clamp01((currentHeight) / dp(ROW_HEIGHT - 4));
+        if (leadingView != null && leadingView.expand > 0) {
+            alpha *= 1f - Utilities.clamp01(leadingView.expand * 2f); // the companion makes room for the card
+        }
+        final float scale = expand > 0 ? 1f : bounce.getScale(0.02f);
         if (alpha <= 0) {
             if (glass != null) {
                 glass.setAlpha(0);
@@ -418,16 +697,25 @@ public class ProfileMusicView extends View {
 
         rect.set(left, dp(PILL_TOP), left + containerWidth, dp(PILL_TOP) + dp(PILL_HEIGHT) * alpha);
         pillCenterY = rect.centerY();
+        // Solegram: opened, the pill grows down and to the sides into the song's card, staying glass
+        final float e = expand;
+        cardRect.set(dp(16), rect.top, getWidth() - dp(16), rect.top + dp(CARD_HEIGHT));
+        shape.set(
+            AndroidUtilities.lerp(rect.left, cardRect.left, e),
+            rect.top,
+            AndroidUtilities.lerp(rect.right, cardRect.right, e),
+            AndroidUtilities.lerp(rect.bottom, cardRect.bottom, e));
+        final float shapeRadius = AndroidUtilities.lerp(rect.height() / 2f, dp(24), e);
         canvas.save();
-        canvas.scale(scale, scale, rect.centerX(), getHeight() / 2f);
+        canvas.scale(scale, scale, rect.centerX(), rect.centerY());
 
         if (glass != null) {
-            final float radius = rect.height() / 2f;
+            final float radius = shapeRadius;
             if (glassRadius != radius) {
                 glassRadius = radius;
                 glass.setRadius(radius);
             }
-            glass.setBounds((int) rect.left, (int) rect.top, (int) Math.ceil(rect.right), (int) Math.ceil(rect.bottom));
+            glass.setBounds((int) shape.left, (int) shape.top, (int) Math.ceil(shape.right), (int) Math.ceil(shape.bottom));
             glass.setAlpha((int) (0xFF * alpha));
             glass.draw(canvas);
         } else {
@@ -455,24 +743,34 @@ public class ProfileMusicView extends View {
         }
 
         clipPath.rewind();
-        clipPath.addRoundRect(rect, rect.height() / 2f, rect.height() / 2f, Path.Direction.CW);
+        clipPath.addRoundRect(shape, shapeRadius, shapeRadius, Path.Direction.CW);
 
         canvas.save();
         canvas.clipPath(clipPath);
+        // the pill's own content fades out as the card opens, the card's fades in
+        final float pillAlpha = alpha * (1f - Utilities.clamp01(e * 2.5f));
         // Solegram: the part already played is lighter, as on the player's line
         final float progress = state != null ? state.progress() : -1f;
-        if (progress >= 0f) {
+        if (progress >= 0f && pillAlpha > 0) {
             progressPaint.setColor(textColor == Color.BLACK ? 0x14000000 : 0x2EFFFFFF);
-            progressPaint.setAlpha((int) (progressPaint.getAlpha() * alpha));
+            progressPaint.setAlpha((int) (progressPaint.getAlpha() * pillAlpha));
             canvas.drawRect(rect.left, rect.top, rect.left + rect.width() * Utilities.clamp01(progress), rect.bottom, progressPaint);
         }
-        canvas.translate(rect.left + dp(10), 0);
-        drawContent(canvas, alpha);
+        if (pillAlpha > 0) {
+            canvas.save();
+            canvas.translate(rect.left + dp(10), 0);
+            drawContent(canvas, pillAlpha);
+            canvas.restore();
+        }
+        if (e > 0) {
+            // the card's content stays in its final place, uncovered as the glass grows over it
+            drawCard(canvas, cardRect, alpha * Utilities.clamp01((e - 0.3f) / 0.6f));
+        }
 
         canvas.restore();
 
         canvas.restore();
-        if (state != null && state.playing()) {
+        if (state != null && state.playing() || card != null && card.playing()) {
             postInvalidateDelayed(50); // the bars and the progress move
         }
     }
