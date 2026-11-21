@@ -709,7 +709,8 @@ public class BottomSheet extends Dialog implements BaseFragment.AttachedSheet {
             if (containerView != null) {
                 if (!fullWidth) {
                     int widthSpec;
-                    if (AndroidUtilities.isTablet()) {
+                    // Solegram: a phone on its side in two panes keeps the phone's sheets (a tablet's would be 80% of its short side)
+                    if (AndroidUtilities.isTablet() && AndroidUtilities.isTabletByScreen()) {
                         widthSpec = MeasureSpec.makeMeasureSpec((int) Math.min(dp(500), Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) * 0.8f) + backgroundPaddingLeft * 2, MeasureSpec.EXACTLY);
                     } else {
                         widthSpec = MeasureSpec.makeMeasureSpec((getBottomSheetWidth(isPortrait, width, height)) + backgroundPaddingLeft * 2, MeasureSpec.EXACTLY);

@@ -1975,7 +1975,7 @@ public class AndroidUtilities {
 
     @SuppressLint("WrongConstant")
     public static void lockOrientation(Activity activity) {
-        if (activity == null || prevOrientation != -10 || isTabletInternal()) {
+        if (activity == null || prevOrientation != -10 || isTabletByScreen()) { // Solegram: a phone in two panes still locks (recording, camera)
             return;
         }
         try {
@@ -2020,7 +2020,7 @@ public class AndroidUtilities {
 
     @SuppressLint("WrongConstant")
     public static void lockOrientation(Activity activity, int orientation) {
-        if (activity == null || isTabletInternal()) {
+        if (activity == null || isTabletByScreen()) {
             return;
         }
         try {
@@ -3068,6 +3068,13 @@ public class AndroidUtilities {
     }
 
     public static boolean isTabletForce() {
+        // Solegram: a wide phone on its side gets the tablet's two panes (chats on the left, the chat on the right)
+        return isTabletByScreen() || ApplicationLoader.applicationContext != null
+            && com.solegram.messenger.SolegramLandscape.split(ApplicationLoader.applicationContext.getResources());
+    }
+
+    /** Solegram: a real tablet (by its screen), whatever the orientation. */
+    public static boolean isTabletByScreen() {
         return ApplicationLoader.applicationContext != null && ApplicationLoader.applicationContext.getResources().getBoolean(R.bool.isTablet);
     }
 

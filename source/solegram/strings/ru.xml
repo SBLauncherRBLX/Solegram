@@ -2244,4 +2244,7 @@
     <string name="SG_SecCleanLinksInfo">Убирать из отправляемых и открываемых ссылок метки слежки: utm, fbclid, si у YouTube и Spotify и другие. Сама ссылка работает как раньше.</string>
     <string name="SG_SecStripMeta">Удалять метаданные из фото и видео</string>
     <string name="SG_SecStripMetaInfo">Фото и видео, отправленные файлом или в исходном качестве, уходят без геопозиции, модели телефона и даты съёмки. Файл на телефоне не меняется.</string>
+    <string name="SG_LandscapeHeader">Горизонтальный режим</string>
+    <string name="SG_LandscapeSplit">Два окна, как на компьютере</string>
+    <string name="SG_LandscapeSplitInfo">Когда телефон повёрнут набок, чаты остаются слева, а открытый чат — справа.</string>
 </resources>

@@ -7336,6 +7336,16 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     public static Runnable whenResumed;
 
+    /** Solegram: the two-pane switch was changed: the layout follows it now, not at the next rotation. */
+    public void solegramRecheckTabletMode() {
+        AndroidUtilities.resetTabletFlag();
+        invalidateTabletMode();
+        checkLayout();
+        if (drawerLayoutContainer != null) {
+            drawerLayoutContainer.requestLayout();
+        }
+    }
+
     private void invalidateTabletMode() {
         Boolean wasTablet = AndroidUtilities.getWasTablet();
         if (wasTablet == null) {
@@ -7412,6 +7422,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         AndroidUtilities.setPreferredMaxRefreshRate(getWindow());
         super.onConfigurationChanged(newConfig);
         PipCoordinator.getInstance().onConfigurationChanged(newConfig);
+        com.solegram.messenger.SolegramLandscape.onConfigurationChanged(newConfig);
         AndroidUtilities.resetTabletFlag();
         invalidateTabletMode();
         checkLayout();

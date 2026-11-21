@@ -13913,5 +13913,8 @@
     <string name="SG_SecCleanLinksInfo">Removes tracking tags from links you send and open: utm, fbclid, the si of YouTube and Spotify and others. The link itself works as before.</string>
     <string name="SG_SecStripMeta">Remove metadata from photos and videos</string>
     <string name="SG_SecStripMetaInfo">Photos and videos sent as files or in original quality go without location, phone model and capture date. The file on your phone is not changed.</string>
+    <string name="SG_LandscapeHeader">Landscape</string>
+    <string name="SG_LandscapeSplit">Two panes, like on a computer</string>
+    <string name="SG_LandscapeSplitInfo">With the phone on its side, the chats stay on the left and the open chat is on the right.</string>
     <!-- SOLEGRAM END -->
 </resources>

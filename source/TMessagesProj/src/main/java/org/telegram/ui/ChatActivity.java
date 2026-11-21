@@ -19177,8 +19177,10 @@ public class ChatActivity extends BaseFragment implements
             int heightSize = allHeight;
 
             if (navbarContentSourceWallpaper.getSource() instanceof GlassSourceBitmap) {
+                // Solegram: the wallpaper is drawn over the whole screen, side insets too (landscape with a cutout):
+                // the glass reads it at that width, else its strip by the edge was black
                 ((GlassSourceBitmap) navbarContentSourceWallpaper.getSource())
-                    .setParentSize(widthSize, heightSize, 0);
+                    .setParentSize(allWidth, heightSize, 0);
             }
             if (lastWidth != widthSize) {
                 globalIgnoreLayout = false;
@@ -33940,7 +33942,7 @@ public class ChatActivity extends BaseFragment implements
 
     /** Solegram: this chat can go into the side dock (an ordinary chat, not a thread, a preview or a picker). */
     public boolean solegramCanDock() {
-        return chatMode == MODE_DEFAULT && dialog_id != 0 && !inPreviewMode && !inBubbleMode && !isInsideContainer
+        return !AndroidUtilities.isTablet() && chatMode == MODE_DEFAULT && dialog_id != 0 && !inPreviewMode && !inBubbleMode && !isInsideContainer
             && threadMessageId == 0 && !isTopic && !isComments && !isReport() && fragmentView != null
             && (pinchToZoomHelper == null || !pinchToZoomHelper.isInOverlayMode())
             && scrimPopupWindow == null

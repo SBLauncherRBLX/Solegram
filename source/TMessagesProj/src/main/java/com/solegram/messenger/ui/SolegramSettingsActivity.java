@@ -171,6 +171,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_GLASS_SETTINGS = 111;
     private static final int ID_MAIN_TITLE = 113;
     private static final int ID_SMOOTH_TRANSITIONS = 114;
+    private static final int ID_LANDSCAPE_SPLIT = 4300;
     private static final int ID_PRESS_SCALE = 115;
     private static final int ID_FLUID_TOUCH = 199;
     private static final int ID_ANIMATE_LISTS = 116;
@@ -514,6 +515,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         iconPackPicker.setSelected(SolegramConfig.iconPack);
         items.add(UItem.asCustom(iconPackPicker));
         items.add(UItem.asShadow(getString(R.string.SG_IconPackInfo)));
+
+        items.add(UItem.asHeader(getString(R.string.SG_LandscapeHeader)));
+        items.add(UItem.asButtonCheck(ID_LANDSCAPE_SPLIT, getString(R.string.SG_LandscapeSplit), getString(R.string.SG_LandscapeSplitInfo)).setChecked(SolegramConfig.landscapeSplit));
+        items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_Animations)));
         items.add(UItem.asButtonCheck(ID_SMOOTH_TRANSITIONS, getString(R.string.SG_SmoothTransitions), getString(R.string.SG_SmoothTransitionsInfo)).setChecked(SolegramConfig.smoothTransitions));
@@ -1022,6 +1027,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_PREMIUM, ID_NP_PATTERN, R.string.SG_NowPlayingPatternProfile, -1},
         {PAGE_MAIN_SCREEN, ID_CENTER_TITLE, R.string.SG_CenterTitle, -1},
         {PAGE_APPEARANCE, ID_SMOOTH_TRANSITIONS, R.string.SG_SmoothTransitions, -1},
+        {PAGE_APPEARANCE, ID_LANDSCAPE_SPLIT, R.string.SG_LandscapeSplit, -1},
         {PAGE_APPEARANCE, ID_PRESS_SCALE, R.string.SG_PressScale, -1},
         {PAGE_APPEARANCE, ID_ANIMATE_LISTS, R.string.SG_AnimateLists, -1},
         {PAGE_APPEARANCE, ID_NEUTRAL_OVERSCROLL, R.string.SG_NeutralOverscroll, -1},
@@ -2481,6 +2487,17 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_SMOOTH_TRANSITIONS:
                 toggleCheck(view, "smoothTransitions");
+                return;
+            case ID_LANDSCAPE_SPLIT:
+                toggleCheck(view, "landscapeSplit");
+                // the layout follows right away when the phone is on its side now
+                if (org.telegram.ui.LaunchActivity.instance != null) {
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (org.telegram.ui.LaunchActivity.instance != null) {
+                            org.telegram.ui.LaunchActivity.instance.solegramRecheckTabletMode();
+                        }
+                    }, 250);
+                }
                 return;
             case ID_PRESS_SCALE:
                 toggleCheck(view, "pressScale");

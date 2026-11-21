@@ -348,7 +348,8 @@ public final class SolegramChatDock extends FrameLayout implements NotificationC
                 pill.getChildAt(i).invalidate();
             }
         }
-        setShown(!dialogs.isEmpty() && UserConfig.getInstance(account).isClientActivated() && !blocked(last));
+        // in two panes (a tablet, a phone on its side) the chats are always on screen: no dock over them
+        setShown(!dialogs.isEmpty() && UserConfig.getInstance(account).isClientActivated() && !blocked(last) && !AndroidUtilities.isTablet());
         if (source != null && shownProgress > 0f && getWidth() > 0 && getHeight() > 0) {
             source.setSize(root.getWidth(), root.getHeight());
             source.updateDisplayListIfNeeded();

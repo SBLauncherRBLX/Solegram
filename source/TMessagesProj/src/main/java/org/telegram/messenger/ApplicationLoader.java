@@ -400,6 +400,7 @@ public class ApplicationLoader extends Application {
             LocaleController.getInstance().onDeviceConfigurationChange(newConfig);
             AndroidUtilities.checkDisplaySize(applicationContext, newConfig);
             VideoCapturerDevice.checkScreenCapturerSize();
+            com.solegram.messenger.SolegramLandscape.onConfigurationChanged(newConfig);
             AndroidUtilities.resetTabletFlag();
         } catch (Exception e) {
             e.printStackTrace();

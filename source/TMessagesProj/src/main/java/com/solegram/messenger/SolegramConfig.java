@@ -44,6 +44,8 @@ public class SolegramConfig {
     public static boolean warnDangerousFiles = true;
     /** Privacy: tracking parameters (utm_*, fbclid, YouTube's and Spotify's si...) are taken out of links sent and opened. */
     public static boolean cleanLinks = true;
+    /** Landscape on a phone: chats on the left, the open chat on the right (Telegram's tablet layout). */
+    public static boolean landscapeSplit = true;
     /** Privacy: photos and videos sent as files go without GPS, phone model and capture dates. */
     public static boolean stripFileMetadata = true;
     public static boolean monetAccent;
@@ -457,6 +459,7 @@ public class SolegramConfig {
         secureRecents = p.getBoolean("secureRecents", false);
         warnDangerousFiles = p.getBoolean("warnDangerousFiles", true);
         cleanLinks = p.getBoolean("cleanLinks", true);
+        landscapeSplit = p.getBoolean("landscapeSplit", true);
         stripFileMetadata = p.getBoolean("stripFileMetadata", true);
         monetAccent = p.getBoolean("monetAccent", false);
         showSeconds = p.getBoolean("showSeconds", false);
@@ -914,6 +917,7 @@ public class SolegramConfig {
             case "reminderAi":
             case "warnDangerousFiles":
             case "cleanLinks":
+            case "landscapeSplit":
             case "stripFileMetadata":
                 return true;
             default:

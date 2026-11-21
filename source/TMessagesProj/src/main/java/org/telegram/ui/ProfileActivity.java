@@ -3319,7 +3319,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     int paddingBottom;
                     if (isInLandscapeMode) {
                         paddingTop = getHeaderExtraHeight() + actionBarHeight;
-                        paddingBottom = 0;
+                        // Solegram: a short profile can still be scrolled until the header is folded (it sprang back up)
+                        paddingBottom = Math.max(0, getMeasuredHeight() - actionBarHeight - listContentHeight);
                     } else {
                         paddingTop = listView.getMeasuredWidth() + getActionsExtraHeight();
                         paddingBottom = Math.max(0, getMeasuredHeight() - (listContentHeight + getHeaderExtraHeight() + actionBarHeight));
@@ -3346,7 +3347,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     int paddingBottom;
                     if (!hasMainTabs && (isInLandscapeMode || AndroidUtilities.isTablet())) {
                         paddingTop = getHeaderExtraHeight();
-                        paddingBottom = 0;
+                        // Solegram: a short profile can still be scrolled until the header is folded (it sprang back up)
+                        paddingBottom = Math.max(0, getMeasuredHeight() - actionBarHeight - listContentHeight);
                     } else {
                         paddingTop = listView.getMeasuredWidth() + getActionsExtraHeight();
                         paddingBottom = Math.max(0, getMeasuredHeight() - (listContentHeight + getHeaderExtraHeight() + actionBarHeight));
@@ -6314,6 +6316,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 listView.smoothScrollBy(0, firstRow.getTop() - getHeaderExtraHeight(), CubicBezierInterpolator.EASE_OUT_QUINT);
             }
         } else {
+            if (!listView.canScrollVertically(1) && extraHeight > 0) {
+                return; // Solegram: at the very end of the list the header stays as it is, the list is not thrown back up
+            }
             final boolean hasActions = getActionsExtraHeight() > 0;
             if (hasActions && extraHeight > 0 && (extraHeight < getHeaderExtraHeight() * 0.6f || velocityY < -1000f) && extraHeight > getActionsExtraHeight() * .6f) {
                 listView.smoothScrollBy(0, (int) (extraHeight - getActionsExtraHeight()), CubicBezierInterpolator.EASE_OUT_QUINT);

@@ -27,6 +27,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.text.TextUtils;
@@ -234,6 +235,17 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
                 if (!glassSource.draw(canvas)) {
                     super.draw(canvas);
                 }
+            }
+
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                // Solegram: a wide screen gets the two-column player (cover on the right, controls on the left)
+                final boolean landscape = MeasureSpec.getSize(widthMeasureSpec) > MeasureSpec.getSize(heightMeasureSpec);
+                if (content != null) {
+                    arrange(landscape);
+                    applyInsets(landscape);
+                }
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
             }
 
             private float downY, downX;
@@ -487,8 +499,104 @@ public class SolegramPlayer extends Dialog implements NotificationCenter.Notific
         bottom.addView(pinButton, LayoutHelper.createFrame(44, 44, Gravity.CENTER, 30, 0, 0, 0));
         content.addView(bottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 6, 0, 0));
 
+        sgTop = top;
+        sgMiddle = middle;
+        sgTimes = times;
+        sgControls = controls;
+        sgBottom = bottom;
         updateModes();
         return root;
+    }
+
+    // ------------------------------------------------------------------ landscape
+
+    private View sgTop, sgMiddle, sgTimes, sgControls, sgBottom;
+    private LinearLayout sgLeft, sgRight;
+    private View sgSpaceTop, sgSpaceBottom;
+    /** 0 portrait (one column, as built), 1 landscape (two columns). */
+    private int sgArranged;
+
+    /**
+     * Landscape: two columns, as a wide screen wants them. On the right the cover (or the lyrics) with the track's
+     * name under it; on the left where it plays from, the progress, the controls and the bottom buttons, centred.
+     * Portrait keeps the one column. Measured each time, so turning the phone with the player open re-arranges it.
+     */
+    private void arrange(boolean landscape) {
+        final int want = landscape ? 1 : 0;
+        if (want == sgArranged || sgTop == null) {
+            return;
+        }
+        sgArranged = want;
+        final Context context = content.getContext();
+        if (sgLeft == null) {
+            sgLeft = new LinearLayout(context);
+            sgLeft.setOrientation(LinearLayout.VERTICAL);
+            sgLeft.setClipChildren(false);
+            sgLeft.setClipToPadding(false);
+            sgRight = new LinearLayout(context);
+            sgRight.setOrientation(LinearLayout.VERTICAL);
+            sgRight.setClipChildren(false);
+            sgRight.setClipToPadding(false);
+            sgSpaceTop = new View(context);
+            sgSpaceBottom = new View(context);
+        }
+        final View[] all = {sgTop, sgMiddle, titleView, artistView, progress, sgTimes, sgControls, sgBottom, sgSpaceTop, sgSpaceBottom, sgLeft, sgRight};
+        for (View v : all) {
+            if (v.getParent() instanceof ViewGroup) {
+                ((ViewGroup) v.getParent()).removeView(v);
+            }
+        }
+        if (!landscape) {
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.addView(sgTop, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
+            content.addView(sgMiddle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
+            content.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 0));
+            content.addView(artistView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+            content.addView(progress, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 36, -10, 14, -10, 0));
+            content.addView(sgTimes, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+            content.addView(sgControls, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 80, 0, 10, 0, 0));
+            content.addView(sgBottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 6, 0, 0));
+            titleView.setGravity(Gravity.START);
+            artistView.setGravity(Gravity.START);
+        } else {
+            content.setOrientation(LinearLayout.HORIZONTAL);
+            sgLeft.addView(sgTop, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
+            sgLeft.addView(sgSpaceTop, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
+            sgLeft.addView(progress, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 36, -10, 0, -10, 0));
+            sgLeft.addView(sgTimes, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+            sgLeft.addView(sgControls, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 80, 0, 6, 0, 0));
+            sgLeft.addView(sgBottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 4, 0, 0));
+            sgLeft.addView(sgSpaceBottom, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 0.6f));
+            sgRight.addView(sgMiddle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
+            sgRight.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 6, 0, 0));
+            sgRight.addView(artistView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+            content.addView(sgLeft, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, 0, 0, 20, 0));
+            content.addView(sgRight, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, 20, 0, 0, 0));
+            titleView.setGravity(Gravity.CENTER_HORIZONTAL);
+            artistView.setGravity(Gravity.CENTER_HORIZONTAL);
+        }
+    }
+
+    /** The padding of the player: the system bars and, in landscape, the camera cutout and a side navigation bar. */
+    private void applyInsets(boolean landscape) {
+        int left = 0, top = AndroidUtilities.statusBarHeight, right = 0, bottom = AndroidUtilities.navigationBarHeight;
+        if (Build.VERSION.SDK_INT >= 23 && root != null && root.getRootWindowInsets() != null) {
+            final android.view.WindowInsets wi = root.getRootWindowInsets();
+            left = wi.getSystemWindowInsetLeft();
+            top = Math.max(wi.getSystemWindowInsetTop(), landscape ? 0 : top);
+            right = wi.getSystemWindowInsetRight();
+            bottom = wi.getSystemWindowInsetBottom();
+            if (Build.VERSION.SDK_INT >= 28 && wi.getDisplayCutout() != null) {
+                left = Math.max(left, wi.getDisplayCutout().getSafeInsetLeft());
+                right = Math.max(right, wi.getDisplayCutout().getSafeInsetRight());
+                top = Math.max(top, wi.getDisplayCutout().getSafeInsetTop());
+            }
+        }
+        if (landscape) {
+            content.setPadding(dp(24) + left, top + dp(4), dp(24) + right, bottom + dp(12));
+        } else {
+            content.setPadding(dp(24), AndroidUtilities.statusBarHeight + dp(6), dp(24), AndroidUtilities.navigationBarHeight + dp(18));
+        }
     }
 
     private ImageView iconButton(Context context, int res, int sizeDp) {
