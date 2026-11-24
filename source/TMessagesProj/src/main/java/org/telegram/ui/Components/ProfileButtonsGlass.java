@@ -159,8 +159,8 @@ public final class ProfileButtonsGlass {
         actionsFactory = createFactory(engine, actionsSource);
         actionsGlassFactory = createFactory(engine, new LensSource());
         actionsGlassFactory.setLiquidGlassEffectAllowed(true);
+        // plain: the bubbles bend it themselves along their own outline
         bubbleFactory = createFactory(engine, new BubbleSource());
-        bubbleFactory.setLiquidGlassEffectAllowed(true);
         headerFactory = createFactory(engine, headerSource);
         headerFactory.setLiquidGlassEffectAllowed(true);
 

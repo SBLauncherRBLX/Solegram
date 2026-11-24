@@ -153,6 +153,11 @@ import java.util.HashSet;
 
 public class SettingsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, ImageUpdater.ImageUpdaterDelegate, MainTabsActivity.TabFragmentDelegate, FactorAnimator.Target {
 
+    /** Solegram: the big avatar on top follows the "avatar corners" option like everywhere (a circle at 100%). */
+    private static int sgAvatarRadius() {
+        return Math.round(dp(45) * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f);
+    }
+
     private static final int ANIMATOR_ID_SEARCH_PAGE_VISIBLE = 0;
 
     private final BoolAnimator animatorSearchPageVisible = new BoolAnimator(ANIMATOR_ID_SEARCH_PAGE_VISIBLE,
@@ -400,7 +405,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         avatarDrawable = new AvatarDrawable();
         avatarView = new BackupImageView(context);
-        avatarView.setRoundRadius(dp(90));
+        avatarView.setRoundRadius(sgAvatarRadius());
         avatarContainer.addView(avatarView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         avatarProgressView = new RadialProgressView(context) {
@@ -414,7 +419,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             protected void onDraw(Canvas canvas) {
                 if (avatarView != null && avatarView.getImageReceiver().hasNotThumb()) {
                     paint.setAlpha((int) (0x55 * avatarView.getImageReceiver().getCurrentAlpha()));
-                    canvas.drawCircle(getMeasuredWidth() / 2.0f, getMeasuredHeight() / 2.0f, getMeasuredWidth() / 2.0f, paint);
+                    // Solegram: the avatar's own shape (the "avatar corners" option), as in the profile
+                    final float r = getMeasuredWidth() / 2.0f * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f;
+                    canvas.drawRoundRect(0, 0, getMeasuredWidth(), getMeasuredHeight(), r, r, paint);
                 }
                 super.onDraw(canvas);
             }
@@ -618,6 +625,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     @Override
     public void onResume() {
         super.onResume();
+        if (avatarView != null) {
+            avatarView.setRoundRadius(sgAvatarRadius()); // the shape may have been changed meanwhile
+        }
         if (listView.adapter != null) {
             listView.adapter.update(false);
         }

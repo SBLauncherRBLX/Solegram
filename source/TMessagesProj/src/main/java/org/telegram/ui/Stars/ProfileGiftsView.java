@@ -312,7 +312,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         // its orbit: where on it, how fast; the orbit itself drifts slowly (radius, tilt, height)
         float orbit, orbitSpeed;
         float pulse, pulseV;
-        float squash, squashV, squashAngle;
+        // elastic shape: the ellipse mode (cos 2θ, sin 2θ) on a spring, driven by the smoothed acceleration
+        float ex, ey, exv, eyv, axs, ays;
+        // where it presses against others: the plane's direction and distance (in its radii), at most 4
+        final float[] cnx = new float[4], cny = new float[4], clim = new float[4];
+        int contacts;
+        float volume = 1f;
+        // the push of the others this step
+        float cfx, cfy;
         float inflate = 1f, inflateV, inflateTarget = 1f;
         long inflateUntil;
         float drawX, drawY, drawR;
@@ -391,17 +398,122 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgFront.invalidate();
     }
 
-    private void sgDrawGlass(Canvas canvas, boolean front, View owner, float cx, float cy, float r, float alpha) {
+    private final ArrayList<Object> sgLensBack = new ArrayList<>(), sgLensFront = new ArrayList<>();
+    private static boolean sgLensBroken;
+
+    /**
+     * What is under the bubble, refracted: the header's capture (a glass drawable, plain, as big as the outline can
+     * get) drawn through the lens shader (Android 13+) that bends it towards the middle near this outline's edge.
+     */
+    private void sgDrawLens(Canvas canvas, boolean front, View owner, SgBubble b, float cx, float cy, float r, float alpha) {
         final ArrayList<org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable> list = front ? sgGlassFront : sgGlassBack;
         final int used = front ? sgGlassFrontUsed++ : sgGlassBackUsed++;
         if (used == list.size()) {
             list.add(sgGlassFactory.create(owner, org.telegram.ui.Components.ProfileButtonsGlass.NO_COLORS));
         }
         final org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable glass = list.get(used);
-        glass.setRadius(r);
-        glass.setBounds((int) (cx - r), (int) (cy - r), (int) Math.ceil(cx + r), (int) Math.ceil(cy + r));
-        glass.setAlpha((int) (0xFF * alpha));
-        glass.draw(canvas);
+        final float reach = r * 1.35f;
+        final int left = (int) Math.floor(cx - reach), top = (int) Math.floor(cy - reach);
+        final int right = (int) Math.ceil(cx + reach), bottom = (int) Math.ceil(cy + reach);
+        glass.setRadius(0);
+        glass.setBounds(left, top, right, bottom);
+        if (android.os.Build.VERSION.SDK_INT >= 33 && !sgLensBroken) {
+            try {
+                final ArrayList<Object> lenses = front ? sgLensFront : sgLensBack;
+                while (lenses.size() <= used) {
+                    lenses.add(new SgLens());
+                }
+                glass.setAlpha(0xFF);
+                ((SgLens) lenses.get(used)).draw(canvas, glass, left, top, right, bottom, cx - left, cy - top, r, b, sgC1, sgS1, sgC2, sgS2, alpha);
+                return;
+            } catch (Throwable e) {
+                // a phone whose graphics cannot run the shader: plain glass from now on
+                org.telegram.messenger.FileLog.e(e);
+                sgLensBroken = true;
+            }
+        }
+        {
+            glass.setAlpha((int) (0xFF * alpha));
+            glass.draw(canvas);
+        }
+    }
+
+    /** The lens (Android 13+): a render node of the capture with a runtime shader on it. */
+    @androidx.annotation.RequiresApi(33)
+    private static final class SgLens {
+        private static final String SHADER =
+            "uniform shader content;\n" +
+            "uniform float2 center;\n" +
+            "uniform float radius;\n" +
+            "uniform float4 ph;\n" +
+            "uniform float2 ell;\n" +
+            "uniform float4 k0;\n" +
+            "uniform float4 k1;\n" +
+            "uniform float4 k2;\n" +
+            "uniform float4 k3;\n" +
+            "uniform float3 wob;\n" +
+            "float smin(float a, float b, float k) {\n" +
+            "  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);\n" +
+            "  return mix(b, a, h) - k * h * (1.0 - h);\n" +
+            "}\n" +
+            "float press(float f, float2 d, float4 c) {\n" +
+            "  if (c.w < 0.5) { return f; }\n" +
+            "  float cs = dot(d, c.xy);\n" +
+            "  if (cs <= 0.05) { return f; }\n" +
+            "  return smin(f, c.z / cs, wob.z);\n" +
+            "}\n" +
+            "float shape(float2 d) {\n" +
+            "  float cos2 = d.x * d.x - d.y * d.y;\n" +
+            "  float sin2 = 2.0 * d.x * d.y;\n" +
+            "  float cos3 = 4.0 * d.x * d.x * d.x - 3.0 * d.x;\n" +
+            "  float sin3 = 3.0 * d.y - 4.0 * d.y * d.y * d.y;\n" +
+            "  float f = 1.0 + wob.x * (sin2 * ph.x + cos2 * ph.y) + wob.y * (sin3 * ph.z - cos3 * ph.w) + ell.x * cos2 + ell.y * sin2;\n" +
+            "  f = press(f, d, k0);\n" +
+            "  f = press(f, d, k1);\n" +
+            "  f = press(f, d, k2);\n" +
+            "  f = press(f, d, k3);\n" +
+            "  return f;\n" +
+            "}\n" +
+            "half4 main(float2 p) {\n" +
+            "  float2 v = p - center;\n" +
+            "  float len = length(v);\n" +
+            "  if (len < 0.001) { return content.eval(p); }\n" +
+            "  float rho = len / (radius * shape(v / len));\n" +
+            "  if (rho >= 1.0) { return content.eval(p); }\n" +
+            "  float r2 = rho * rho;\n" +
+            "  float r4 = r2 * r2;\n" +
+            // a slight magnifier inside, bending strongly near the edge (the light comes from deeper in)
+            "  float2 src = center + v * (0.9 - 0.3 * r4 * r2);\n" +
+            "  float2 spl = v * 0.025 * r4;\n" +
+            "  half4 col = content.eval(src);\n" +
+            "  half red = content.eval(src + spl).r;\n" +
+            "  half blue = content.eval(src - spl).b;\n" +
+            "  return half4(red, col.g, blue, col.a);\n" +
+            "}\n";
+
+        private final android.graphics.RenderNode node = new android.graphics.RenderNode("sgBubbleLens");
+        private final android.graphics.RuntimeShader shader = new android.graphics.RuntimeShader(SHADER);
+
+        void draw(Canvas canvas, android.graphics.drawable.Drawable glass, int left, int top, int right, int bottom,
+                  float cx, float cy, float r, SgBubble b, float c1, float s1, float c2, float s2, float alpha) {
+            node.setPosition(left, top, right, bottom);
+            final android.graphics.RecordingCanvas rc = node.beginRecording();
+            rc.translate(-left, -top);
+            glass.draw(rc);
+            node.endRecording();
+            shader.setFloatUniform("center", cx, cy);
+            shader.setFloatUniform("radius", r);
+            shader.setFloatUniform("ph", c1, s1, c2, s2);
+            shader.setFloatUniform("ell", b.ex, b.ey);
+            shader.setFloatUniform("wob", SG_WOBBLE_2, SG_WOBBLE_3, SG_SMOOTH);
+            for (int k = 0; k < 4; k++) {
+                final boolean on = k < b.contacts;
+                shader.setFloatUniform("k" + k, on ? b.cnx[k] : 0, on ? b.cny[k] : 0, on ? b.clim[k] : 2f, on ? 1f : 0f);
+            }
+            node.setRenderEffect(android.graphics.RenderEffect.createRuntimeShaderEffect(shader, "content"));
+            node.setAlpha(alpha);
+            canvas.drawRenderNode(node);
+        }
     }
 
     private void sgHideUnusedGlass(boolean front) {
@@ -791,6 +903,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                 }
             }
         }
+        sgContacts(n);
         for (int i = 0; i < n; i++) {
             final SgBubble b = gifts.get(i).sg;
             final float r = dp(21) * b.size * b.inflate;
@@ -812,24 +925,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             if (b != sgHeld && b.x > right) fx += (right - b.x) * 40f;
             if (b != sgHeld && b.y < top) fy += (top - b.y) * 40f;
             if (b != sgHeld && b.y > bottom) fy += (bottom - b.y) * 40f;
-            // the others: bubbles do not go through each other, they squash a little where they touch
-            for (int j = 0; j < n; j++) {
-                if (j == i) continue;
-                final SgBubble o = gifts.get(j).sg;
-                final float or = dp(21) * o.size * o.inflate;
-                final float dx = b.x - o.x, dy = b.y - o.y;
-                final float dist = Math.max(0.5f, (float) Math.hypot(dx, dy));
-                final float overlap = r + or + dp(3) - dist;
-                if (overlap > 0) {
-                    fx += dx / dist * overlap * 60f;
-                    fy += dy / dist * overlap * 60f;
-                    final float hit = Math.min(1f, overlap / r);
-                    if (hit > Math.abs(b.squash)) {
-                        b.squashV -= hit * 6f * dt * 60f;
-                        b.squashAngle = (float) Math.atan2(dy, dx);
-                    }
-                }
-            }
+            fx += b.cfx;
+            fy += b.cfy;
             b.lastVx = b.vx;
             b.lastVy = b.vy;
             b.vx += fx * dt;
@@ -842,8 +939,23 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             // springs: the beat's swell, the squash where it touched, a tap's swell (back by itself)
             b.pulseV += (-140f * b.pulse - 9f * b.pulseV) * dt;
             b.pulse += b.pulseV * dt;
-            b.squashV += (-120f * b.squash - 7f * b.squashV) * dt;
-            b.squash = Math.max(-0.35f, Math.min(0.35f, b.squash + b.squashV * dt));
+            // the jelly: squashed along where it is pushed, springing back with a soft wobble
+            final float ax = (b.vx - b.lastVx) / Math.max(dt, 1e-4f), ay = (b.vy - b.lastVy) / Math.max(dt, 1e-4f);
+            final float follow = 1f - (float) Math.exp(-8f * dt);
+            b.axs += (ax - b.axs) * follow;
+            b.ays += (ay - b.ays) * follow;
+            final float accel = (float) Math.hypot(b.axs, b.ays);
+            float tex = 0, tey = 0;
+            if (accel > 1f) {
+                final float mag = Math.min(0.09f, accel / dp(3200));
+                final float c = b.axs / accel, sn = b.ays / accel;
+                tex = -mag * (c * c - sn * sn);
+                tey = -mag * (2 * c * sn);
+            }
+            b.exv += (-110f * (b.ex - tex) - 7f * b.exv) * dt;
+            b.eyv += (-110f * (b.ey - tey) - 7f * b.eyv) * dt;
+            b.ex = Math.max(-0.2f, Math.min(0.2f, b.ex + b.exv * dt));
+            b.ey = Math.max(-0.2f, Math.min(0.2f, b.ey + b.eyv * dt));
             if (b.inflateTarget > 1f && now > b.inflateUntil) {
                 b.inflateTarget = 1f;
             }
@@ -851,6 +963,103 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             b.inflate = Math.max(0.5f, b.inflate + b.inflateV * dt);
             sgStepSnow(b, dt, r);
         }
+    }
+
+    /**
+     * The bubbles against each other: a soft spring with damping along the line between them (no kicks), and where they
+     * press, each is flattened against the plane where the two circles meet (the outline does it, see sgShape).
+     */
+    private void sgContacts(int n) {
+        for (int i = 0; i < n; i++) {
+            final SgBubble b = gifts.get(i).sg;
+            b.cfx = b.cfy = 0;
+            b.contacts = 0;
+        }
+        for (int i = 0; i < n; i++) {
+            final SgBubble a = gifts.get(i).sg;
+            final float ra = dp(21) * a.size * a.inflate * (1f + 0.12f * a.pulse);
+            for (int j = i + 1; j < n; j++) {
+                final SgBubble b = gifts.get(j).sg;
+                final float rb = dp(21) * b.size * b.inflate * (1f + 0.12f * b.pulse);
+                final float dx = b.x - a.x, dy = b.y - a.y;
+                final float dist = Math.max(0.5f, (float) Math.hypot(dx, dy));
+                if (dist > ra + rb + dp(8)) {
+                    continue;
+                }
+                final float nx = dx / dist, ny = dy / dist;
+                final float overlap = ra + rb - dist;
+                if (overlap > 0) {
+                    final float ma = a.size * a.size * a.inflate, mb = b.size * b.size * b.inflate;
+                    final float vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+                    final float push = overlap * 130f - vn * 9f;
+                    if (push > 0) {
+                        final float ka = 2f * mb / (ma + mb), kb = 2f * ma / (ma + mb);
+                        a.cfx -= nx * push * ka;
+                        a.cfy -= ny * push * ka;
+                        b.cfx += nx * push * kb;
+                        b.cfy += ny * push * kb;
+                    }
+                }
+                // the plane where the two circles meet (the radical line), in each one's radii
+                final float da = (dist * dist + ra * ra - rb * rb) / (2f * dist);
+                sgAddContact(a, nx, ny, da / ra);
+                sgAddContact(b, -nx, -ny, (dist - da) / rb);
+            }
+        }
+        for (int i = 0; i < n; i++) {
+            final SgBubble b = gifts.get(i).sg;
+            float lost = 0;
+            for (int k = 0; k < b.contacts; k++) {
+                lost += Math.max(0, 1f - b.clim[k]);
+            }
+            // what is pressed in bulges out elsewhere a little (it keeps about its size)
+            b.volume += (1f + 0.22f * lost - b.volume) * 0.3f;
+        }
+    }
+
+    private static void sgAddContact(SgBubble b, float nx, float ny, float lim) {
+        lim = Math.max(0.55f, Math.min(1.3f, lim));
+        int slot = b.contacts;
+        if (slot >= 4) {
+            // keep the four that press the most
+            int worst = 0;
+            for (int k = 1; k < 4; k++) {
+                if (b.clim[k] > b.clim[worst]) worst = k;
+            }
+            if (b.clim[worst] <= lim) {
+                return;
+            }
+            slot = worst;
+        } else {
+            b.contacts++;
+        }
+        b.cnx[slot] = nx;
+        b.cny[slot] = ny;
+        b.clim[slot] = lim;
+    }
+
+    private static final float SG_WOBBLE_2 = 0.03f, SG_WOBBLE_3 = 0.02f, SG_SMOOTH = 0.12f;
+
+    private static float sgSmoothMin(float a, float b, float k) {
+        final float h = Math.max(0f, Math.min(1f, 0.5f + 0.5f * (b - a) / k));
+        return b + (a - b) * h - k * h * (1f - h);
+    }
+
+    /**
+     * The outline's radius (in the bubble's radii) towards the direction (dx, dy) (a unit vector): a slow flow of low
+     * harmonics, the elastic ellipse, flattened where it presses against others. The lens shader has the same function.
+     */
+    private float sgShape(SgBubble b, float dx, float dy, float c1, float s1, float c2, float s2) {
+        final float cos2 = dx * dx - dy * dy, sin2 = 2f * dx * dy;
+        final float cos3 = 4f * dx * dx * dx - 3f * dx, sin3 = 3f * dy - 4f * dy * dy * dy;
+        float f = 1f + SG_WOBBLE_2 * (sin2 * c1 + cos2 * s1) + SG_WOBBLE_3 * (sin3 * c2 - cos3 * s2) + b.ex * cos2 + b.ey * sin2;
+        for (int k = 0; k < b.contacts; k++) {
+            final float c = dx * b.cnx[k] + dy * b.cny[k];
+            if (c > 0.05f) {
+                f = sgSmoothMin(f, b.clim[k] / c, SG_SMOOTH);
+            }
+        }
+        return f;
     }
 
     /** The snow inside a bubble: falls down the real gravity through thick water, lags behind the bubble and the phone. */
@@ -950,24 +1159,23 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgHideUnusedGlass(front);
     }
 
-    /** The bubble's outline: a circle that slowly flows into other soft shapes, squashed where it hit and as it moves. */
+    private float sgC1, sgS1, sgC2, sgS2;
+
+    /** The bubble's outline now, radius {@code r} (its volume already in). */
     private void sgBuildShape(SgBubble b, float cx, float cy, float r) {
+        final float t1 = sgTime * 0.8f + b.phase, t2 = sgTime * 0.55f + b.phase * 1.7f;
+        sgC1 = (float) Math.cos(t1);
+        sgS1 = (float) Math.sin(t1);
+        sgC2 = (float) Math.cos(t2);
+        sgS2 = (float) Math.sin(t2);
         sgPath.rewind();
-        final int points = 24;
-        final float speed = (float) Math.hypot(b.vx, b.vy);
-        final float stretch = Math.min(0.1f, speed / dp(1000));
-        final float moveAngle = (float) Math.atan2(b.vy, b.vx);
-        final float t1 = sgTime * 0.9f + b.phase, t2 = sgTime * 0.6f + b.phase * 1.7f, t3 = sgTime * 1.3f + b.phase * 0.4f;
+        final int points = 48;
         float firstX = 0, firstY = 0, prevX = 0, prevY = 0;
         for (int k = 0; k <= points; k++) {
-            final float t = (float) (Math.PI * 2 * (k % points) / points);
-            // low harmonics only, slow: it flows, never ripples
-            float rr = 1f + 0.05f * (float) Math.sin(2 * t + t1) + 0.035f * (float) Math.sin(3 * t - t2) + 0.015f * (float) Math.sin(4 * t + t3)
-                + 0.05f * b.pulse * (float) Math.sin(2 * t + b.phase);
-            rr *= 1f + stretch * (float) Math.cos(2 * (t - moveAngle));
-            rr *= 1f + b.squash * (float) Math.cos(2 * (t - b.squashAngle));
-            final float px = cx + (float) Math.cos(t) * r * rr;
-            final float py = cy + (float) Math.sin(t) * r * rr;
+            final double t = Math.PI * 2 * (k % points) / points;
+            final float dx = (float) Math.cos(t), dy = (float) Math.sin(t);
+            final float rr = r * sgShape(b, dx, dy, sgC1, sgS1, sgC2, sgS2);
+            final float px = cx + dx * rr, py = cy + dy * rr;
             if (k == 0) {
                 firstX = px;
                 firstY = py;
@@ -995,13 +1203,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             canvas.drawCircle(0, 0, dp(22.5f), gift.gradientPaint);
             canvas.restore();
         }
-        sgBuildShape(b, cx, cy, r);
+        final float shapeR = r * b.volume;
+        sgBuildShape(b, cx, cy, shapeR);
         canvas.save();
         canvas.clipPath(sgPath);
-        // the lens: what is under it, refracted (the glass of the header; clipped to the flowing shape)
+        // the lens: what is under it, refracted along this very outline (the glass of the header)
         final boolean glass = sgGlassFactory != null && canvas.isHardwareAccelerated();
         if (glass) {
-            sgDrawGlass(canvas, front, owner, cx, cy, r * 1.12f, alpha);
+            sgDrawLens(canvas, front, owner, b, cx, cy, shapeR, alpha);
         }
         // jelly glass: clear in the middle, the colour gathers at the rim
         if (b.body == null || b.bodyColor != color) {

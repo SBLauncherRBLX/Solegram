@@ -1452,6 +1452,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
             }
+            if (y1 != 0) {
+                sgDrawHeaderMelt(canvas, y1);
+            }
             if (fading) {
                 canvas.restore();
             }
@@ -1468,6 +1471,39 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private Rect blurBounds = new Rect();
+
+        // region Solegram: the header does not end with a line: its lower part melts into the page's colour
+        private final Paint sgHeaderMeltPaint = new Paint();
+        private int sgHeaderMeltColor;
+        private float sgHeaderMeltHeight;
+
+        private void sgDrawHeaderMelt(Canvas canvas, int y1) {
+            // only while the header is open (the small bar of a scrolled profile keeps its colour)
+            final float shown = Utilities.clamp01((extraHeight - dp(40)) / dp(80)) * (1f - mediaHeaderAnimationProgress);
+            if (shown <= 0.01f) {
+                return;
+            }
+            final int page = getThemedColor(Theme.key_windowBackgroundGray);
+            final float height = Math.min(dp(84), extraHeight * 0.5f);
+            if (sgHeaderMeltColor != page || sgHeaderMeltHeight != height) {
+                sgHeaderMeltColor = page;
+                sgHeaderMeltHeight = height;
+                final int[] colors = new int[8];
+                final float[] stops = new float[8];
+                for (int i = 0; i < 8; i++) {
+                    final float t = i / 7f;
+                    stops[i] = t;
+                    colors[i] = Theme.multAlpha(page, t * t * (3 - 2 * t));
+                }
+                sgHeaderMeltPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, height, colors, stops, Shader.TileMode.CLAMP));
+            }
+            sgHeaderMeltPaint.setAlpha((int) (0xFF * shown));
+            canvas.save();
+            canvas.translate(0, y1 - height);
+            canvas.drawRect(0, 0, getMeasuredWidth(), height + 1, sgHeaderMeltPaint);
+            canvas.restore();
+        }
+        // endregion
 
         // region Solegram: the colour at the bottom of the photo (the expanded photo melts into it, see OverlaysView)
         private Bitmap sgColorOf;
