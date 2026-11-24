@@ -132,6 +132,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         super.onAttachedToWindow();
 
         NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.starUserGiftsLoaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.starGiftsLoaded);
 
         for (Gift gift : gifts) {
             gift.emojiDrawable.addView(this);
@@ -149,6 +150,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         super.onDetachedFromWindow();
 
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.starUserGiftsLoaded);
+        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.starGiftsLoaded);
 
         for (Gift gift : gifts) {
             gift.emojiDrawable.removeView(this);
@@ -163,7 +165,11 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.starUserGiftsLoaded) {
+        if (id == NotificationCenter.starGiftsLoaded) {
+            if (sgTestGiftsWanted()) {
+                update();
+            }
+        } else if (id == NotificationCenter.starUserGiftsLoaded) {
             if ((long) args[0] == dialogId) {
                 update();
             }
@@ -198,6 +204,19 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             sgPatternDocument = pattern != null ? pattern.document : null;
             sgPatternDocumentId = sgPatternDocument != null ? sgPatternDocument.id : 0;
             sgPatternColor = backdrop.pattern_color | 0xFF000000;
+            initParticles();
+        }
+
+        /** Solegram (betas): a test gift on the own profile, only on this phone; the gift itself snows inside. */
+        Gift(long fakeId, TLRPC.Document sticker, int color, int patternColor) {
+            id = fakeId;
+            document = sticker;
+            documentId = sticker.id;
+            this.color = color | 0xFF000000;
+            slug = null;
+            sgPatternDocument = sticker;
+            sgPatternDocumentId = sticker.id;
+            sgPatternColor = patternColor | 0xFF000000;
             initParticles();
         }
 
@@ -290,6 +309,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         boolean placed;
         float x, y, vx, vy, lastVx, lastVy;
         float phase, size = 1f, ring, spin = 1f;
+        // its orbit: where on it, how fast; the orbit itself drifts slowly (radius, tilt, height)
+        float orbit, orbitSpeed;
         float pulse, pulseV;
         float squash, squashV, squashAngle;
         float inflate = 1f, inflateV, inflateTarget = 1f;
@@ -308,6 +329,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             vx = b.vx;
             vy = b.vy;
             phase = b.phase;
+            orbit = b.orbit;
+            orbitSpeed = b.orbitSpeed;
             size = b.size;
             ring = b.ring;
             spin = b.spin;
@@ -528,22 +551,171 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         return best;
     }
 
-    /** A tap swells the bubble and stirs its snow (a tap on a swollen one opens the gift). */
+    /** A tap opens the gift (and stirs its snow). */
     private void sgTap(Gift gift) {
-        final SgBubble b = gift.sg;
-        if (b.inflateTarget > 1f) {
-            onGiftClick(gift);
-            b.inflateTarget = 1f;
-        } else {
-            b.inflateTarget = 2.6f;
-            b.inflateUntil = android.os.SystemClock.uptimeMillis() + 2600;
-            b.stir(sgRandom, 3.5f);
-            try {
-                performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
-            } catch (Throwable ignore) {
-            }
+        gift.sg.stir(sgRandom, 2.5f);
+        onGiftClick(gift);
+        invalidate();
+    }
+
+    // region holding a bubble: it swells and follows the finger until it is let go
+
+    @androidx.annotation.Nullable
+    private SgBubble sgHeld;
+    private Gift sgPressed;
+    private float sgFingerX, sgFingerY, sgDownX, sgDownY;
+    private boolean sgMoved;
+    private final Runnable sgHoldRunnable = () -> {
+        if (sgPressed != null) {
+            sgStartHold(sgPressed);
+        }
+    };
+
+    private void sgStartHold(Gift gift) {
+        sgHeld = gift.sg;
+        sgHeld.inflateTarget = 1.9f;
+        sgHeld.inflateUntil = Long.MAX_VALUE;
+        sgHeld.stir(sgRandom, 3f);
+        gift.bounce.setPressed(false);
+        if (getParent() != null) {
+            getParent().requestDisallowInterceptTouchEvent(true);
+        }
+        try {
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        } catch (Throwable ignore) {
         }
         invalidate();
+    }
+
+    private void sgRelease() {
+        if (sgHeld != null) {
+            sgHeld.inflateTarget = 1f;
+            sgHeld.inflateUntil = 0;
+            // its place on the orbit: the nearest to where it was let go, so it does not fly round to the old one
+            final float a = (float) Math.atan2(sgHeld.y / 0.62f, sgHeld.x / 1.45f);
+            final float twoPi = (float) (Math.PI * 2);
+            float k = Math.round((sgHeld.orbit - a) / twoPi);
+            sgHeld.orbit = a + k * twoPi;
+            sgHeld = null;
+            invalidate();
+        }
+    }
+
+    private boolean sgTouch(MotionEvent event) {
+        if (!active) {
+            return false;
+        }
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN: {
+                sgPressed = sgGiftUnder(event.getX(), event.getY());
+                if (sgPressed == null) {
+                    return false;
+                }
+                sgFingerX = sgDownX = event.getX();
+                sgFingerY = sgDownY = event.getY();
+                sgMoved = false;
+                sgPressed.bounce.setPressed(true);
+                removeCallbacks(sgHoldRunnable);
+                postDelayed(sgHoldRunnable, 220);
+                return true;
+            }
+            case MotionEvent.ACTION_MOVE: {
+                if (sgPressed == null) {
+                    return false;
+                }
+                sgFingerX = event.getX();
+                sgFingerY = event.getY();
+                if (!sgMoved && Math.hypot(sgFingerX - sgDownX, sgFingerY - sgDownY) > android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop()) {
+                    sgMoved = true;
+                    if (sgHeld == null) {
+                        // pulled at once: held right away
+                        removeCallbacks(sgHoldRunnable);
+                        sgStartHold(sgPressed);
+                    }
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL: {
+                removeCallbacks(sgHoldRunnable);
+                final Gift pressed = sgPressed;
+                sgPressed = null;
+                if (pressed == null) {
+                    return false;
+                }
+                pressed.bounce.setPressed(false);
+                if (sgHeld != null) {
+                    sgRelease();
+                } else if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    sgTap(pressed);
+                }
+                return true;
+            }
+        }
+        return sgPressed != null;
+    }
+
+    // endregion
+
+    private float sgTargetX, sgTargetY;
+
+    // region test gifts (betas): the developer sees how gifts look on the own profile without having any
+
+    private static final int[][] SG_TEST_COLORS = {
+        {0xFF4F8FE8, 0xFF2A5BB0}, {0xFFE86F9A, 0xFFB03A66}, {0xFFF2B84B, 0xFFB07A1C}, {0xFF57C98A, 0xFF2A8A57},
+        {0xFFA77BEA, 0xFF6A45B5}, {0xFFEF7B52, 0xFFB3482A}, {0xFF52C6D6, 0xFF23899A}, {0xFFB0B8C4, 0xFF6D7684},
+        {0xFFE15A5A, 0xFF9E2B2B},
+    };
+
+    private boolean sgTestGiftsWanted() {
+        return com.solegram.messenger.SolegramConfig.devTestGifts
+            && org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")
+            && dialogId == org.telegram.messenger.UserConfig.getInstance(currentAccount).getClientUserId();
+    }
+
+    private void sgAddTestGifts() {
+        if (!sgTestGiftsWanted()) {
+            return;
+        }
+        final int limit = sgOrbit ? SG_MAX : Math.max(1, maxCount);
+        final StarsController stars = StarsController.getInstance(currentAccount);
+        if (stars.gifts.isEmpty()) {
+            stars.loadStarGifts(); // starGiftsLoaded brings them
+            return;
+        }
+        int n = 0;
+        for (int i = 0; i < stars.gifts.size() && gifts.size() < limit; i++) {
+            final TL_stars.StarGift g = stars.gifts.get(i);
+            final TLRPC.Document sticker = g != null ? g.getDocument() : null;
+            if (sticker == null) {
+                continue;
+            }
+            final long fakeId = -1000L - i;
+            if (giftIds.contains(fakeId)) {
+                continue;
+            }
+            final int[] colors = SG_TEST_COLORS[n++ % SG_TEST_COLORS.length];
+            gifts.add(new Gift(fakeId, sticker, colors[0], colors[1]));
+            giftIds.add(fakeId);
+        }
+    }
+
+    // endregion
+
+    /**
+     * Where the bubble's place on its orbit is now (px from the avatar's centre): an orbit wider than high, as if seen
+     * a little from above, whose size, tilt and height drift slowly and differently for each bubble.
+     */
+    private void sgOrbitTarget(SgBubble b) {
+        final float slow = sgTime * 0.11f + b.phase;
+        final float radius = sgAvatarR + dp(30) + dp(30) * b.ring + dp(12) * (float) Math.sin(slow);
+        final float tilt = 0.28f * (float) Math.sin(sgTime * 0.06f + b.phase * 0.5f);
+        final float lift = dp(10) * (float) Math.sin(sgTime * 0.08f + b.phase * 1.3f);
+        final float ox = (float) Math.cos(b.orbit) * radius * 1.45f;
+        final float oy = (float) Math.sin(b.orbit) * radius * 0.62f;
+        final float c = (float) Math.cos(tilt), s = (float) Math.sin(tilt);
+        sgTargetX = ox * c - oy * s;
+        sgTargetY = ox * s + oy * c - dp(6) + lift;
     }
 
     private void sgStepAndDraw(Canvas canvas) {
@@ -603,9 +775,12 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                 b.size = 0.85f + 0.3f * sgRandom.nextFloat();
                 b.ring = sgRandom.nextFloat();
                 b.spin = sgRandom.nextBoolean() ? 1f : 0.7f;
-                final double a = Math.PI * 2 * (i + sgRandom.nextFloat() * 0.6f) / Math.max(1, n);
-                b.x = (float) Math.cos(a) * (sgAvatarR + dp(50)) * 1.3f;
-                b.y = (float) Math.sin(a) * (sgAvatarR + dp(30));
+                b.orbit = (float) (Math.PI * 2 * (i + sgRandom.nextFloat() * 0.5f) / Math.max(1, n));
+                // one way round for all, each at its own pace
+                b.orbitSpeed = 0.3f + 0.16f * sgRandom.nextFloat();
+                sgOrbitTarget(b);
+                b.x = sgTargetX;
+                b.y = sgTargetY;
             }
             if (!b.snowPlaced) {
                 b.snowPlaced = true;
@@ -619,24 +794,24 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         for (int i = 0; i < n; i++) {
             final SgBubble b = gifts.get(i).sg;
             final float r = dp(21) * b.size * b.inflate;
-            // a ring round the avatar, wider than high; each keeps its own distance on it
-            final float sx = 1.45f;
-            final float ex = b.x / sx, ey = b.y;
-            final float d = Math.max(1f, (float) Math.hypot(ex, ey));
-            final float want = sgAvatarR + dp(26) + dp(26) * b.ring;
-            float fx = -(d - want) * 5f * ex / d * sx;
-            float fy = -(d - want) * 5f * ey / d;
-            // a slow drift round it, and a wander of its own
-            fx += -ey / d * dp(26) * b.spin * 1.6f - b.vx * 0.4f;
-            fy += ex / d * dp(26) * b.spin * 1.6f - b.vy * 0.4f;
-            fx += (float) Math.sin(sgTime * 0.9f + b.phase) * dp(60);
-            fy += (float) Math.cos(sgTime * 0.7f + b.phase * 1.3f) * dp(50);
+            float fx, fy;
+            if (b == sgHeld) {
+                // held: it follows the finger closely
+                fx = (sgFingerX - sgAcx - b.x) * 70f - b.vx * 15f;
+                fy = (sgFingerY - sgAcy - b.y) * 70f - b.vy * 15f;
+            } else {
+                // its place on the orbit moves on; the bubble follows it softly (and finds its way back after a throw)
+                b.orbit += b.orbitSpeed * dt;
+                sgOrbitTarget(b);
+                fx = (sgTargetX - b.x) * 9f - b.vx * 5f;
+                fy = (sgTargetY - b.y) * 9f - b.vy * 5f;
+            }
             // the header's edges push back softly
             final float left = -sgAcx + r, right = w - sgAcx - r, top = sgTop - sgAcy + r, bottom = sgBottom - sgAcy - r;
-            if (b.x < left) fx += (left - b.x) * 40f;
-            if (b.x > right) fx += (right - b.x) * 40f;
-            if (b.y < top) fy += (top - b.y) * 40f;
-            if (b.y > bottom) fy += (bottom - b.y) * 40f;
+            if (b != sgHeld && b.x < left) fx += (left - b.x) * 40f;
+            if (b != sgHeld && b.x > right) fx += (right - b.x) * 40f;
+            if (b != sgHeld && b.y < top) fy += (top - b.y) * 40f;
+            if (b != sgHeld && b.y > bottom) fy += (bottom - b.y) * 40f;
             // the others: bubbles do not go through each other, they squash a little where they touch
             for (int j = 0; j < n; j++) {
                 if (j == i) continue;
@@ -752,8 +927,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                 continue;
             }
             // nearer and farther, slowly: the near ones pass in front of the avatar
-            final float depth = (float) Math.sin(sgTime * 0.45f + b.phase * 0.7f);
-            final boolean isFront = depth > 0 || b.inflate > 1.15f;
+            // the lower half of the orbit is the near one: those pass in front of the avatar
+            final float depth = (float) Math.sin(b.orbit);
+            final boolean isFront = depth > 0 || b.inflate > 1.15f || b == sgHeld;
             if (isFront != front) {
                 continue;
             }
@@ -943,6 +1119,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                 }
             }
         }
+
+        sgAddTestGifts();
 
         boolean changed = false;
         if (gifts.size() != oldGifts.size()) {
@@ -1152,6 +1330,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (sgOrbit) {
+            return sgTouch(event);
+        }
         if (!active) return false;
         final Gift hit = getGiftUnder(event.getX(), event.getY());
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -1184,6 +1365,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     }
 
     public void onGiftClick(Gift gift) {
+        if (gift.slug == null) {
+            return; // a test gift
+        }
         Browser.openUrl(getContext(), "https://t.me/nft/" + gift.slug);
     }
 }

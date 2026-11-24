@@ -2259,4 +2259,6 @@
     <string name="SG_StatsFmPlayingNow">Playing now</string>
     <string name="SG_GiftsOrbit">Gifts orbit the avatar</string>
     <string name="SG_GiftsOrbitInfo">Gifts on profiles circle the photo and hop to the beat of the profile\'s music</string>
+    <string name="SG_TestGifts">Test gifts (beta)</string>
+    <string name="SG_TestGiftsInfo">Betas only: 9 gifts from Telegram\'s catalog on your profile, to see how they look. Only you see them, on this phone; reopen the profile</string>
 </resources>

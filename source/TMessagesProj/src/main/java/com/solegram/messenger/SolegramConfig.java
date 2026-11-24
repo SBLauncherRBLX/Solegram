@@ -401,6 +401,8 @@ public class SolegramConfig {
     public static boolean profileCards = true;
     /** ProfileGiftsView: the gifts on the profile fly round the avatar (and hop to the beat of its own music). */
     public static boolean profileGiftsOrbit = true;
+    /** Betas only: test gifts on the own profile, only on this phone (to see how gifts look). */
+    public static boolean devTestGifts;
     public static String updateChannel = "";
     public static long lastUpdateCheck;
     public static int skippedUpdateBuild;
@@ -695,6 +697,7 @@ public class SolegramConfig {
         mapsNavApp = clamp(p.getInt("mapsNavApp", 1), 0, 7);
         profileCards = p.getBoolean("profileCards", true);
         profileGiftsOrbit = p.getBoolean("profileGiftsOrbit", true);
+        devTestGifts = p.getBoolean("devTestGifts", false);
         updateChannel = p.getString("updateChannel", "");
         lastUpdateCheck = readLong(p, "lastUpdateCheck");
         skippedUpdateBuild = p.getInt("skippedUpdateBuild", 0);

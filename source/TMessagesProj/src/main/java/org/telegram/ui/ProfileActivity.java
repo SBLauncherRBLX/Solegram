@@ -1455,7 +1455,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (fading) {
                 canvas.restore();
             }
-            sgUpdateTail(y1);
             // below y1 the header of the media is glass: headerFadeView, over the pages. Leaving the media the header
             // grows back from the top while the media are already lower: the screen's background between them
             if (mediaHeaderAnimationProgress > 0 && y1 < v && sharedMediaLayout != null && sharedMediaLayout.isAttachedToWindow()) {
@@ -1470,38 +1469,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         private Rect blurBounds = new Rect();
 
-        // region Solegram: the header does not end with a line: its colour (or the photo's) melts into the page below
-        int sgTailTop = -1, sgTailColor;
-        float sgTailAlpha;
-
-        private void sgUpdateTail(int y1) {
-            int top = -1, color = 0;
-            float alpha = 0f;
-            final boolean banner = sgBanner != null && sgCard != null && sgCard.hasBanner() && com.solegram.messenger.SolegramConfig.profileCards;
-            if (y1 > 0 && !capturing) {
-                final float progressToGradient = (playProfileAnimation == 0 ? 1f : avatarAnimationProgress) * hasColorAnimated.set(hasColorById);
-                int header = ColorUtils.blendARGB(currentColor, color1Animated.get(), Utilities.clamp01(progressToGradient));
-                if (banner) {
-                    header = sgBannerBottomColor(header);
-                }
-                final float photo = Utilities.clamp01(expandProgress);
-                if (photo > 0f) {
-                    header = ColorUtils.blendARGB(header, sgPhotoBottomColor(header), photo);
-                }
-                top = y1;
-                color = header | 0xFF000000;
-                alpha = (1f - headerBlurFactor) * (1f - mediaHeaderAnimationProgress) * (playProfileAnimation == 0 ? 1f : avatarAnimationProgress);
-            }
-            if (top != sgTailTop || color != sgTailColor || Math.abs(alpha - sgTailAlpha) > 0.004f) {
-                sgTailTop = top;
-                sgTailColor = color;
-                sgTailAlpha = alpha;
-                if (listView != null) {
-                    listView.invalidate();
-                }
-            }
-        }
-
+        // region Solegram: the colour at the bottom of the photo (the expanded photo melts into it, see OverlaysView)
         private Bitmap sgColorOf;
         private int sgColorOfValue;
 
@@ -1552,13 +1520,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             return sgBottomColor(bitmap != null ? bitmap : avatarImage != null ? avatarImage.getImageReceiver().getBitmap() : null, fallback);
         }
 
-        private int sgBannerBottomColor(int fallback) {
-            int color = sgBottomColor(sgBanner.getBitmap(), fallback);
-            if (sgCard.dim > 0) {
-                color = ColorUtils.blendARGB(color, Color.BLACK, sgCard.dim / 100f);
-            }
-            return color;
-        }
         // endregion
 
         private Paint sgDimPaint;
@@ -1573,63 +1534,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             capturing = true;
             draw(canvas);
             capturing = false;
-        }
-    }
-
-    /** The list's background: the page's colour, and under the header the header's own colour fading into it. */
-    private final class SgPageBackground extends android.graphics.drawable.Drawable {
-        private final Paint page = new Paint();
-        private final Paint tail = new Paint();
-        private android.graphics.LinearGradient gradient;
-        private int gradientColor, gradientPage;
-        private float gradientTop, gradientHeight;
-
-        @Override
-        public void draw(@NonNull Canvas canvas) {
-            final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
-            page.setColor(pageColor);
-            final android.graphics.Rect bounds = getBounds();
-            canvas.drawRect(bounds, page);
-            if (topView == null || listView == null || topView.sgTailTop < 0 || topView.sgTailAlpha <= 0.01f) {
-                return;
-            }
-            final float top = topView.sgTailTop + topView.getY() - listView.getY();
-            final float height = dp(96);
-            if (top + height <= bounds.top || top >= bounds.bottom) {
-                return;
-            }
-            final int color = topView.sgTailColor;
-            if (gradient == null || gradientColor != color || gradientPage != pageColor || gradientTop != top || gradientHeight != height) {
-                gradientColor = color;
-                gradientPage = pageColor;
-                gradientTop = top;
-                gradientHeight = height;
-                // an eased fade (not linear), so no edge shows where it ends
-                final int[] colors = new int[6];
-                final float[] stops = new float[6];
-                for (int i = 0; i < 6; i++) {
-                    final float t = i / 5f;
-                    stops[i] = t;
-                    colors[i] = ColorUtils.blendARGB(color, pageColor, t * t * (3 - 2 * t));
-                }
-                gradient = new android.graphics.LinearGradient(0, top, 0, top + height, colors, stops, Shader.TileMode.CLAMP);
-                tail.setShader(gradient);
-            }
-            tail.setAlpha((int) (0xFF * topView.sgTailAlpha));
-            canvas.drawRect(bounds.left, Math.max(bounds.top, top - dp(2)), bounds.right, Math.min(bounds.bottom, top + height), tail);
-        }
-
-        @Override
-        public void setAlpha(int alpha) {
-        }
-
-        @Override
-        public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {
-        }
-
-        @Override
-        public int getOpacity() {
-            return android.graphics.PixelFormat.OPAQUE;
         }
     }
 
@@ -1758,6 +1662,63 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         }
 
+        // region Solegram: the expanded photo melts into the page (like Telegram's new iOS profile): its lower part
+        // goes over into the colour of its own bottom (a little darker, the name stays readable), and the last strip
+        // into the page's colour, so the photo never ends with a line
+        private final Paint sgMeltPaint = new Paint();
+        private final Paint sgEdgePaint = new Paint();
+        private int sgMeltColor, sgMeltHeight, sgEdgeColor, sgEdgeHeight;
+
+        private void sgDrawPhotoMelt(Canvas canvas) {
+            final float shown = Utilities.clamp01(expandProgress);
+            final int h = getHeight(), w = getWidth();
+            if (shown <= 0.01f || h <= 0 || topView == null) {
+                return;
+            }
+            final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
+            final int photo = topView.sgPhotoBottomColor(pageColor);
+            final int melt = ColorUtils.blendARGB(photo, Color.BLACK, 0.3f) | 0xFF000000;
+            final int meltHeight = (int) Math.min(h * 0.55f, dp(330));
+            if (sgMeltColor != melt || sgMeltHeight != meltHeight) {
+                sgMeltColor = melt;
+                sgMeltHeight = meltHeight;
+                final int[] colors = new int[7];
+                final float[] stops = new float[7];
+                for (int i = 0; i < 7; i++) {
+                    final float t = i / 6f;
+                    stops[i] = t;
+                    // eased: no visible start or end of the fade
+                    final float e = t * t * (3 - 2 * t);
+                    colors[i] = Theme.multAlpha(melt, 0.82f * e);
+                }
+                sgMeltPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, meltHeight, colors, stops, Shader.TileMode.CLAMP));
+            }
+            final int edgeHeight = dp(40);
+            if (sgEdgeColor != pageColor || sgEdgeHeight != edgeHeight) {
+                sgEdgeColor = pageColor;
+                sgEdgeHeight = edgeHeight;
+                final int[] colors = new int[5];
+                final float[] stops = new float[5];
+                for (int i = 0; i < 5; i++) {
+                    final float t = i / 4f;
+                    stops[i] = t;
+                    colors[i] = Theme.multAlpha(pageColor, t * t * (3 - 2 * t));
+                }
+                sgEdgePaint.setShader(new android.graphics.LinearGradient(0, 0, 0, edgeHeight, colors, stops, Shader.TileMode.CLAMP));
+            }
+            canvas.save();
+            canvas.translate(0, h - meltHeight);
+            sgMeltPaint.setAlpha((int) (0xFF * shown));
+            canvas.drawRect(0, 0, w, meltHeight, sgMeltPaint);
+            canvas.restore();
+            canvas.save();
+            canvas.translate(0, h - edgeHeight);
+            sgEdgePaint.setAlpha((int) (0xFF * shown));
+            canvas.drawRect(0, 0, w, edgeHeight, sgEdgePaint);
+            canvas.restore();
+        }
+        // endregion
+
         @Override
         protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             final int actionBarHeight = statusBarHeight + ActionBar.getCurrentActionBarHeight();
@@ -1779,6 +1740,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             }
 
+            sgDrawPhotoMelt(canvas);
             topOverlayGradient.draw(canvas);
             bottomOverlayGradient.draw(canvas);
             canvas.drawRect(topOverlayRect, backgroundPaint);
@@ -4752,8 +4714,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         listView.applyPaddingToSections = false;
         // the rows above the list's top go under the header's blur, with their cards
         listView.setSectionsOverscanTop(AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight());
-        // Solegram: the page's background, with the header's colour melting into it right under the header
-        listView.setBackground(new SgPageBackground());
+        ThemeBind.backgroundColor(listView, Theme.key_windowBackgroundGray, resourcesProvider);
         listView.setVerticalScrollBarEnabled(false);
         final IBlur3Capture listViewCapture = new ViewGroupPartRenderer(listView, (ViewGroup) fragmentView, (canvas, child, drawingTime) -> {
             if (child == sharedMediaLayout) {
@@ -6489,6 +6450,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             captureHeaderImage(avatarsViewPager, c, p, root);
             // the blur at the bottom of the photo goes on under the action buttons
             captureHeaderImage(avatarsBlurView, c, p, root);
+            // Solegram: the glass of the buttons sees the photo melting into the page too
+            if (overlaysView != null && expandProgress > 0.01f && overlaysView.getVisibility() == View.VISIBLE) {
+                Blur3Utils.captureRelativeParent((canvas, position) -> overlaysView.sgDrawPhotoMelt(canvas), c, p, overlaysView, root);
+            }
         };
         setupHeaderGlass();
 
@@ -9691,6 +9656,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             overlaysLp.width = listView.getMeasuredWidth();
             overlaysLp.height = (int) (extraHeight + newTop);
             overlaysView.requestLayout();
+            overlaysView.invalidate();
         }
         if (topView != null) {
             topView.backgroundGradientMatrix.setTranslate(0f, avatarY - topView.backgroundGradientY);

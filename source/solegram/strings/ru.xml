@@ -2259,4 +2259,6 @@
     <string name="SG_StatsFmPlayingNow">Сейчас играет</string>
     <string name="SG_GiftsOrbit">Подарки летают вокруг аватарки</string>
     <string name="SG_GiftsOrbitInfo">Подарки на профиле кружат вокруг фото и подпрыгивают в такт музыке профиля</string>
+    <string name="SG_TestGifts">Тестовые подарки (бета)</string>
+    <string name="SG_TestGiftsInfo">Только в бетах: 9 подарков из каталога Telegram в вашем профиле, чтобы посмотреть, как они выглядят. Видите только вы, на этом телефоне; откройте профиль заново</string>
 </resources>

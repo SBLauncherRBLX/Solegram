@@ -315,6 +315,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_CARD_PAGE = 1131;
     private static final int ID_CARD_SHOW_OTHERS = 1136;
     private static final int ID_GIFTS_ORBIT = 4305;
+    private static final int ID_TEST_GIFTS = 4306;
     private static final int ID_STREAKS = 1140;
     private static final int ID_NEW_PLAYER = 1141;
     private static final int ID_MUSIC_TAB = 1142;
@@ -1359,6 +1360,10 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asButtonCheck(ID_NAME_EMOJI_SHARE, getString(R.string.SG_NameEmojiShare), getString(R.string.SG_NameEmojiShareInfo)).setChecked(SolegramConfig.nameEmojiShare));
         items.add(UItem.asButtonCheck(ID_CARD_SHOW_OTHERS, getString(R.string.SG_CardShowOthers), getString(R.string.SG_CardShowOthersInfo)).setChecked(SolegramConfig.profileCards));
         items.add(UItem.asButtonCheck(ID_GIFTS_ORBIT, getString(R.string.SG_GiftsOrbit), getString(R.string.SG_GiftsOrbitInfo)).setChecked(SolegramConfig.profileGiftsOrbit));
+        if (org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")) {
+            // betas only: the developer checks how gifts look without having them
+            items.add(UItem.asButtonCheck(ID_TEST_GIFTS, getString(R.string.SG_TestGifts), getString(R.string.SG_TestGiftsInfo)).setChecked(SolegramConfig.devTestGifts));
+        }
         items.add(UItem.asButtonCheck(ID_ANIMATED_AVATARS, getString(R.string.SG_AnimatedAvatars), getString(R.string.SG_AnimatedAvatarsInfo)).setChecked(SolegramConfig.animatedAvatars));
         items.add(UItem.asShadow(getString(R.string.SG_PremiumLookInfo)));
 
@@ -3006,6 +3011,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_GIFTS_ORBIT:
                 toggleCheck(view, "profileGiftsOrbit");
+                return;
+            case ID_TEST_GIFTS:
+                toggleCheck(view, "devTestGifts");
                 return;
             case ID_MAP_ENGINE: {
                 final String[] names = new String[3];

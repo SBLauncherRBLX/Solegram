@@ -581,7 +581,7 @@ public class ProfileActionsView extends View {
     // region Solegram: round buttons with the label under them (Telegram's new iOS profile, "Profile V2")
 
     private static boolean sgRound() {
-        return true;
+        return false; // the owner kept the rounded rectangles
     }
 
     /**
