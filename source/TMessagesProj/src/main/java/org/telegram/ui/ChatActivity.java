@@ -33640,6 +33640,12 @@ public class ChatActivity extends BaseFragment implements
             }
             solegramPlaceCompactMenu(scrimPopupContainerLayout, liquidMenu); // Solegram: a compact menu above the message sits by it
             solegramFixMenuWidth(scrimPopupContainerLayout, scrimPopupWindow); // Solegram: the icons' pill is never cut off
+            {
+                // and if the menu still grows wider once shown (a longer row, the reactions), the window grows with it
+                final ChatScrimPopupContainerLayout sgContainer = scrimPopupContainerLayout;
+                final ActionBarPopupWindow sgWindow = scrimPopupWindow;
+                sgContainer.solegramAfterLayout = () -> solegramFitMenuWindow(sgContainer, sgWindow);
+            }
             final int finalPopupX = scrimPopupX = popupX;
             final int finalPopupY = scrimPopupY = popupY;
             if (liquidMenu == null) {
@@ -34132,6 +34138,36 @@ public class ChatActivity extends BaseFragment implements
         if (container.getMeasuredWidth() > 0) {
             window.setWidth(container.getMeasuredWidth());
         }
+    }
+
+    /**
+     * Solegram: the menu window is never narrower than what it holds. Its width is set before it is shown, but the menu
+     * can still come out wider (a row added or longer, the reactions' width): then the menu's right side and the icons'
+     * pill were cut by the window's edge. The window grows to the content (moved left only if it would leave the screen).
+     */
+    private void solegramFitMenuWindow(ChatScrimPopupContainerLayout container, ActionBarPopupWindow window) {
+        if (window == null || container == null || !window.isShowing() || window != scrimPopupWindow) {
+            return;
+        }
+        final View root = container.getRootView();
+        final int need = container.getMeasuredWidth();
+        final int have = root != null ? root.getWidth() : 0;
+        if (have <= 0 || need <= have) {
+            return;
+        }
+        final View screenRoot = fragmentView != null ? fragmentView.getRootView() : null;
+        final int screen = screenRoot != null && screenRoot.getWidth() > 0 ? screenRoot.getWidth() : AndroidUtilities.displaySize.x;
+        int x = scrimPopupX;
+        if (x + need > screen) {
+            x = Math.max(0, screen - need);
+        }
+        final int fx = x;
+        container.post(() -> {
+            if (window.isShowing() && window == scrimPopupWindow) {
+                scrimPopupX = fx;
+                window.update(fx, scrimPopupY, need, -1);
+            }
+        });
     }
 
     /** Solegram: the icons' pill opens with the menu: it grows out of the menu's side, its icons come in one by one. */

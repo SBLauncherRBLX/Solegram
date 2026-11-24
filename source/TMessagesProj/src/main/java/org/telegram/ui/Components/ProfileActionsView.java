@@ -331,8 +331,14 @@ public class ProfileActionsView extends View {
                 action.rect.width() / 2.0f * (1.0f - action.getScale()),
                 action.rect.height() / 2.0f * (1.0f - action.getScale())
             );
+            float shapeR = r;
+            if (sgRound()) {
+                updateBounds(action);
+                sgCircleNow(action, fraction, AndroidUtilities.rectTmp);
+                shapeR = AndroidUtilities.rectTmp.width() / 2f;
+            }
             if (glassFactory != null) {
-                drawGlass(canvas, AndroidUtilities.rectTmp, r, action.getAlpha() * alphaFraction1);
+                drawGlass(canvas, AndroidUtilities.rectTmp, shapeR, action.getAlpha() * alphaFraction1);
                 continue;
             }
             // Solegram: flat buttons (no glass); over the expanded photo they go a soft dark, so white icons read
@@ -346,13 +352,13 @@ public class ProfileActionsView extends View {
             paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f + 0.9f * overPhoto : 1f)));
             paint.setShadowLayer(0, 0, 0, 0);
 
-            solegramFill(canvas, AndroidUtilities.rectTmp, r, paint);
+            solegramFill(canvas, AndroidUtilities.rectTmp, shapeR, paint);
             if (radialGradient != null && overPhoto < 1f) {
                 int wasAlpha2 = shaderPaint.getAlpha();
                 shaderPaint.setAlpha((int) (action.getAlpha() * alphaFraction1 * wasAlpha2 * (1f - overPhoto)));
                 matrix.setTranslate(AndroidUtilities.rectTmp.left, AndroidUtilities.rectTmp.top);
                 radialGradient.setLocalMatrix(matrix);
-                solegramFill(canvas, AndroidUtilities.rectTmp, r, shaderPaint);
+                solegramFill(canvas, AndroidUtilities.rectTmp, shapeR, shaderPaint);
                 shaderPaint.setAlpha(wasAlpha2);
             }
             paint.setColor(wasColor); // its own colour and alpha back
@@ -385,6 +391,19 @@ public class ProfileActionsView extends View {
         final int drawableSize = dp(24);
         final float drawableR = drawableSize * 0.5f;
 
+        if (sgRound()) {
+            // the label under the circle: small, like on the new iOS profile
+            action.text.setMaxWidth(action.rect.width() + xpadding / 2f - dp(1));
+            action.textScale = action.text.getLineCount() >= 2 ? 0.72f : 0.84f;
+            sgLayoutRound(action);
+            action.setBounds(
+                (int) (cx - drawableR),
+                (int) (action.sgCircle.centerY() - drawableR),
+                (int) (cx + drawableR),
+                (int) (action.sgCircle.centerY() + drawableR)
+            );
+            return;
+        }
         action.text.setMaxWidth(action.rect.width() - dp(2));
         action.textScale = action.text.getLineCount() >= 3 ? 0.75f : action.text.getLineCount() >= 2 ? 0.85f : 1.0f;
         final float drawableTop = Math.max(0, (targetHeight - action.text.getHeight() * action.textScale) / 3f + dpf2(1.33f));
@@ -420,11 +439,15 @@ public class ProfileActionsView extends View {
         final float cy = action.rect.centerY();
         fraction *= action.getScale();
         canvas.scale(fraction, fraction, cx, cy);
-        canvas.clipRect(action.rect);
-
         updateBounds(action);
+        if (sgRound()) {
+            // the label is a little wider than the cell (the gap between the buttons)
+            canvas.clipRect(action.rect.left - xpadding / 4f, action.rect.top, action.rect.right + xpadding / 4f, action.rect.bottom);
+        } else {
+            canvas.clipRect(action.rect);
+        }
 
-        final float textY = action.bounds.bottom + action.bounds.top - action.text.getHeight() * action.textScale / 2.0f - dp(4.66f);
+        final float textY = sgRound() ? action.sgLabelTop : action.bounds.bottom + action.bounds.top - action.text.getHeight() * action.textScale / 2.0f - dp(4.66f);
         canvas.save();
         canvas.scale(action.textScale, action.textScale, cx, textY + action.text.getHeight() * action.textScale / 2.0f);
         action.text.draw(canvas, cx - action.text.getWidth() / 2f, textY, textColor, alpha);
@@ -538,8 +561,14 @@ public class ProfileActionsView extends View {
         }
 
         if (action.loadingDrawable != null) {
-            action.loadingDrawable.setBounds(action.rect);
-            action.loadingDrawable.setRadii(getRoundRadius());
+            if (sgRound()) {
+                AndroidUtilities.rectTmp.set(action.sgCircle);
+                action.loadingDrawable.setBounds(AndroidUtilities.rectTmp);
+                action.loadingDrawable.setRadii(AndroidUtilities.rectTmp.width() / 2f);
+            } else {
+                action.loadingDrawable.setBounds(action.rect);
+                action.loadingDrawable.setRadii(getRoundRadius());
+            }
             action.loadingDrawable.setAlpha((int) (0xFF * alpha));
             action.loadingDrawable.draw(canvas);
         }
@@ -548,6 +577,37 @@ public class ProfileActionsView extends View {
     public float getRoundRadius() {
         return dp(16);
     }
+
+    // region Solegram: round buttons with the label under them (Telegram's new iOS profile, "Profile V2")
+
+    private static boolean sgRound() {
+        return true;
+    }
+
+    /**
+     * The round button of an action in the full-height layout (the circle, then the label under it, centred together
+     * in the cell); {@link #updateBounds} has set the label's width and scale.
+     */
+    private void sgLayoutRound(Action action) {
+        final float cellTop = top, cellH = targetHeight;
+        final float textH = action.text.getHeight() * action.textScale;
+        final float gap = dp(4);
+        final float d = Math.max(dp(22), Math.min(dp(46), Math.min(action.rect.width() - dp(4), cellH - textH - gap)));
+        final float groupTop = cellTop + Math.max(0, (cellH - d - gap - textH) / 2f);
+        final float cx = action.rect.centerX();
+        action.sgCircle.set(cx - d / 2f, groupTop, cx + d / 2f, groupTop + d);
+        action.sgLabelTop = groupTop + d + gap;
+    }
+
+    /** The circle as drawn now: scaled like drawAction scales the icon and the label (around the cell's centre). */
+    private void sgCircleNow(Action action, float fraction, RectF out) {
+        final float s = fraction * action.getScale();
+        final float cx = action.rect.centerX(), cy = action.rect.centerY();
+        final RectF c = action.sgCircle;
+        out.set(cx + (c.left - cx) * s, cy + (c.top - cy) * s, cx + (c.right - cx) * s, cy + (c.bottom - cy) * s);
+    }
+
+    // endregion
 
     private Action hit = null;
     private float downX, downY;
@@ -1078,7 +1138,12 @@ public class ProfileActionsView extends View {
             final int base = color != 0 ? color : 0xFF808080;
             plate.setColor(ColorUtils.blendARGB(base, isButtonColorLight() ? 0xFFFFFFFF : 0xFF000000, 0.12f));
             plate.setAlpha(0xE6);
-            solegramFill(c, a.rect, r, plate);
+            if (sgRound()) {
+                updateBounds(a);
+                solegramFill(c, a.sgCircle, a.sgCircle.width() / 2f, plate);
+            } else {
+                solegramFill(c, a.rect, r, plate);
+            }
             drawAction(c, a, 1f, 1f);
             return bitmap;
         }
@@ -1095,6 +1160,9 @@ public class ProfileActionsView extends View {
         int sgMotionKind;
         final RectF prevRect = new RectF();
         final RectF rect = new RectF();
+        /** Solegram: the round button in the full-height layout, and its label's top. */
+        final RectF sgCircle = new RectF();
+        float sgLabelTop;
 
         private final AnimatedFloat positionFraction = new AnimatedFloat(ProfileActionsView.this, 0, 250, CubicBezierInterpolator.DEFAULT);
         private final RectF to = new RectF();

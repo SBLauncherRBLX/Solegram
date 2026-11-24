@@ -4047,11 +4047,12 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     @Override
                     public void onVisualizerUpdate(boolean playing, boolean animate, float[] values) {
                         Theme.getCurrentAudiVisualizerDrawable().setWaveform(playing, animate, values);
+                        com.solegram.messenger.SolegramBeat.onWaveform(playing, values); // Solegram: the profile's gifts bounce to it
                     }
 
                     @Override
                     public boolean needUpdate() {
-                        return Theme.getCurrentAudiVisualizerDrawable().getParentView() != null;
+                        return Theme.getCurrentAudiVisualizerDrawable().getParentView() != null || com.solegram.messenger.SolegramBeat.wanted();
                     }
                 });
                 if (exists) {

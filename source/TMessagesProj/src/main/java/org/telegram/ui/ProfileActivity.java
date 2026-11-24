@@ -1455,6 +1455,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (fading) {
                 canvas.restore();
             }
+            sgUpdateTail(y1);
             // below y1 the header of the media is glass: headerFadeView, over the pages. Leaving the media the header
             // grows back from the top while the media are already lower: the screen's background between them
             if (mediaHeaderAnimationProgress > 0 && y1 < v && sharedMediaLayout != null && sharedMediaLayout.isAttachedToWindow()) {
@@ -1468,6 +1469,98 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private Rect blurBounds = new Rect();
+
+        // region Solegram: the header does not end with a line: its colour (or the photo's) melts into the page below
+        int sgTailTop = -1, sgTailColor;
+        float sgTailAlpha;
+
+        private void sgUpdateTail(int y1) {
+            int top = -1, color = 0;
+            float alpha = 0f;
+            final boolean banner = sgBanner != null && sgCard != null && sgCard.hasBanner() && com.solegram.messenger.SolegramConfig.profileCards;
+            if (y1 > 0 && !capturing) {
+                final float progressToGradient = (playProfileAnimation == 0 ? 1f : avatarAnimationProgress) * hasColorAnimated.set(hasColorById);
+                int header = ColorUtils.blendARGB(currentColor, color1Animated.get(), Utilities.clamp01(progressToGradient));
+                if (banner) {
+                    header = sgBannerBottomColor(header);
+                }
+                final float photo = Utilities.clamp01(expandProgress);
+                if (photo > 0f) {
+                    header = ColorUtils.blendARGB(header, sgPhotoBottomColor(header), photo);
+                }
+                top = y1;
+                color = header | 0xFF000000;
+                alpha = (1f - headerBlurFactor) * (1f - mediaHeaderAnimationProgress) * (playProfileAnimation == 0 ? 1f : avatarAnimationProgress);
+            }
+            if (top != sgTailTop || color != sgTailColor || Math.abs(alpha - sgTailAlpha) > 0.004f) {
+                sgTailTop = top;
+                sgTailColor = color;
+                sgTailAlpha = alpha;
+                if (listView != null) {
+                    listView.invalidate();
+                }
+            }
+        }
+
+        private Bitmap sgColorOf;
+        private int sgColorOfValue;
+
+        /** The average colour of a bitmap's lower part (where it meets the page). */
+        private int sgBottomColor(@Nullable Bitmap bitmap, int fallback) {
+            if (bitmap == null || bitmap.isRecycled()) {
+                return fallback;
+            }
+            if (bitmap == sgColorOf) {
+                return sgColorOfValue;
+            }
+            int result = fallback;
+            try {
+                Bitmap source = bitmap;
+                if (Build.VERSION.SDK_INT >= 26 && bitmap.getConfig() == Bitmap.Config.HARDWARE) {
+                    source = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+                }
+                final Bitmap small = Bitmap.createScaledBitmap(source, 8, 8, true);
+                long r = 0, g = 0, b = 0;
+                int n = 0;
+                for (int y = 6; y < 8; y++) {
+                    for (int x = 0; x < 8; x++) {
+                        final int c = small.getPixel(x, y);
+                        r += Color.red(c);
+                        g += Color.green(c);
+                        b += Color.blue(c);
+                        n++;
+                    }
+                }
+                result = Color.rgb((int) (r / n), (int) (g / n), (int) (b / n));
+                if (small != source) {
+                    small.recycle();
+                }
+                if (source != bitmap) {
+                    source.recycle();
+                }
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            sgColorOf = bitmap;
+            sgColorOfValue = result;
+            return result;
+        }
+
+        private int sgPhotoBottomColor(int fallback) {
+            BackupImageView view = avatarsViewPager != null ? avatarsViewPager.getCurrentItemView() : null;
+            final Bitmap bitmap = view != null ? view.getImageReceiver().getBitmap() : null;
+            return sgBottomColor(bitmap != null ? bitmap : avatarImage != null ? avatarImage.getImageReceiver().getBitmap() : null, fallback);
+        }
+
+        private int sgBannerBottomColor(int fallback) {
+            int color = sgBottomColor(sgBanner.getBitmap(), fallback);
+            if (sgCard.dim > 0) {
+                color = ColorUtils.blendARGB(color, Color.BLACK, sgCard.dim / 100f);
+            }
+            return color;
+        }
+        // endregion
+
         private Paint sgDimPaint;
         private int sgDimHeight, sgDimValue;
         private final Paint gapPaint = new Paint();
@@ -1480,6 +1573,63 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             capturing = true;
             draw(canvas);
             capturing = false;
+        }
+    }
+
+    /** The list's background: the page's colour, and under the header the header's own colour fading into it. */
+    private final class SgPageBackground extends android.graphics.drawable.Drawable {
+        private final Paint page = new Paint();
+        private final Paint tail = new Paint();
+        private android.graphics.LinearGradient gradient;
+        private int gradientColor, gradientPage;
+        private float gradientTop, gradientHeight;
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
+            page.setColor(pageColor);
+            final android.graphics.Rect bounds = getBounds();
+            canvas.drawRect(bounds, page);
+            if (topView == null || listView == null || topView.sgTailTop < 0 || topView.sgTailAlpha <= 0.01f) {
+                return;
+            }
+            final float top = topView.sgTailTop + topView.getY() - listView.getY();
+            final float height = dp(96);
+            if (top + height <= bounds.top || top >= bounds.bottom) {
+                return;
+            }
+            final int color = topView.sgTailColor;
+            if (gradient == null || gradientColor != color || gradientPage != pageColor || gradientTop != top || gradientHeight != height) {
+                gradientColor = color;
+                gradientPage = pageColor;
+                gradientTop = top;
+                gradientHeight = height;
+                // an eased fade (not linear), so no edge shows where it ends
+                final int[] colors = new int[6];
+                final float[] stops = new float[6];
+                for (int i = 0; i < 6; i++) {
+                    final float t = i / 5f;
+                    stops[i] = t;
+                    colors[i] = ColorUtils.blendARGB(color, pageColor, t * t * (3 - 2 * t));
+                }
+                gradient = new android.graphics.LinearGradient(0, top, 0, top + height, colors, stops, Shader.TileMode.CLAMP);
+                tail.setShader(gradient);
+            }
+            tail.setAlpha((int) (0xFF * topView.sgTailAlpha));
+            canvas.drawRect(bounds.left, Math.max(bounds.top, top - dp(2)), bounds.right, Math.min(bounds.bottom, top + height), tail);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return android.graphics.PixelFormat.OPAQUE;
         }
     }
 
@@ -2746,14 +2896,18 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         }
         views.add(avatarContainer);
-        views.add(nameTextView);
         views.add(onlineTextView);
         views.add(ratingView);
+        // the name falls letter by letter; a round avatar rolls
+        final java.util.ArrayList<View> letters = new java.util.ArrayList<>();
+        letters.add(nameTextView);
+        final View round = com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) >= 50 && !isTopic ? avatarContainer : null;
         hide.add(storyView);
         hide.add(giftsView);
+        hide.add(giftsView != null ? giftsView.sgFront : null);
         hide.add(animatedStatusView);
         hide.add(avatarsViewPagerIndicatorView);
-        sgShake = com.solegram.messenger.ui.SolegramProfileShake.toggle(sgShake, (ViewGroup) fragmentView, actionsView, views, hide, actionsView);
+        sgShake = com.solegram.messenger.ui.SolegramProfileShake.toggle(sgShake, (ViewGroup) fragmentView, actionsView, views, letters, round, hide, actionsView);
         return true;
     }
 
@@ -4598,7 +4752,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         listView.applyPaddingToSections = false;
         // the rows above the list's top go under the header's blur, with their cards
         listView.setSectionsOverscanTop(AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight());
-        ThemeBind.backgroundColor(listView, Theme.key_windowBackgroundGray, resourcesProvider);
+        // Solegram: the page's background, with the header's colour melting into it right under the header
+        listView.setBackground(new SgPageBackground());
         listView.setVerticalScrollBarEnabled(false);
         final IBlur3Capture listViewCapture = new ViewGroupPartRenderer(listView, (ViewGroup) fragmentView, (canvas, child, drawingTime) -> {
             if (child == sharedMediaLayout) {
@@ -6040,7 +6195,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
         avatarContainer2.addView(storyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         giftsView = new ProfileGiftsView(context, currentAccount, getDialogId(), avatarContainer, avatarImage, resourcesProvider);
+        // Solegram: the gifts hop to the beat of this profile's own music while it plays
+        giftsView.sgSetMusicPlays(() -> sgPlaysSavedMusic(MediaController.getInstance().getPlayingMessageObject()) && !MediaController.getInstance().isMessagePaused());
         avatarContainer2.addView(giftsView, 0, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        // Solegram: the gift bubbles that come nearer pass in front of the avatar
+        final int sgGooeyIndex = avatarContainer2.indexOfChild(avatarGooey);
+        avatarContainer2.addView(giftsView.sgFront, sgGooeyIndex >= 0 ? sgGooeyIndex + 1 : avatarContainer2.getChildCount(), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         updateProfileData(true);
 
         writeButton = new RLottieImageView(context);
@@ -8517,6 +8677,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
         if (musicView != null) {
             musicView.setGlassFactory(buttonsGlass.actionsGlassFactory, ProfileButtonsGlass.GLASS_COLORS);
+        }
+        if (giftsView != null && buttonsGlass.hasLiveCapture()) {
+            // the gift bubbles refract the header and the avatar under them
+            giftsView.sgSetGlass(buttonsGlass.bubbleFactory);
         }
         simpleActionBar.setButtonsGlass(buttonsGlass.headerFactory);
         simpleActionBar.setMenuGlassStroke(false);

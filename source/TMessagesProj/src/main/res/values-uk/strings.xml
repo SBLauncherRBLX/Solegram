@@ -2524,5 +2524,7 @@
     <string name="SG_StatsFmNotFound">No such stats.fm profile</string>
     <string name="SG_StatsFmLinked">stats.fm linked: %1$s</string>
     <string name="SG_StatsFmPlayingNow">Playing now</string>
+    <string name="SG_GiftsOrbit">Gifts orbit the avatar</string>
+    <string name="SG_GiftsOrbitInfo">Gifts on profiles circle the photo and hop to the beat of the profile\'s music</string>
     <!-- SOLEGRAM END -->
 </resources>

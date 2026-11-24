@@ -399,6 +399,8 @@ public class SolegramConfig {
     public static int mapsNavApp = 1;
     /** SolegramProfileCard: banners and tile layouts of Solegram users' profiles are shown. */
     public static boolean profileCards = true;
+    /** ProfileGiftsView: the gifts on the profile fly round the avatar (and hop to the beat of its own music). */
+    public static boolean profileGiftsOrbit = true;
     public static String updateChannel = "";
     public static long lastUpdateCheck;
     public static int skippedUpdateBuild;
@@ -692,6 +694,7 @@ public class SolegramConfig {
         mapEngine = clamp(p.getInt("mapEngine", 0), 0, 2);
         mapsNavApp = clamp(p.getInt("mapsNavApp", 1), 0, 7);
         profileCards = p.getBoolean("profileCards", true);
+        profileGiftsOrbit = p.getBoolean("profileGiftsOrbit", true);
         updateChannel = p.getString("updateChannel", "");
         lastUpdateCheck = readLong(p, "lastUpdateCheck");
         skippedUpdateBuild = p.getInt("skippedUpdateBuild", 0);
@@ -846,6 +849,7 @@ public class SolegramConfig {
             case "roundEditor":
             case "unifiedWallet":
             case "profileCards":
+            case "profileGiftsOrbit":
             case "ghostReadOnInteract":
             case "ghostInDrawer":
             case "backgroundConnection":

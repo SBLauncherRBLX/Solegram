@@ -94,6 +94,13 @@ public final class ProfileButtonsGlass {
      * buttons' colour.
      */
     public final BlurredBackgroundDrawableViewFactory actionsGlassFactory;
+    /** Solegram: clear lens glass for the gift bubbles: what is under them (the header, the avatar) refracted, untinted. */
+    public final BlurredBackgroundDrawableViewFactory bubbleFactory;
+
+    /** Whether the glass sees what is under it (Android 12+, a capture); without it the bubbles are drawn by themselves. */
+    public boolean hasLiveCapture() {
+        return clearSource != null;
+    }
     /** The rim and the shadow of {@link #actionsGlassFactory}. */
     public static final BlurredBackgroundColorProvider GLASS_COLORS = new BlurredBackgroundColorProvider() {
         @Override
@@ -152,6 +159,8 @@ public final class ProfileButtonsGlass {
         actionsFactory = createFactory(engine, actionsSource);
         actionsGlassFactory = createFactory(engine, new LensSource());
         actionsGlassFactory.setLiquidGlassEffectAllowed(true);
+        bubbleFactory = createFactory(engine, new BubbleSource());
+        bubbleFactory.setLiquidGlassEffectAllowed(true);
         headerFactory = createFactory(engine, headerSource);
         headerFactory.setLiquidGlassEffectAllowed(true);
 
@@ -422,6 +431,21 @@ public final class ProfileButtonsGlass {
     }
 
     /** What {@link #actionsGlassFactory} bends: the clear capture of what is under the button, tinted. */
+    /** The bubbles' lens: only the clear capture; nothing where there is none (the bubble draws its own body). */
+    private final class BubbleSource implements GlassSource, BlurredBackgroundDrawableViewFactory.DrawableOwner {
+        @Override
+        public BlurredBackgroundDrawable createDrawable() {
+            return new BlurredBackgroundDrawable(this);
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas, float left, float top, float right, float bottom) {
+            if (clearSource != null && canvas.isHardwareAccelerated()) {
+                clearSource.draw(canvas, left, top, right, bottom);
+            }
+        }
+    }
+
     private final class LensSource implements GlassSource, BlurredBackgroundDrawableViewFactory.DrawableOwner {
         private final Paint dimPaint = new Paint();
 

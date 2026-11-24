@@ -33,7 +33,13 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
         solegramLayoutSidePill();
+        if (solegramAfterLayout != null) {
+            solegramAfterLayout.run();
+        }
     }
+
+    /** Solegram: told after each layout (the window is made wide enough for the menu and its pill). */
+    public Runnable solegramAfterLayout;
 
     // region Solegram side pill
 
