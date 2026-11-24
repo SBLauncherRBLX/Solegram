@@ -46,6 +46,24 @@ public class ProfileGalleryBlurView extends View {
 
     private ProfileGalleryView view;
     public int actionSize;
+    /**
+     * Solegram: the blur is above the photo (the photo is lower, under the header's top; the name and the buttons lie
+     * on the photo itself). Android 12+ only (the render node); before it there is no blur.
+     */
+    public static final boolean SG_TOP = true;
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private RenderEffect sgTopEffect(float nodeHeight, float fade) {
+        final float r = getBlurRadius();
+        final LinearGradient gradient = new LinearGradient(0, nodeHeight, 0, Math.max(0, nodeHeight - fade),
+            new int[]{Color.TRANSPARENT, Color.WHITE}, null, Shader.TileMode.CLAMP);
+        return RenderEffect.createBlendModeEffect(
+            RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP),
+            RenderEffect.createShaderEffect(gradient),
+            BlendMode.DST_IN);
+    }
+
+    private float sgTopEffectHeight = -1, sgTopEffectFade = -1;
     public int size;
 
     private final Runnable blurTask = this::doBlur;
@@ -403,6 +421,9 @@ public class ProfileGalleryBlurView extends View {
         if (view == null || !view.isAttachedToWindow() || view.getVisibility() == GONE) {
             return;
         }
+        if (SG_TOP && !(usingRenderNode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && canvas.isHardwareAccelerated())) {
+            return; // the blur above the photo needs the render node
+        }
 
         if (usingRenderNode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (canvas.isHardwareAccelerated()) {
@@ -500,6 +521,16 @@ public class ProfileGalleryBlurView extends View {
     @RequiresApi(api = Build.VERSION_CODES.S)
     public void drawRenderNode(Canvas canvas, float width) {
         initRenderNode();
+        if (SG_TOP) {
+            final float scale = getRenderNodeScale();
+            final float nodeHeight = (float) Math.ceil((size + actionSize) / scale);
+            final float fade = AndroidUtilities.dpf2(56) / scale;
+            if (sgTopEffectHeight != nodeHeight || sgTopEffectFade != fade) {
+                sgTopEffectHeight = nodeHeight;
+                sgTopEffectFade = fade;
+                blurNode.setRenderEffect(sgTopEffect(nodeHeight, fade));
+            }
+        }
 
         if (listeners[0] != null) listeners[0].listenInvalidate(null);
         if (listeners[1] != null) listeners[1].listenInvalidate(null);
@@ -533,7 +564,19 @@ public class ProfileGalleryBlurView extends View {
     private void drawViewWithRenderNode(Canvas recordingCanvas, int index) {
         View drawingView = view.getItemViewAt(currentPosition + index);
 
-        if (drawingView != null) {
+        if (SG_TOP && drawingView != null) {
+            // the photo's top under the gradient of the blur, and its mirror (stretched) above it
+            recordingCanvas.save();
+            recordingCanvas.translate(0, actionSize);
+            drawingView.draw(recordingCanvas);
+            recordingCanvas.restore();
+
+            recordingCanvas.save();
+            recordingCanvas.translate(0, actionSize);
+            recordingCanvas.scale(1f, -2f);
+            drawingView.draw(recordingCanvas);
+            recordingCanvas.restore();
+        } else if (drawingView != null) {
             int h = drawingView.getMeasuredHeight();
             recordingCanvas.save();
             recordingCanvas.translate(0, size - h);
@@ -558,6 +601,10 @@ public class ProfileGalleryBlurView extends View {
 
     @RequiresApi(api = Build.VERSION_CODES.S)
     public void drawOpeningRenderNode(ProfileActivity.AvatarImageView avatarImageView, Canvas canvas, float width, float height, float fraction, float alpha) {
+        if (SG_TOP) {
+            sgDrawOpeningTop(avatarImageView, canvas, width, height, fraction, alpha);
+            return;
+        }
         fraction = 1f - fraction;
         float openingScale = width / view.getMeasuredWidth();
         float croppedSize = size * fraction;
@@ -584,6 +631,55 @@ public class ProfileGalleryBlurView extends View {
         canvas.translate(0f, -scaledSize);
         canvas.scale(scale, scale);
         canvas.drawRenderNode(blurNode);
+    }
+
+    /** The avatar growing into the photo: the blur grows above it (the canvas is at the image's top left). */
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private void sgDrawOpeningTop(ProfileActivity.AvatarImageView avatarImageView, Canvas canvas, float width, float height, float fraction, float alpha) {
+        fraction = 1f - fraction;
+        final float openingScale = width / Math.max(1, view.getMeasuredWidth());
+        final float overlap = size * fraction * openingScale;
+        final float above = actionSize * openingScale;
+        final float scale = getRenderNodeScale();
+        initRenderNode();
+        final float nodeHeight = (float) Math.ceil((overlap + above) / scale);
+        final float fade = Math.min(overlap, AndroidUtilities.dpf2(56) * openingScale) / scale;
+        sgTopEffectHeight = -1; // the pager's own effect is set again when it draws
+        blurNode.setRenderEffect(sgTopEffect(nodeHeight, Math.max(1, fade)));
+        blurNode.setPosition(0, 0, (int) Math.ceil(width / scale), (int) nodeHeight);
+        final RecordingCanvas rc = blurNode.beginRecording();
+        rc.scale(1f / scale, 1f / scale);
+        final ImageReceiver imageReceiver = avatarImageView.animatedEmojiDrawable != null
+                ? avatarImageView.animatedEmojiDrawable.getImageReceiver()
+                : avatarImageView.imageReceiver;
+        sgDrawOpeningImageTop(imageReceiver, rc, above);
+        if (avatarImageView.drawForeground && avatarImageView.foregroundAlpha > 0f) {
+            sgDrawOpeningImageTop(avatarImageView.foregroundImageReceiver, rc, above);
+        }
+        blurNode.endRecording();
+        blurNode.setAlpha(alpha);
+        canvas.translate(0f, -above);
+        canvas.scale(scale, scale);
+        canvas.drawRenderNode(blurNode);
+    }
+
+    private void sgDrawOpeningImageTop(ImageReceiver imageReceiver, Canvas rc, float above) {
+        if (imageReceiver == null) {
+            return;
+        }
+        final int oldR = imageReceiver.getRoundRadius()[0];
+        imageReceiver.setRoundRadius(0);
+        rc.save();
+        rc.translate(-imageReceiver.getImageX(), above - imageReceiver.getImageY());
+        imageReceiver.draw(rc);
+        rc.restore();
+        rc.save();
+        rc.translate(-imageReceiver.getImageX(), above);
+        rc.scale(1f, -2f);
+        rc.translate(0, -imageReceiver.getImageY());
+        imageReceiver.draw(rc);
+        rc.restore();
+        imageReceiver.setRoundRadius(oldR);
     }
 
     private void drawOpeningImageRenderNode(

@@ -1160,7 +1160,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
 
             if (shouldDrawBlur) {
-                canvas.translate(inset, inset + thisHeight);
+                // Solegram: the blur above the photo (ProfileGalleryBlurView.SG_TOP), below it in Telegram
+                canvas.translate(inset, ProfileGalleryBlurView.SG_TOP ? inset : inset + thisHeight);
                 float fraction = !isPulledDown && !blurView.isUsingRenderNode() && avatarsViewPager.getRealPosition() != 0 ? 1f : (1f - blurSizeFraction);
                 blurView.draw(canvas, this, thisWidth - inset * 2f, thisHeight - inset * 2f, true, fraction, alpha);
             }
@@ -1474,20 +1475,32 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         // region Solegram: the header does not end with a line: its lower part melts into the page's colour
         private final Paint sgHeaderMeltPaint = new Paint();
+        private final Paint sgHeaderSolidPaint = new Paint();
         private int sgHeaderMeltColor;
-        private float sgHeaderMeltHeight;
 
         private void sgDrawHeaderMelt(Canvas canvas, int y1) {
-            // only while the header is open (the small bar of a scrolled profile keeps its colour)
-            final float shown = Utilities.clamp01((extraHeight - dp(40)) / dp(80)) * (1f - mediaHeaderAnimationProgress);
-            if (shown <= 0.01f) {
+            final float shown = 1f - mediaHeaderAnimationProgress;
+            if (shown <= 0.01f || extraHeight <= 0) {
                 return;
             }
             final int page = getThemedColor(Theme.key_windowBackgroundGray);
-            final float height = Math.min(dp(84), extraHeight * 0.5f);
-            if (sgHeaderMeltColor != page || sgHeaderMeltHeight != height) {
+            // the melt ends a little above the buttons (they stand on the page's colour); everything follows the
+            // header's bottom and shrinks with it while the profile scrolls, so it never jumps or vanishes
+            final float meltBottom = y1 - Math.min(dp(54), extraHeight * 0.45f);
+            float meltTop = meltBottom - Math.min(dp(44), extraHeight * 0.4f);
+            if (onlineTextView != null && onlineTextView.getVisibility() == View.VISIBLE) {
+                // not over the status (its white text on a light page would not read)
+                final float statusBottom = onlineTextView.getY() + onlineTextView.getHeight() * onlineTextView.getScaleY() + dp(2);
+                if (statusBottom > meltTop && meltBottom - statusBottom >= dp(16)) {
+                    meltTop = statusBottom;
+                }
+            }
+            final float height = meltBottom - meltTop;
+            if (height < 1) {
+                return;
+            }
+            if (sgHeaderMeltColor != page) {
                 sgHeaderMeltColor = page;
-                sgHeaderMeltHeight = height;
                 final int[] colors = new int[8];
                 final float[] stops = new float[8];
                 for (int i = 0; i < 8; i++) {
@@ -1495,68 +1508,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     stops[i] = t;
                     colors[i] = Theme.multAlpha(page, t * t * (3 - 2 * t));
                 }
-                sgHeaderMeltPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, height, colors, stops, Shader.TileMode.CLAMP));
+                // a unit gradient, stretched to the melt's height below
+                sgHeaderMeltPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, 1, colors, stops, Shader.TileMode.CLAMP));
+                sgHeaderSolidPaint.setColor(page);
             }
             sgHeaderMeltPaint.setAlpha((int) (0xFF * shown));
+            sgHeaderSolidPaint.setAlpha((int) (0xFF * shown));
             canvas.save();
-            canvas.translate(0, y1 - height);
-            canvas.drawRect(0, 0, getMeasuredWidth(), height + 1, sgHeaderMeltPaint);
+            canvas.translate(0, meltTop);
+            canvas.scale(1, height);
+            canvas.drawRect(0, 0, getMeasuredWidth(), 1, sgHeaderMeltPaint);
             canvas.restore();
+            canvas.drawRect(0, meltBottom - 0.5f, getMeasuredWidth(), y1, sgHeaderSolidPaint);
         }
         // endregion
 
-        // region Solegram: the colour at the bottom of the photo (the expanded photo melts into it, see OverlaysView)
-        private Bitmap sgColorOf;
-        private int sgColorOfValue;
-
-        /** The average colour of a bitmap's lower part (where it meets the page). */
-        private int sgBottomColor(@Nullable Bitmap bitmap, int fallback) {
-            if (bitmap == null || bitmap.isRecycled()) {
-                return fallback;
-            }
-            if (bitmap == sgColorOf) {
-                return sgColorOfValue;
-            }
-            int result = fallback;
-            try {
-                Bitmap source = bitmap;
-                if (Build.VERSION.SDK_INT >= 26 && bitmap.getConfig() == Bitmap.Config.HARDWARE) {
-                    source = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-                }
-                final Bitmap small = Bitmap.createScaledBitmap(source, 8, 8, true);
-                long r = 0, g = 0, b = 0;
-                int n = 0;
-                for (int y = 6; y < 8; y++) {
-                    for (int x = 0; x < 8; x++) {
-                        final int c = small.getPixel(x, y);
-                        r += Color.red(c);
-                        g += Color.green(c);
-                        b += Color.blue(c);
-                        n++;
-                    }
-                }
-                result = Color.rgb((int) (r / n), (int) (g / n), (int) (b / n));
-                if (small != source) {
-                    small.recycle();
-                }
-                if (source != bitmap) {
-                    source.recycle();
-                }
-            } catch (Throwable e) {
-                FileLog.e(e);
-            }
-            sgColorOf = bitmap;
-            sgColorOfValue = result;
-            return result;
-        }
-
-        private int sgPhotoBottomColor(int fallback) {
-            BackupImageView view = avatarsViewPager != null ? avatarsViewPager.getCurrentItemView() : null;
-            final Bitmap bitmap = view != null ? view.getImageReceiver().getBitmap() : null;
-            return sgBottomColor(bitmap != null ? bitmap : avatarImage != null ? avatarImage.getImageReceiver().getBitmap() : null, fallback);
-        }
-
-        // endregion
 
         private Paint sgDimPaint;
         private int sgDimHeight, sgDimValue;
@@ -1703,33 +1669,29 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         // into the page's colour, so the photo never ends with a line
         private final Paint sgMeltPaint = new Paint();
         private final Paint sgEdgePaint = new Paint();
-        private int sgMeltColor, sgMeltHeight, sgEdgeColor, sgEdgeHeight;
+        private int sgMeltHeight, sgEdgeColor, sgEdgeHeight;
 
         private void sgDrawPhotoMelt(Canvas canvas) {
             final float shown = Utilities.clamp01(expandProgress);
             final int h = getHeight(), w = getWidth();
-            if (shown <= 0.01f || h <= 0 || topView == null) {
+            if (shown <= 0.01f || h <= 0) {
                 return;
             }
-            final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
-            final int photo = topView.sgPhotoBottomColor(pageColor);
-            final int melt = ColorUtils.blendARGB(photo, Color.BLACK, 0.3f) | 0xFF000000;
-            final int meltHeight = (int) Math.min(h * 0.55f, dp(330));
-            if (sgMeltColor != melt || sgMeltHeight != meltHeight) {
-                sgMeltColor = melt;
+            // the name and the buttons lie on the photo itself now (the blur is above it): a soft darkening under them
+            final int meltHeight = (int) Math.min(h * 0.45f, dp(260));
+            if (sgMeltHeight != meltHeight) {
                 sgMeltHeight = meltHeight;
                 final int[] colors = new int[7];
                 final float[] stops = new float[7];
                 for (int i = 0; i < 7; i++) {
                     final float t = i / 6f;
                     stops[i] = t;
-                    // eased: no visible start or end of the fade
-                    final float e = t * t * (3 - 2 * t);
-                    colors[i] = Theme.multAlpha(melt, 0.82f * e);
+                    colors[i] = Theme.multAlpha(0xFF000000, 0.5f * t * t * (3 - 2 * t));
                 }
                 sgMeltPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, meltHeight, colors, stops, Shader.TileMode.CLAMP));
             }
-            final int edgeHeight = dp(40);
+            final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
+            final int edgeHeight = dp(28);
             if (sgEdgeColor != pageColor || sgEdgeHeight != edgeHeight) {
                 sgEdgeColor = pageColor;
                 sgEdgeHeight = edgeHeight;
@@ -6756,6 +6718,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int getActionsExtraHeight() {
         return getActionsExtraHeight(true);
     }
+
+    /** Solegram: where the expanded photo starts: under the blur above it (the space of the name and the buttons). */
+    private float sgPhotoTop() {
+        return ProfileGalleryBlurView.SG_TOP ? getActionsExtraHeight() : 0f;
+    }
     private int getActionsExtraHeight(boolean withPills) {
         if (userId != 0 && imageUpdater != null && !myProfile)
             return 0;
@@ -7001,7 +6968,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         avatarContainer.setScaleX(avatarScale);
         avatarContainer.setScaleY(avatarScale);
-        avatarContainer.setTranslationY(lerp((float) Math.ceil(avatarY), 0f, value));
+        avatarContainer.setTranslationY(lerp((float) Math.ceil(avatarY), sgPhotoTop(), value));
         avatarImage.setRoundRadiusForExpand((int) AndroidUtilities.lerp(getSmallAvatarRoundRadius(), 0f, value));
         avatarImage.setBlurRadiusProgressForExpand(value, avatarScale, isPulledDown);
         if (storyView != null) {
@@ -9545,7 +9512,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                 avatarImage.setRoundRadiusForExpand((int) AndroidUtilities.lerp(getSmallAvatarRoundRadius(), 0f, avatarAnimationProgress));
                 avatarContainer.setTranslationX(AndroidUtilities.lerp(avX, 0, avatarAnimationProgress));
-                avatarContainer.setTranslationY(AndroidUtilities.lerp((float) Math.ceil(avY), 0f, avatarAnimationProgress));
+                avatarContainer.setTranslationY(AndroidUtilities.lerp((float) Math.ceil(avY), sgPhotoTop(), avatarAnimationProgress));
                 float extra = (avatarContainer.getMeasuredWidth() - dp(42)) * (avatarScale * 100 / 42);
                 timeItem.setTranslationX(avatarContainer.getX() + dp(16) + extra);
                 timeItem.setTranslationY(avatarContainer.getY() + dp(-10) + extra);
