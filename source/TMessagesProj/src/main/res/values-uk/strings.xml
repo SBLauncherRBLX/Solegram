@@ -2574,5 +2574,8 @@
     <string name="SG_TestGiftsReset">Reset</string>
     <string name="SG_TestGiftsSaved">Test gifts saved: reopen your profile</string>
     <string name="SG_TestGiftsLoading">The gift catalog is loading, open again in a second</string>
+    <string name="SG_ShotUndo">Undo</string>
+    <string name="SG_ShotTextHidden">Text hidden</string>
+    <string name="SG_ShotMessageRemoved">Message removed</string>
     <!-- SOLEGRAM END -->
 </resources>

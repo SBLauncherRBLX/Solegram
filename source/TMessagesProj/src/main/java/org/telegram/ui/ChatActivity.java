@@ -3376,13 +3376,9 @@ public class ChatActivity extends BaseFragment implements
         }
         final int top = Math.max(0, (int) (chatListViewPaddingTop - chatListViewPaddingVisibleOffset));
         final int bottom = Math.min(chatListView.getHeight(), chatListView.getHeight() - Math.max(chatListView.getPaddingBottom(), 0));
-        final java.util.ArrayList<com.solegram.messenger.ui.SolegramShotEditor.Piece> pieces =
-            com.solegram.messenger.ui.SolegramShotEditor.capture(chatListView, top, bottom > top ? bottom : chatListView.getHeight());
-        if (pieces == null) {
+        if (!com.solegram.messenger.ui.SolegramShotEditor.show(this, chatListView, top, bottom > top ? bottom : chatListView.getHeight())) {
             BulletinFactory.of(this).createErrorBulletin(getString(R.string.SG_ShotNothing)).show();
-            return;
         }
-        presentFragment(new com.solegram.messenger.ui.SolegramShotEditor(pieces, chatListView.getWidth()));
     }
 
     private Object solegramShotCallback;
@@ -33649,6 +33645,12 @@ public class ChatActivity extends BaseFragment implements
             scrimPopupWindow = new ActionBarPopupWindow(scrimPopupContainerLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT) {
                 @Override
                 public void dismiss() {
+                    // Solegram: the icons' pill goes first and fast, so the menu's closing never shows it cut by the window
+                    final View sgPill = scrimPopupContainerLayout != null ? scrimPopupContainerLayout.solegramSidePill() : null;
+                    if (sgPill != null && sgPill.getAlpha() > 0f) {
+                        sgPill.animate().cancel();
+                        sgPill.animate().alpha(0f).scaleX(0.9f).scaleY(0.9f).setDuration(120).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+                    }
                     // Solegram: a liquid menu flows back into the message first; the window goes once it is all back
                     final SolegramMenuLiquid liquid = solegramMenuLiquid != null && solegramMenuLiquid.window == this ? solegramMenuLiquid : null;
                     if (liquid == null || !liquid.close(scrimPopupWindowHideDimOnDismiss, () -> dismiss(false))) {

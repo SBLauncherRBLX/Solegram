@@ -1214,10 +1214,10 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         final float flash = Math.max(0f, Math.min(1f, b.flash));
         // a soft bloom of its colour round it (brighter on the beat)
         if (gift.gradientPaint != null) {
-            gift.gradientPaint.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.42f + 0.5f * flash)));
+            gift.gradientPaint.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.8f + 0.2f * flash)));
             canvas.save();
             canvas.translate(cx, cy);
-            final float g = r / dp(22.5f) * (1.55f + 0.25f * flash);
+            final float g = r / dp(22.5f) * (1.8f + 0.3f * flash);
             canvas.scale(g, g);
             canvas.drawCircle(0, 0, dp(22.5f), gift.gradientPaint);
             canvas.restore();
@@ -1236,7 +1236,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             b.bodyColor = color;
             final int rim = androidx.core.graphics.ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.22f);
             b.body = new RadialGradient(0, 0, dp(21) * 1.05f,
-                new int[]{Theme.multAlpha(color, 0.46f), Theme.multAlpha(color, 0.52f), Theme.multAlpha(rim, 0.72f), Theme.multAlpha(rim, 0.9f)},
+                new int[]{Theme.multAlpha(color, 0.58f), Theme.multAlpha(color, 0.66f), Theme.multAlpha(rim, 0.82f), Theme.multAlpha(rim, 0.95f)},
                 new float[]{0f, 0.6f, 0.9f, 1f}, Shader.TileMode.CLAMP);
         }
         sgMatrix.reset();

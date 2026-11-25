@@ -2561,5 +2561,8 @@
     <string name="SG_TestGiftsReset">Сбросить</string>
     <string name="SG_TestGiftsSaved">Тестовые подарки сохранены — откройте профиль заново</string>
     <string name="SG_TestGiftsLoading">Каталог подарков загружается, откройте ещё раз через секунду</string>
+    <string name="SG_ShotUndo">Вернуть</string>
+    <string name="SG_ShotTextHidden">Текст скрыт</string>
+    <string name="SG_ShotMessageRemoved">Сообщение убрано</string>
     <!-- SOLEGRAM END -->
 </resources>

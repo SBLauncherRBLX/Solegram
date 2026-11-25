@@ -58,13 +58,27 @@ import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.util.TypedValue;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import org.telegram.messenger.ChatThemeController;
+import org.telegram.tgnet.ResultCallback;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.ActionBar.EmojiThemes;
+import org.telegram.ui.ChatActivity;
+
+import java.util.List;
 
 /**
  * Solegram: «красивый скриншот». The messages a chat shows are taken as pictures (Telegram's own drawing, without the
  * chat's header and input) and put on a background of the user's choice. Messages can be swiped away (the others close
  * up), text can be selected and hidden under blur, and the result goes to chats or to the gallery, signed «Solegram».
  */
-public class SolegramShotEditor extends BaseFragment {
+public class SolegramShotEditor {
 
     /** A message (or a date) of the screenshot: its picture and, for text, its lines. */
     public static final class Piece {
@@ -177,25 +191,53 @@ public class SolegramShotEditor extends BaseFragment {
 
     // endregion
 
-    private final ArrayList<Piece> pieces;
-    private final int contentWidth;
-    @Nullable
-    private final Drawable chatWallpaper;
+    // region the sheet over the chat
+
+    private final ChatActivity chat;
+    private final ViewGroup list;
+    private final int captureTop, captureBottom;
+    private ArrayList<Piece> pieces;
+    private int contentWidth;
+    private BottomSheet sheet;
     private ShotView shot;
-    private int background; // 0: the chat's own wallpaper, then GRADIENTS
+    private TextView subtitle;
     private final ArrayList<Runnable> undo = new ArrayList<>();
+    private final ArrayList<View> swatches = new ArrayList<>();
+    private final ArrayList<EmojiThemes> themes = new ArrayList<>();
+    /** -1: the chat's own look; else an index in {@link #themes}. */
+    private int chosen = -1;
+    private final EmojiThemes startTheme;
+    private final TLRPC.WallPaper startWallpaper;
+    private final boolean startDark;
+    private boolean dark;
+    private boolean themed;
 
-    private static final int[][] GRADIENTS = {
-        {0xFF9AD6F3, 0xFFB6A8F4}, {0xFFA8E6B8, 0xFFF3F0A0}, {0xFFF6B3D3, 0xFFB49CF2}, {0xFF7FD3C4, 0xFF5B8EE6},
-        {0xFFFFD39A, 0xFFF59BB2}, {0xFF8FB7FF, 0xFFE0A6FF}, {0xFF2C3E7A, 0xFF7A4CB0}, {0xFF1D2B3A, 0xFF3B6E6A},
-        {0xFFC9D6DF, 0xFFE2D1C3}, {0xFF262626, 0xFF4A4A4A},
-    };
-
-    public SolegramShotEditor(ArrayList<Piece> pieces, int contentWidth) {
+    private SolegramShotEditor(ChatActivity chat, ViewGroup list, int top, int bottom, ArrayList<Piece> pieces) {
+        this.chat = chat;
+        this.list = list;
+        this.captureTop = top;
+        this.captureBottom = bottom;
         this.pieces = pieces;
-        this.contentWidth = contentWidth;
-        Drawable w = Theme.getCachedWallpaperNonBlocking();
-        this.chatWallpaper = w != null ? w : Theme.getCachedWallpaper();
+        this.contentWidth = list.getWidth();
+        final ChatActivity.ThemeDelegate delegate = chat.themeDelegate;
+        startTheme = delegate != null ? delegate.getCurrentTheme() : null;
+        startWallpaper = delegate != null ? delegate.getCurrentWallpaper() : null;
+        startDark = delegate != null ? delegate.isDark() : Theme.isCurrentThemeDark();
+        dark = startDark;
+    }
+
+    /** The messages on the chat's screen (between {@code top} and {@code bottom} of its list) into the editor's sheet. */
+    public static boolean show(ChatActivity chat, ViewGroup list, int top, int bottom) {
+        final ArrayList<Piece> pieces = capture(list, top, bottom);
+        if (pieces == null || chat.getParentActivity() == null) {
+            return false;
+        }
+        new SolegramShotEditor(chat, list, top, bottom, pieces).open();
+        return true;
+    }
+
+    private boolean canTheme() {
+        return chat.themeDelegate != null && chat.themeDelegate.isThemeChangeAvailable(false);
     }
 
     private int messageCount() {
@@ -206,120 +248,293 @@ public class SolegramShotEditor extends BaseFragment {
         return n;
     }
 
-    @Override
-    public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_close_white);
-        actionBar.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
-        actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);
-        actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
-        actionBar.setSubtitleColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
-        actionBar.setCastShadows(false);
-        actionBar.setTitle(getString(R.string.SG_ShotTitle));
-        updateSubtitle();
-        actionBar.createMenu().addItem(1, R.drawable.msg_reset);
-        actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
-            @Override
-            public void onItemClick(int id) {
-                if (id == -1) {
-                    finishFragment();
-                } else if (id == 1 && !undo.isEmpty()) {
-                    undo.remove(undo.size() - 1).run();
-                    shot.relayout(true);
-                    updateSubtitle();
-                }
-            }
+    /** «Вернуть» for the last edit, as a bulletin in the sheet. */
+    private void offerUndo(String text) {
+        if (sheet == null || !sheet.isShowing()) return;
+        try {
+            BulletinFactory.of(sheet.getContainer(), chat.getResourceProvider()).createSimpleBulletin(R.raw.chats_infotip, text,
+                getString(R.string.SG_ShotUndo), () -> {
+                    if (!undo.isEmpty()) {
+                        undo.remove(undo.size() - 1).run();
+                        shot.relayout(true);
+                        updateSubtitle();
+                    }
+                }).show();
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    private void updateSubtitle() {
+        if (subtitle != null) {
+            subtitle.setText(LocaleController.formatString(R.string.SG_ShotSubtitle, messageCount()));
+        }
+    }
+
+    private void open() {
+        final Context context = chat.getParentActivity();
+        sheet = new BottomSheet(context, false, chat.getResourceProvider());
+        sheet.fixNavigationBar();
+        final LinearLayout column = new LinearLayout(context);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(0, dp(6), 0, dp(12));
+
+        // the header: ✕, the title and the count, the day/night switch
+        final FrameLayout header = new FrameLayout(context);
+        final View close = roundButton(context, false);
+        close.setOnClickListener(v -> sheet.dismiss());
+        header.addView(close, LayoutHelper.createFrame(40, 40, Gravity.LEFT | Gravity.CENTER_VERTICAL, 14, 0, 0, 0));
+        final View sun = roundButton(context, true);
+        sun.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            dark = !dark;
+            applyTheme();
+            v.invalidate();
         });
+        header.addView(sun, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 14, 0));
+        final LinearLayout titles = new LinearLayout(context);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.setGravity(Gravity.CENTER_HORIZONTAL);
+        final TextView title = new TextView(context);
+        title.setText(getString(R.string.SG_ShotTitle));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        title.setTypeface(AndroidUtilities.bold());
+        title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        titles.addView(title);
+        subtitle = new TextView(context);
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        subtitle.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
+        titles.addView(subtitle);
+        updateSubtitle();
+        header.addView(titles, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+        column.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52, 0, 0, 0, 8));
 
-        final LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
-        final FrameLayout spacer = new FrameLayout(context);
-        root.addView(spacer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
         shot = new ShotView(context);
-        spacer.addView(shot, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 0, 0, 0));
+        final int cardHeight = (int) (AndroidUtilities.displaySize.y * 0.52f / AndroidUtilities.density);
+        column.addView(shot, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, cardHeight, 0, 0, 0, 0));
 
-        // the backgrounds: the chat's own, then gradients
+        // the themes: the chat's own look, then Telegram's chat themes (or plain gradients where a chat can't take one)
         final HorizontalScrollView scroll = new HorizontalScrollView(context);
         scroll.setHorizontalScrollBarEnabled(false);
         final LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(dp(12), 0, dp(12), 0);
         scroll.addView(row);
-        final ArrayList<View> swatches = new ArrayList<>();
-        for (int i = 0; i <= GRADIENTS.length; i++) {
-            final int index = i;
-            final View swatch = new View(context) {
-                private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
-
+        addSwatch(context, row, -1);
+        column.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 62, 0, 10, 0, 6));
+        if (canTheme()) {
+            ChatThemeController.getInstance(chat.getCurrentAccount()).requestAllChatThemes(new ResultCallback<List<EmojiThemes>>() {
                 @Override
-                protected void onDraw(@NonNull Canvas canvas) {
-                    final float cx = getWidth() / 2f, cy = getHeight() / 2f, r = dp(16);
-                    if (index == 0) {
-                        canvas.save();
-                        final Path clip = new Path();
-                        clip.addCircle(cx, cy, r, Path.Direction.CW);
-                        canvas.clipPath(clip);
-                        drawWallpaper(canvas, (int) (cx - r), (int) (cy - r), (int) (2 * r), (int) (2 * r));
-                        canvas.restore();
-                    } else {
-                        final int[] g = GRADIENTS[index - 1];
-                        paint.setShader(new LinearGradient(cx - r, cy - r, cx + r, cy + r, g[0], g[1], Shader.TileMode.CLAMP));
-                        canvas.drawCircle(cx, cy, r, paint);
-                    }
-                    if (background == index) {
-                        ring.setStyle(Paint.Style.STROKE);
-                        ring.setStrokeWidth(dp(2));
-                        ring.setColor(getThemedColor(Theme.key_featuredStickers_addButton));
-                        canvas.drawCircle(cx, cy, r + dp(4), ring);
+                public void onComplete(List<EmojiThemes> result) {
+                    if (result == null) return;
+                    for (EmojiThemes t : result) {
+                        if (t == null || t.showAsDefaultStub || t.items.isEmpty()) continue;
+                        try {
+                            t.loadPreviewColors(chat.getCurrentAccount());
+                        } catch (Throwable e) {
+                            continue;
+                        }
+                        themes.add(t);
+                        addSwatch(context, row, themes.size() - 1);
                     }
                 }
-            };
-            swatch.setOnClickListener(v -> {
-                background = index;
-                for (View s : swatches) s.invalidate();
-                shot.invalidate();
-                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            });
-            swatches.add(swatch);
-            row.addView(swatch, LayoutHelper.createLinear(46, 46, 2, 0, 2, 0));
+            }, false);
+        } else {
+            for (int i = 0; i < GRADIENTS.length; i++) {
+                addSwatch(context, row, 1000 + i);
+            }
         }
-        root.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 0, 8, 0, 0));
 
+        // share (big), save (round)
         final LinearLayout buttons = new LinearLayout(context);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        final ButtonWithCounterView save = new ButtonWithCounterView(context, false, getResourceProvider());
-        save.setText(getString(R.string.SG_ShotSave), false);
+        final ImageView save = new ImageView(context);
+        save.setScaleType(ImageView.ScaleType.CENTER);
+        save.setImageResource(R.drawable.msg_download);
+        save.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_featuredStickers_addButton), PorterDuff.Mode.SRC_IN));
+        save.setBackground(Theme.createCircleDrawable(dp(48), Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton), 0.12f)));
         save.setOnClickListener(v -> saveToGallery());
-        final ButtonWithCounterView share = new ButtonWithCounterView(context, getResourceProvider());
+        final ButtonWithCounterView share = new ButtonWithCounterView(context, chat.getResourceProvider());
+        share.setRound();
         share.setText(getString(R.string.SG_ShotShare), false);
         share.setOnClickListener(v -> shareToChats());
-        buttons.addView(save, LayoutHelper.createLinear(0, 48, 0.42f, 0, 0, 5, 0));
-        buttons.addView(share, LayoutHelper.createLinear(0, 48, 0.58f, 5, 0, 0, 0));
-        root.addView(buttons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 14, 6, 14, 14));
+        buttons.addView(save, LayoutHelper.createLinear(48, 48, 0, 0, 10, 0));
+        buttons.addView(share, LayoutHelper.createLinear(0, 48, 1f));
+        column.addView(buttons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 6, 16, 0));
 
-        fragmentView = root;
-        return root;
+        sheet.setCustomView(column);
+        sheet.setOnDismissListener(d -> {
+            // the chat goes back to its own look
+            if (themed && chat.themeDelegate != null) {
+                try {
+                    chat.themeDelegate.setCurrentTheme(startTheme, startWallpaper, false, startDark, true);
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                }
+            }
+            for (Piece p : pieces) {
+                if (p.bitmap != null) p.bitmap.recycle();
+                if (p.blurred != null) p.blurred.recycle();
+            }
+        });
+        sheet.show();
     }
 
-    private void updateSubtitle() {
-        if (actionBar != null) {
-            actionBar.setSubtitle(LocaleController.formatString(R.string.SG_ShotSubtitle, messageCount()));
+    private View roundButton(Context context, boolean sunIcon) {
+        final View v = new View(context) {
+            private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+            @Override
+            protected void onDraw(@NonNull Canvas canvas) {
+                final float cx = getWidth() / 2f, cy = getHeight() / 2f;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_dialogTextBlack), 0.07f));
+                canvas.drawCircle(cx, cy, Math.min(cx, cy), paint);
+                paint.setColor(Theme.getColor(Theme.key_dialogTextBlack));
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(dp(1.8f));
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                if (!sunIcon) {
+                    final float r = dp(6);
+                    canvas.drawLine(cx - r, cy - r, cx + r, cy + r, paint);
+                    canvas.drawLine(cx + r, cy - r, cx - r, cy + r, paint);
+                } else if (!dark) {
+                    // a sun: the look is light
+                    canvas.drawCircle(cx, cy, dp(4.5f), paint);
+                    for (int i = 0; i < 8; i++) {
+                        final double a = Math.PI / 4 * i;
+                        canvas.drawLine(cx + (float) Math.cos(a) * dp(7.5f), cy + (float) Math.sin(a) * dp(7.5f),
+                            cx + (float) Math.cos(a) * dp(9.5f), cy + (float) Math.sin(a) * dp(9.5f), paint);
+                    }
+                } else {
+                    // a moon: the look is dark
+                    final Path moon = new Path();
+                    moon.addCircle(cx, cy, dp(7), Path.Direction.CW);
+                    final Path bite = new Path();
+                    bite.addCircle(cx + dp(4), cy - dp(3), dp(6), Path.Direction.CW);
+                    moon.op(bite, Path.Op.DIFFERENCE);
+                    paint.setStyle(Paint.Style.FILL);
+                    canvas.drawPath(moon, paint);
+                }
+            }
+        };
+        return v;
+    }
+
+    private void addSwatch(Context context, LinearLayout row, int index) {
+        final View swatch = new View(context) {
+            private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final RectF rect = new RectF();
+
+            @Override
+            protected void onDraw(@NonNull Canvas canvas) {
+                final float cx = getWidth() / 2f, cy = getHeight() / 2f, r = dp(19);
+                canvas.save();
+                final Path clip = new Path();
+                clip.addCircle(cx, cy, r, Path.Direction.CW);
+                canvas.clipPath(clip);
+                if (index == -1) {
+                    drawStartWallpaper(canvas, (int) (cx - r), (int) (cy - r), (int) (2 * r), (int) (2 * r));
+                } else if (index >= 1000) {
+                    final int[] g = GRADIENTS[index - 1000];
+                    paint.setShader(new LinearGradient(cx - r, cy - r, cx + r, cy + r, g[0], g[1], Shader.TileMode.CLAMP));
+                    canvas.drawCircle(cx, cy, r, paint);
+                    paint.setShader(null);
+                } else {
+                    final EmojiThemes.ThemeItem item = themes.get(index).getThemeItem(dark && themes.get(index).items.size() > 1 ? 1 : 0);
+                    final int c1 = item.patternBgColor != 0 ? item.patternBgColor : item.inBubbleColor;
+                    final int c2 = item.patternBgGradientColor2 != 0 ? item.patternBgGradientColor2 : item.patternBgGradientColor1 != 0 ? item.patternBgGradientColor1 : c1;
+                    paint.setShader(new LinearGradient(cx - r, cy - r, cx + r, cy + r, c1 | 0xFF000000, c2 | 0xFF000000, Shader.TileMode.CLAMP));
+                    canvas.drawCircle(cx, cy, r, paint);
+                    paint.setShader(null);
+                    // its two bubbles, as Telegram's theme picker draws them
+                    paint.setColor(item.inBubbleColor | 0xFF000000);
+                    rect.set(cx - r * 0.7f, cy - r * 0.42f, cx + r * 0.15f, cy - r * 0.08f);
+                    canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, paint);
+                    paint.setColor(item.outBubbleColor | 0xFF000000);
+                    rect.set(cx - r * 0.15f, cy + r * 0.08f, cx + r * 0.7f, cy + r * 0.42f);
+                    canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, paint);
+                }
+                canvas.restore();
+                if (chosen == index) {
+                    ring.setStyle(Paint.Style.STROKE);
+                    ring.setStrokeWidth(dp(2));
+                    ring.setColor(Theme.getColor(Theme.key_featuredStickers_addButton));
+                    canvas.drawCircle(cx, cy, r + dp(4), ring);
+                }
+            }
+        };
+        swatch.setOnClickListener(v -> {
+            if (chosen == index) return;
+            chosen = index;
+            for (View s : swatches) s.invalidate();
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            applyTheme();
+        });
+        swatches.add(swatch);
+        row.addView(swatch, LayoutHelper.createLinear(50, 50, 2, 0, 2, 0));
+    }
+
+    /** The chosen theme (and day or night) on the chat for real; the messages are taken again in its colours. */
+    private void applyTheme() {
+        if (chosen >= 1000 || !canTheme()) {
+            shot.invalidate();
+            return;
         }
+        final EmojiThemes theme = chosen >= 0 ? themes.get(chosen) : startTheme;
+        final TLRPC.WallPaper wallpaper = chosen >= 0 ? null : startWallpaper;
+        try {
+            chat.themeDelegate.setCurrentTheme(theme, wallpaper, false, dark, true);
+            themed = true;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return;
+        }
+        // a frame for the chat to draw in its new colours, then the screenshot again (keeping what was edited)
+        AndroidUtilities.runOnUIThread(this::recapture, 120);
+        AndroidUtilities.runOnUIThread(() -> shot.invalidate(), 600); // a pattern wallpaper may come a moment later
+        AndroidUtilities.runOnUIThread(() -> shot.invalidate(), 1400);
     }
 
-    @Override
-    public boolean isLightStatusBar() {
-        return AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundWhite)) > 0.721f;
+    private void recapture() {
+        if (sheet == null || !sheet.isShowing()) return;
+        final ArrayList<Piece> fresh = capture(list, captureTop, captureBottom);
+        if (fresh == null) return;
+        if (fresh.size() == pieces.size()) {
+            for (int i = 0; i < fresh.size(); i++) {
+                final Piece was = pieces.get(i), now = fresh.get(i);
+                now.removed = was.removed;
+                now.alpha = was.alpha;
+                now.y = was.y;
+                now.hidden.addAll(was.hidden);
+            }
+        }
+        for (Piece p : pieces) {
+            if (p.bitmap != null) p.bitmap.recycle();
+            if (p.blurred != null) p.blurred.recycle();
+        }
+        pieces = fresh;
+        contentWidth = list.getWidth();
+        undo.clear(); // the old pictures are gone
+        shot.selected = null;
+        shot.hidePill();
+        shot.relayout(false);
     }
+
+    // endregion
+
+    private static final int[][] GRADIENTS = {
+        {0xFF9AD6F3, 0xFFB6A8F4}, {0xFFA8E6B8, 0xFFF3F0A0}, {0xFFF6B3D3, 0xFFB49CF2}, {0xFF7FD3C4, 0xFF5B8EE6},
+        {0xFFFFD39A, 0xFFF59BB2}, {0xFF8FB7FF, 0xFFE0A6FF}, {0xFF2C3E7A, 0xFF7A4CB0}, {0xFF1D2B3A, 0xFF3B6E6A},
+    };
 
     // region the background
 
-    private void drawWallpaper(Canvas canvas, int left, int top, int w, int h) {
-        final Drawable wp = chatWallpaper;
+    private void drawDrawable(Canvas canvas, @Nullable Drawable wp, int left, int top, int w, int h) {
         if (wp == null) {
             final Paint p = new Paint();
-            p.setColor(getThemedColor(Theme.key_chat_wallpaper));
+            p.setColor(Theme.getColor(Theme.key_chat_wallpaper));
             canvas.drawRect(left, top, left + w, top + h, p);
             return;
         }
@@ -337,16 +552,27 @@ public class SolegramShotEditor extends BaseFragment {
         canvas.restore();
     }
 
+    private Drawable startWallpaperDrawable;
+
+    private void drawStartWallpaper(Canvas canvas, int left, int top, int w, int h) {
+        if (startWallpaperDrawable == null) {
+            startWallpaperDrawable = chat.themeDelegate != null ? chat.themeDelegate.getWallpaperDrawable() : Theme.getCachedWallpaperNonBlocking();
+        }
+        drawDrawable(canvas, startWallpaperDrawable, left, top, w, h);
+    }
+
     private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private void drawBackground(Canvas canvas, int w, int h) {
-        if (background == 0) {
-            drawWallpaper(canvas, 0, 0, w, h);
-        } else {
-            final int[] g = GRADIENTS[background - 1];
+        if (chosen >= 1000) {
+            final int[] g = GRADIENTS[chosen - 1000];
             bgPaint.setShader(new LinearGradient(0, 0, w, h, g[0], g[1], Shader.TileMode.CLAMP));
             canvas.drawRect(0, 0, w, h, bgPaint);
+            return;
         }
+        // the chat's wallpaper as it is now (the chosen theme's)
+        final Drawable wp = chat.themeDelegate != null ? chat.themeDelegate.getWallpaperDrawable() : Theme.getCachedWallpaperNonBlocking();
+        drawDrawable(canvas, wp, 0, 0, w, h);
     }
 
     // endregion
@@ -359,8 +585,7 @@ public class SolegramShotEditor extends BaseFragment {
     private final TextPaint signPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Path hidePath = new Path();
 
-    /** The content's height (the picture's own pixels) with the pieces where they are going. */
-    private int contentHeight(boolean animated) {
+    private int contentHeight() {
         float y = dp(PAD_TOP);
         boolean first = true;
         for (Piece p : pieces) {
@@ -372,9 +597,9 @@ public class SolegramShotEditor extends BaseFragment {
         return (int) (y + dp(PAD_BOTTOM));
     }
 
-    private void drawPieces(Canvas canvas, boolean live) {
+    private void drawPieces(Canvas canvas) {
         for (Piece p : pieces) {
-            if (p.removed && p.alpha <= 0f || Float.isNaN(p.y)) continue;
+            if (p.removed && p.alpha <= 0f || Float.isNaN(p.y) || p.bitmap == null || p.bitmap.isRecycled()) continue;
             piecePaint.setAlpha((int) (0xFF * Math.max(0f, Math.min(1f, p.alpha))));
             canvas.save();
             canvas.translate(p.dx, p.y);
@@ -386,7 +611,6 @@ public class SolegramShotEditor extends BaseFragment {
         }
     }
 
-    /** The hidden text: the picture under it blurred (made once per message), in soft rounded patches. */
     private void drawHidden(Canvas canvas, Piece p) {
         if (p.blurred == null) {
             try {
@@ -419,11 +643,10 @@ public class SolegramShotEditor extends BaseFragment {
         canvas.drawText("Solegram", dp(14), h - dp(12), signPaint);
     }
 
-    /** The whole picture at the size of the chat, for sending or saving. */
     @Nullable
     private Bitmap render() {
         shot.relayout(false);
-        final int w = contentWidth, h = contentHeight(false);
+        final int w = contentWidth, h = contentHeight();
         try {
             final Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(out);
@@ -432,7 +655,7 @@ public class SolegramShotEditor extends BaseFragment {
                 p.dx = 0;
                 if (p.removed) p.alpha = 0;
             }
-            drawPieces(c, false);
+            drawPieces(c);
             drawSignature(c, w, h);
             return out;
         } catch (Throwable e) {
@@ -464,11 +687,11 @@ public class SolegramShotEditor extends BaseFragment {
 
     private void saveToGallery() {
         final File file = writeShot();
-        if (file == null || getParentActivity() == null) {
+        if (file == null || chat.getParentActivity() == null) {
             return;
         }
-        MediaController.saveFile(file.getAbsolutePath(), getParentActivity(), 0, null, null);
-        BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_save_to_gallery, getString(R.string.SG_ShotSaved)).show();
+        MediaController.saveFile(file.getAbsolutePath(), chat.getParentActivity(), 0, null, null);
+        BulletinFactory.of(sheet.getContainer(), chat.getResourceProvider()).createSimpleBulletin(R.raw.ic_save_to_gallery, getString(R.string.SG_ShotSaved)).show();
     }
 
     private void shareToChats() {
@@ -476,23 +699,25 @@ public class SolegramShotEditor extends BaseFragment {
         if (file == null) {
             return;
         }
+        sheet.dismiss();
         final android.os.Bundle args = new android.os.Bundle();
         args.putBoolean("onlySelect", true);
         args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
         args.putBoolean("allowGlobalSearch", false);
         final DialogsActivity picker = new DialogsActivity(args);
+        final int account = chat.getCurrentAccount();
         picker.setDelegate((fragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
             if (dids != null) {
                 for (int i = 0; i < dids.size(); i++) {
-                    SendMessagesHelper.prepareSendingPhoto(AccountInstance.getInstance(currentAccount), file.getAbsolutePath(), null,
+                    SendMessagesHelper.prepareSendingPhoto(AccountInstance.getInstance(account), file.getAbsolutePath(), null,
                         dids.get(i).dialogId, null, null, null, null, null, null, null, 0, null, notify, scheduleDate, 0, null);
                 }
             }
             fragment.finishFragment();
-            BulletinFactory.of(SolegramShotEditor.this).createSimpleBulletin(R.raw.forward, getString(R.string.SG_ShotSent)).show();
+            BulletinFactory.of(chat).createSimpleBulletin(R.raw.forward, getString(R.string.SG_ShotSent)).show();
             return true;
         });
-        presentFragment(picker);
+        chat.presentFragment(picker);
     }
 
     // endregion
@@ -512,7 +737,7 @@ public class SolegramShotEditor extends BaseFragment {
         private float downX, downY, lastY;
         private boolean moved, swiping, scrolling, selectingText;
         @Nullable
-        private Piece touched, selected;
+        Piece touched, selected;
         private int selStartLine = -1, selStartOffset, selEndLine, selEndOffset;
         private boolean textMode;
         private final ArrayList<RectF> selection = new ArrayList<>();
@@ -522,7 +747,7 @@ public class SolegramShotEditor extends BaseFragment {
 
         ShotView(Context context) {
             super(context);
-            selectPaint.setColor(Theme.multAlpha(getThemedColor(Theme.key_featuredStickers_addButton), 0.32f));
+            selectPaint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton), 0.32f));
             pillText.setTextSize(dp(14));
             pillText.setTypeface(AndroidUtilities.bold());
             pillText.setColor(0xFFFFFFFF);
@@ -575,7 +800,7 @@ public class SolegramShotEditor extends BaseFragment {
         private void layoutCard() {
             final float w = getWidth() - dp(32);
             scale = w / contentWidth;
-            final float ch = contentHeight(false) * scale;
+            final float ch = contentHeight() * scale;
             final float maxH = getHeight() - dp(16);
             final float h = Math.min(ch, maxH);
             final float top = Math.max(dp(8), (getHeight() - h) / 2f);
@@ -595,9 +820,9 @@ public class SolegramShotEditor extends BaseFragment {
             canvas.clipPath(cardPath);
             canvas.translate(card.left, card.top - scroll);
             canvas.scale(scale, scale);
-            final int h = contentHeight(false);
+            final int h = contentHeight();
             drawBackground(canvas, contentWidth, Math.max(h, (int) ((card.height() + scroll) / scale)));
-            drawPieces(canvas, true);
+            drawPieces(canvas);
             // what is selected
             if (selected != null && !selected.removed) {
                 canvas.save();
@@ -639,7 +864,7 @@ public class SolegramShotEditor extends BaseFragment {
             invalidate();
         }
 
-        private void hidePill() {
+        void hidePill() {
             pillLabelA = pillLabelB = null;
             invalidate();
         }
@@ -846,6 +1071,7 @@ public class SolegramShotEditor extends BaseFragment {
                 final ArrayList<RectF> added = new ArrayList<>(selection);
                 p.hidden.addAll(added);
                 undo.add(() -> p.hidden.removeAll(added));
+                offerUndo(getString(R.string.SG_ShotTextHidden));
                 selection.clear();
                 selStartLine = -1;
                 textMode = false;
@@ -888,6 +1114,7 @@ public class SolegramShotEditor extends BaseFragment {
                     p.dx = 0;
                     relayout(true);
                     updateSubtitle();
+                    offerUndo(getString(R.string.SG_ShotMessageRemoved));
                 }
             });
             a.start();
@@ -914,12 +1141,4 @@ public class SolegramShotEditor extends BaseFragment {
         }
     }
 
-    @Override
-    public void onFragmentDestroy() {
-        super.onFragmentDestroy();
-        for (Piece p : pieces) {
-            if (p.bitmap != null) p.bitmap.recycle();
-            if (p.blurred != null) p.blurred.recycle();
-        }
-    }
 }
