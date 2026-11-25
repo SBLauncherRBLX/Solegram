@@ -1060,6 +1060,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- The widget engine (HTML widgets' code): no permissions, files or network; one process for every widget. -->
+        <service
+            android:name="org.telegram.utils.twidget.WidgetEngineService"
+            android:process=":widgets"
+            android:isolatedProcess="true"
+            android:exported="false" />
+
         <!-- Solegram reminders: the alarm, the notification buttons, and the alarm set again when it may have been lost or moved -->
         <receiver android:name="com.solegram.messenger.SolegramReminderReceiver" android:exported="false">
             <intent-filter>

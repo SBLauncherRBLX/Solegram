@@ -4298,6 +4298,14 @@ public class AndroidUtilities {
             f = FileLoader.getInstance(UserConfig.selectedAccount).getPathToMessage(message.messageOwner);
         }
         if (f != null && f.exists()) {
+            // Solegram: a theme of Solegram's look opens its preview
+            if (parentFragment != null && com.solegram.messenger.SolegramThemeShare.isThemeFile(f.getName())) {
+                final com.solegram.messenger.SolegramThemeShare.Theme sgTheme = com.solegram.messenger.SolegramThemeShare.read(f);
+                if (sgTheme != null) {
+                    parentFragment.presentFragment(new com.solegram.messenger.ui.SolegramThemePreviewActivity(sgTheme));
+                    return;
+                }
+            }
             if (parentFragment != null && f.getName().toLowerCase().endsWith("attheme")) {
                 Theme.ThemeInfo themeInfo = Theme.applyThemeFile(f, message.getDocumentName(), null, true);
                 if (themeInfo != null) {

@@ -316,6 +316,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_CARD_SHOW_OTHERS = 1136;
     private static final int ID_GIFTS_ORBIT = 4305;
     private static final int ID_TEST_GIFTS = 4306;
+    private static final int ID_SHARE_THEME = 4307;
     private static final int ID_STREAKS = 1140;
     private static final int ID_NEW_PLAYER = 1141;
     private static final int ID_MUSIC_TAB = 1142;
@@ -482,6 +483,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asShadow(getString(R.string.SG_SettingsMovedInfo)));
 
         items.add(UItem.asHeader(getString(R.string.SG_Backup)));
+        items.add(tile(UItem.asButton(ID_SHARE_THEME, R.drawable.msg_theme, getString(R.string.SG_ThemeShareSend)), TILE_PURPLE)
+            .setSolegramSubtitle(getString(R.string.SG_ThemeShareSendInfo)));
         items.add(tile(UItem.asButton(ID_EXPORT, R.drawable.msg_shareout, getString(R.string.SG_ExportSettings)), TILE_TEAL));
         items.add(tile(UItem.asButton(ID_IMPORT, R.drawable.msg_photo_settings, getString(R.string.SG_ImportSettings)), TILE_CYAN));
         items.add(UItem.asButton(ID_RESET, R.drawable.msg_reset, getString(R.string.SG_ResetSettings)).red());
@@ -2452,6 +2455,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_EXPORT:
                 exportSettings();
                 return;
+            case ID_SHARE_THEME:
+                shareTheme();
+                return;
             case ID_IMPORT:
                 importSettings();
                 return;
@@ -3255,6 +3261,38 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         } catch (Throwable e) {
             FileLog.e(e);
         }
+    }
+
+    /** The look as a theme file, sent to a chat picked here (the receiver taps it to see and put it on). */
+    private void shareTheme() {
+        final org.telegram.tgnet.TLRPC.User me = getUserConfig().getCurrentUser();
+        final String suggested = LocaleController.formatString(R.string.SG_ThemeShareDefaultName,
+            me != null ? org.telegram.messenger.UserObject.getFirstName(me) : "Solegram");
+        askText(getString(R.string.SG_ThemeShareSend), getString(R.string.SG_ThemeShareNameInfo), suggested, getString(R.string.SG_ThemeShareNameHint), name -> {
+            final File file = com.solegram.messenger.SolegramThemeShare.exportFile(TextUtils.isEmpty(name) ? suggested : name.trim());
+            if (file == null) {
+                BulletinFactory.of(bulletinHost()).createErrorBulletin(getString(R.string.UnknownError)).show();
+                return;
+            }
+            final android.os.Bundle args = new android.os.Bundle();
+            args.putBoolean("onlySelect", true);
+            args.putInt("dialogsType", org.telegram.ui.DialogsActivity.DIALOGS_TYPE_FORWARD);
+            args.putBoolean("allowGlobalSearch", false);
+            final org.telegram.ui.DialogsActivity picker = new org.telegram.ui.DialogsActivity(args);
+            picker.setDelegate((fragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
+                if (dids != null) {
+                    for (int i = 0; i < dids.size(); i++) {
+                        org.telegram.messenger.SendMessagesHelper.prepareSendingDocument(org.telegram.messenger.AccountInstance.getInstance(currentAccount),
+                            file.getAbsolutePath(), file.getAbsolutePath(), null, null, com.solegram.messenger.SolegramThemeShare.MIME,
+                            dids.get(i).dialogId, null, null, null, null, null, notify, scheduleDate, null, null, false);
+                    }
+                }
+                fragment.finishFragment();
+                BulletinFactory.of(bulletinHost()).createSimpleBulletin(R.raw.forward, getString(R.string.SG_ThemeShareSent)).show();
+                return true;
+            });
+            presentFragment(picker);
+        });
     }
 
     private void exportSettings() {

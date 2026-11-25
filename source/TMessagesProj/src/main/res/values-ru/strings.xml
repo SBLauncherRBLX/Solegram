@@ -2515,5 +2515,26 @@
     <string name="SG_GiftsOrbitInfo">Подарки на профиле кружат вокруг фото и подпрыгивают в такт музыке профиля</string>
     <string name="SG_TestGifts">Тестовые подарки (бета)</string>
     <string name="SG_TestGiftsInfo">Только в бетах: 9 подарков из каталога Telegram в вашем профиле, чтобы посмотреть, как они выглядят. Видите только вы, на этом телефоне; откройте профиль заново</string>
+    <string name="SG_ThemeShareTitle">Тема Solegram</string>
+    <string name="SG_ThemeShareSend">Поделиться темой</string>
+    <string name="SG_ThemeShareSendInfo">Цвета и вид Solegram — файлом в чат</string>
+    <string name="SG_ThemeShareNameInfo">Тема уйдёт файлом в выбранный чат: цвета светлой и тёмной темы и настройки вида (стекло, форма аватарок, анимации). Ничего личного в ней нет.</string>
+    <string name="SG_ThemeShareNameHint">Название темы</string>
+    <string name="SG_ThemeShareDefaultName">Тема %1$s</string>
+    <string name="SG_ThemeShareSent">Тема отправлена</string>
+    <string name="SG_ThemeShareBroken">Этот файл темы повреждён</string>
+    <string name="SG_ThemeShareLight">Светлая</string>
+    <string name="SG_ThemeShareDark">Тёмная</string>
+    <string name="SG_ThemeShareNote">Тема меняет только вид: цвета и настройки внешнего вида Solegram. Вернуть прежние цвета можно в редакторе темы.</string>
+    <string name="SG_ThemeShareInstall">Установить тему</string>
+    <string name="SG_ThemeShareInstalled">Тема установлена</string>
+    <string name="SG_ThemeShareRestartHint">Часть настроек вида применится после перезапуска</string>
+    <string name="SG_ThemeSharePreviewOnline">в сети</string>
+    <string name="SG_ThemeSharePreviewMsg1">Смотри, какая тема 🎨</string>
+    <string name="SG_ThemeSharePreviewMsg2">Очень красиво 😍</string>
+    <string name="SG_ThemeSharePreviewMsg3">Ставлю!</string>
+    <string name="SG_ThemeSharePreviewInput">Сообщение</string>
+    <string name="SG_ThemeShareColors">Цветов: %1$d</string>
+    <string name="SG_ThemeShareSettings">Настроек вида: %1$d</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -40,6 +40,8 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
 
     /** Solegram: told after each layout (the window is made wide enough for the menu and its pill). */
     public Runnable solegramAfterLayout;
+    /** Solegram: the width the menu with its pill wants, before it is cut to the width the window gave. */
+    public int solegramWantedWidth;
 
     // region Solegram side pill
 
@@ -209,6 +211,8 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }
         solegramMeasureSidePill();
+        // the whole width the menu and its pill want (the window grows to it, see ChatActivity.solegramFitMenuWindow)
+        solegramWantedWidth = getMeasuredWidth();
         if (sgReserve > 0 && sgMode != MeasureSpec.UNSPECIFIED && getMeasuredWidth() > sgSize) {
             setMeasuredDimension(sgSize, getMeasuredHeight());
         }

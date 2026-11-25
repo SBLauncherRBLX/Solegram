@@ -143,9 +143,8 @@ public class ProfileActionsView extends View {
         paint.setAlpha(40);
 
         xpadding = dpf2(14);
-        // Solegram: the buttons a little lower (on the page's colour, under the header's melt)
-        ypadding = dpf2(6);
-        top = dpf2(14);
+        ypadding = dpf2(12);
+        top = dpf2(8);
         textPadding = dpf2(4);
 
         this.targetHeight = (int) (targetHeight - ypadding - top);

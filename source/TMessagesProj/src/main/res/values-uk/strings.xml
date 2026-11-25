@@ -2528,5 +2528,26 @@
     <string name="SG_GiftsOrbitInfo">Gifts on profiles circle the photo and hop to the beat of the profile\'s music</string>
     <string name="SG_TestGifts">Test gifts (beta)</string>
     <string name="SG_TestGiftsInfo">Betas only: 9 gifts from Telegram\'s catalog on your profile, to see how they look. Only you see them, on this phone; reopen the profile</string>
+    <string name="SG_ThemeShareTitle">Solegram theme</string>
+    <string name="SG_ThemeShareSend">Share theme</string>
+    <string name="SG_ThemeShareSendInfo">Solegram colours and look as a file to a chat</string>
+    <string name="SG_ThemeShareNameInfo">The theme goes to the chat you pick as a file: light and dark colours and look settings (glass, avatar shape, animations). Nothing personal is in it.</string>
+    <string name="SG_ThemeShareNameHint">Theme name</string>
+    <string name="SG_ThemeShareDefaultName">%1$s\'s theme</string>
+    <string name="SG_ThemeShareSent">Theme sent</string>
+    <string name="SG_ThemeShareBroken">This theme file is broken</string>
+    <string name="SG_ThemeShareLight">Light</string>
+    <string name="SG_ThemeShareDark">Dark</string>
+    <string name="SG_ThemeShareNote">A theme only changes the look: colours and Solegram appearance settings. The previous colours can be restored in the theme editor.</string>
+    <string name="SG_ThemeShareInstall">Install theme</string>
+    <string name="SG_ThemeShareInstalled">Theme installed</string>
+    <string name="SG_ThemeShareRestartHint">Some look settings apply after a restart</string>
+    <string name="SG_ThemeSharePreviewOnline">online</string>
+    <string name="SG_ThemeSharePreviewMsg1">Look at this theme 🎨</string>
+    <string name="SG_ThemeSharePreviewMsg2">So pretty 😍</string>
+    <string name="SG_ThemeSharePreviewMsg3">Installing!</string>
+    <string name="SG_ThemeSharePreviewInput">Message</string>
+    <string name="SG_ThemeShareColors">Colours: %1$d</string>
+    <string name="SG_ThemeShareSettings">Look settings: %1$d</string>
     <!-- SOLEGRAM END -->
 </resources>

@@ -273,12 +273,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, RecyclerListView parentListView, ProfileActivity.AvatarImageView parentAvatarImageView, int parentClassGuid, Callback callback, ProfileGalleryBlurView blurView) {
         super(context);
         this.blurView = blurView;
-        // Solegram: the photo is lower, the blur above it (ProfileGalleryBlurView.SG_TOP)
-        if (ProfileGalleryBlurView.SG_TOP) {
-            setPadding(0, blurView == null ? 0 : blurView.actionSize, 0, 0);
-        } else {
-            setPadding(0, 0, 0, blurView == null ? 0 : blurView.actionSize);
-        }
+        setPadding(0, 0, 0, blurView == null ? 0 : blurView.actionSize);
         if (blurView != null) {
             blurView.setView(this);
         }
@@ -390,7 +385,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
         if (blurView != null) {
-            blurView.setTranslationY(ProfileGalleryBlurView.SG_TOP ? 0 : getHeight() - blurView.getMeasuredHeight());
+            blurView.setTranslationY(getHeight() - blurView.getMeasuredHeight());
         }
     }
 
