@@ -50,7 +50,6 @@ import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ActionBar.MessageDrawable;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Components.MotionBackgroundDrawable;
@@ -625,7 +624,14 @@ public class SolegramShotEditor {
                 }
             }
         }
-        l = new Look(colors, night, wallpaper);
+        final int[] service;
+        if (colors.indexOfKey(Theme.key_chat_serviceBackground) >= 0 && wallpaper == null) {
+            final int c = colors.get(Theme.key_chat_serviceBackground);
+            service = new int[]{c, colors.get(Theme.key_chat_serviceBackgroundSelected, c)};
+        } else {
+            service = AndroidUtilities.calcDrawableColor(wallpaper != null ? wallpaper : Theme.getCachedWallpaperNonBlocking());
+        }
+        l = new Look(colors, night, wallpaper, service);
         looks.put(key, l);
         return l;
     }
@@ -655,111 +661,15 @@ public class SolegramShotEditor {
         return motion;
     }
 
-    /** Colours, bubbles and service paints of one look, for drawing the chat's cells once in it. */
-    private final class Look implements Theme.ResourcesProvider {
-        final SparseIntArray colors;
-        final boolean night;
+    /** Colours, bubbles and service paints of one look (with its wallpaper), for drawing the chat's cells once in it. */
+    private final class Look extends SolegramLookProvider {
         @Nullable
         final Drawable wallpaper;
-        private final java.util.HashMap<String, Drawable> drawables = new java.util.HashMap<>();
-        private final java.util.HashMap<String, Paint> paints = new java.util.HashMap<>();
 
-        Look(SparseIntArray colors, boolean night, @Nullable Drawable wallpaper) {
-            this.colors = colors;
-            this.night = night;
+        Look(SparseIntArray colors, boolean night, @Nullable Drawable wallpaper, int[] service) {
+            super(colors, night, service[0], service[1]);
             this.wallpaper = wallpaper;
-            int service, serviceSelected;
-            if (colors.indexOfKey(Theme.key_chat_serviceBackground) >= 0 && wallpaper == null) {
-                service = colors.get(Theme.key_chat_serviceBackground);
-                serviceSelected = colors.get(Theme.key_chat_serviceBackgroundSelected, service);
-            } else {
-                final int[] c = AndroidUtilities.calcDrawableColor(wallpaper != null ? wallpaper : Theme.getCachedWallpaperNonBlocking());
-                service = c[0];
-                serviceSelected = c[1];
-            }
-            final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
-            bg.setColor(service);
-            paints.put(Theme.key_paint_chatActionBackground, bg);
-            final Paint bgSelected = new Paint(Paint.ANTI_ALIAS_FLAG);
-            bgSelected.setColor(serviceSelected);
-            paints.put(Theme.key_paint_chatActionBackgroundSelected, bgSelected);
-            final Paint darken = new Paint(Paint.ANTI_ALIAS_FLAG);
-            darken.setColor(0x15000000);
-            paints.put(Theme.key_paint_chatActionBackgroundDarken, darken);
-            textPaint(Theme.key_paint_chatActionText, getColor(Theme.key_chat_serviceText));
-            textPaint(Theme.key_paint_chatActionText2, getColor(Theme.key_chat_serviceText));
-            textPaint(Theme.key_paint_chatActionText3, getColor(Theme.key_chat_serviceText));
-            textPaint(Theme.key_paint_chatBotButton, getColor(Theme.key_chat_botButtonText));
-        }
-
-        private void textPaint(String key, int color) {
-            final Paint base = Theme.getThemePaint(key);
-            if (base == null) return;
-            final TextPaint p = base instanceof TextPaint ? new TextPaint((TextPaint) base) : new TextPaint(base);
-            p.setColor(color);
-            paints.put(key, p);
-        }
-
-        @Override
-        public int getColor(int key) {
-            final int i = colors.indexOfKey(key);
-            return i >= 0 ? colors.valueAt(i) : Theme.getColor(key);
-        }
-
-        @Override
-        public Paint getPaint(String paintKey) {
-            final Paint p = paints.get(paintKey);
-            return p != null ? p : Theme.getThemePaint(paintKey);
-        }
-
-        @Override
-        public Drawable getDrawable(String key) {
-            if (drawables.containsKey(key)) {
-                return drawables.get(key);
-            }
-            Drawable d;
-            switch (key) {
-                case Theme.key_drawable_msgIn: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, false, false, this); break;
-                case Theme.key_drawable_msgInSelected: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, false, true, this); break;
-                case Theme.key_drawable_msgInMedia: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, false, false, this); break;
-                case Theme.key_drawable_msgInMediaSelected: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, false, true, this); break;
-                case Theme.key_drawable_msgOut: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, true, false, this); break;
-                case Theme.key_drawable_msgOutSelected: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, true, true, this); break;
-                case Theme.key_drawable_msgOutMedia: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, true, false, this); break;
-                case Theme.key_drawable_msgOutMediaSelected: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, true, true, this); break;
-                default: {
-                    // ticks, clocks, icons: Telegram's, coloured in the look's colours (as a themed chat does)
-                    d = null;
-                    final Drawable base = Theme.getThemeDrawablesMap().get(key);
-                    final Drawable.ConstantState state = base != null ? base.getConstantState() : null;
-                    final int colorKey = Theme.getThemeDrawableColorKey(key);
-                    if (state != null && colorKey >= 0) {
-                        d = state.newDrawable().mutate();
-                        Theme.setDrawableColor(d, getColor(colorKey));
-                    }
-                }
-            }
-            drawables.put(key, d);
-            return d;
-        }
-
-        @Override
-        public boolean isDark() {
-            return night;
-        }
-
-        @Override
-        public boolean isCompactMode() {
-            return chat.themeDelegate != null ? chat.themeDelegate.isCompactMode() : org.telegram.messenger.SharedConfig.compactMode;
-        }
-
-        @Override
-        public boolean hasGradientService() {
-            return false;
-        }
-
-        @Override
-        public void applyServiceShaderMatrix(int w, int h, float translationX, float translationY) {
+            compact = chat.themeDelegate != null ? chat.themeDelegate.isCompactMode() : org.telegram.messenger.SharedConfig.compactMode;
         }
     }
 
@@ -872,9 +782,10 @@ public class SolegramShotEditor {
     private static final float PATCH_GROW = 2.5f, PATCH_FEATHER = 2.5f;
 
     /**
-     * The patch over one hidden rect of a piece: the picture around it (a line's height more on each side, so the blur
-     * takes in the bubble, not just the letters) shrunk 4 times, blurred twice, then cut to a rounded rect with soft
-     * edges and given a light frost.
+     * The patch over one hidden rect of a piece. The words are made unreadable for sure: the area is averaged down
+     * (halving again and again, so every pixel counts) to blocks about half a line high, i.e. a letter or two per
+     * block, drawn back as a mosaic, and that mosaic is blurred so it is soft smudges with no letter shapes left. Then
+     * a light frost and a rounded rect with feathered edges.
      */
     @Nullable
     private Bitmap makePatch(Bitmap source, RectF r) {
@@ -882,35 +793,35 @@ public class SolegramShotEditor {
             final float grow = dp(PATCH_GROW), feather = dp(PATCH_FEATHER);
             final RectF shape = new RectF(r.left - grow, r.top - grow, r.right + grow, r.bottom + grow);
             final int pw = (int) Math.ceil(shape.width() + 2 * feather), ph = (int) Math.ceil(shape.height() + 2 * feather);
-            if (pw <= 0 || ph <= 0) return null;
-            final float reach = Math.max(dp(6), r.height());
-            final int sx = (int) Math.max(0, Math.floor(shape.left - feather - reach));
-            final int sy = (int) Math.max(0, Math.floor(shape.top - feather - reach));
-            final int ex = (int) Math.min(source.getWidth(), Math.ceil(shape.right + feather + reach));
-            final int ey = (int) Math.min(source.getHeight(), Math.ceil(shape.bottom + feather + reach));
-            if (ex - sx < 2 || ey - sy < 2) return null;
-            final int f = 4;
-            final Bitmap small = Bitmap.createBitmap(Math.max(1, (ex - sx) / f), Math.max(1, (ey - sy) / f), Bitmap.Config.ARGB_8888);
-            final Canvas sc = new Canvas(small);
-            sc.scale(small.getWidth() / (float) (ex - sx), small.getHeight() / (float) (ey - sy));
-            sc.translate(-sx, -sy);
-            sc.drawBitmap(source, 0, 0, new Paint(Paint.FILTER_BITMAP_FLAG));
-            final int radius = Math.max(3, Math.min(24, Math.round(r.height() / f * 0.5f)));
-            Utilities.stackBlurBitmap(small, radius);
-            Utilities.stackBlurBitmap(small, Math.max(2, radius / 2));
-
+            if (pw <= 2 || ph <= 2) return null;
+            final float ox = shape.left - feather, oy = shape.top - feather;
+            // the area itself, as it is in the picture (outside the piece: transparent)
+            Bitmap cur = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
+            new Canvas(cur).drawBitmap(source, -ox, -oy, null);
+            final int block = Math.max(dp(5), Math.round(r.height() * 0.5f));
+            final int tw = Math.max(1, Math.round(pw / (float) block)), th = Math.max(1, Math.round(ph / (float) block));
+            while (cur.getWidth() / 2 >= tw && cur.getHeight() / 2 >= th && cur.getWidth() > 1 && cur.getHeight() > 1) {
+                final Bitmap half = Bitmap.createScaledBitmap(cur, Math.max(1, cur.getWidth() / 2), Math.max(1, cur.getHeight() / 2), true);
+                cur.recycle();
+                cur = half;
+            }
+            if (cur.getWidth() != tw || cur.getHeight() != th) {
+                final Bitmap fit = Bitmap.createScaledBitmap(cur, tw, th, true);
+                cur.recycle();
+                cur = fit;
+            }
             final Bitmap patch = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
             final Canvas pc = new Canvas(patch);
-            final float ox = shape.left - feather, oy = shape.top - feather;
             pc.save();
-            pc.translate(sx - ox, sy - oy);
-            pc.scale((ex - sx) / (float) small.getWidth(), (ey - sy) / (float) small.getHeight());
-            pc.drawBitmap(small, 0, 0, new Paint(Paint.FILTER_BITMAP_FLAG));
+            pc.scale(pw / (float) tw, ph / (float) th);
+            pc.drawBitmap(cur, 0, 0, null); // nearest: the mosaic
             pc.restore();
-            small.recycle();
-            // a light frost, so it reads as hidden rather than as an empty bubble
+            cur.recycle();
+            // the blocks' edges melted away: soft smudges, nothing to read
+            Utilities.stackBlurBitmap(patch, Math.max(2, Math.min(60, block / 2)));
             final RectF local = new RectF(feather, feather, feather + shape.width(), feather + shape.height());
             final float round = Math.min(local.height() / 2f, dp(9));
+            // a light frost, so it reads as hidden rather than as an empty bubble
             final Paint frost = new Paint(Paint.ANTI_ALIAS_FLAG);
             final boolean night = look != null ? look.night : startDark;
             frost.setColor(night ? 0x24FFFFFF : 0x2EFFFFFF);

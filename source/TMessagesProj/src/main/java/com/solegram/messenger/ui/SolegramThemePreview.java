@@ -25,6 +25,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.util.SparseIntArray;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -38,12 +39,17 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import com.solegram.messenger.SolegramConfig;
+import com.solegram.messenger.SolegramIcons;
+import com.solegram.messenger.SolegramThemeColors;
+import com.solegram.messenger.SolegramThemeGenerator;
 import com.solegram.messenger.SolegramThemeShare;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
@@ -60,48 +66,34 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 /**
- * Solegram: a theme sent in a chat is tried on in a sheet from the bottom. The theme is put on for real (colours, icons,
- * avatar shape, glass, the rest) with the circle of new colours, and the sheet shows a chat in it built of Telegram's
- * own parts: the user's wallpaper, real message bubbles, a glass header with the user's avatar and a glass input with
- * the theme's icons. «Установить» keeps it; «Отмена» or closing the sheet gives the old look back. What the look was is
- * kept on disk, so a preview the app never ended is undone at the next start.
+ * Solegram: a theme sent in a chat is looked at in a sheet from the bottom before anything changes. The sheet shows a
+ * chat in the theme built of Telegram's own parts drawn in the theme's colours (they are worked out, not put on): the
+ * user's wallpaper, real message bubbles with the theme's corners, a glass header with the user's avatar in the
+ * theme's avatar shape and a glass input with the theme's icon pack. Only «Установить» puts the theme on (with the
+ * circle of new colours); «Отмена» or closing the sheet leaves the app exactly as it was.
  */
 public final class SolegramThemePreview {
 
     private SolegramThemePreview() {
     }
 
-    @Nullable
-    private static SolegramThemeShare.Theme theme;
-    private static boolean installed;
-    private static int oldAccent;
+    private static boolean showing;
 
-    /** Puts the theme on for a while and shows the sheet to look at it. */
+    /** Shows the sheet to look at the theme; the app's look is not touched until «Установить». */
     public static void start(BaseFragment from, SolegramThemeShare.Theme t) {
         final Activity activity = from.getParentActivity();
-        if (activity == null || theme != null) {
+        if (activity == null || showing) {
             return;
         }
-        theme = t;
-        installed = false;
-        oldAccent = Theme.getColor(Theme.key_featuredStickers_addButton);
-        SolegramThemeShare.savePreviewSnapshot();
-        final INavigationLayout layout = from.getParentLayout();
-        final View decor = activity.getWindow().getDecorView();
-        SolegramThemeReveal.start(activity, decor.getWidth() / 2f, decor.getHeight() * 0.62f, t.accent(Theme.isCurrentThemeDark()), () -> {
-            SolegramThemeShare.apply(t);
-            SolegramThemeShare.refresh(layout);
-        });
-        // the sheet in the new look (a moment for the theme's resources)
-        AndroidUtilities.runOnUIThread(() -> show(from, t), 160);
-    }
-
-    private static void show(BaseFragment from, SolegramThemeShare.Theme t) {
-        final Activity activity = from.getParentActivity();
-        if (activity == null) {
-            end(from, false);
+        final SolegramLookProvider look;
+        try {
+            look = lookOf(t, Theme.isCurrentThemeDark());
+        } catch (Throwable e) {
+            FileLog.e(e);
             return;
         }
+        showing = true;
+        final boolean[] install = {false};
         final BottomSheet sheet = new BottomSheet(activity, false);
         sheet.fixNavigationBar();
         final LinearLayout column = new LinearLayout(activity);
@@ -124,57 +116,95 @@ public final class SolegramThemePreview {
         info.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
         column.addView(info, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 28, 4, 28, 14));
 
-        column.addView(new ChatPreview(activity, from.getParentLayout()), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 380, 14, 0, 14, 0));
+        final int pack = setting(t, "iconPack", SolegramConfig.iconPack);
+        final int corners = setting(t, "avatarCorners", SolegramConfig.avatarCorners);
+        final int bubbles = t.bubbleRadius >= 0 && t.bubbleRadius <= 17 ? t.bubbleRadius : SharedConfig.bubbleRadius;
+        column.addView(new ChatPreview(activity, from.getParentLayout(), look, pack, corners, bubbles),
+            LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 380, 14, 0, 14, 0));
 
         final LinearLayout buttons = new LinearLayout(activity);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
         final ButtonWithCounterView cancel = new ButtonWithCounterView(activity, false, null);
         cancel.setText(getString(R.string.Cancel), false);
-        final ButtonWithCounterView install = new ButtonWithCounterView(activity, null);
-        install.setText(getString(R.string.SG_ThemeShareInstall), false);
+        final ButtonWithCounterView installButton = new ButtonWithCounterView(activity, null);
+        installButton.setText(getString(R.string.SG_ThemeShareInstall), false);
         buttons.addView(cancel, LayoutHelper.createLinear(0, 48, 1f, 0, 0, 5, 0));
-        buttons.addView(install, LayoutHelper.createLinear(0, 48, 1f, 5, 0, 0, 0));
+        buttons.addView(installButton, LayoutHelper.createLinear(0, 48, 1f, 5, 0, 0, 0));
         column.addView(buttons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 14, 14, 14, 0));
 
         cancel.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             sheet.dismiss();
         });
-        install.setOnClickListener(v -> {
+        installButton.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-            installed = true;
+            install[0] = true;
             sheet.dismiss();
         });
         sheet.setCustomView(column);
-        sheet.setOnDismissListener(d -> end(from, installed));
+        sheet.setOnDismissListener(d -> {
+            showing = false;
+            if (install[0]) {
+                install(from, t);
+            }
+        });
         sheet.show();
     }
 
-    /** The sheet is closed: the theme stays, or the look before it comes back (with the circle again). */
-    private static void end(BaseFragment from, boolean keep) {
-        if (theme == null) {
-            return;
-        }
-        theme = null;
-        installed = false;
-        if (keep) {
-            SolegramThemeShare.dropPreviewSnapshot();
-            BulletinFactory.of(from).createSimpleBulletin(R.raw.contact_check, getString(R.string.SG_ThemeShareInstalled),
-                getString(R.string.SG_ThemeShareRestartHint)).show();
-            return;
-        }
+    private static int setting(SolegramThemeShare.Theme t, String key, int fallback) {
+        final Object v = t.settings.get(key);
+        return v instanceof Number ? ((Number) v).intValue() : fallback;
+    }
+
+    /** «Установить»: now the theme is put on, under the circle of its colours. */
+    private static void install(BaseFragment from, SolegramThemeShare.Theme t) {
         final Activity activity = from.getParentActivity();
         final INavigationLayout layout = from.getParentLayout();
-        final Runnable back = () -> {
-            SolegramThemeShare.restorePreviewSnapshot();
+        final Runnable put = () -> {
+            SolegramThemeShare.apply(t);
             SolegramThemeShare.refresh(layout);
         };
         if (activity != null && activity.getWindow() != null) {
             final View decor = activity.getWindow().getDecorView();
-            SolegramThemeReveal.start(activity, decor.getWidth() / 2f, decor.getHeight() * 0.62f, oldAccent, back);
+            SolegramThemeReveal.start(activity, decor.getWidth() / 2f, decor.getHeight() * 0.62f, t.accent(Theme.isCurrentThemeDark()), put);
         } else {
-            back.run();
+            put.run();
         }
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                BulletinFactory.of(from).createSimpleBulletin(R.raw.contact_check, getString(R.string.SG_ThemeShareInstalled),
+                    getString(R.string.SG_ThemeShareRestartHint)).show();
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }, 700);
+    }
+
+    /**
+     * The theme's colours, worked out over the ones on screen now as putting it on would do: its accent with all
+     * Telegram derives from it, then its colours part by part (or the generator's, for a theme made of three colours).
+     */
+    static SolegramLookProvider lookOf(SolegramThemeShare.Theme t, boolean night) {
+        final SparseIntArray colors = SolegramLookProvider.currentColors();
+        java.util.Map<String, Integer> slots = night ? t.dark : t.light;
+        if (slots.isEmpty() && t.primary != 0) {
+            slots = SolegramThemeGenerator.generate(t.primary, t.secondary, t.background, t.style, night);
+        }
+        final Integer accent = slots.get("accent");
+        if (accent != null) {
+            try {
+                Theme.solegramShiftAccent(colors, accent);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+        }
+        final SparseIntArray painted = SolegramThemeColors.preview(slots, night);
+        for (int i = 0; i < painted.size(); i++) {
+            colors.put(painted.keyAt(i), painted.valueAt(i));
+        }
+        Drawable wp = Theme.getCachedWallpaperNonBlocking();
+        final int[] service = AndroidUtilities.calcDrawableColor(wp != null ? wp : new ColorDrawable(colors.get(Theme.key_chat_wallpaper)));
+        return new SolegramLookProvider(colors, night, service[0], service[1]);
     }
 
     /** A chat in the look now: the wallpaper, a glass header, Telegram's own message bubbles, a glass input. */
@@ -191,9 +221,13 @@ public final class SolegramThemePreview {
         private final Drawable wallpaper;
         private final Drawable back, more, attach, smile, mic;
         private final String name;
+        private final SolegramLookProvider look;
+        private final int bubbleRadius;
 
-        ChatPreview(Context context, INavigationLayout layout) {
+        ChatPreview(Context context, INavigationLayout layout, SolegramLookProvider look, int pack, int corners, int bubbleRadius) {
             super(context);
+            this.look = look;
+            this.bubbleRadius = bubbleRadius;
             setWillNotDraw(false);
             setClipToOutline(true);
             setOutlineProvider(new ViewOutlineProvider() {
@@ -207,17 +241,30 @@ public final class SolegramThemePreview {
                 w = Theme.getCachedWallpaper();
             }
             wallpaper = w != null ? w : new ColorDrawable(Theme.getColor(Theme.key_chat_wallpaper));
-            back = icon(context, R.drawable.ic_ab_back, Theme.key_actionBarDefaultIcon);
-            more = icon(context, R.drawable.ic_ab_other, Theme.key_actionBarDefaultIcon);
-            attach = icon(context, R.drawable.input_attach, Theme.key_chat_messagePanelIcons);
-            smile = icon(context, R.drawable.input_smile, Theme.key_chat_messagePanelIcons);
-            mic = icon(context, R.drawable.input_mic, Theme.key_chat_messagePanelIcons);
+            back = icon(context, pack, R.drawable.ic_ab_back, look.getColor(Theme.key_actionBarDefaultIcon));
+            more = icon(context, pack, R.drawable.ic_ab_other, look.getColor(Theme.key_actionBarDefaultIcon));
+            attach = icon(context, pack, R.drawable.input_attach, look.getColor(Theme.key_chat_messagePanelIcons));
+            smile = icon(context, pack, R.drawable.input_smile, look.getColor(Theme.key_chat_messagePanelIcons));
+            mic = icon(context, pack, R.drawable.input_mic, look.getColor(Theme.key_chat_messagePanelIcons));
 
             final TLRPC.User me = UserConfig.getInstance(UserConfig.selectedAccount).getCurrentUser();
             name = me != null ? UserObject.getFirstName(me) : "Solegram";
-            // the avatar: a real one, so it has the theme's avatar shape
-            final BackupImageView avatar = new BackupImageView(context);
-            avatar.setRoundRadius(dp(19));
+            // the avatar: a real one, cut to the theme's avatar shape (the image itself square)
+            final float avatarRadius = corners >= 100 ? dp(19) : dp(19) * Math.max(0, corners) / 100f;
+            final BackupImageView avatar = new BackupImageView(context) {
+                private final android.graphics.Path clip = new android.graphics.Path();
+
+                @Override
+                protected void onDraw(@NonNull Canvas canvas) {
+                    clip.rewind();
+                    clip.addRoundRect(0, 0, getWidth(), getHeight(), avatarRadius, avatarRadius, android.graphics.Path.Direction.CW);
+                    canvas.save();
+                    canvas.clipPath(clip);
+                    super.onDraw(canvas);
+                    canvas.restore();
+                }
+            };
+            avatar.setRoundRadius(0);
             final AvatarDrawable avatarDrawable = new AvatarDrawable();
             if (me != null) {
                 avatarDrawable.setInfo(me);
@@ -226,7 +273,7 @@ public final class SolegramThemePreview {
             addView(avatar, LayoutHelper.createFrame(38, 38, Gravity.LEFT | Gravity.TOP, 52, (HEADER - 38) / 2f, 0, 0));
 
             // Telegram's own bubbles (on our wallpaper: the cell's own background is off)
-            final ThemePreviewMessagesCell messages = new ThemePreviewMessagesCell(context, layout, 0);
+            final ThemePreviewMessagesCell messages = new ThemePreviewMessagesCell(context, layout, 0, 0, look);
             messages.setOverrideBackground(new ColorDrawable(0));
             messages.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
             addView(messages, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 0, 0, 0, INPUT + 6));
@@ -234,11 +281,20 @@ public final class SolegramThemePreview {
             rim.setStrokeWidth(Math.max(1, dp(0.66f)));
         }
 
-        private static Drawable icon(Context context, int res, int key) {
-            final Drawable d = ContextCompat.getDrawable(context, res);
-            final Drawable m = d != null ? d.mutate() : new ColorDrawable(0);
-            m.setColorFilter(new PorterDuffColorFilter(Theme.getColor(key), PorterDuff.Mode.SRC_IN));
-            return m;
+        /** An icon of the theme's pack (whatever pack is on now), in the theme's colour. */
+        private static Drawable icon(Context context, int pack, int res, int color) {
+            Drawable d = null;
+            try {
+                d = SolegramIcons.preview(context, pack, res);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            if (d == null) {
+                final Drawable own = ContextCompat.getDrawable(context, res);
+                d = own != null ? own.mutate() : new ColorDrawable(0);
+            }
+            d.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
+            return d;
         }
 
         @Override
@@ -298,11 +354,18 @@ public final class SolegramThemePreview {
         @Override
         protected void dispatchDraw(@NonNull Canvas canvas) {
             final int w = getWidth(), h = getHeight();
-            // the messages (and the avatar) first, the glass header and input over the wallpaper's edges
-            super.dispatchDraw(canvas);
+            // the messages (and the avatar) first, the glass header and input over the wallpaper's edges; the bubbles
+            // with the theme's corners (Telegram's bubbles read them while they draw)
+            final int ownRadius = SharedConfig.bubbleRadius;
+            SharedConfig.bubbleRadius = bubbleRadius;
+            try {
+                super.dispatchDraw(canvas);
+            } finally {
+                SharedConfig.bubbleRadius = ownRadius;
+            }
             canvas.save();
             canvas.clipRect(0, 0, w, dp(HEADER));
-            glass(canvas, 0, dp(HEADER), Theme.getColor(Theme.key_actionBarDefault), true);
+            glass(canvas, 0, dp(HEADER), look.getColor(Theme.key_actionBarDefault), true);
             canvas.restore();
             final int s = dp(24);
             back.setBounds(dp(14), (dp(HEADER) - s) / 2, dp(14) + s, (dp(HEADER) + s) / 2);
@@ -311,11 +374,11 @@ public final class SolegramThemePreview {
             more.draw(canvas);
             text.setTypeface(AndroidUtilities.bold());
             text.setTextSize(dp(16));
-            text.setColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
+            text.setColor(look.getColor(Theme.key_actionBarDefaultTitle));
             canvas.drawText(TextUtils.ellipsize(name, text, w - dp(160), TextUtils.TruncateAt.END).toString(), dp(100), dp(HEADER) / 2f - dp(1), text);
             text.setTypeface(null);
             text.setTextSize(dp(13));
-            text.setColor(Theme.getColor(Theme.key_actionBarDefaultSubtitle));
+            text.setColor(look.getColor(Theme.key_actionBarDefaultSubtitle));
             canvas.drawText(getString(R.string.SG_ThemeSharePreviewOnline), dp(100), dp(HEADER) / 2f + dp(16), text);
             // the avatar is a child: drawn again over the header's glass
             for (int i = 0; i < getChildCount(); i++) {
@@ -326,8 +389,8 @@ public final class SolegramThemePreview {
             }
 
             final float top = h - dp(INPUT);
-            glass(canvas, top, h, Theme.getColor(Theme.key_chat_messagePanelBackground), false);
-            tint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_chat_messagePanelHint), 0.14f));
+            glass(canvas, top, h, look.getColor(Theme.key_chat_messagePanelBackground), false);
+            tint.setColor(Theme.multAlpha(look.getColor(Theme.key_chat_messagePanelHint), 0.14f));
             rect.set(dp(50), top + dp(8), w - dp(50), h - dp(8));
             canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, tint);
             attach.setBounds(dp(13), (int) (top + (dp(INPUT) - s) / 2f), dp(13) + s, (int) (top + (dp(INPUT) + s) / 2f));
@@ -337,7 +400,7 @@ public final class SolegramThemePreview {
             smile.setBounds((int) rect.right - dp(8) - s, (int) (top + (dp(INPUT) - s) / 2f), (int) rect.right - dp(8), (int) (top + (dp(INPUT) + s) / 2f));
             smile.draw(canvas);
             text.setTextSize(dp(15));
-            text.setColor(Theme.getColor(Theme.key_chat_messagePanelHint));
+            text.setColor(look.getColor(Theme.key_chat_messagePanelHint));
             canvas.drawText(getString(R.string.SG_ThemeSharePreviewInput), rect.left + dp(14), top + dp(INPUT) / 2f + dp(5), text);
         }
     }
