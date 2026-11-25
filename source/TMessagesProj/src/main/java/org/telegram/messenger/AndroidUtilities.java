@@ -1970,6 +1970,16 @@ public class AndroidUtilities {
         if (pathString.endsWith(".attheme")) {
             return false;
         }
+        // Solegram: a theme the user shares is written to cache/sg_themes; only such files may leave the app's own folder
+        if (pathString.toLowerCase().endsWith(com.solegram.messenger.SolegramThemeShare.EXTENSION)) {
+            try {
+                final String themes = new File(ApplicationLoader.applicationContext.getCacheDir(), "sg_themes").getCanonicalPath() + "/";
+                if (pathString.startsWith(themes) && pathString.indexOf('/', themes.length()) < 0) {
+                    return false;
+                }
+            } catch (Exception ignore) {
+            }
+        }
         return pathString != null && pathString.toLowerCase().contains("/data/data/" + ApplicationLoader.applicationContext.getPackageName());
     }
 
