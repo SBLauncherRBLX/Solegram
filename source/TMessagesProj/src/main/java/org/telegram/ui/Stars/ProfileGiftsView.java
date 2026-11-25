@@ -1328,7 +1328,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         if (w <= 0 || h <= 0) {
             return;
         }
-        final float stroke = dp(2.2f);
+        final float stroke = dp(1.8f);
         float rr = avatarImage.getImageReceiver().getRoundRadius()[0] * scale;
         rr = Math.max(0, Math.min(rr, Math.min(w, h) / 2f));
         sgRingRect.set(x + stroke / 2f, y + stroke / 2f, x + w - stroke / 2f, y + h - stroke / 2f);
@@ -1344,8 +1344,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         if (sgRingSheen == null || sgRingSheenW != w || sgRingSheenH != h) {
             sgRingSheenW = w;
             sgRingSheenH = h;
-            sgRingSheen = new LinearGradient(0, 0, w, h, new int[]{0xD9FFFFFF, 0x26FFFFFF, 0x1AFFFFFF, 0x8CFFFFFF},
-                new float[]{0f, 0.42f, 0.6f, 1f}, Shader.TileMode.CLAMP);
+            sgRingSheen = new LinearGradient(0, 0, w, h, new int[]{0xB3FFFFFF, 0x80FFFFFF, 0x99FFFFFF},
+                new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
         }
         sgMatrix.reset();
         sgMatrix.postTranslate(x, y);
@@ -1355,13 +1355,6 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgRingPaint.setShader(sgRingSheen);
         sgRingPaint.setAlpha((int) (0xFF * alpha));
         canvas.drawPath(sgRingPath, sgRingPaint);
-        // depth: a thin dark line just inside the rim
-        sgRingPaint.setShader(null);
-        sgRingPaint.setStrokeWidth(Math.max(1f, dp(0.8f)));
-        sgRingPaint.setColor(Theme.multAlpha(0xFF000000, 0.28f * alpha));
-        sgRingRect.inset(stroke * 0.9f, stroke * 0.9f);
-        final float ri = Math.max(0, r - stroke * 0.9f);
-        canvas.drawRoundRect(sgRingRect, ri, ri, sgRingPaint);
         // the bubbles' light on the glass: each lights the part of the rim nearest to it, in its colour
         final float acx = x + w / 2f, acy = y + h / 2f, ar = Math.max(w, h) / 2f;
         sgRingPaint.setStyle(Paint.Style.STROKE);
@@ -1389,12 +1382,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             b.reflect.setLocalMatrix(sgMatrix);
             sgRingPaint.setShader(b.reflect);
             final float strength = near * alpha * Math.min(1f, 0.75f + 0.5f * b.flash);
-            // a soft spill of its light just outside the rim, then the rim itself lit
-            sgRingPaint.setStrokeWidth(stroke * 3.2f);
-            sgRingPaint.setAlpha((int) (0xFF * 0.32f * strength));
-            canvas.drawPath(sgRingPath, sgRingPaint);
-            sgRingPaint.setStrokeWidth(stroke * 1.2f);
-            sgRingPaint.setAlpha((int) (0xFF * 0.95f * strength));
+            // the rim takes a soft tint of its light where it is near
+            sgRingPaint.setStrokeWidth(stroke);
+            sgRingPaint.setAlpha((int) (0xFF * 0.6f * strength));
             canvas.drawPath(sgRingPath, sgRingPaint);
         }
         sgRingPaint.setShader(null);
@@ -1417,35 +1407,31 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         final int rich = sgSaturated(color);
         final int light = androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.45f);
         final float k = r / dp(21);
-        // a faint wide bloom for the air round it
+        // the glow: soft and wide, as measured in the example: right outside the edge about a third of the colour,
+        // fading smoothly to nothing about 1.8 radii further; one gradient, no layers
         if (b.glow == null || b.glowColor != color) {
             b.glowColor = color;
             b.glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-            b.glow.setShader(new RadialGradient(0, 0, dp(22.5f), new int[]{Theme.multAlpha(rich, 0.5f), Theme.multAlpha(rich, 0.18f), Theme.multAlpha(rich, 0f)},
-                new float[]{0.55f, 0.78f, 1f}, Shader.TileMode.CLAMP));
+            // distance in radii → strength, taken from the example's pixels (1.07R .30, 1.45R .17, 1.9R .10)
+            final float[] dist = {0f, 1f, 1.1f, 1.25f, 1.45f, 1.7f, 1.9f, 2.2f, 2.5f, 2.8f};
+            final float[] level = {0.36f, 0.36f, 0.3f, 0.23f, 0.17f, 0.125f, 0.1f, 0.06f, 0.028f, 0f};
+            final float[] stops = new float[dist.length];
+            final int[] colors = new int[dist.length];
+            for (int i = 0; i < dist.length; i++) {
+                stops[i] = dist[i] / 2.8f;
+                colors[i] = Theme.multAlpha(rich, level[i]);
+            }
+            b.glow.setShader(new RadialGradient(0, 0, dp(21) * 2.8f, colors, stops, Shader.TileMode.CLAMP));
         }
-        b.glow.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.7f + 0.3f * flash)));
+        b.glow.setAlpha((int) (0xFF * Math.min(1f, alpha * (1f + 0.5f * flash))));
         canvas.save();
         canvas.translate(cx, cy);
-        final float g = k * (1.5f + 0.15f * flash);
-        canvas.scale(g, g);
-        canvas.drawCircle(0, 0, dp(22.5f), b.glow);
+        canvas.scale(k * b.volume, k * b.volume);
+        canvas.drawCircle(0, 0, dp(21) * 2.8f, b.glow);
         canvas.restore();
 
         final float shapeR = r * b.volume;
         sgBuildShape(b, cx, cy, shapeR);
-        // the glow along the outline: the shape stroked wide and soft, three times, narrower and stronger inwards
-        final float glowBoost = alpha * (1f + 0.6f * flash);
-        sgGlowStroke.setColor(rich);
-        sgGlowStroke.setStrokeWidth(dp(15) * k);
-        sgGlowStroke.setAlpha((int) Math.min(255, 0xFF * 0.08f * glowBoost));
-        canvas.drawPath(sgPath, sgGlowStroke);
-        sgGlowStroke.setStrokeWidth(dp(9) * k);
-        sgGlowStroke.setAlpha((int) Math.min(255, 0xFF * 0.15f * glowBoost));
-        canvas.drawPath(sgPath, sgGlowStroke);
-        sgGlowStroke.setStrokeWidth(dp(4.5f) * k);
-        sgGlowStroke.setAlpha((int) Math.min(255, 0xFF * 0.3f * glowBoost));
-        canvas.drawPath(sgPath, sgGlowStroke);
 
         canvas.save();
         canvas.clipPath(sgPath);
@@ -1457,22 +1443,19 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         // the jelly: light and clear in the middle, the colour gathering towards the edge, the edge itself bright
         if (b.body == null || b.bodyColor != color) {
             b.bodyColor = color;
-            b.body = new RadialGradient(0, 0, dp(21) * 1.04f,
-                new int[]{Theme.multAlpha(light, 0.26f), Theme.multAlpha(rich, 0.36f), Theme.multAlpha(rich, 0.62f), Theme.multAlpha(light, 0.9f)},
-                new float[]{0f, 0.55f, 0.84f, 1f}, Shader.TileMode.CLAMP);
+            final int edge = androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.22f);
+            final int soft = androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.18f); // pastel inside, as in the example
+            b.body = new RadialGradient(0, 0, dp(21) * 1.06f,
+                new int[]{Theme.multAlpha(soft, 0.5f), Theme.multAlpha(soft, 0.55f), Theme.multAlpha(rich, 0.66f), Theme.multAlpha(edge, 0.86f), Theme.multAlpha(edge, 0.95f)},
+                new float[]{0f, 0.5f, 0.75f, 0.9f, 1f}, Shader.TileMode.CLAMP);
         }
         sgMatrix.reset();
         sgMatrix.postScale(shapeR / dp(21), shapeR / dp(21));
         sgMatrix.postTranslate(cx, cy);
         b.body.setLocalMatrix(sgMatrix);
         sgFill.setShader(b.body);
-        sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, (glass ? 0.85f : 1f) + 0.3f * flash)));
+        sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.95f + 0.2f * flash)));
         canvas.drawPaint(sgFill);
-        // the rim light inside the edge (half of the stroke is inside the clip)
-        sgGlowStroke.setColor(light);
-        sgGlowStroke.setStrokeWidth(dp(5) * k);
-        sgGlowStroke.setAlpha((int) (0xFF * Math.min(1f, (0.42f + 0.3f * flash) * alpha)));
-        canvas.drawPath(sgPath, sgGlowStroke);
         // the snow: the pattern's symbol, settled at the bottom or swirling
         if (gift.sgPattern != null) {
             final int fs = (int) (r * SG_FLAKE_SIZE);
@@ -1504,9 +1487,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             gift.emojiDrawable.draw(canvas);
         }
         canvas.restore();
-        // a thin light edge all round
-        sgRim.setStrokeWidth(Math.max(1f, dp(1f) * k));
-        sgRim.setColor(Theme.multAlpha(androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.7f), (0.55f + 0.35f * flash) * alpha));
+        // only a whisper of an edge, so the outline stays smooth (the example has no line round it)
+        sgRim.setStrokeWidth(Math.max(1f, dp(0.6f) * k));
+        sgRim.setColor(Theme.multAlpha(light, 0.22f * alpha));
         canvas.drawPath(sgPath, sgRim);
     }
 
