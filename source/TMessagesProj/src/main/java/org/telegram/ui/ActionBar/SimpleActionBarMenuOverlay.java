@@ -155,6 +155,15 @@ public class SimpleActionBarMenuOverlay extends FrameLayout {
     private ActionBarMenuItem item;
     private ActionBarPopupWindow.ActionBarPopupWindowLayout content;
     private BlurredBackgroundDrawable glass;
+
+    /** Solegram: where the open menu's glass is, in this overlay's coordinates (false: no menu glass now). */
+    public boolean solegramGlassBounds(android.graphics.RectF out) {
+        if (glass == null || glass.getBounds().isEmpty()) {
+            return false;
+        }
+        out.set(glass.getBounds());
+        return true;
+    }
     private MenuOverlayHost glassBar;
     private final java.util.WeakHashMap<MenuOverlayHost, BlurredBackgroundDrawable> glasses = new java.util.WeakHashMap<>();
     /** See {@link MenuOverlayHost#isMenuFromPillBelow()}. */

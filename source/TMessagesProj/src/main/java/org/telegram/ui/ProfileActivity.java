@@ -1479,6 +1479,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         private float sgHeaderMeltHeight;
 
         private void sgDrawHeaderMelt(Canvas canvas, int y1) {
+            if (!SG_MELTS) {
+                return; // the owner asked for the header to end without the fade into the page (3.5.2-beta18)
+            }
             // it follows the header's bottom and shrinks with the header while the profile scrolls (never fades out
             // on its own): the small bar of a fully scrolled profile has none
             final float shown = 1f - mediaHeaderAnimationProgress;
@@ -1655,6 +1658,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         private int sgMeltColor, sgMeltHeight;
 
         private void sgDrawPhotoMelt(Canvas canvas) {
+            if (!SG_MELTS) {
+                return;
+            }
             // as long as the photo is open (scrolling the open photo up keeps it: expandProgress drops then)
             final float shown = Utilities.clamp01(Math.max(expandProgress, currentExpandAnimatorValue));
             final int h = getHeight(), w = getWidth();
@@ -6535,8 +6541,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return ViewPositionWatcher.computeRectInParent(view, root, captureViewRect) && RectF.intersects(captureViewRect, position);
     }
 
+    /** Solegram: the fades of the header (and of the opened photo) into the page; off on request, code kept. */
+    private static final boolean SG_MELTS = false;
+
     private final Path sgCaptureClip = new Path();
-    private final RectF sgClipGifts = new RectF(), sgClipRect = new RectF();
+    private final RectF sgClipGifts = new RectF(), sgClipRect = new RectF(), sgClipOverlay = new RectF();
 
     /** The glass buttons' places (the action row, the music line, the header's buttons) in the gifts view's coordinates. */
     private boolean sgButtonsClip(ViewGroup root) {
@@ -6548,6 +6557,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (simpleActionBar != null && simpleActionBar.getVisibility() == View.VISIBLE) {
             for (int i = 0; i < simpleActionBar.getChildCount(); i++) {
                 any |= sgAddClip(simpleActionBar.getChildAt(i), root);
+            }
+            // an open menu of the header (the ⋯ one): its glass sees the bubbles under it too
+            final org.telegram.ui.ActionBar.SimpleActionBarMenuOverlay overlay = simpleActionBar.getOpenMenuOverlay();
+            if (overlay != null && overlay.solegramGlassBounds(sgClipRect) && ViewPositionWatcher.computeRectInParent(overlay, root, sgClipOverlay)) {
+                sgClipRect.offset(sgClipOverlay.left - sgClipGifts.left, sgClipOverlay.top - sgClipGifts.top);
+                sgCaptureClip.addRect(sgClipRect, Path.Direction.CW);
+                any = true;
             }
         }
         return any;
