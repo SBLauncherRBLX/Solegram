@@ -2672,6 +2672,69 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final Runnable sgStatsTick = this::sgRefreshStatsFm;
 
     /** The profile's own music plays now. */
+    // region Solegram: the avatar moves a little to the beat of the profile's own music while it plays
+
+    private float sgBeatScale, sgBeatScaleV, sgBeatTilt, sgBeatTiltV;
+    private long sgBeatLast;
+    private boolean sgBeatRunning, sgBeatLeft;
+
+    private final com.solegram.messenger.SolegramBeat.Listener sgAvatarBeat = strength -> {
+        if (avatarImage == null || isPulledDown || MediaController.getInstance().isMessagePaused()
+            || !sgPlaysSavedMusic(MediaController.getInstance().getPlayingMessageObject())) {
+            return;
+        }
+        // a small push: it swells a few percent and tips to one side, then the other on the next beat
+        sgBeatScaleV += 0.55f * strength;
+        sgBeatLeft = !sgBeatLeft;
+        sgBeatTiltV += (sgBeatLeft ? -1f : 1f) * 24f * strength;
+        if (!sgBeatRunning) {
+            sgBeatRunning = true;
+            sgBeatLast = 0;
+            AndroidUtilities.runOnUIThread(this::sgBeatFrame);
+        }
+    };
+
+    /** One frame of the springs (swell and tilt) that bring the avatar back after each beat. */
+    private void sgBeatFrame() {
+        if (avatarImage == null) {
+            sgBeatRunning = false;
+            return;
+        }
+        final long now = android.os.SystemClock.uptimeMillis();
+        final float dt = sgBeatLast == 0 ? 1f / 60f : Math.min(1f / 30f, (now - sgBeatLast) / 1000f);
+        sgBeatLast = now;
+        sgBeatScaleV += (-260f * sgBeatScale - 16f * sgBeatScaleV) * dt;
+        sgBeatScale += sgBeatScaleV * dt;
+        sgBeatTiltV += (-200f * sgBeatTilt - 14f * sgBeatTiltV) * dt;
+        sgBeatTilt += sgBeatTiltV * dt;
+        final boolean still = Math.abs(sgBeatScale) < 0.0005f && Math.abs(sgBeatScaleV) < 0.005f
+            && Math.abs(sgBeatTilt) < 0.02f && Math.abs(sgBeatTiltV) < 0.2f;
+        if (still || isPulledDown) {
+            sgBeatScale = sgBeatScaleV = sgBeatTilt = sgBeatTiltV = 0;
+        }
+        avatarImage.setScaleX(1f + sgBeatScale);
+        avatarImage.setScaleY(1f + sgBeatScale);
+        avatarImage.setRotation(sgBeatTilt);
+        if (still || isPulledDown) {
+            sgBeatRunning = false;
+            return;
+        }
+        avatarImage.postOnAnimation(this::sgBeatFrame);
+    }
+
+    private void sgStopAvatarBeat() {
+        com.solegram.messenger.SolegramBeat.remove(sgAvatarBeat);
+        sgBeatScale = sgBeatScaleV = sgBeatTilt = sgBeatTiltV = 0;
+        sgBeatRunning = false;
+        if (avatarImage != null) {
+            avatarImage.setScaleX(1f);
+            avatarImage.setScaleY(1f);
+            avatarImage.setRotation(0f);
+        }
+    }
+
+    // endregion
+
     private boolean sgPlaysSavedMusic(@Nullable MessageObject mo) {
         return mo != null && mo.getDocument() != null && userInfo != null && userInfo.saved_music != null
             && mo.getDocument().id == userInfo.saved_music.id;
@@ -10365,6 +10428,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         // Solegram: a shake here drops the header (the easter egg), the shake shortcut waits outside the profile
         com.solegram.messenger.SolegramGestures.addShakeHandler(sgShakeHandler);
         super.onResume();
+        if (userId != 0) {
+            com.solegram.messenger.SolegramBeat.add(sgAvatarBeat);
+        }
         sgStatsResumed = true;
         if (userInfo != null) {
             sgRefreshStatsFm(); // what plays on stats.fm, while the profile is open
@@ -10417,6 +10483,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public void onPause() {
+        sgStopAvatarBeat();
         sgCloseMusicCard(true); // the card does not outlive the screen being in front
         sgStatsResumed = false;
         AndroidUtilities.cancelRunOnUIThread(sgStatsTick);

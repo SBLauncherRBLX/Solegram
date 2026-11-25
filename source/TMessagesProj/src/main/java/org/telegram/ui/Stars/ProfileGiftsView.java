@@ -12,6 +12,8 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
+import android.graphics.Path;
+import android.graphics.LinearGradient;
 import android.graphics.Shader;
 import android.view.MotionEvent;
 import android.view.View;
@@ -251,7 +253,45 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         public final RectF bounds = new RectF();
         public final ButtonBounce bounce = new ButtonBounce(ProfileGiftsView.this);
 
+        /** Solegram: the bubble's colour = the sticker's own average colour (the backdrop's until the sticker is drawn). */
+        int sgTone;
+        private int sgToneTries;
+        private long sgToneAt;
+
+        int sgTone() {
+            if (sgTone != 0 || sgToneTries >= 12) {
+                return sgTone != 0 ? sgTone : color;
+            }
+            final long now = android.os.SystemClock.uptimeMillis();
+            if (now - sgToneAt < 400) {
+                return color;
+            }
+            sgToneAt = now;
+            sgToneTries++;
+            try {
+                final org.telegram.messenger.ImageReceiver ir = emojiDrawable != null ? emojiDrawable.getImageReceiver() : null;
+                android.graphics.Bitmap bm = ir != null ? ir.getBitmap() : null;
+                if (bm == null || bm.isRecycled()) {
+                    return color;
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 26 && bm.getConfig() == android.graphics.Bitmap.Config.HARDWARE) {
+                    bm = bm.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
+                }
+                final android.graphics.Bitmap small = android.graphics.Bitmap.createScaledBitmap(bm, 24, 24, true);
+                final int tone = sgAverage(small);
+                if (small != bm) small.recycle();
+                if (tone != 0) {
+                    sgTone = tone;
+                }
+            } catch (Throwable e) {
+                sgToneTries = 12;
+            }
+            return sgTone != 0 ? sgTone : color;
+        }
+
         public void copy(Gift b) {
+            sgTone = b.sgTone;
+            sgToneTries = b.sgToneTries;
             gradient = b.gradient;
             emojiDrawable = b.emojiDrawable;
             gradientPaint = b.gradientPaint;
@@ -310,6 +350,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         // the bloom round it: the gift's colour made richer (not wider)
         Paint glow;
         int glowColor;
+        // its light on the avatar's glass ring
+        RadialGradient reflect;
+        int reflectColor;
         float x, y, vx, vy, lastVx, lastVy;
         float phase, size = 1f, ring, spin = 1f;
         // its orbit: where on it, how fast; the orbit itself drifts slowly (radius, tilt, height)
@@ -1147,6 +1190,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         }
         canvas.save();
         canvas.clipRect(0, 0, getWidth(), expandY);
+        if (front) {
+            sgDrawAvatarRing(canvas, viewAlpha); // over the avatar, under the bubbles that pass in front of it
+        }
         for (int i = 0; i < gifts.size(); i++) {
             final Gift gift = gifts.get(i);
             final SgBubble b = gift.sg;
@@ -1165,12 +1211,13 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             final float ease = 1f - (1f - collapse) * (1f - collapse);
             final float cx = AndroidUtilities.lerp(sgRealCx, sgAcx + b.x, ease);
             final float cy = AndroidUtilities.lerp(sgRealCy, sgAcy + b.y, ease);
-            final float scale = (0.5f + 0.5f * ease) * (1f + 0.06f * depth) * (1f + 0.12f * b.pulse) * b.inflate;
+            // the near ones bigger, the far ones smaller and dimmer: depth
+            final float scale = (0.5f + 0.5f * ease) * (1f + 0.2f * depth) * (1f + 0.12f * b.pulse) * b.inflate;
             final float r = dp(21) * b.size * scale * gift.bounce.getScale(0.1f);
             b.drawX = cx;
             b.drawY = cy;
             b.drawR = r;
-            final float alpha = enter * sgAlpha * (0.8f + 0.2f * (depth + 1f) / 2f) * viewAlpha;
+            final float alpha = enter * sgAlpha * (0.62f + 0.38f * (depth + 1f) / 2f) * viewAlpha;
             sgDrawBubble(canvas, gift, cx, cy, r, alpha, front, owner);
         }
         canvas.restore();
@@ -1211,6 +1258,39 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgPath.close();
     }
 
+    /**
+     * The sticker's colour as one: the average of its visible pixels, coloured ones weigh more than greys, dark
+     * outlines and white glints less (so a pink gift gives pink, not grey). 0: nothing visible yet.
+     */
+    static int sgAverage(android.graphics.Bitmap b) {
+        final int w = b.getWidth(), h = b.getHeight();
+        final int[] px = new int[w * h];
+        b.getPixels(px, 0, w, 0, 0, w, h);
+        final float[] hsv = new float[3];
+        double r = 0, g = 0, bl = 0, total = 0;
+        for (int p : px) {
+            final int a = p >>> 24;
+            if (a < 40) continue;
+            android.graphics.Color.colorToHSV(p | 0xFF000000, hsv);
+            final float v = hsv[2], s = hsv[1];
+            final double weight = a / 255.0 * (0.2 + s * s * 2.0) * (v < 0.18f ? 0.15 : v > 0.97f && s < 0.08f ? 0.3 : 1.0);
+            r += ((p >> 16) & 0xFF) * weight;
+            g += ((p >> 8) & 0xFF) * weight;
+            bl += (p & 0xFF) * weight;
+            total += weight;
+        }
+        if (total < 4) {
+            return 0;
+        }
+        final int avg = 0xFF000000 | ((int) (r / total) << 16) | ((int) (g / total) << 8) | (int) (bl / total);
+        android.graphics.Color.colorToHSV(avg, hsv);
+        if (hsv[1] > 0.1f) {
+            hsv[1] = Math.min(1f, hsv[1] * 1.25f + 0.08f);
+        }
+        hsv[2] = Math.max(hsv[2], 0.82f);
+        return android.graphics.Color.HSVToColor(hsv);
+    }
+
     /** The colour with its saturation pushed up (greys stay grey), a touch brighter when it is dark. */
     private static int sgSaturated(int color) {
         final float[] hsv = new float[3];
@@ -1222,27 +1302,151 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         return android.graphics.Color.HSVToColor(hsv);
     }
 
+    private final Paint sgGlowStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint sgRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF sgRingRect = new RectF();
+    private final Path sgRingPath = new Path();
+    private LinearGradient sgRingSheen;
+    private float sgRingSheenW, sgRingSheenH;
+
+    /**
+     * A glass ring along the avatar's own shape (its corners as the avatar has them): a light rim catching light at
+     * the top-left and the bottom-right, a thin dark line inside for depth, and the bubbles' light on it, each in its
+     * colour, brightest where a bubble is nearest. Not with a stories ring (that one takes the edge).
+     */
+    private void sgDrawAvatarRing(Canvas canvas, float viewAlpha) {
+        if (avatarImage == null || avatarImage.hasStories) {
+            return;
+        }
+        final float alpha = sgAlpha * viewAlpha * (1f - expandProgress);
+        if (alpha <= 0.01f) {
+            return;
+        }
+        final float scale = avatarContainer.getScaleX();
+        final float x = avatarContainer.getX() + avatarImage.getX() * scale, y = avatarContainer.getY() + avatarImage.getY() * scale;
+        final float w = avatarImage.getWidth() * scale, h = avatarImage.getHeight() * scale;
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        final float stroke = dp(2.2f);
+        float rr = avatarImage.getImageReceiver().getRoundRadius()[0] * scale;
+        rr = Math.max(0, Math.min(rr, Math.min(w, h) / 2f));
+        sgRingRect.set(x + stroke / 2f, y + stroke / 2f, x + w - stroke / 2f, y + h - stroke / 2f);
+        final float r = Math.max(0, rr - stroke / 2f);
+        sgRingPath.rewind();
+        sgRingPath.addRoundRect(sgRingRect, r, r, Path.Direction.CW);
+        // it moves with the avatar (the beat's swell and tilt)
+        canvas.save();
+        final float acx0 = x + w / 2f, acy0 = y + h / 2f;
+        canvas.rotate(avatarImage.getRotation(), acx0, acy0);
+        canvas.scale(avatarImage.getScaleX(), avatarImage.getScaleY(), acx0, acy0);
+        // the glass rim: light at two opposite sides, faint between
+        if (sgRingSheen == null || sgRingSheenW != w || sgRingSheenH != h) {
+            sgRingSheenW = w;
+            sgRingSheenH = h;
+            sgRingSheen = new LinearGradient(0, 0, w, h, new int[]{0xD9FFFFFF, 0x26FFFFFF, 0x1AFFFFFF, 0x8CFFFFFF},
+                new float[]{0f, 0.42f, 0.6f, 1f}, Shader.TileMode.CLAMP);
+        }
+        sgMatrix.reset();
+        sgMatrix.postTranslate(x, y);
+        sgRingSheen.setLocalMatrix(sgMatrix);
+        sgRingPaint.setStyle(Paint.Style.STROKE);
+        sgRingPaint.setStrokeWidth(stroke);
+        sgRingPaint.setShader(sgRingSheen);
+        sgRingPaint.setAlpha((int) (0xFF * alpha));
+        canvas.drawPath(sgRingPath, sgRingPaint);
+        // depth: a thin dark line just inside the rim
+        sgRingPaint.setShader(null);
+        sgRingPaint.setStrokeWidth(Math.max(1f, dp(0.8f)));
+        sgRingPaint.setColor(Theme.multAlpha(0xFF000000, 0.28f * alpha));
+        sgRingRect.inset(stroke * 0.9f, stroke * 0.9f);
+        final float ri = Math.max(0, r - stroke * 0.9f);
+        canvas.drawRoundRect(sgRingRect, ri, ri, sgRingPaint);
+        // the bubbles' light on the glass: each lights the part of the rim nearest to it, in its colour
+        final float acx = x + w / 2f, acy = y + h / 2f, ar = Math.max(w, h) / 2f;
+        sgRingPaint.setStyle(Paint.Style.STROKE);
+        for (int i = 0; i < gifts.size(); i++) {
+            final Gift gift = gifts.get(i);
+            final SgBubble b = gift.sg;
+            if (!b.placed || b.drawR <= 0) {
+                continue;
+            }
+            final float d = (float) Math.hypot(b.drawX - acx, b.drawY - acy) - ar - b.drawR;
+            final float near = Utilities.clamp01(1f - d / dp(56));
+            if (near <= 0.02f) {
+                continue;
+            }
+            final int rich = sgSaturated(gift.sgTone());
+            if (b.reflect == null || b.reflectColor != rich) {
+                b.reflectColor = rich;
+                b.reflect = new RadialGradient(0, 0, 1f, new int[]{rich, Theme.multAlpha(rich, 0.45f), Theme.multAlpha(rich, 0f)},
+                    new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
+            }
+            final float reach = b.drawR * 2.4f + dp(24);
+            sgMatrix.reset();
+            sgMatrix.postScale(reach, reach);
+            sgMatrix.postTranslate(b.drawX, b.drawY);
+            b.reflect.setLocalMatrix(sgMatrix);
+            sgRingPaint.setShader(b.reflect);
+            final float strength = near * alpha * Math.min(1f, 0.75f + 0.5f * b.flash);
+            // a soft spill of its light just outside the rim, then the rim itself lit
+            sgRingPaint.setStrokeWidth(stroke * 3.2f);
+            sgRingPaint.setAlpha((int) (0xFF * 0.32f * strength));
+            canvas.drawPath(sgRingPath, sgRingPaint);
+            sgRingPaint.setStrokeWidth(stroke * 1.2f);
+            sgRingPaint.setAlpha((int) (0xFF * 0.95f * strength));
+            canvas.drawPath(sgRingPath, sgRingPaint);
+        }
+        sgRingPaint.setShader(null);
+        canvas.restore();
+    }
+
+    {
+        sgGlowStroke.setStyle(Paint.Style.STROKE);
+        sgGlowStroke.setStrokeJoin(Paint.Join.ROUND);
+    }
+
+    /**
+     * A bubble as in the iOS look: a light, see-through jelly of its gift's colour, a bright rim of that colour along
+     * its outline, a soft glow that hugs the outline (not a round blob) and a thin light edge; the gift inside.
+     */
     private void sgDrawBubble(Canvas canvas, Gift gift, float cx, float cy, float r, float alpha, boolean front, View owner) {
         final SgBubble b = gift.sg;
-        final int color = gift.color;
+        final int color = gift.sgTone();
         final float flash = Math.max(0f, Math.min(1f, b.flash));
-        // a soft bloom of its colour round it (brighter on the beat): the size it always had, the hue richer
+        final int rich = sgSaturated(color);
+        final int light = androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.45f);
+        final float k = r / dp(21);
+        // a faint wide bloom for the air round it
         if (b.glow == null || b.glowColor != color) {
             b.glowColor = color;
-            final int rich = sgSaturated(color);
             b.glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-            b.glow.setShader(new RadialGradient(0, 0, dp(22.5f), new int[]{rich, Theme.multAlpha(rich, 0.55f), Theme.multAlpha(rich, 0f)},
-                new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
+            b.glow.setShader(new RadialGradient(0, 0, dp(22.5f), new int[]{Theme.multAlpha(rich, 0.5f), Theme.multAlpha(rich, 0.18f), Theme.multAlpha(rich, 0f)},
+                new float[]{0.55f, 0.78f, 1f}, Shader.TileMode.CLAMP));
         }
-        b.glow.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.85f + 0.15f * flash)));
+        b.glow.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.7f + 0.3f * flash)));
         canvas.save();
         canvas.translate(cx, cy);
-        final float g = r / dp(22.5f) * (1.55f + 0.25f * flash);
+        final float g = k * (1.5f + 0.15f * flash);
         canvas.scale(g, g);
         canvas.drawCircle(0, 0, dp(22.5f), b.glow);
         canvas.restore();
+
         final float shapeR = r * b.volume;
         sgBuildShape(b, cx, cy, shapeR);
+        // the glow along the outline: the shape stroked wide and soft, three times, narrower and stronger inwards
+        final float glowBoost = alpha * (1f + 0.6f * flash);
+        sgGlowStroke.setColor(rich);
+        sgGlowStroke.setStrokeWidth(dp(15) * k);
+        sgGlowStroke.setAlpha((int) Math.min(255, 0xFF * 0.08f * glowBoost));
+        canvas.drawPath(sgPath, sgGlowStroke);
+        sgGlowStroke.setStrokeWidth(dp(9) * k);
+        sgGlowStroke.setAlpha((int) Math.min(255, 0xFF * 0.15f * glowBoost));
+        canvas.drawPath(sgPath, sgGlowStroke);
+        sgGlowStroke.setStrokeWidth(dp(4.5f) * k);
+        sgGlowStroke.setAlpha((int) Math.min(255, 0xFF * 0.3f * glowBoost));
+        canvas.drawPath(sgPath, sgGlowStroke);
+
         canvas.save();
         canvas.clipPath(sgPath);
         // the lens: what is under it, refracted along this very outline (the glass of the header)
@@ -1250,45 +1454,59 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         if (glass) {
             sgDrawLens(canvas, front, owner, b, cx, cy, shapeR, alpha);
         }
-        // a jelly of the gift's colour: evenly see-through, a little denser and lighter towards the edge (no glare)
+        // the jelly: light and clear in the middle, the colour gathering towards the edge, the edge itself bright
         if (b.body == null || b.bodyColor != color) {
             b.bodyColor = color;
-            final int rim = androidx.core.graphics.ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.22f);
-            b.body = new RadialGradient(0, 0, dp(21) * 1.05f,
-                new int[]{Theme.multAlpha(color, 0.58f), Theme.multAlpha(color, 0.66f), Theme.multAlpha(rim, 0.82f), Theme.multAlpha(rim, 0.95f)},
-                new float[]{0f, 0.6f, 0.9f, 1f}, Shader.TileMode.CLAMP);
+            b.body = new RadialGradient(0, 0, dp(21) * 1.04f,
+                new int[]{Theme.multAlpha(light, 0.26f), Theme.multAlpha(rich, 0.36f), Theme.multAlpha(rich, 0.62f), Theme.multAlpha(light, 0.9f)},
+                new float[]{0f, 0.55f, 0.84f, 1f}, Shader.TileMode.CLAMP);
         }
         sgMatrix.reset();
         sgMatrix.postScale(shapeR / dp(21), shapeR / dp(21));
         sgMatrix.postTranslate(cx, cy);
         b.body.setLocalMatrix(sgMatrix);
         sgFill.setShader(b.body);
-        sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, (glass ? 0.8f : 0.95f) + 0.35f * flash)));
+        sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, (glass ? 0.85f : 1f) + 0.3f * flash)));
         canvas.drawPaint(sgFill);
+        // the rim light inside the edge (half of the stroke is inside the clip)
+        sgGlowStroke.setColor(light);
+        sgGlowStroke.setStrokeWidth(dp(5) * k);
+        sgGlowStroke.setAlpha((int) (0xFF * Math.min(1f, (0.42f + 0.3f * flash) * alpha)));
+        canvas.drawPath(sgPath, sgGlowStroke);
         // the snow: the pattern's symbol, settled at the bottom or swirling
         if (gift.sgPattern != null) {
             final int fs = (int) (r * SG_FLAKE_SIZE);
-            gift.sgPattern.setAlpha((int) (0xD0 * alpha));
-            for (int k = 0; k < SG_FLAKES; k++) {
-                final float fx = cx + b.fx[k] * r, fy = cy + b.fy[k] * r;
+            gift.sgPattern.setAlpha((int) (0xB0 * alpha));
+            for (int i = 0; i < SG_FLAKES; i++) {
+                final float fx = cx + b.fx[i] * r, fy = cy + b.fy[i] * r;
                 canvas.save();
-                canvas.rotate(b.fa[k], fx, fy);
+                canvas.rotate(b.fa[i], fx, fy);
                 gift.sgPattern.setBounds((int) (fx - fs / 2f), (int) (fy - fs / 2f), (int) (fx + fs / 2f), (int) (fy + fs / 2f));
                 gift.sgPattern.draw(canvas);
                 canvas.restore();
             }
         }
+        // sparkles: a few tiny light specks drifting in the jelly, twinkling
+        sgFill.setShader(null);
+        for (int i = 0; i < 4; i++) {
+            final float ph = b.phase * 3.1f + i * 1.7f;
+            final float sx = cx + (float) Math.cos(ph + sgTime * 0.23f) * r * (0.35f + 0.12f * i);
+            final float sy = cy + (float) Math.sin(ph * 1.3f + sgTime * 0.19f) * r * (0.3f + 0.1f * i);
+            final float tw = 0.5f + 0.5f * (float) Math.sin(sgTime * 2.2f + ph * 2f);
+            sgFill.setColor(Theme.multAlpha(0xFFFFFFFF, (0.25f + 0.5f * tw) * alpha));
+            canvas.drawCircle(sx, sy, dp(0.9f + 0.5f * (i % 2)) * k, sgFill);
+        }
         // the gift itself in the middle
         if (gift.emojiDrawable != null) {
-            final int sz = (int) (dp(24) * r / dp(21));
+            final int sz = (int) (dp(25) * k);
             gift.emojiDrawable.setBounds((int) (cx - sz / 2f), (int) (cy - sz / 2f), (int) (cx + sz / 2f), (int) (cy + sz / 2f));
             gift.emojiDrawable.setAlpha((int) (0xFF * alpha));
             gift.emojiDrawable.draw(canvas);
         }
         canvas.restore();
-        // only a thin, light edge all round
-        sgRim.setStrokeWidth(Math.max(1f, dp(1f) * r / dp(21)));
-        sgRim.setColor(Theme.multAlpha(androidx.core.graphics.ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.6f), (0.35f + 0.4f * flash) * alpha));
+        // a thin light edge all round
+        sgRim.setStrokeWidth(Math.max(1f, dp(1f) * k));
+        sgRim.setColor(Theme.multAlpha(androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.7f), (0.55f + 0.35f * flash) * alpha));
         canvas.drawPath(sgPath, sgRim);
     }
 
