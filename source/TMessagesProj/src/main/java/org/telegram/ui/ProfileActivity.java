@@ -1507,58 +1507,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
         // endregion
 
-        // region Solegram: the colour at the bottom of the photo (the expanded photo melts into it, see OverlaysView)
-        private Bitmap sgColorOf;
-        private int sgColorOfValue;
-
-        /** The average colour of a bitmap's lower part (where it meets the page). */
-        private int sgBottomColor(@Nullable Bitmap bitmap, int fallback) {
-            if (bitmap == null || bitmap.isRecycled()) {
-                return fallback;
-            }
-            if (bitmap == sgColorOf) {
-                return sgColorOfValue;
-            }
-            int result = fallback;
-            try {
-                Bitmap source = bitmap;
-                if (Build.VERSION.SDK_INT >= 26 && bitmap.getConfig() == Bitmap.Config.HARDWARE) {
-                    source = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-                }
-                final Bitmap small = Bitmap.createScaledBitmap(source, 8, 8, true);
-                long r = 0, g = 0, b = 0;
-                int n = 0;
-                for (int y = 6; y < 8; y++) {
-                    for (int x = 0; x < 8; x++) {
-                        final int c = small.getPixel(x, y);
-                        r += Color.red(c);
-                        g += Color.green(c);
-                        b += Color.blue(c);
-                        n++;
-                    }
-                }
-                result = Color.rgb((int) (r / n), (int) (g / n), (int) (b / n));
-                if (small != source) {
-                    small.recycle();
-                }
-                if (source != bitmap) {
-                    source.recycle();
-                }
-            } catch (Throwable e) {
-                FileLog.e(e);
-            }
-            sgColorOf = bitmap;
-            sgColorOfValue = result;
-            return result;
-        }
-
-        private int sgPhotoBottomColor(int fallback) {
-            BackupImageView view = avatarsViewPager != null ? avatarsViewPager.getCurrentItemView() : null;
-            final Bitmap bitmap = view != null ? view.getImageReceiver().getBitmap() : null;
-            return sgBottomColor(bitmap != null ? bitmap : avatarImage != null ? avatarImage.getImageReceiver().getBitmap() : null, fallback);
-        }
-
-        // endregion
 
         private Paint sgDimPaint;
         private int sgDimHeight, sgDimValue;
@@ -1704,56 +1652,36 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         // goes over into the colour of its own bottom (a little darker, the name stays readable), and the last strip
         // into the page's colour, so the photo never ends with a line
         private final Paint sgMeltPaint = new Paint();
-        private final Paint sgEdgePaint = new Paint();
-        private int sgMeltColor, sgMeltHeight, sgEdgeColor, sgEdgeHeight;
+        private int sgMeltColor, sgMeltHeight;
 
         private void sgDrawPhotoMelt(Canvas canvas) {
             // as long as the photo is open (scrolling the open photo up keeps it: expandProgress drops then)
             final float shown = Utilities.clamp01(Math.max(expandProgress, currentExpandAnimatorValue));
             final int h = getHeight(), w = getWidth();
-            if (shown <= 0.01f || h <= 0 || topView == null) {
+            if (shown <= 0.01f || h <= 0) {
                 return;
             }
+            // only the page's own colour: the photo melts into the background of what is under it
             final int pageColor = getThemedColor(Theme.key_windowBackgroundGray);
-            final int photo = topView.sgPhotoBottomColor(pageColor);
-            final int melt = ColorUtils.blendARGB(photo, Color.BLACK, 0.3f) | 0xFF000000;
-            final int meltHeight = (int) Math.min(h * 0.55f, dp(330));
-            if (sgMeltColor != melt || sgMeltHeight != meltHeight) {
-                sgMeltColor = melt;
+            final int meltHeight = (int) Math.min(h * 0.4f, dp(220));
+            if (sgMeltColor != pageColor || sgMeltHeight != meltHeight) {
+                sgMeltColor = pageColor;
                 sgMeltHeight = meltHeight;
-                final int[] colors = new int[7];
-                final float[] stops = new float[7];
-                for (int i = 0; i < 7; i++) {
-                    final float t = i / 6f;
+                final int[] colors = new int[8];
+                final float[] stops = new float[8];
+                for (int i = 0; i < 8; i++) {
+                    final float t = i / 7f;
                     stops[i] = t;
-                    // eased: no visible start or end of the fade
-                    final float e = t * t * (3 - 2 * t);
-                    colors[i] = Theme.multAlpha(melt, 0.82f * e);
+                    // eased, and slow at first: no visible start, the full page colour only at the very bottom
+                    final float e = t * t * t * (t * (t * 6 - 15) + 10);
+                    colors[i] = Theme.multAlpha(pageColor, e);
                 }
                 sgMeltPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, meltHeight, colors, stops, Shader.TileMode.CLAMP));
-            }
-            final int edgeHeight = dp(40);
-            if (sgEdgeColor != pageColor || sgEdgeHeight != edgeHeight) {
-                sgEdgeColor = pageColor;
-                sgEdgeHeight = edgeHeight;
-                final int[] colors = new int[5];
-                final float[] stops = new float[5];
-                for (int i = 0; i < 5; i++) {
-                    final float t = i / 4f;
-                    stops[i] = t;
-                    colors[i] = Theme.multAlpha(pageColor, t * t * (3 - 2 * t));
-                }
-                sgEdgePaint.setShader(new android.graphics.LinearGradient(0, 0, 0, edgeHeight, colors, stops, Shader.TileMode.CLAMP));
             }
             canvas.save();
             canvas.translate(0, h - meltHeight);
             sgMeltPaint.setAlpha((int) (0xFF * shown));
-            canvas.drawRect(0, 0, w, meltHeight, sgMeltPaint);
-            canvas.restore();
-            canvas.save();
-            canvas.translate(0, h - edgeHeight);
-            sgEdgePaint.setAlpha((int) (0xFF * shown));
-            canvas.drawRect(0, 0, w, edgeHeight, sgEdgePaint);
+            canvas.drawRect(0, 0, w, meltHeight + 1, sgMeltPaint);
             canvas.restore();
         }
         // endregion
