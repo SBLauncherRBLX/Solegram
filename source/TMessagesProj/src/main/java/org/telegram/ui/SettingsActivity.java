@@ -153,9 +153,12 @@ import java.util.HashSet;
 
 public class SettingsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, ImageUpdater.ImageUpdaterDelegate, MainTabsActivity.TabFragmentDelegate, FactorAnimator.Target {
 
-    /** Solegram: the big avatar on top follows the "avatar corners" option like everywhere (a circle at 100%). */
+    /**
+     * Solegram: the big avatar on top: a circle's radius, as every avatar asks for; the avatar's ImageReceiver turns it
+     * into the "avatar corners" shape itself (asking for the shape here made it twice as square as everywhere else).
+     */
     private static int sgAvatarRadius() {
-        return Math.round(dp(45) * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f);
+        return dp(45);
     }
 
     private static final int ANIMATOR_ID_SEARCH_PAGE_VISIBLE = 0;

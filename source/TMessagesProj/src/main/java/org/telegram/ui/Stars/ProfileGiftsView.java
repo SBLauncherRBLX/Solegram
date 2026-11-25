@@ -318,6 +318,10 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         final float[] cnx = new float[4], cny = new float[4], clim = new float[4];
         int contacts;
         float volume = 1f;
+        /** The beat's flash of its colour, 1 → 0. */
+        float flash;
+        /** How strongly the outline flows now (each breathes in its own rhythm). */
+        float w2 = SG_WOBBLE_2, w3 = SG_WOBBLE_3;
         // the push of the others this step
         float cfx, cfy;
         float inflate = 1f, inflateV, inflateTarget = 1f;
@@ -365,9 +369,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     private final android.graphics.Path sgPath = new android.graphics.Path();
     private final Paint sgFill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint sgRim = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint sgShine = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Matrix sgMatrix = new Matrix();
-    private RadialGradient sgShineShader;
 
     // the lens: the glass of the profile's header (Android 12+), one drawable per bubble and layer
     @androidx.annotation.Nullable
@@ -505,7 +507,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             shader.setFloatUniform("radius", r);
             shader.setFloatUniform("ph", c1, s1, c2, s2);
             shader.setFloatUniform("ell", b.ex, b.ey);
-            shader.setFloatUniform("wob", SG_WOBBLE_2, SG_WOBBLE_3, SG_SMOOTH);
+            shader.setFloatUniform("wob", b.w2, b.w3, SG_SMOOTH);
             for (int k = 0; k < 4; k++) {
                 final boolean on = k < b.contacts;
                 shader.setFloatUniform("k" + k, on ? b.cnx[k] : 0, on ? b.cny[k] : 0, on ? b.clim[k] : 2f, on ? 1f : 0f);
@@ -531,16 +533,13 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         }
         for (int i = 0; i < this.gifts.size(); i++) {
             final SgBubble b = this.gifts.get(i).sg;
-            // each swells and hops a little, its own way; the snow jumps
-            b.pulseV += 9f * strength * (0.7f + 0.6f * sgRandom.nextFloat());
-            b.vy -= dp(70) * strength * (0.6f + 0.8f * sgRandom.nextFloat());
-            b.vx += dp(30) * strength * (sgRandom.nextFloat() * 2 - 1);
-            b.stir(sgRandom, 1.6f * strength);
+            // each flashes its own colour on the beat (they do not move for it)
+            b.flash = Math.max(b.flash, Math.min(1f, strength * (0.8f + 0.4f * sgRandom.nextFloat())));
         }
         invalidate();
     };
 
-    /** Whether the profile's own music plays now (the bubbles hop to its beat then). */
+    /** Whether the profile's own music plays now (the bubbles flash to its beat then). */
     public void sgSetMusicPlays(java.util.function.BooleanSupplier plays) {
         sgMusicPlays = plays;
         sgUpdateBeat();
@@ -939,6 +938,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             // springs: the beat's swell, the squash where it touched, a tap's swell (back by itself)
             b.pulseV += (-140f * b.pulse - 9f * b.pulseV) * dt;
             b.pulse += b.pulseV * dt;
+            b.flash *= (float) Math.exp(-4.5f * dt);
             // the jelly: squashed along where it is pushed, springing back with a soft wobble
             final float ax = (b.vx - b.lastVx) / Math.max(dt, 1e-4f), ay = (b.vy - b.lastVy) / Math.max(dt, 1e-4f);
             final float follow = 1f - (float) Math.exp(-8f * dt);
@@ -1038,7 +1038,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         b.clim[slot] = lim;
     }
 
-    private static final float SG_WOBBLE_2 = 0.03f, SG_WOBBLE_3 = 0.02f, SG_SMOOTH = 0.12f;
+    // the slow flow of the outline while it just floats: clearly not a circle, never a ripple
+    private static final float SG_WOBBLE_2 = 0.075f, SG_WOBBLE_3 = 0.05f, SG_SMOOTH = 0.12f;
 
     private static float sgSmoothMin(float a, float b, float k) {
         final float h = Math.max(0f, Math.min(1f, 0.5f + 0.5f * (b - a) / k));
@@ -1052,7 +1053,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     private float sgShape(SgBubble b, float dx, float dy, float c1, float s1, float c2, float s2) {
         final float cos2 = dx * dx - dy * dy, sin2 = 2f * dx * dy;
         final float cos3 = 4f * dx * dx * dx - 3f * dx, sin3 = 3f * dy - 4f * dy * dy * dy;
-        float f = 1f + SG_WOBBLE_2 * (sin2 * c1 + cos2 * s1) + SG_WOBBLE_3 * (sin3 * c2 - cos3 * s2) + b.ex * cos2 + b.ey * sin2;
+        float f = 1f + b.w2 * (sin2 * c1 + cos2 * s1) + b.w3 * (sin3 * c2 - cos3 * s2) + b.ex * cos2 + b.ey * sin2;
         for (int k = 0; k < b.contacts; k++) {
             final float c = dx * b.cnx[k] + dy * b.cny[k];
             if (c > 0.05f) {
@@ -1163,7 +1164,10 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 
     /** The bubble's outline now, radius {@code r} (its volume already in). */
     private void sgBuildShape(SgBubble b, float cx, float cy, float r) {
-        final float t1 = sgTime * 0.8f + b.phase, t2 = sgTime * 0.55f + b.phase * 1.7f;
+        final float t1 = sgTime * 1.05f + b.phase, t2 = sgTime * 0.75f + b.phase * 1.7f;
+        final float breathe = 0.65f + 0.35f * (float) Math.sin(sgTime * 0.37f + b.phase * 2.3f);
+        b.w2 = SG_WOBBLE_2 * (0.7f + 0.6f * breathe);
+        b.w3 = SG_WOBBLE_3 * (1.3f - 0.6f * breathe);
         sgC1 = (float) Math.cos(t1);
         sgS1 = (float) Math.sin(t1);
         sgC2 = (float) Math.cos(t2);
@@ -1193,12 +1197,13 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     private void sgDrawBubble(Canvas canvas, Gift gift, float cx, float cy, float r, float alpha, boolean front, View owner) {
         final SgBubble b = gift.sg;
         final int color = gift.color;
-        // the glow round it
+        final float flash = Math.max(0f, Math.min(1f, b.flash));
+        // a soft bloom of its colour round it (brighter on the beat)
         if (gift.gradientPaint != null) {
-            gift.gradientPaint.setAlpha((int) (0x80 * alpha));
+            gift.gradientPaint.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.42f + 0.5f * flash)));
             canvas.save();
             canvas.translate(cx, cy);
-            final float g = r / dp(22.5f) * 1.5f;
+            final float g = r / dp(22.5f) * (1.55f + 0.25f * flash);
             canvas.scale(g, g);
             canvas.drawCircle(0, 0, dp(22.5f), gift.gradientPaint);
             canvas.restore();
@@ -1212,24 +1217,25 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         if (glass) {
             sgDrawLens(canvas, front, owner, b, cx, cy, shapeR, alpha);
         }
-        // jelly glass: clear in the middle, the colour gathers at the rim
+        // a jelly of the gift's colour: evenly see-through, a little denser and lighter towards the edge (no glare)
         if (b.body == null || b.bodyColor != color) {
             b.bodyColor = color;
-            b.body = new RadialGradient(-dp(21) * 0.15f, -dp(21) * 0.2f, dp(21) * 1.15f,
-                new int[]{Theme.multAlpha(color, 0.12f), Theme.multAlpha(color, 0.32f), Theme.multAlpha(androidx.core.graphics.ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.25f), 0.78f)},
-                new float[]{0f, 0.65f, 1f}, Shader.TileMode.CLAMP);
+            final int rim = androidx.core.graphics.ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.22f);
+            b.body = new RadialGradient(0, 0, dp(21) * 1.05f,
+                new int[]{Theme.multAlpha(color, 0.46f), Theme.multAlpha(color, 0.52f), Theme.multAlpha(rim, 0.72f), Theme.multAlpha(rim, 0.9f)},
+                new float[]{0f, 0.6f, 0.9f, 1f}, Shader.TileMode.CLAMP);
         }
         sgMatrix.reset();
-        sgMatrix.postScale(r / dp(21), r / dp(21));
+        sgMatrix.postScale(shapeR / dp(21), shapeR / dp(21));
         sgMatrix.postTranslate(cx, cy);
         b.body.setLocalMatrix(sgMatrix);
         sgFill.setShader(b.body);
-        sgFill.setAlpha((int) (0xFF * alpha * (glass ? 0.85f : 1f)));
+        sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, (glass ? 0.8f : 0.95f) + 0.35f * flash)));
         canvas.drawPaint(sgFill);
         // the snow: the pattern's symbol, settled at the bottom or swirling
         if (gift.sgPattern != null) {
             final int fs = (int) (r * SG_FLAKE_SIZE);
-            gift.sgPattern.setAlpha((int) (0xE6 * alpha));
+            gift.sgPattern.setAlpha((int) (0xD0 * alpha));
             for (int k = 0; k < SG_FLAKES; k++) {
                 final float fx = cx + b.fx[k] * r, fy = cy + b.fy[k] * r;
                 canvas.save();
@@ -1247,21 +1253,10 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             gift.emojiDrawable.draw(canvas);
         }
         canvas.restore();
-        // the rim and the shine on top
-        sgRim.setStrokeWidth(Math.max(1f, dp(1.1f) * r / dp(21)));
-        sgRim.setColor(Theme.multAlpha(0xFFFFFFFF, 0.4f * alpha));
+        // only a thin, light edge all round
+        sgRim.setStrokeWidth(Math.max(1f, dp(1f) * r / dp(21)));
+        sgRim.setColor(Theme.multAlpha(androidx.core.graphics.ColorUtils.blendARGB(color, 0xFFFFFFFF, 0.6f), (0.35f + 0.4f * flash) * alpha));
         canvas.drawPath(sgPath, sgRim);
-        if (sgShineShader == null) {
-            sgShineShader = new RadialGradient(0, 0, dp(10), new int[]{0x99FFFFFF, 0x00FFFFFF}, null, Shader.TileMode.CLAMP);
-            sgShine.setShader(sgShineShader);
-        }
-        sgMatrix.reset();
-        sgMatrix.postScale(r / dp(21) * 1.1f, r / dp(21) * 0.75f);
-        sgMatrix.postRotate(-35);
-        sgMatrix.postTranslate(cx - r * 0.42f, cy - r * 0.48f);
-        sgShineShader.setLocalMatrix(sgMatrix);
-        sgShine.setAlpha((int) (0xFF * alpha));
-        canvas.drawCircle(cx - r * 0.42f, cy - r * 0.48f, r * 0.6f, sgShine);
     }
 
     // endregion

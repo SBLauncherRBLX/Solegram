@@ -2282,4 +2282,6 @@
     <string name="SG_ThemeSharePreviewInput">Сообщение</string>
     <string name="SG_ThemeShareColors">Цветов: %1$d</string>
     <string name="SG_ThemeShareSettings">Настроек вида: %1$d</string>
+    <string name="SG_ThemePreviewTitle">Тема «%1$s»</string>
+    <string name="SG_ThemePreviewInfo">Так тема выглядит у вас: цвета, иконки, форма аватарок и стекло. «Отмена» вернёт прежний вид.</string>
 </resources>

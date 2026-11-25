@@ -79,6 +79,8 @@ public final class SolegramThemeShare {
         public int primary, secondary, background, style;
         /** key -> value of the look's settings. */
         public final Map<String, Object> settings = new LinkedHashMap<>();
+        /** Telegram's own look: the corners of message bubbles (-1: not in the theme). */
+        public int bubbleRadius = -1;
 
         public int accent(boolean darkTheme) {
             final Integer a = (darkTheme ? dark : light).get("accent");
@@ -120,6 +122,9 @@ public final class SolegramThemeShare {
                 }
             }
             root.put("settings", settings);
+            final JSONObject telegram = new JSONObject();
+            telegram.put("bubbleRadius", org.telegram.messenger.SharedConfig.bubbleRadius);
+            root.put("telegram", telegram);
             return root.toString(1);
         } catch (Exception e) {
             FileLog.e(e);
@@ -234,6 +239,11 @@ public final class SolegramThemeShare {
                     }
                 }
             }
+            final JSONObject telegram = root.optJSONObject("telegram");
+            if (telegram != null) {
+                final int radius = telegram.optInt("bubbleRadius", -1);
+                t.bubbleRadius = radius >= 0 && radius <= 17 ? radius : -1;
+            }
             if (t.light.isEmpty() && t.dark.isEmpty() && t.settings.isEmpty()) {
                 return null;
             }
@@ -268,6 +278,119 @@ public final class SolegramThemeShare {
         }
     }
 
+    private static void setBubbleRadius(int radius) {
+        if (radius < 0 || radius > 17 || radius == org.telegram.messenger.SharedConfig.bubbleRadius) {
+            return;
+        }
+        org.telegram.messenger.SharedConfig.bubbleRadius = radius;
+        org.telegram.messenger.MessagesController.getGlobalMainSettings().edit().putInt("bubbleRadius", radius).commit();
+    }
+
+    /**
+     * Everything shows the look now: the settings read again (the icon pack too), Telegram's resources and colours made
+     * again, and every screen asked to build its views again ({@code layout} may be null).
+     */
+    public static void refresh(@Nullable org.telegram.ui.ActionBar.INavigationLayout layout) {
+        SolegramConfig.reload();
+        org.telegram.ui.ActionBar.Theme.reloadAllResources(ApplicationLoader.applicationContext);
+        org.telegram.ui.ActionBar.Theme.refreshThemeColors(false, true);
+        org.telegram.messenger.NotificationCenter.getGlobalInstance().postNotificationName(org.telegram.messenger.NotificationCenter.solegramSettingsChanged, "theme");
+        if (layout != null) {
+            layout.rebuildAllFragmentViews(false, false);
+        }
+    }
+
+    // region preview: the theme is put on for a while; what was there before is kept to come back to
+
+    private static final String PREVIEW_KEY = "themePreviewSnapshot";
+
+    /** What the look is now, to come back to after a preview (kept on disk: a preview the app did not end is undone). */
+    public static void savePreviewSnapshot() {
+        try {
+            final JSONObject root = new JSONObject();
+            final JSONObject colors = new JSONObject();
+            colors.put("light", slots(false));
+            colors.put("dark", slots(true));
+            root.put("colors", colors);
+            final JSONObject made = new JSONObject();
+            made.put("primary", SolegramThemeGenerator.savedPrimary());
+            made.put("secondary", SolegramThemeGenerator.savedSecondary());
+            made.put("background", SolegramThemeGenerator.savedBackground());
+            made.put("style", SolegramThemeGenerator.savedStyle());
+            root.put("generator", made);
+            final JSONObject settings = new JSONObject();
+            final Map<String, ?> all = SolegramConfig.prefs().getAll();
+            for (String key : LOOK) {
+                final Object v = all.get(key);
+                if (v != null && fits(key, v)) {
+                    settings.put(key, v);
+                }
+            }
+            root.put("settings", settings);
+            root.put("bubbleRadius", org.telegram.messenger.SharedConfig.bubbleRadius);
+            SolegramConfig.prefs().edit().putString(PREVIEW_KEY, root.toString()).commit();
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    public static boolean hasPreviewSnapshot() {
+        return SolegramConfig.prefs().contains(PREVIEW_KEY);
+    }
+
+    /** The preview is kept: the saved look is forgotten. */
+    public static void dropPreviewSnapshot() {
+        SolegramConfig.prefs().edit().remove(PREVIEW_KEY).commit();
+    }
+
+    /** Back to the look saved before the preview (settings the theme brought that were not there are removed). */
+    public static boolean restorePreviewSnapshot() {
+        final String json = SolegramConfig.prefs().getString(PREVIEW_KEY, null);
+        if (json == null) {
+            return false;
+        }
+        try {
+            final JSONObject root = new JSONObject(json);
+            final JSONObject colors = root.optJSONObject("colors");
+            final Map<String, Integer> light = new LinkedHashMap<>(), dark = new LinkedHashMap<>();
+            if (colors != null) {
+                readSlots(colors.optJSONObject("light"), light);
+                readSlots(colors.optJSONObject("dark"), dark);
+            }
+            SolegramThemeColors.setAll(false, light);
+            SolegramThemeColors.setAll(true, dark);
+            final JSONObject made = root.optJSONObject("generator");
+            if (made != null) {
+                SolegramThemeGenerator.save(made.optInt("primary"), made.optInt("secondary"), made.optInt("background"), made.optInt("style"));
+            }
+            final JSONObject settings = root.optJSONObject("settings");
+            final SharedPreferences.Editor e = SolegramConfig.prefs().edit();
+            for (String key : LOOK) {
+                final Object v = settings != null ? settings.opt(key) : null;
+                if (v == null || !fits(key, v)) {
+                    e.remove(key);
+                } else if (INTS.contains(key)) {
+                    e.putInt(key, ((Number) v).intValue());
+                } else if (STRINGS.contains(key)) {
+                    e.putString(key, (String) v);
+                } else {
+                    e.putBoolean(key, (Boolean) v);
+                }
+            }
+            e.remove(PREVIEW_KEY);
+            e.commit();
+            setBubbleRadius(root.optInt("bubbleRadius", -1));
+            SolegramConfig.reload();
+            return true;
+        } catch (Exception e) {
+            FileLog.e(e);
+            SolegramConfig.prefs().edit().remove(PREVIEW_KEY).commit();
+            return false;
+        }
+    }
+
+    // endregion
+
     /** Puts the theme on: its colours (or Telegram's when it has none), what it was made of, its look settings. */
     public static void apply(Theme t) {
         SolegramThemeColors.setAll(false, t.light);
@@ -294,6 +417,7 @@ public final class SolegramThemeShare {
             e.commit();
             SolegramConfig.reload();
         }
+        setBubbleRadius(t.bubbleRadius);
     }
 
     // endregion

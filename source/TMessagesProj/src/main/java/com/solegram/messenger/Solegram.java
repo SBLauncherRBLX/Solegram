@@ -80,6 +80,11 @@ public final class Solegram {
             return;
         }
         postInited = true;
+        // a theme tried on when the app was closed: the look before it comes back
+        if (SolegramThemeShare.hasPreviewSnapshot()) {
+            SolegramThemeShare.restorePreviewSnapshot();
+            AndroidUtilities.runOnUIThread(() -> SolegramThemeShare.refresh(null));
+        }
         try {
             PluginsController.getInstance().init();
         } catch (Throwable e) {

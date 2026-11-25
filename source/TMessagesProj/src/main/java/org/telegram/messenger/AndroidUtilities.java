@@ -4312,7 +4312,7 @@ public class AndroidUtilities {
             if (parentFragment != null && com.solegram.messenger.SolegramThemeShare.isThemeFile(f.getName())) {
                 final com.solegram.messenger.SolegramThemeShare.Theme sgTheme = com.solegram.messenger.SolegramThemeShare.read(f);
                 if (sgTheme != null) {
-                    parentFragment.presentFragment(new com.solegram.messenger.ui.SolegramThemePreviewActivity(sgTheme));
+                    com.solegram.messenger.ui.SolegramThemePreview.start(parentFragment, sgTheme);
                     return;
                 }
             }

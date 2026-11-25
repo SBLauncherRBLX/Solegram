@@ -7096,8 +7096,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return dp(needInsetForStories() ? 24 : 38);
             }
         }
-        // Solegram: the "avatar corners" setting, as everywhere else (a circle only at 100%)
-        return Math.round(dp(50) * com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) / 100f);
+        // Solegram: a circle's radius, as every avatar asks for: the avatar's ImageReceiver makes the "avatar corners"
+        // shape of it (asking for the shape here applied the setting twice)
+        return dp(50);
     }
 
     private void updateTtlIcon() {

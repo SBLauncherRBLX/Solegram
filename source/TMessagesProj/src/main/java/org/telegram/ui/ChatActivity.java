@@ -3366,9 +3366,17 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    /** Solegram: this chat shows a theme sent in a chat, tried on (SolegramThemePreview). */
+    private boolean sgThemePreview() {
+        return arguments != null && arguments.getBoolean(com.solegram.messenger.ui.SolegramThemePreview.ARG, false);
+    }
+
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        if (sgThemePreview()) {
+            com.solegram.messenger.ui.SolegramThemePreview.closed(this);
+        }
         if (solegramMenuLiquid != null) {
             solegramMenuLiquid.finishNow();
         }
@@ -28369,6 +28377,9 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
         super.onTransitionAnimationEnd(isOpen, backward);
+        if (isOpen && sgThemePreview()) {
+            com.solegram.messenger.ui.SolegramThemePreview.attach(this); // Solegram: the card of a theme tried on
+        }
         if (isOpen) {
             if (backward) {
                 if (showPinBulletin && pinBulletin != null) {
@@ -31119,6 +31130,9 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onPause() {
         super.onPause();
+        if (sgThemePreview()) {
+            com.solegram.messenger.ui.SolegramThemePreview.paused();
+        }
         scrolling = false;
         if (scrimPopupWindow != null) {
             scrimPopupWindow.setPauseNotifications(false);
@@ -44759,7 +44773,7 @@ public class ChatActivity extends BaseFragment implements
                     if (sgFile != null) {
                         final com.solegram.messenger.SolegramThemeShare.Theme sgTheme = com.solegram.messenger.SolegramThemeShare.read(sgFile);
                         if (sgTheme != null) {
-                            presentFragment(new com.solegram.messenger.ui.SolegramThemePreviewActivity(sgTheme));
+                            com.solegram.messenger.ui.SolegramThemePreview.start(ChatActivity.this, sgTheme);
                         } else {
                             BulletinFactory.of(ChatActivity.this).createErrorBulletin(getString(R.string.SG_ThemeShareBroken)).show();
                         }

@@ -13952,5 +13952,7 @@
     <string name="SG_ThemeSharePreviewInput">Message</string>
     <string name="SG_ThemeShareColors">Colours: %1$d</string>
     <string name="SG_ThemeShareSettings">Look settings: %1$d</string>
+    <string name="SG_ThemePreviewTitle">Theme “%1$s”</string>
+    <string name="SG_ThemePreviewInfo">This is how the theme looks for you: colours, icons, avatar shape and glass. Cancel brings the old look back.</string>
     <!-- SOLEGRAM END -->
 </resources>
