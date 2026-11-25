@@ -5837,6 +5837,28 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             }
 
+            // Solegram: a touch on a gift bubble goes to the bubbles first, even over the name and the status
+            private boolean sgBubbleTouch;
+
+            @Override
+            public boolean dispatchTouchEvent(MotionEvent ev) {
+                if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    sgBubbleTouch = giftsView != null && giftsView.getVisibility() == View.VISIBLE
+                        && giftsView.sgTakesTouch(ev.getX() - giftsView.getLeft(), ev.getY() - giftsView.getTop());
+                }
+                if (sgBubbleTouch) {
+                    final int action = ev.getActionMasked();
+                    ev.offsetLocation(-giftsView.getLeft(), -giftsView.getTop());
+                    final boolean handled = giftsView.dispatchTouchEvent(ev);
+                    ev.offsetLocation(giftsView.getLeft(), giftsView.getTop());
+                    if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                        sgBubbleTouch = false;
+                    }
+                    return handled || true;
+                }
+                return super.dispatchTouchEvent(ev);
+            }
+
             @Override
             public boolean onInterceptTouchEvent(MotionEvent ev) {
                 return (customAvatarProgress == 0 && canvasButton != null && canvasButton.checkTouchEvent(ev)) || super.onInterceptTouchEvent(ev);

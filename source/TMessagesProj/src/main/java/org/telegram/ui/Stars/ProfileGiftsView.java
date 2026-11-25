@@ -353,6 +353,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         // its light on the avatar's glass ring
         RadialGradient reflect;
         int reflectColor;
+        // the liquid film near its edge
+        Shader film1, film2;
+        int filmColor;
         float x, y, vx, vy, lastVx, lastVy;
         float phase, size = 1f, ring, spin = 1f;
         // its orbit: where on it, how fast; the orbit itself drifts slowly (radius, tilt, height)
@@ -690,6 +693,28 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 
     // the frame's geometry
     private float sgAcx, sgAcy, sgAvatarR, sgRealCx, sgRealCy, sgAlpha, sgCollapse, sgTop, sgBottom;
+
+    /** Whether a touch at (x, y) (this view's coordinates) is on a bubble that should take it. */
+    public boolean sgTakesTouch(float x, float y) {
+        if (!sgOrbit || !active || sgAlpha <= 0.01f) {
+            return false;
+        }
+        final Gift g = sgGiftUnder(x, y);
+        if (g == null) {
+            return false;
+        }
+        final SgBubble b = g.sg;
+        final boolean isFront = Math.sin(b.orbit) > 0 || b.inflate > 1.15f || b == sgHeld;
+        if (!isFront) {
+            // behind the avatar: the avatar keeps its own taps there
+            final float ax = avatarContainer.getX(), ay = avatarContainer.getY();
+            final float aw = avatarContainer.getWidth() * avatarContainer.getScaleX(), ah = avatarContainer.getHeight() * avatarContainer.getScaleY();
+            if (x >= ax && x <= ax + aw && y >= ay && y <= ay + ah) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     private Gift sgGiftUnder(float x, float y) {
         Gift best = null;
@@ -1178,6 +1203,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     private void sgDraw(Canvas canvas, boolean front, View owner) {
         if (front) {
             sgGlassFrontUsed = 0;
+            sgDrawAvatarRing(canvas, getAlpha()); // the glass ring is on every profile, bubbles or not (under the front ones)
         }
         if (gifts.isEmpty() || sgAlpha <= 0.01f || expandProgress >= 1f || collapseProgress <= 0f) {
             sgHideUnusedGlass(front);
@@ -1190,9 +1216,6 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         }
         canvas.save();
         canvas.clipRect(0, 0, getWidth(), expandY);
-        if (front) {
-            sgDrawAvatarRing(canvas, viewAlpha); // over the avatar, under the bubbles that pass in front of it
-        }
         for (int i = 0; i < gifts.size(); i++) {
             final Gift gift = gifts.get(i);
             final SgBubble b = gift.sg;
@@ -1315,10 +1338,12 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
      * colour, brightest where a bubble is nearest. Not with a stories ring (that one takes the edge).
      */
     private void sgDrawAvatarRing(Canvas canvas, float viewAlpha) {
-        if (avatarImage == null || avatarImage.hasStories) {
+        if (!sgOrbit || avatarImage == null || avatarImage.hasStories || avatarImage.getVisibility() != VISIBLE) {
             return;
         }
-        final float alpha = sgAlpha * viewAlpha * (1f - expandProgress);
+        // its own visibility (not the bubbles'): the header open, the photo not pulled down
+        final float closed = Utilities.clamp01((expandY - (AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight())) / dp(50));
+        final float alpha = viewAlpha * (1f - expandProgress) * (1f - actionBarProgress) * closed * Utilities.clamp01(collapseProgress * 1.5f);
         if (alpha <= 0.01f) {
             return;
         }
@@ -1328,72 +1353,87 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         if (w <= 0 || h <= 0) {
             return;
         }
-        final float stroke = dp(1.8f);
         float rr = avatarImage.getImageReceiver().getRoundRadius()[0] * scale;
         rr = Math.max(0, Math.min(rr, Math.min(w, h) / 2f));
-        sgRingRect.set(x + stroke / 2f, y + stroke / 2f, x + w - stroke / 2f, y + h - stroke / 2f);
-        final float r = Math.max(0, rr - stroke / 2f);
+        // a glass tube round the avatar, apart from it: a gap, then the tube
+        final float gap = dp(3.5f) * Math.min(1f, scale), tube = dp(3.6f) * Math.min(1f, scale);
+        final float mid = gap + tube / 2f;
+        sgRingRect.set(x - mid, y - mid, x + w + mid, y + h + mid);
+        final float r = rr <= 0 ? mid * 0.6f : rr + mid;
         sgRingPath.rewind();
         sgRingPath.addRoundRect(sgRingRect, r, r, Path.Direction.CW);
-        // it moves with the avatar (the beat's swell and tilt)
         canvas.save();
         final float acx0 = x + w / 2f, acy0 = y + h / 2f;
+        // it moves with the avatar (the beat's swell and tilt)
         canvas.rotate(avatarImage.getRotation(), acx0, acy0);
         canvas.scale(avatarImage.getScaleX(), avatarImage.getScaleY(), acx0, acy0);
-        // the glass rim: light at two opposite sides, faint between
+        // the glass body: barely there
+        sgRingPaint.setShader(null);
+        sgRingPaint.setStyle(Paint.Style.STROKE);
+        sgRingPaint.setStrokeWidth(tube);
+        sgRingPaint.setColor(Theme.multAlpha(0xFFFFFFFF, 0.07f * alpha));
+        canvas.drawPath(sgRingPath, sgRingPaint);
+        // its two edges catch the light: the outer one brighter at the top-left, the inner one fainter
         if (sgRingSheen == null || sgRingSheenW != w || sgRingSheenH != h) {
             sgRingSheenW = w;
             sgRingSheenH = h;
-            sgRingSheen = new LinearGradient(0, 0, w, h, new int[]{0xB3FFFFFF, 0x80FFFFFF, 0x99FFFFFF},
-                new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
+            sgRingSheen = new LinearGradient(0, 0, w, h, new int[]{0xD9FFFFFF, 0x40FFFFFF, 0x8CFFFFFF},
+                new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP);
         }
         sgMatrix.reset();
         sgMatrix.postTranslate(x, y);
         sgRingSheen.setLocalMatrix(sgMatrix);
-        sgRingPaint.setStyle(Paint.Style.STROKE);
-        sgRingPaint.setStrokeWidth(stroke);
+        final float edge = Math.max(1f, dp(0.9f));
         sgRingPaint.setShader(sgRingSheen);
+        sgRingPaint.setStrokeWidth(edge);
         sgRingPaint.setAlpha((int) (0xFF * alpha));
-        canvas.drawPath(sgRingPath, sgRingPaint);
-        // the bubbles' light on the glass: each lights the part of the rim nearest to it, in its colour
-        final float acx = x + w / 2f, acy = y + h / 2f, ar = Math.max(w, h) / 2f;
-        sgRingPaint.setStyle(Paint.Style.STROKE);
+        sgRingEdge(canvas, mid + tube / 2f - edge / 2f, x, y, w, h, rr);
+        sgRingPaint.setAlpha((int) (0xFF * 0.6f * alpha));
+        sgRingEdge(canvas, mid - tube / 2f + edge / 2f, x, y, w, h, rr);
+        // the bubbles' glow mirrored in the glass: the body tinted near each, both edges lit in its colour
+        final float acx = x + w / 2f, acy = y + h / 2f, ar = Math.max(w, h) / 2f + mid;
         for (int i = 0; i < gifts.size(); i++) {
             final Gift gift = gifts.get(i);
             final SgBubble b = gift.sg;
-            if (!b.placed || b.drawR <= 0) {
+            if (!b.placed || b.drawR <= 0 || sgAlpha <= 0.01f) {
                 continue;
             }
             final float d = (float) Math.hypot(b.drawX - acx, b.drawY - acy) - ar - b.drawR;
-            final float near = Utilities.clamp01(1f - d / dp(56));
+            final float near = Utilities.clamp01(1f - d / dp(64));
             if (near <= 0.02f) {
                 continue;
             }
             final int rich = sgSaturated(gift.sgTone());
             if (b.reflect == null || b.reflectColor != rich) {
                 b.reflectColor = rich;
-                b.reflect = new RadialGradient(0, 0, 1f, new int[]{rich, Theme.multAlpha(rich, 0.45f), Theme.multAlpha(rich, 0f)},
+                b.reflect = new RadialGradient(0, 0, 1f, new int[]{rich, Theme.multAlpha(rich, 0.5f), Theme.multAlpha(rich, 0f)},
                     new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
             }
-            final float reach = b.drawR * 2.4f + dp(24);
+            final float reach = b.drawR * 2.6f + dp(28);
             sgMatrix.reset();
             sgMatrix.postScale(reach, reach);
             sgMatrix.postTranslate(b.drawX, b.drawY);
             b.reflect.setLocalMatrix(sgMatrix);
             sgRingPaint.setShader(b.reflect);
-            final float strength = near * alpha * Math.min(1f, 0.75f + 0.5f * b.flash);
-            // the rim takes a soft tint of its light where it is near
-            sgRingPaint.setStrokeWidth(stroke);
-            sgRingPaint.setAlpha((int) (0xFF * 0.6f * strength));
+            final float strength = near * alpha * sgAlpha * Math.min(1f, 0.8f + 0.5f * b.flash);
+            sgRingPaint.setStrokeWidth(tube);
+            sgRingPaint.setAlpha((int) (0xFF * 0.22f * strength));
             canvas.drawPath(sgRingPath, sgRingPaint);
+            sgRingPaint.setStrokeWidth(edge);
+            sgRingPaint.setAlpha((int) (0xFF * 0.9f * strength));
+            sgRingEdge(canvas, mid + tube / 2f - edge / 2f, x, y, w, h, rr);
+            sgRingPaint.setAlpha((int) (0xFF * 0.6f * strength));
+            sgRingEdge(canvas, mid - tube / 2f + edge / 2f, x, y, w, h, rr);
         }
         sgRingPaint.setShader(null);
         canvas.restore();
     }
 
-    {
-        sgGlowStroke.setStyle(Paint.Style.STROKE);
-        sgGlowStroke.setStrokeJoin(Paint.Join.ROUND);
+    /** One edge of the ring: the avatar's rounded rect pushed out by {@code out}. */
+    private void sgRingEdge(Canvas canvas, float out, float x, float y, float w, float h, float rr) {
+        sgRingRect.set(x - out, y - out, x + w + out, y + h + out);
+        final float r = rr <= 0 ? out * 0.6f : rr + out;
+        canvas.drawRoundRect(sgRingRect, r, r, sgRingPaint);
     }
 
     /**
@@ -1469,15 +1509,49 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                 canvas.restore();
             }
         }
-        // sparkles: a few tiny light specks drifting in the jelly, twinkling
-        sgFill.setShader(null);
-        for (int i = 0; i < 4; i++) {
-            final float ph = b.phase * 3.1f + i * 1.7f;
-            final float sx = cx + (float) Math.cos(ph + sgTime * 0.23f) * r * (0.35f + 0.12f * i);
-            final float sy = cy + (float) Math.sin(ph * 1.3f + sgTime * 0.19f) * r * (0.3f + 0.1f * i);
-            final float tw = 0.5f + 0.5f * (float) Math.sin(sgTime * 2.2f + ph * 2f);
-            sgFill.setColor(Theme.multAlpha(0xFFFFFFFF, (0.25f + 0.5f * tw) * alpha));
-            canvas.drawCircle(sx, sy, dp(0.9f + 0.5f * (i % 2)) * k, sgFill);
+        // the liquid near the edge: streaks of light and of shifted hue that flow round the rim (two layers turning
+        // opposite ways, so the pattern keeps changing), fading out towards the middle, like a soap film / jelly
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            if (b.film1 == null || b.filmColor != color) {
+                b.filmColor = color;
+                final float[] hsv = new float[3];
+                android.graphics.Color.colorToHSV(rich, hsv);
+                final float hue = hsv[0];
+                hsv[0] = (hue + 40f) % 360f;
+                final int warm = android.graphics.Color.HSVToColor(hsv);
+                hsv[0] = (hue + 320f) % 360f;
+                final int cool = android.graphics.Color.HSVToColor(hsv);
+                final int lit = androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.75f);
+                final Shader mask = new RadialGradient(0, 0, 1f, new int[]{0x00FFFFFF, 0x00FFFFFF, 0x80FFFFFF, 0xFFFFFFFF, 0x99FFFFFF},
+                    new float[]{0f, 0.55f, 0.78f, 0.93f, 1f}, Shader.TileMode.CLAMP);
+                final Shader flow1 = new android.graphics.SweepGradient(0, 0,
+                    new int[]{Theme.multAlpha(lit, 0.55f), 0, Theme.multAlpha(warm, 0.5f), 0, Theme.multAlpha(lit, 0.35f), Theme.multAlpha(cool, 0.45f), 0, Theme.multAlpha(lit, 0.55f)},
+                    new float[]{0f, 0.12f, 0.27f, 0.4f, 0.55f, 0.68f, 0.84f, 1f});
+                final Shader mask2 = new RadialGradient(0, 0, 1f, new int[]{0x00FFFFFF, 0x00FFFFFF, 0x66FFFFFF, 0xDDFFFFFF, 0x80FFFFFF},
+                    new float[]{0f, 0.62f, 0.83f, 0.95f, 1f}, Shader.TileMode.CLAMP);
+                final Shader flow2 = new android.graphics.SweepGradient(0, 0,
+                    new int[]{0, Theme.multAlpha(cool, 0.4f), 0, Theme.multAlpha(lit, 0.5f), 0, Theme.multAlpha(warm, 0.35f), 0},
+                    new float[]{0f, 0.18f, 0.33f, 0.5f, 0.66f, 0.82f, 1f});
+                b.film1 = new android.graphics.ComposeShader(mask, flow1, android.graphics.PorterDuff.Mode.SRC_IN);
+                b.film2 = new android.graphics.ComposeShader(mask2, flow2, android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+            sgFill.setColor(0xFFFFFFFF);
+            sgMatrix.reset();
+            sgMatrix.postScale(shapeR, shapeR);
+            sgMatrix.postRotate((sgTime * 26f + b.phase * 57f) % 360f);
+            sgMatrix.postTranslate(cx, cy);
+            b.film1.setLocalMatrix(sgMatrix);
+            sgFill.setShader(b.film1);
+            sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.85f + 0.3f * flash)));
+            canvas.drawPaint(sgFill);
+            sgMatrix.reset();
+            sgMatrix.postScale(shapeR, shapeR);
+            sgMatrix.postRotate((-sgTime * 17f + b.phase * 91f) % 360f);
+            sgMatrix.postTranslate(cx, cy);
+            b.film2.setLocalMatrix(sgMatrix);
+            sgFill.setShader(b.film2);
+            canvas.drawPaint(sgFill);
+            sgFill.setShader(null);
         }
         // the gift itself in the middle
         if (gift.emojiDrawable != null) {
