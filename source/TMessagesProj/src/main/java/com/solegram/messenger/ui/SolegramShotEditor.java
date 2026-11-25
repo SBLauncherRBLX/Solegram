@@ -18,6 +18,8 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.util.SparseIntArray;
 import android.graphics.drawable.Drawable;
 import android.os.SystemClock;
 import android.text.Layout;
@@ -48,7 +50,10 @@ import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.MessageDrawable;
+import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
+import org.telegram.ui.Components.MotionBackgroundDrawable;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
@@ -74,7 +79,7 @@ import org.telegram.ui.ChatActivity;
 import java.util.List;
 
 /**
- * Solegram: «красивый скриншот». The messages a chat shows are taken as pictures (Telegram's own drawing, without the
+ * Solegram: the screenshot editor («Редактор скриншота»). The messages a chat shows are taken as pictures (Telegram's own drawing, without the
  * chat's header and input) and put on a background of the user's choice. Messages can be swiped away (the others close
  * up), text can be selected and hidden under blur, and the result goes to chats or to the gallery, signed «Solegram».
  */
@@ -83,14 +88,22 @@ public class SolegramShotEditor {
     /** A message (or a date) of the screenshot: its picture and, for text, its lines. */
     public static final class Piece {
         Bitmap bitmap;
-        @Nullable
-        Bitmap blurred;
+        /** The blurred patches over hidden text, made once per hidden rect. */
+        final java.util.IdentityHashMap<RectF, Bitmap> patches = new java.util.IdentityHashMap<>();
         int gapBefore;
         boolean message;
         final ArrayList<Line> lines = new ArrayList<>();
         final ArrayList<RectF> hidden = new ArrayList<>();
         boolean removed;
         float y = Float.NaN, dx, alpha = 1f;
+
+        void recycle() {
+            if (bitmap != null) bitmap.recycle();
+            for (Bitmap b : patches.values()) {
+                if (b != null) b.recycle();
+            }
+            patches.clear();
+        }
     }
 
     /** A line of a message's text: its layout and where it is in the piece's picture. */
@@ -206,11 +219,14 @@ public class SolegramShotEditor {
     private final ArrayList<EmojiThemes> themes = new ArrayList<>();
     /** -1: the chat's own look; else an index in {@link #themes}. */
     private int chosen = -1;
+    @Nullable
     private final EmojiThemes startTheme;
-    private final TLRPC.WallPaper startWallpaper;
     private final boolean startDark;
     private boolean dark;
-    private boolean themed;
+    /** The look the messages are drawn in now; null = the chat exactly as it is. */
+    @Nullable
+    private Look look;
+    private final java.util.HashMap<String, Look> looks = new java.util.HashMap<>();
 
     private SolegramShotEditor(ChatActivity chat, ViewGroup list, int top, int bottom, ArrayList<Piece> pieces) {
         this.chat = chat;
@@ -220,8 +236,8 @@ public class SolegramShotEditor {
         this.pieces = pieces;
         this.contentWidth = list.getWidth();
         final ChatActivity.ThemeDelegate delegate = chat.themeDelegate;
-        startTheme = delegate != null ? delegate.getCurrentTheme() : null;
-        startWallpaper = delegate != null ? delegate.getCurrentWallpaper() : null;
+        final EmojiThemes current = delegate != null ? delegate.getCurrentTheme() : null;
+        startTheme = current != null && !current.showAsDefaultStub && !current.items.isEmpty() ? current : null;
         startDark = delegate != null ? delegate.isDark() : Theme.isCurrentThemeDark();
         dark = startDark;
     }
@@ -234,10 +250,6 @@ public class SolegramShotEditor {
         }
         new SolegramShotEditor(chat, list, top, bottom, pieces).open();
         return true;
-    }
-
-    private boolean canTheme() {
-        return chat.themeDelegate != null && chat.themeDelegate.isThemeChangeAvailable(false);
     }
 
     private int messageCount() {
@@ -322,7 +334,7 @@ public class SolegramShotEditor {
         scroll.addView(row);
         addSwatch(context, row, -1);
         column.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 62, 0, 10, 0, 6));
-        if (canTheme()) {
+        {
             ChatThemeController.getInstance(chat.getCurrentAccount()).requestAllChatThemes(new ResultCallback<List<EmojiThemes>>() {
                 @Override
                 public void onComplete(List<EmojiThemes> result) {
@@ -337,12 +349,9 @@ public class SolegramShotEditor {
                         themes.add(t);
                         addSwatch(context, row, themes.size() - 1);
                     }
+                    addGradients(context, row);
                 }
             }, false);
-        } else {
-            for (int i = 0; i < GRADIENTS.length; i++) {
-                addSwatch(context, row, 1000 + i);
-            }
         }
 
         // share (big), save (round)
@@ -363,20 +372,14 @@ public class SolegramShotEditor {
         column.addView(buttons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 6, 16, 0));
 
         sheet.setCustomView(column);
+        // the chat itself is never touched: a theme is only drawn into the picture
         sheet.setOnDismissListener(d -> {
-            // the chat goes back to its own look
-            if (themed && chat.themeDelegate != null) {
-                try {
-                    chat.themeDelegate.setCurrentTheme(startTheme, startWallpaper, false, startDark, true);
-                } catch (Throwable e) {
-                    FileLog.e(e);
-                }
-            }
             for (Piece p : pieces) {
-                if (p.bitmap != null) p.bitmap.recycle();
-                if (p.blurred != null) p.blurred.recycle();
+                p.recycle();
             }
         });
+        // the themes may not come (no network): the gradients anyway, a moment later
+        AndroidUtilities.runOnUIThread(() -> addGradients(context, row), 1500);
         sheet.show();
     }
 
@@ -419,6 +422,16 @@ public class SolegramShotEditor {
             }
         };
         return v;
+    }
+
+    private boolean gradientsAdded;
+
+    private void addGradients(Context context, LinearLayout row) {
+        if (gradientsAdded) return;
+        gradientsAdded = true;
+        for (int i = 0; i < GRADIENTS.length; i++) {
+            addSwatch(context, row, 1000 + i);
+        }
     }
 
     private void addSwatch(Context context, LinearLayout row, int index) {
@@ -476,30 +489,25 @@ public class SolegramShotEditor {
         row.addView(swatch, LayoutHelper.createLinear(50, 50, 2, 0, 2, 0));
     }
 
-    /** The chosen theme (and day or night) on the chat for real; the messages are taken again in its colours. */
+    /**
+     * The chosen theme (and day or night): the messages are drawn again, once, in its colours into the picture. The
+     * chat's own cells are given the look's colours only for that one drawing and get theirs back right after, so
+     * neither the chat nor the app changes.
+     */
     private void applyTheme() {
-        if (chosen >= 1000 || !canTheme()) {
-            shot.invalidate();
-            return;
-        }
-        final EmojiThemes theme = chosen >= 0 ? themes.get(chosen) : startTheme;
-        final TLRPC.WallPaper wallpaper = chosen >= 0 ? null : startWallpaper;
         try {
-            chat.themeDelegate.setCurrentTheme(theme, wallpaper, false, dark, true);
-            themed = true;
+            look = lookFor(chosen >= 1000 ? -1 : chosen, dark);
         } catch (Throwable e) {
             FileLog.e(e);
-            return;
+            look = null;
         }
-        // a frame for the chat to draw in its new colours, then the screenshot again (keeping what was edited)
-        AndroidUtilities.runOnUIThread(this::recapture, 120);
-        AndroidUtilities.runOnUIThread(() -> shot.invalidate(), 600); // a pattern wallpaper may come a moment later
-        AndroidUtilities.runOnUIThread(() -> shot.invalidate(), 1400);
+        recapture();
+        for (View s : swatches) s.invalidate();
     }
 
     private void recapture() {
         if (sheet == null || !sheet.isShowing()) return;
-        final ArrayList<Piece> fresh = capture(list, captureTop, captureBottom);
+        final ArrayList<Piece> fresh = captureIn(look);
         if (fresh == null) return;
         if (fresh.size() == pieces.size()) {
             for (int i = 0; i < fresh.size(); i++) {
@@ -511,8 +519,7 @@ public class SolegramShotEditor {
             }
         }
         for (Piece p : pieces) {
-            if (p.bitmap != null) p.bitmap.recycle();
-            if (p.blurred != null) p.blurred.recycle();
+            p.recycle();
         }
         pieces = fresh;
         contentWidth = list.getWidth();
@@ -520,6 +527,240 @@ public class SolegramShotEditor {
         shot.selected = null;
         shot.hidePill();
         shot.relayout(false);
+    }
+
+    /** The chat's list drawn once with {@code look}'s colours (null: as it is). */
+    @Nullable
+    private ArrayList<Piece> captureIn(@Nullable Look look) {
+        if (look == null) {
+            return capture(list, captureTop, captureBottom);
+        }
+        final ArrayList<View> swapped = new ArrayList<>();
+        final ArrayList<Theme.ResourcesProvider> own = new ArrayList<>();
+        try {
+            for (int i = 0; i < list.getChildCount(); i++) {
+                final View c = list.getChildAt(i);
+                if (c instanceof ChatMessageCell) {
+                    final ChatMessageCell cell = (ChatMessageCell) c;
+                    own.add(cell.getResourcesProvider());
+                    swapped.add(c);
+                    cell.setResourcesProvider(look);
+                } else if (c instanceof ChatActionCell) {
+                    own.add(((ChatActionCell) c).solegramSwapResources(look));
+                    swapped.add(c);
+                }
+            }
+            return capture(list, captureTop, captureBottom);
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
+        } finally {
+            for (int i = 0; i < swapped.size(); i++) {
+                final View c = swapped.get(i);
+                if (c instanceof ChatMessageCell) {
+                    ((ChatMessageCell) c).setResourcesProvider(own.get(i));
+                } else {
+                    ((ChatActionCell) c).solegramSwapResources(own.get(i));
+                }
+                c.invalidate();
+            }
+            list.invalidate();
+        }
+    }
+
+    /**
+     * The look for a theme of {@link #themes} ({@code index} >= 0) or the chat's own (-1) in day or night; null when
+     * that is just the chat as it is on the screen.
+     */
+    @Nullable
+    private Look lookFor(int index, boolean night) {
+        final EmojiThemes theme = index >= 0 ? themes.get(index) : startTheme;
+        if (index < 0 && night == startDark) {
+            return null;
+        }
+        final String key = index + (night ? "n" : "d");
+        Look l = looks.get(key);
+        if (l != null) {
+            return l;
+        }
+        final int account = chat.getCurrentAccount();
+        final SparseIntArray colors = new SparseIntArray();
+        final int[] defaults = Theme.getDefaultColors();
+        if (defaults != null) {
+            for (int i = 0; i < defaults.length; i++) {
+                colors.put(i, defaults[i]);
+            }
+        }
+        Drawable wallpaper = null;
+        if (theme != null) {
+            final int item = night && theme.items.size() > 1 ? 1 : 0;
+            final SparseIntArray themeColors = theme.createColors(account, item);
+            if (themeColors != null) {
+                for (int i = 0; i < themeColors.size(); i++) {
+                    colors.put(themeColors.keyAt(i), themeColors.valueAt(i));
+                }
+            }
+            wallpaper = themeWallpaper(theme, item, colors);
+        } else {
+            // the app's own day or night theme
+            final Theme.ThemeInfo info = EmojiThemes.getDefaultThemeInfo(night);
+            final String[] link = new String[1];
+            final SparseIntArray values = info.assetName != null ? Theme.getThemeFileValues(null, info.assetName, link)
+                : info.pathToFile != null ? Theme.getThemeFileValues(new File(info.pathToFile), null, link) : null;
+            if (values != null) {
+                for (int i = 0; i < values.size(); i++) {
+                    colors.put(values.keyAt(i), values.valueAt(i));
+                }
+                final Theme.ThemeAccent accent = info.getAccent(false);
+                if (accent != null) {
+                    accent.fillAccentColors(values, colors);
+                }
+            }
+            if (colors.indexOfKey(Theme.key_chat_wallpaper) >= 0 && values != null && values.indexOfKey(Theme.key_chat_wallpaper) >= 0) {
+                final int c1 = colors.get(Theme.key_chat_wallpaper), c2 = colors.get(Theme.key_chat_wallpaper_gradient_to1, 0);
+                if (c2 != 0) {
+                    wallpaper = new MotionBackgroundDrawable(c1, c2, colors.get(Theme.key_chat_wallpaper_gradient_to2, 0), colors.get(Theme.key_chat_wallpaper_gradient_to3, 0), true);
+                } else {
+                    wallpaper = new ColorDrawable(c1 | 0xFF000000);
+                }
+            }
+        }
+        l = new Look(colors, night, wallpaper);
+        looks.put(key, l);
+        return l;
+    }
+
+    /** A theme's wallpaper as Telegram draws it for a chat: its gradient, its pattern when it comes. */
+    private Drawable themeWallpaper(EmojiThemes theme, int item, SparseIntArray colors) {
+        final MotionBackgroundDrawable motion = new MotionBackgroundDrawable();
+        final TLRPC.WallPaper wp = theme.getWallpaper(item);
+        final int intensity = wp != null && wp.settings != null ? wp.settings.intensity : 0;
+        motion.setPatternBitmap(intensity);
+        motion.setColors(colors.get(Theme.key_chat_wallpaper), colors.get(Theme.key_chat_wallpaper_gradient_to1, 0),
+            colors.get(Theme.key_chat_wallpaper_gradient_to2, 0), colors.get(Theme.key_chat_wallpaper_gradient_to3, 0), 0, true);
+        final int patternColor = motion.getPatternColor();
+        try {
+            theme.loadWallpaper(item, pair -> {
+                if (pair == null || pair.second == null || pair.second.bitmap == null) return;
+                final Bitmap bitmap = pair.second.bitmap;
+                AndroidUtilities.runOnUIThread(() -> {
+                    motion.setPatternBitmap(intensity, bitmap);
+                    motion.setPatternColorFilter(patternColor);
+                    if (shot != null) shot.invalidate();
+                });
+            });
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return motion;
+    }
+
+    /** Colours, bubbles and service paints of one look, for drawing the chat's cells once in it. */
+    private final class Look implements Theme.ResourcesProvider {
+        final SparseIntArray colors;
+        final boolean night;
+        @Nullable
+        final Drawable wallpaper;
+        private final java.util.HashMap<String, Drawable> drawables = new java.util.HashMap<>();
+        private final java.util.HashMap<String, Paint> paints = new java.util.HashMap<>();
+
+        Look(SparseIntArray colors, boolean night, @Nullable Drawable wallpaper) {
+            this.colors = colors;
+            this.night = night;
+            this.wallpaper = wallpaper;
+            int service, serviceSelected;
+            if (colors.indexOfKey(Theme.key_chat_serviceBackground) >= 0 && wallpaper == null) {
+                service = colors.get(Theme.key_chat_serviceBackground);
+                serviceSelected = colors.get(Theme.key_chat_serviceBackgroundSelected, service);
+            } else {
+                final int[] c = AndroidUtilities.calcDrawableColor(wallpaper != null ? wallpaper : Theme.getCachedWallpaperNonBlocking());
+                service = c[0];
+                serviceSelected = c[1];
+            }
+            final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            bg.setColor(service);
+            paints.put(Theme.key_paint_chatActionBackground, bg);
+            final Paint bgSelected = new Paint(Paint.ANTI_ALIAS_FLAG);
+            bgSelected.setColor(serviceSelected);
+            paints.put(Theme.key_paint_chatActionBackgroundSelected, bgSelected);
+            final Paint darken = new Paint(Paint.ANTI_ALIAS_FLAG);
+            darken.setColor(0x15000000);
+            paints.put(Theme.key_paint_chatActionBackgroundDarken, darken);
+            textPaint(Theme.key_paint_chatActionText, getColor(Theme.key_chat_serviceText));
+            textPaint(Theme.key_paint_chatActionText2, getColor(Theme.key_chat_serviceText));
+            textPaint(Theme.key_paint_chatActionText3, getColor(Theme.key_chat_serviceText));
+            textPaint(Theme.key_paint_chatBotButton, getColor(Theme.key_chat_botButtonText));
+        }
+
+        private void textPaint(String key, int color) {
+            final Paint base = Theme.getThemePaint(key);
+            if (base == null) return;
+            final TextPaint p = base instanceof TextPaint ? new TextPaint((TextPaint) base) : new TextPaint(base);
+            p.setColor(color);
+            paints.put(key, p);
+        }
+
+        @Override
+        public int getColor(int key) {
+            final int i = colors.indexOfKey(key);
+            return i >= 0 ? colors.valueAt(i) : Theme.getColor(key);
+        }
+
+        @Override
+        public Paint getPaint(String paintKey) {
+            final Paint p = paints.get(paintKey);
+            return p != null ? p : Theme.getThemePaint(paintKey);
+        }
+
+        @Override
+        public Drawable getDrawable(String key) {
+            if (drawables.containsKey(key)) {
+                return drawables.get(key);
+            }
+            Drawable d;
+            switch (key) {
+                case Theme.key_drawable_msgIn: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, false, false, this); break;
+                case Theme.key_drawable_msgInSelected: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, false, true, this); break;
+                case Theme.key_drawable_msgInMedia: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, false, false, this); break;
+                case Theme.key_drawable_msgInMediaSelected: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, false, true, this); break;
+                case Theme.key_drawable_msgOut: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, true, false, this); break;
+                case Theme.key_drawable_msgOutSelected: d = new MessageDrawable(MessageDrawable.TYPE_TEXT, true, true, this); break;
+                case Theme.key_drawable_msgOutMedia: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, true, false, this); break;
+                case Theme.key_drawable_msgOutMediaSelected: d = new MessageDrawable(MessageDrawable.TYPE_MEDIA, true, true, this); break;
+                default: {
+                    // ticks, clocks, icons: Telegram's, coloured in the look's colours (as a themed chat does)
+                    d = null;
+                    final Drawable base = Theme.getThemeDrawablesMap().get(key);
+                    final Drawable.ConstantState state = base != null ? base.getConstantState() : null;
+                    final int colorKey = Theme.getThemeDrawableColorKey(key);
+                    if (state != null && colorKey >= 0) {
+                        d = state.newDrawable().mutate();
+                        Theme.setDrawableColor(d, getColor(colorKey));
+                    }
+                }
+            }
+            drawables.put(key, d);
+            return d;
+        }
+
+        @Override
+        public boolean isDark() {
+            return night;
+        }
+
+        @Override
+        public boolean isCompactMode() {
+            return chat.themeDelegate != null ? chat.themeDelegate.isCompactMode() : org.telegram.messenger.SharedConfig.compactMode;
+        }
+
+        @Override
+        public boolean hasGradientService() {
+            return false;
+        }
+
+        @Override
+        public void applyServiceShaderMatrix(int w, int h, float translationX, float translationY) {
+        }
     }
 
     // endregion
@@ -570,9 +811,11 @@ public class SolegramShotEditor {
             canvas.drawRect(0, 0, w, h, bgPaint);
             return;
         }
-        // the chat's wallpaper as it is now (the chosen theme's)
-        final Drawable wp = chat.themeDelegate != null ? chat.themeDelegate.getWallpaperDrawable() : Theme.getCachedWallpaperNonBlocking();
-        drawDrawable(canvas, wp, 0, 0, w, h);
+        if (look != null && look.wallpaper != null) {
+            drawDrawable(canvas, look.wallpaper, 0, 0, w, h);
+        } else {
+            drawStartWallpaper(canvas, 0, 0, w, h);
+        }
     }
 
     // endregion
@@ -611,28 +854,81 @@ public class SolegramShotEditor {
         }
     }
 
+    /** Hidden text: frosted patches, the words under them blurred to soft smudges, the edges feathered. */
     private void drawHidden(Canvas canvas, Piece p) {
-        if (p.blurred == null) {
-            try {
-                final int f = 6;
-                final Bitmap small = Bitmap.createScaledBitmap(p.bitmap, Math.max(1, p.bitmap.getWidth() / f), Math.max(1, p.bitmap.getHeight() / f), true);
-                Utilities.stackBlurBitmap(small, 3);
-                p.blurred = small;
-            } catch (Throwable e) {
-                FileLog.e(e);
-                return;
+        hidePaint.setAlpha((int) (0xFF * Math.max(0f, Math.min(1f, p.alpha))));
+        for (RectF r : p.hidden) {
+            Bitmap patch = p.patches.get(r);
+            if (patch == null && !p.patches.containsKey(r)) {
+                patch = makePatch(p.bitmap, r);
+                p.patches.put(r, patch);
+            }
+            if (patch != null) {
+                canvas.drawBitmap(patch, r.left - dp(PATCH_GROW) - dp(PATCH_FEATHER), r.top - dp(PATCH_GROW) - dp(PATCH_FEATHER), hidePaint);
             }
         }
-        hidePath.rewind();
-        for (RectF r : p.hidden) {
-            hidePath.addRoundRect(r, dp(6), dp(6), Path.Direction.CW);
+    }
+
+    private static final float PATCH_GROW = 2.5f, PATCH_FEATHER = 2.5f;
+
+    /**
+     * The patch over one hidden rect of a piece: the picture around it (a line's height more on each side, so the blur
+     * takes in the bubble, not just the letters) shrunk 4 times, blurred twice, then cut to a rounded rect with soft
+     * edges and given a light frost.
+     */
+    @Nullable
+    private Bitmap makePatch(Bitmap source, RectF r) {
+        try {
+            final float grow = dp(PATCH_GROW), feather = dp(PATCH_FEATHER);
+            final RectF shape = new RectF(r.left - grow, r.top - grow, r.right + grow, r.bottom + grow);
+            final int pw = (int) Math.ceil(shape.width() + 2 * feather), ph = (int) Math.ceil(shape.height() + 2 * feather);
+            if (pw <= 0 || ph <= 0) return null;
+            final float reach = Math.max(dp(6), r.height());
+            final int sx = (int) Math.max(0, Math.floor(shape.left - feather - reach));
+            final int sy = (int) Math.max(0, Math.floor(shape.top - feather - reach));
+            final int ex = (int) Math.min(source.getWidth(), Math.ceil(shape.right + feather + reach));
+            final int ey = (int) Math.min(source.getHeight(), Math.ceil(shape.bottom + feather + reach));
+            if (ex - sx < 2 || ey - sy < 2) return null;
+            final int f = 4;
+            final Bitmap small = Bitmap.createBitmap(Math.max(1, (ex - sx) / f), Math.max(1, (ey - sy) / f), Bitmap.Config.ARGB_8888);
+            final Canvas sc = new Canvas(small);
+            sc.scale(small.getWidth() / (float) (ex - sx), small.getHeight() / (float) (ey - sy));
+            sc.translate(-sx, -sy);
+            sc.drawBitmap(source, 0, 0, new Paint(Paint.FILTER_BITMAP_FLAG));
+            final int radius = Math.max(3, Math.min(24, Math.round(r.height() / f * 0.5f)));
+            Utilities.stackBlurBitmap(small, radius);
+            Utilities.stackBlurBitmap(small, Math.max(2, radius / 2));
+
+            final Bitmap patch = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
+            final Canvas pc = new Canvas(patch);
+            final float ox = shape.left - feather, oy = shape.top - feather;
+            pc.save();
+            pc.translate(sx - ox, sy - oy);
+            pc.scale((ex - sx) / (float) small.getWidth(), (ey - sy) / (float) small.getHeight());
+            pc.drawBitmap(small, 0, 0, new Paint(Paint.FILTER_BITMAP_FLAG));
+            pc.restore();
+            small.recycle();
+            // a light frost, so it reads as hidden rather than as an empty bubble
+            final RectF local = new RectF(feather, feather, feather + shape.width(), feather + shape.height());
+            final float round = Math.min(local.height() / 2f, dp(9));
+            final Paint frost = new Paint(Paint.ANTI_ALIAS_FLAG);
+            final boolean night = look != null ? look.night : startDark;
+            frost.setColor(night ? 0x24FFFFFF : 0x2EFFFFFF);
+            pc.drawRoundRect(local, round, round, frost);
+            frost.setColor(night ? 0x14FFFFFF : 0x0F000000);
+            frost.setStyle(Paint.Style.STROKE);
+            frost.setStrokeWidth(Math.max(1, dp(0.6f)));
+            pc.drawRoundRect(local, round, round, frost);
+            // the shape, its edge feathered
+            final Paint mask = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mask.setXfermode(new android.graphics.PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+            mask.setMaskFilter(new android.graphics.BlurMaskFilter(feather, android.graphics.BlurMaskFilter.Blur.NORMAL));
+            pc.drawRoundRect(local, round, round, mask);
+            return patch;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return null;
         }
-        canvas.save();
-        canvas.clipPath(hidePath);
-        canvas.scale(p.bitmap.getWidth() / (float) p.blurred.getWidth(), p.bitmap.getHeight() / (float) p.blurred.getHeight());
-        hidePaint.setAlpha((int) (0xFF * Math.max(0f, Math.min(1f, p.alpha))));
-        canvas.drawBitmap(p.blurred, 0, 0, hidePaint);
-        canvas.restore();
     }
 
     private void drawSignature(Canvas canvas, int w, int h) {
@@ -732,6 +1028,9 @@ public class SolegramShotEditor {
         private final TextPaint pillText = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private float scale = 1f, scroll;
         private ValueAnimator layoutAnimator;
+        private final android.widget.OverScroller scroller;
+        @Nullable
+        private android.view.VelocityTracker velocity;
 
         // touch
         private float downX, downY, lastY;
@@ -747,6 +1046,7 @@ public class SolegramShotEditor {
 
         ShotView(Context context) {
             super(context);
+            scroller = new android.widget.OverScroller(context);
             selectPaint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton), 0.32f));
             pillText.setTextSize(dp(14));
             pillText.setTypeface(AndroidUtilities.bold());
@@ -806,6 +1106,18 @@ public class SolegramShotEditor {
             final float top = Math.max(dp(8), (getHeight() - h) / 2f);
             card.set(dp(16), top, dp(16) + w, top + h);
             scroll = Math.max(0, Math.min(scroll, ch - h));
+        }
+
+        private float maxScroll() {
+            return Math.max(0, contentHeight() * scale - card.height());
+        }
+
+        @Override
+        public void computeScroll() {
+            if (scroller.computeScrollOffset()) {
+                scroll = scroller.getCurrY();
+                invalidate();
+            }
         }
 
         @Override
@@ -965,6 +1277,14 @@ public class SolegramShotEditor {
                     downX = x;
                     downY = lastY = y;
                     moved = swiping = scrolling = selectingText = false;
+                    scroller.forceFinished(true);
+                    if (velocity != null) velocity.recycle();
+                    velocity = android.view.VelocityTracker.obtain();
+                    velocity.addMovement(e);
+                    // a card that scrolls keeps its drags: the sheet doesn't take them for closing
+                    if (card.contains(x, y) && maxScroll() > 0) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
                     if (!pill.isEmpty() && pill.contains(x, y)) {
                         return true;
                     }
@@ -981,6 +1301,7 @@ public class SolegramShotEditor {
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
+                    if (velocity != null) velocity.addMovement(e);
                     final int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
                     if (selectingText && touched != null) {
                         final int[] h = hit(touched, cx(x), cy(y) - touched.y);
@@ -1005,7 +1326,7 @@ public class SolegramShotEditor {
                         touched.alpha = 1f - Math.min(0.7f, Math.abs(touched.dx) / contentWidth);
                         invalidate();
                     } else if (scrolling) {
-                        scroll -= y - lastY;
+                        scroll = Math.max(0, Math.min(maxScroll(), scroll - (y - lastY)));
                         invalidate();
                     }
                     lastY = y;
@@ -1014,6 +1335,19 @@ public class SolegramShotEditor {
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL: {
                     final boolean up = e.getActionMasked() == MotionEvent.ACTION_UP;
+                    if (scrolling && up && velocity != null) {
+                        velocity.addMovement(e);
+                        velocity.computeCurrentVelocity(1000, ViewConfiguration.get(getContext()).getScaledMaximumFlingVelocity());
+                        final float vy = velocity.getYVelocity();
+                        if (Math.abs(vy) > ViewConfiguration.get(getContext()).getScaledMinimumFlingVelocity()) {
+                            scroller.fling(0, (int) scroll, 0, (int) -vy, 0, 0, 0, (int) maxScroll());
+                            postInvalidateOnAnimation();
+                        }
+                    }
+                    if (velocity != null) {
+                        velocity.recycle();
+                        velocity = null;
+                    }
                     if (!moved && up && !pill.isEmpty() && pill.contains(x, y)) {
                         tapPill(pillA.contains(x, y));
                         return true;

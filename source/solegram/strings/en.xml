@@ -2284,8 +2284,8 @@
     <string name="SG_ThemeShareSettings">Look settings: %1$d</string>
     <string name="SG_ThemePreviewTitle">Theme “%1$s”</string>
     <string name="SG_ThemePreviewInfo">This is how the theme looks for you: colours, icons, avatar shape and glass. Cancel brings the old look back.</string>
-    <string name="SG_ShotMenu">Beautiful screenshot</string>
-    <string name="SG_ShotTitle">Share it beautifully</string>
+    <string name="SG_ShotMenu">Screenshot editor</string>
+    <string name="SG_ShotTitle">Screenshot editor</string>
     <string name="SG_ShotSubtitle">Screenshot · messages: %1$d</string>
     <string name="SG_ShotSave">Save</string>
     <string name="SG_ShotShare">Share</string>
@@ -2299,7 +2299,7 @@
     <string name="SG_ShotSelectText">Hide text</string>
     <string name="SG_ShotSelectHint">Select the text with your finger</string>
     <string name="SG_ShotHideText">Hide text</string>
-    <string name="SG_ShotOffer">Beautiful screenshots</string>
+    <string name="SG_ShotOffer">Screenshot editor</string>
     <string name="SG_ShotOfferInfo">After a screenshot in a chat: remove messages, hide text and share the picture (Android 14+). Also in the chat menu</string>
     <string name="SG_TestGiftsPick">Pick test gifts</string>
     <string name="SG_TestGiftsPickInfo">The marked ones come first, in the order marked; the rest are filled from the catalog up to the count</string>

@@ -307,6 +307,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     /** One floating bubble: where it is (px from the avatar's centre), how it moves, wobbles, swells; its snow. */
     static final class SgBubble {
         boolean placed;
+        // the bloom round it: the gift's colour made richer (not wider)
+        Paint glow;
+        int glowColor;
         float x, y, vx, vy, lastVx, lastVy;
         float phase, size = 1f, ring, spin = 1f;
         // its orbit: where on it, how fast; the orbit itself drifts slowly (radius, tilt, height)
@@ -1208,20 +1211,36 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgPath.close();
     }
 
+    /** The colour with its saturation pushed up (greys stay grey), a touch brighter when it is dark. */
+    private static int sgSaturated(int color) {
+        final float[] hsv = new float[3];
+        android.graphics.Color.colorToHSV(color | 0xFF000000, hsv);
+        if (hsv[1] > 0.08f) {
+            hsv[1] = Math.min(1f, hsv[1] * 1.55f + 0.18f);
+        }
+        hsv[2] = Math.max(hsv[2], 0.62f);
+        return android.graphics.Color.HSVToColor(hsv);
+    }
+
     private void sgDrawBubble(Canvas canvas, Gift gift, float cx, float cy, float r, float alpha, boolean front, View owner) {
         final SgBubble b = gift.sg;
         final int color = gift.color;
         final float flash = Math.max(0f, Math.min(1f, b.flash));
-        // a soft bloom of its colour round it (brighter on the beat)
-        if (gift.gradientPaint != null) {
-            gift.gradientPaint.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.8f + 0.2f * flash)));
-            canvas.save();
-            canvas.translate(cx, cy);
-            final float g = r / dp(22.5f) * (1.8f + 0.3f * flash);
-            canvas.scale(g, g);
-            canvas.drawCircle(0, 0, dp(22.5f), gift.gradientPaint);
-            canvas.restore();
+        // a soft bloom of its colour round it (brighter on the beat): the size it always had, the hue richer
+        if (b.glow == null || b.glowColor != color) {
+            b.glowColor = color;
+            final int rich = sgSaturated(color);
+            b.glow = new Paint(Paint.ANTI_ALIAS_FLAG);
+            b.glow.setShader(new RadialGradient(0, 0, dp(22.5f), new int[]{rich, Theme.multAlpha(rich, 0.55f), Theme.multAlpha(rich, 0f)},
+                new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
         }
+        b.glow.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.85f + 0.15f * flash)));
+        canvas.save();
+        canvas.translate(cx, cy);
+        final float g = r / dp(22.5f) * (1.55f + 0.25f * flash);
+        canvas.scale(g, g);
+        canvas.drawCircle(0, 0, dp(22.5f), b.glow);
+        canvas.restore();
         final float shapeR = r * b.volume;
         sgBuildShape(b, cx, cy, shapeR);
         canvas.save();

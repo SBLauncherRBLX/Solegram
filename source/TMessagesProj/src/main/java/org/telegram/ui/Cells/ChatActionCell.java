@@ -4224,6 +4224,13 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         return Theme.getColor(key, themeDelegate);
     }
 
+    /** Solegram: the screenshot editor draws the cell once in another theme's colours; gives back the cell's own. */
+    public Theme.ResourcesProvider solegramSwapResources(Theme.ResourcesProvider provider) {
+        final Theme.ResourcesProvider was = themeDelegate;
+        themeDelegate = provider;
+        return was;
+    }
+
     protected Paint getThemedPaint(String paintKey) {
         Paint paint = themeDelegate != null ? themeDelegate.getPaint(paintKey) : null;
         return paint != null ? paint : Theme.getThemePaint(paintKey);

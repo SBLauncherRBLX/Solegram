@@ -2284,8 +2284,8 @@
     <string name="SG_ThemeShareSettings">Настроек вида: %1$d</string>
     <string name="SG_ThemePreviewTitle">Тема «%1$s»</string>
     <string name="SG_ThemePreviewInfo">Так тема выглядит у вас: цвета, иконки, форма аватарок и стекло. «Отмена» вернёт прежний вид.</string>
-    <string name="SG_ShotMenu">Красивый скриншот</string>
-    <string name="SG_ShotTitle">Поделиться красиво</string>
+    <string name="SG_ShotMenu">Редактор скриншота</string>
+    <string name="SG_ShotTitle">Редактор скриншота</string>
     <string name="SG_ShotSubtitle">Скриншот · сообщений: %1$d</string>
     <string name="SG_ShotSave">Сохранить</string>
     <string name="SG_ShotShare">Поделиться</string>
@@ -2299,7 +2299,7 @@
     <string name="SG_ShotSelectText">Скрыть текст</string>
     <string name="SG_ShotSelectHint">Выделите текст пальцем</string>
     <string name="SG_ShotHideText">Скрыть текст</string>
-    <string name="SG_ShotOffer">Красивые скриншоты</string>
+    <string name="SG_ShotOffer">Редактор скриншота</string>
     <string name="SG_ShotOfferInfo">После скриншота в чате — предложение убрать сообщения, скрыть текст и поделиться картинкой (Android 14+). Также в меню чата</string>
     <string name="SG_TestGiftsPick">Выбрать тестовые подарки</string>
     <string name="SG_TestGiftsPickInfo">Отмеченные встанут первыми в том порядке, в каком вы их отметили; остальные добираются из каталога до нужного количества</string>
