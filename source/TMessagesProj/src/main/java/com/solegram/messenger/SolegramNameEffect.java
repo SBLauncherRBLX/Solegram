@@ -256,6 +256,29 @@ public final class SolegramNameEffect {
             return LiteMode.isEnabled(LiteMode.FLAGS_ANIMATED_EMOJI);
         }
 
+        // Slow effects (pulse, rainbow, the gradient's 3 s loop) look the same at ~30 redraws a second; the moving
+        // shimmer band at ~40. The host is a whole row (a chat in the list, a message), so it is not redrawn at the
+        // screen's 60-120 Hz for a name.
+        private static final long SLOW_FRAME = 33, MOVING_FRAME = 24;
+        private static final long[] FLICKER_STEPS = {2000, 2080, 2160, 2210, 2300, 2330};
+
+        /** When each host's next redraw is already asked for (UI thread): one pending redraw per view, never a pile. */
+        private static final java.util.WeakHashMap<View, Long> due = new java.util.WeakHashMap<>();
+
+        private static void later(View view, long ms) {
+            final long nowMs = SystemClock.uptimeMillis(), at = nowMs + ms;
+            final Long was = due.get(view);
+            if (was != null && was > nowMs && was <= at + 4) {
+                return; // a redraw no later than this one is coming
+            }
+            due.put(view, at);
+            if (ms <= 16) {
+                view.postInvalidateOnAnimation();
+            } else {
+                view.postInvalidateDelayed(ms);
+            }
+        }
+
         /** Draws the name's layout with the effect; the paint is left as it was. */
         public void draw(View view, Canvas canvas, Layout layout, TextPaint paint) {
             final boolean animate = animate();
@@ -283,7 +306,20 @@ public final class SolegramNameEffect {
                     layout.draw(canvas);
                     paint.clearShadowLayer();
                     if (animate && mode != GLOW_STEADY) {
-                        view.postInvalidateOnAnimation();
+                        if (mode == GLOW_FLICKER) {
+                            // nothing moves between the dips: the next redraw at the next change
+                            final long t = now % 2600;
+                            long next = 2600;
+                            for (long b : FLICKER_STEPS) {
+                                if (b > t) {
+                                    next = b;
+                                    break;
+                                }
+                            }
+                            later(view, next - t);
+                        } else {
+                            later(view, SLOW_FRAME);
+                        }
                     }
                     return;
                 }
@@ -320,7 +356,19 @@ public final class SolegramNameEffect {
                         final float top = layout.getLineTop(0) + AndroidUtilities.dp(2), bottom = layout.getLineBottom(0) - AndroidUtilities.dp(1);
                         canvas.drawRect(x + AndroidUtilities.dp(1.5f), top, x + AndroidUtilities.dp(3.5f), bottom, caretPaint);
                     }
-                    view.postInvalidateOnAnimation();
+                    // redrawn only when a letter comes or goes, or the caret blinks
+                    final long blink = 450 - now % 450;
+                    long wait;
+                    if (t < type) {
+                        wait = perChar - t % perChar;
+                    } else if (t < type + hold) {
+                        wait = Math.min(type + hold - t, blink);
+                    } else if (t < type + hold + erase) {
+                        wait = 45 - (t - type - hold) % 45;
+                    } else {
+                        wait = Math.min(type + hold + erase + pause - t, blink);
+                    }
+                    later(view, wait);
                     return;
                 }
                 case SHIMMER: {
@@ -347,7 +395,9 @@ public final class SolegramNameEffect {
                     paint.setShader(was);
                     paint.setColor(wasColor);
                     if (animate) {
-                        view.postInvalidateOnAnimation();
+                        // the band moves for 60% of the cycle, then the name rests until the next one
+                        final long inCycle = now % cycle;
+                        later(view, inCycle < cycle * 0.6f ? MOVING_FRAME : cycle - inCycle);
                     }
                     return;
                 }
@@ -378,7 +428,7 @@ public final class SolegramNameEffect {
                     layout.draw(canvas);
                     paint.setShader(was);
                     if (animate) {
-                        view.postInvalidateOnAnimation();
+                        later(view, SLOW_FRAME);
                     }
                     return;
                 }

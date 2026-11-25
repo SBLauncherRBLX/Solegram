@@ -386,14 +386,17 @@ public final class SolegramProfileCard {
         return e;
     }
 
+    private static int rememberedSinceCount;
+
     private static void remember(Entry e) {
         e.knownAt = System.currentTimeMillis();
         if (e.userId == 0) {
             return;
         }
         final android.content.SharedPreferences prefs = disk();
-        if (prefs.getAll().size() > 1500) {
-            prefs.edit().clear().apply(); // a simple bound: read again when needed
+        // a simple bound (read again when needed); counted now and then, not on every save (getAll copies it all)
+        if (rememberedSinceCount++ % 64 == 0 && prefs.getAll().size() > 1500) {
+            prefs.edit().clear().apply();
         }
         prefs.edit().putString("c" + e.userId, e.knownAt + "|" + (e.card == null ? "-" : e.card.encode())).apply();
     }

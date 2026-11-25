@@ -1720,6 +1720,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int search = 40;
     private final static int sg_streak = 1101;
     private final static int sg_shot = 1102;
+    private final static int sg_export = 1103;
 
     private final static int topic_close = 60;
     private final static int open_forum = 61;
@@ -4080,6 +4081,8 @@ public class ChatActivity extends BaseFragment implements
                     com.solegram.messenger.ui.SolegramStreakSheet.show(ChatActivity.this, dialog_id);
                 } else if (id == sg_shot) {
                     solegramOpenShotEditor();
+                } else if (id == sg_export) {
+                    com.solegram.messenger.ui.SolegramChatExport.show(ChatActivity.this);
                 } else if (id == search) {
                     openSearchWithText(isSupportedTags() ? "" : null);
                 } else if (id == translate) {
@@ -4498,6 +4501,10 @@ public class ChatActivity extends BaseFragment implements
             if (chatMode == 0 && currentEncryptedChat == null) {
                 // Solegram: the messages on the screen as a tidy picture to edit and share
                 headerItem.lazilyAddSubItem(sg_shot, R.drawable.msg_screencast, LocaleController.getString(R.string.SG_ShotMenu));
+            }
+            if (com.solegram.messenger.ui.SolegramChatExport.available(this)) {
+                // Solegram: the chat saved to a file (HTML, text or JSON, with the downloaded media in a ZIP)
+                headerItem.lazilyAddSubItem(sg_export, R.drawable.msg_download, LocaleController.getString(R.string.SG_ExportMenu));
             }
             if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, dp(24), dp(24));

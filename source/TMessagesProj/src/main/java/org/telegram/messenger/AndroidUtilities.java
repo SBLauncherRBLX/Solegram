@@ -1980,6 +1980,17 @@ public class AndroidUtilities {
             } catch (Exception ignore) {
             }
         }
+        // Solegram: a chat the user exported is written to cache/sg_exports (only the finished file there may leave)
+        final String lowerPath = pathString.toLowerCase();
+        if (lowerPath.endsWith(".html") || lowerPath.endsWith(".txt") || lowerPath.endsWith(".json") || lowerPath.endsWith(".zip")) {
+            try {
+                final String exports = new File(ApplicationLoader.applicationContext.getCacheDir(), "sg_exports").getCanonicalPath() + "/";
+                if (pathString.startsWith(exports) && pathString.indexOf('/', exports.length()) < 0) {
+                    return false;
+                }
+            } catch (Exception ignore) {
+            }
+        }
         // Solegram: a theme the user shares is written to cache/sg_themes; only such files may leave the app's own folder
         if (pathString.toLowerCase().endsWith(com.solegram.messenger.SolegramThemeShare.EXTENSION)) {
             try {
