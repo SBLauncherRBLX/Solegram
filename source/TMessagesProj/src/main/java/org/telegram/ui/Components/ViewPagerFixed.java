@@ -335,6 +335,29 @@ public class ViewPagerFixed extends FrameLayout {
      * cut short (the pages' views rebuilt after a theme or interface change) left two half-shifted pages on screen
      * until the app was restarted.
      */
+    /**
+     * Solegram: a tap on a tab means no finger is on the pages: a drag that never got its end, or an animation that is
+     * still marked as running, is finished at once so the tap is not ignored (the tabs looked frozen on the profile).
+     */
+    public void solegramForceIdle() {
+        if (startedTracking) {
+            resetTouch();
+        }
+        maybeStartTracking = false;
+        if (tabsAnimation != null && tabsAnimation.isRunning()) {
+            tabsAnimation.end();
+        }
+        tabsAnimationInProgress = false;
+        if (manualScrolling != null) {
+            if (manualScrolling.isRunning()) {
+                manualScrolling.end();
+            }
+            manualScrolling = null;
+        }
+        notificationsLocker.unlock();
+        solegramSettle();
+    }
+
     public void solegramSettle() {
         if (manualScrolling != null && manualScrolling.isRunning() || tabsAnimation != null && tabsAnimation.isRunning()
                 || startedTracking || maybeStartTracking || tabsAnimationInProgress) {
@@ -517,6 +540,7 @@ public class ViewPagerFixed extends FrameLayout {
         }
         maybeStartTracking = true;
         startedTracking = false;
+        notificationsLocker.unlock(); // Solegram: a dropped drag keeps no lock
         setTranslationX(viewPages[0], 0);
         if (viewPages[1] != null) {
             setTranslationX(viewPages[1], animatingForward ? viewPages[0].getMeasuredWidth() : -viewPages[0].getMeasuredWidth());
@@ -740,6 +764,9 @@ public class ViewPagerFixed extends FrameLayout {
                 if (!prepareForMoving(ev, dx < 0)) {
                     maybeStartTracking = true;
                     startedTracking = false;
+                    // Solegram: the drag is dropped here (the finger went over a part that may not slide, e.g. the
+                    // profile's photos or media tabs): its notifications lock must go too, or the app stops updating
+                    notificationsLocker.unlock();
                     setTranslationX(viewPages[0], 0);
                     if (viewPages[1] != null) {
                         setTranslationX(viewPages[1], animatingForward ? viewPages[0].getMeasuredWidth() : -viewPages[0].getMeasuredWidth());

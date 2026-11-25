@@ -6507,6 +6507,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             captureHeaderImage(avatarsViewPager, c, p, root);
             // the blur at the bottom of the photo goes on under the action buttons
             captureHeaderImage(avatarsBlurView, c, p, root);
+            // Solegram: the gift bubbles show through the glass buttons too (only where the buttons are: the bubbles'
+            // own lenses read this same picture and must not see themselves in it)
+            if (giftsView != null && giftsView.getVisibility() == View.VISIBLE && giftsView.getAlpha() > 0 && sgButtonsClip(root)) {
+                Blur3Utils.captureRelativeParent((canvas, position) -> {
+                    canvas.save();
+                    canvas.clipPath(sgCaptureClip);
+                    giftsView.sgDrawForCapture(canvas);
+                    canvas.restore();
+                }, c, p, giftsView, root);
+            }
             // Solegram: the glass of the buttons sees the photo melting into the page too
             if (overlaysView != null && (expandProgress > 0.01f || currentExpandAnimatorValue > 0.01f) && overlaysView.getVisibility() == View.VISIBLE) {
                 Blur3Utils.captureRelativeParent((canvas, position) -> overlaysView.sgDrawPhotoMelt(canvas), c, p, overlaysView, root);
@@ -6523,6 +6533,34 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     /** The header is far from some areas of the capture, e.g. the tabs: not recorded for them. */
     private static boolean isUnderGlass(View view, RectF position, ViewGroup root) {
         return ViewPositionWatcher.computeRectInParent(view, root, captureViewRect) && RectF.intersects(captureViewRect, position);
+    }
+
+    private final Path sgCaptureClip = new Path();
+    private final RectF sgClipGifts = new RectF(), sgClipRect = new RectF();
+
+    /** The glass buttons' places (the action row, the music line, the header's buttons) in the gifts view's coordinates. */
+    private boolean sgButtonsClip(ViewGroup root) {
+        sgCaptureClip.rewind();
+        if (!ViewPositionWatcher.computeRectInParent(giftsView, root, sgClipGifts)) {
+            return false;
+        }
+        boolean any = sgAddClip(actionsView, root) | sgAddClip(musicView, root);
+        if (simpleActionBar != null && simpleActionBar.getVisibility() == View.VISIBLE) {
+            for (int i = 0; i < simpleActionBar.getChildCount(); i++) {
+                any |= sgAddClip(simpleActionBar.getChildAt(i), root);
+            }
+        }
+        return any;
+    }
+
+    private boolean sgAddClip(View v, ViewGroup root) {
+        if (v == null || v.getVisibility() != View.VISIBLE || v.getAlpha() <= 0 || v.getWidth() <= 0
+            || !ViewPositionWatcher.computeRectInParent(v, root, sgClipRect)) {
+            return false;
+        }
+        sgClipRect.offset(-sgClipGifts.left, -sgClipGifts.top);
+        sgCaptureClip.addRect(sgClipRect, Path.Direction.CW);
+        return true;
     }
 
     private static void captureHeaderImage(View view, Canvas canvas, RectF position, ViewGroup root) {

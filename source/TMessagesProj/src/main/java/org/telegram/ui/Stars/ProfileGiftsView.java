@@ -1200,18 +1200,34 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     }
 
     /** {@code front}: the bubbles in front of the avatar (those coming nearer, and swollen ones), else those behind. */
+    /** Drawing the bubbles into the header's capture (for the glass buttons over them): no glass of their own then. */
+    private boolean sgCapturing;
+
+    /** Solegram: the bubbles as pictures into the capture that the glass buttons refract (no lenses, no state changed). */
+    public void sgDrawForCapture(Canvas canvas) {
+        if (!sgOrbit || gifts.isEmpty()) {
+            return;
+        }
+        sgCapturing = true;
+        try {
+            sgDraw(canvas, false, this);
+            sgDraw(canvas, true, sgFront);
+        } finally {
+            sgCapturing = false;
+        }
+    }
+
     private void sgDraw(Canvas canvas, boolean front, View owner) {
-        if (front) {
+        if (front && !sgCapturing) {
             sgGlassFrontUsed = 0;
-            sgDrawAvatarRing(canvas, getAlpha()); // the glass ring is on every profile, bubbles or not (under the front ones)
         }
         if (gifts.isEmpty() || sgAlpha <= 0.01f || expandProgress >= 1f || collapseProgress <= 0f) {
-            sgHideUnusedGlass(front);
+            if (!sgCapturing) sgHideUnusedGlass(front);
             return;
         }
         final float viewAlpha = front ? getAlpha() : 1f;
         if (front && viewAlpha <= 0.01f) {
-            sgHideUnusedGlass(true);
+            if (!sgCapturing) sgHideUnusedGlass(true);
             return;
         }
         canvas.save();
@@ -1244,7 +1260,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             sgDrawBubble(canvas, gift, cx, cy, r, alpha, front, owner);
         }
         canvas.restore();
-        sgHideUnusedGlass(front);
+        if (!sgCapturing) sgHideUnusedGlass(front);
     }
 
     private float sgC1, sgS1, sgC2, sgS2;
@@ -1476,7 +1492,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         canvas.save();
         canvas.clipPath(sgPath);
         // the lens: what is under it, refracted along this very outline (the glass of the header)
-        final boolean glass = sgGlassFactory != null && canvas.isHardwareAccelerated();
+        final boolean glass = !sgCapturing && sgGlassFactory != null && canvas.isHardwareAccelerated();
         if (glass) {
             sgDrawLens(canvas, front, owner, b, cx, cy, shapeR, alpha);
         }

@@ -401,7 +401,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             final int position = indexToPosition(index);
             tabs[index].setOnClickListener(v -> {
                 if (viewPager.isManualScrolling() || viewPager.isTouch() || viewPager.checkTabsAnimationInProgress()) {
-                    return;
+                    // Solegram: never ignore a tab: whatever is left of a drag or a transition is finished now
+                    viewPager.solegramForceIdle();
                 }
 
                 viewPager.solegramSettle(); // a transition left unfinished is finished before the next one
