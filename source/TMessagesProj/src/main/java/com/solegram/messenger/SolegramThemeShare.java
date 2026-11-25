@@ -29,7 +29,7 @@ import java.util.Map;
 /**
  * Solegram: a theme to share in a chat - the colours of light and dark themes (SolegramThemeColors), the three colours
  * the theme was made of, and the settings of how the app looks (glass, avatar corners, motion...), in a file of our own
- * ({@code .sgtheme}: JSON, format "solegram-theme"). Only what is about the look is ever taken from such a file: a
+ * ({@code .solegram}: JSON, format "solegram-theme"). Only what is about the look is ever taken from such a file: a
  * theme somebody sent cannot touch privacy, protection, the updater or anything else.
  */
 public final class SolegramThemeShare {
@@ -37,7 +37,9 @@ public final class SolegramThemeShare {
     private SolegramThemeShare() {
     }
 
-    public static final String EXTENSION = ".sgtheme";
+    public static final String EXTENSION = ".solegram";
+    /** The first themes were sent with this one: they still open. */
+    private static final String OLD_EXTENSION = ".sgtheme";
     public static final String MIME = "application/x-solegram-theme";
     private static final String FORMAT = "solegram-theme";
     private static final int MAX_BYTES = 256 * 1024;
@@ -147,7 +149,7 @@ public final class SolegramThemeShare {
         return String.format("#%08X", color);
     }
 
-    /** Writes the current look into a file to send ({@code <name>.sgtheme} in the cache). */
+    /** Writes the current look into a file to send ({@code <name>.solegram} in the cache). */
     @Nullable
     public static File exportFile(String name) {
         try {
@@ -176,7 +178,11 @@ public final class SolegramThemeShare {
     // region import
 
     public static boolean isThemeFile(@Nullable String name) {
-        return name != null && name.toLowerCase().endsWith(EXTENSION);
+        if (name == null) {
+            return false;
+        }
+        final String lower = name.toLowerCase();
+        return lower.endsWith(EXTENSION) || lower.endsWith(OLD_EXTENSION);
     }
 
     /** The theme in a file, or null when it is not one (or too big, or broken). */

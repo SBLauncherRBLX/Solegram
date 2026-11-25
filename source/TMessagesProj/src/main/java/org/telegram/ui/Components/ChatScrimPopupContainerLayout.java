@@ -38,6 +38,20 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
         }
     }
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (solegramSidePill != null && getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) getParent()).setClipChildren(false);
+        }
+    }
+
+    /** Solegram: the icons' pill as laid out now, or null. */
+    @androidx.annotation.Nullable
+    public View solegramSidePill() {
+        return solegramSidePill != null && solegramSidePill.getParent() == this && solegramSidePill.getVisibility() != GONE ? solegramSidePill : null;
+    }
+
     /** Solegram: told after each layout (the window is made wide enough for the menu and its pill). */
     public Runnable solegramAfterLayout;
     /** Solegram: the width the menu with its pill wants, before it is cut to the width the window gave. */
@@ -51,6 +65,12 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
 
     public void solegramSetSidePill(View pill) {
         solegramSidePill = pill;
+        // the pill may lie past this layout's (or the window frame's) edge for a moment: never cut it, the window grows
+        setClipChildren(false);
+        setClipToPadding(false);
+        if (getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) getParent()).setClipChildren(false);
+        }
         pill.setClickable(true); // a tap between its buttons does not close the menu
         final android.graphics.drawable.Drawable shadow = androidx.core.content.ContextCompat.getDrawable(getContext(), org.telegram.messenger.R.drawable.popup_fixed_alert4);
         if (shadow != null) {

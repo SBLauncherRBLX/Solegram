@@ -317,6 +317,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_GIFTS_ORBIT = 4305;
     private static final int ID_TEST_GIFTS = 4306;
     private static final int ID_SHARE_THEME = 4307;
+    private static final int ID_SHOT_OFFER = 4308;
+    private static final int ID_TEST_GIFTS_PICK = 4309;
     private static final int ID_STREAKS = 1140;
     private static final int ID_NEW_PLAYER = 1141;
     private static final int ID_MUSIC_TAB = 1142;
@@ -823,6 +825,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         // the menu of a message
         items.add(UItem.asHeader(getString(R.string.SG_MessageMenu)));
         items.add(UItem.asButtonCheck(ID_MESSAGE_DETAILS, getString(R.string.SG_MessageDetailsItem), getString(R.string.SG_MessageDetailsItemInfo)).setChecked(SolegramConfig.messageDetails));
+        items.add(UItem.asButtonCheck(ID_SHOT_OFFER, getString(R.string.SG_ShotOffer), getString(R.string.SG_ShotOfferInfo)).setChecked(SolegramConfig.shotOffer));
         items.add(UItem.asButtonCheck(ID_JUMP_TO_FIRST, getString(R.string.SG_JumpToFirstItem), getString(R.string.SG_JumpToFirstItemInfo)).setChecked(SolegramConfig.jumpToFirstInMenu));
         items.add(UItem.asShadow(null));
 
@@ -1366,6 +1369,8 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         if (org.telegram.messenger.BuildConfig.SOLEGRAM_VERSION_NAME.contains("beta")) {
             // betas only: the developer checks how gifts look without having them
             items.add(UItem.asButtonCheck(ID_TEST_GIFTS, getString(R.string.SG_TestGifts), getString(R.string.SG_TestGiftsInfo)).setChecked(SolegramConfig.devTestGifts));
+            items.add(UItem.asButton(ID_TEST_GIFTS_PICK, R.drawable.msg_gift_premium, getString(R.string.SG_TestGiftsPick),
+                LocaleController.formatString(R.string.SG_TestGiftsCount, SolegramConfig.devTestGiftCount)));
         }
         items.add(UItem.asButtonCheck(ID_ANIMATED_AVATARS, getString(R.string.SG_AnimatedAvatars), getString(R.string.SG_AnimatedAvatarsInfo)).setChecked(SolegramConfig.animatedAvatars));
         items.add(UItem.asShadow(getString(R.string.SG_PremiumLookInfo)));
@@ -2795,6 +2800,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
             case ID_MESSAGE_DETAILS:
                 toggleCheck(view, "messageDetails");
                 return;
+            case ID_SHOT_OFFER:
+                toggleCheck(view, "shotOffer");
+                return;
             case ID_REMEMBER_FOLDER:
                 toggleCheck(view, "rememberFolder");
                 return;
@@ -3020,6 +3028,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_TEST_GIFTS:
                 toggleCheck(view, "devTestGifts");
+                return;
+            case ID_TEST_GIFTS_PICK:
+                SolegramTestGiftsSheet.show(this);
                 return;
             case ID_MAP_ENGINE: {
                 final String[] names = new String[3];

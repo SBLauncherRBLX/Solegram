@@ -794,20 +794,34 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             stars.loadStarGifts(); // starGiftsLoaded brings them
             return;
         }
-        int n = 0;
-        for (int i = 0; i < stars.gifts.size() && gifts.size() < limit; i++) {
-            final TL_stars.StarGift g = stars.gifts.get(i);
+        // how many (the setting) and which: the picked ones first, in the order picked, then the catalog's next
+        final int count = Math.max(1, Math.min(com.solegram.messenger.SolegramConfig.devTestGiftCount, limit));
+        final ArrayList<TL_stars.StarGift> order = new ArrayList<>();
+        for (long id : com.solegram.messenger.SolegramConfig.devTestGiftIdList()) {
+            for (TL_stars.StarGift g : stars.gifts) {
+                if (g != null && g.id == id && !order.contains(g)) {
+                    order.add(g);
+                }
+            }
+        }
+        if (order.isEmpty()) {
+            order.addAll(stars.gifts);
+        }
+        int added = 0, n = 0;
+        for (int i = 0; i < order.size() && added < count && gifts.size() < limit; i++) {
+            final TL_stars.StarGift g = order.get(i);
             final TLRPC.Document sticker = g != null ? g.getDocument() : null;
             if (sticker == null) {
                 continue;
             }
-            final long fakeId = -1000L - i;
+            final long fakeId = -1000L - Math.abs(g.id % 100000);
             if (giftIds.contains(fakeId)) {
                 continue;
             }
             final int[] colors = SG_TEST_COLORS[n++ % SG_TEST_COLORS.length];
             gifts.add(new Gift(fakeId, sticker, colors[0], colors[1]));
             giftIds.add(fakeId);
+            added++;
         }
     }
 
@@ -938,7 +952,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             // springs: the beat's swell, the squash where it touched, a tap's swell (back by itself)
             b.pulseV += (-140f * b.pulse - 9f * b.pulseV) * dt;
             b.pulse += b.pulseV * dt;
-            b.flash *= (float) Math.exp(-4.5f * dt);
+            b.flash *= (float) Math.exp(-7.5f * dt); // a short flash: it reads as the beat itself
             // the jelly: squashed along where it is pushed, springing back with a soft wobble
             final float ax = (b.vx - b.lastVx) / Math.max(dt, 1e-4f), ay = (b.vy - b.lastVy) / Math.max(dt, 1e-4f);
             final float follow = 1f - (float) Math.exp(-8f * dt);

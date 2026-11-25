@@ -403,6 +403,24 @@ public class SolegramConfig {
     public static boolean profileGiftsOrbit = true;
     /** Betas only: test gifts on the own profile, only on this phone (to see how gifts look). */
     public static boolean devTestGifts;
+    /** Betas: how many test gifts, and which (catalog gift ids, comma separated; empty: the catalog's first). */
+    public static int devTestGiftCount = 9;
+    public static String devTestGiftIds = "";
+
+    public static java.util.List<Long> devTestGiftIdList() {
+        final java.util.ArrayList<Long> ids = new java.util.ArrayList<>();
+        if (devTestGiftIds != null && !devTestGiftIds.isEmpty()) {
+            for (String part : devTestGiftIds.split(",")) {
+                try {
+                    ids.add(Long.parseLong(part.trim()));
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        }
+        return ids;
+    }
+    /** A screenshot in a chat offers the «beautiful screenshot» editor (Android 14+). */
+    public static boolean shotOffer = true;
     public static String updateChannel = "";
     public static long lastUpdateCheck;
     public static int skippedUpdateBuild;
@@ -698,6 +716,9 @@ public class SolegramConfig {
         profileCards = p.getBoolean("profileCards", true);
         profileGiftsOrbit = p.getBoolean("profileGiftsOrbit", true);
         devTestGifts = p.getBoolean("devTestGifts", false);
+        devTestGiftCount = clamp(p.getInt("devTestGiftCount", 9), 1, 9);
+        devTestGiftIds = p.getString("devTestGiftIds", "");
+        shotOffer = p.getBoolean("shotOffer", true);
         updateChannel = p.getString("updateChannel", "");
         lastUpdateCheck = readLong(p, "lastUpdateCheck");
         skippedUpdateBuild = p.getInt("skippedUpdateBuild", 0);
@@ -853,6 +874,7 @@ public class SolegramConfig {
             case "unifiedWallet":
             case "profileCards":
             case "profileGiftsOrbit":
+            case "shotOffer":
             case "ghostReadOnInteract":
             case "ghostInDrawer":
             case "backgroundConnection":

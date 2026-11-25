@@ -1719,6 +1719,7 @@ public class ChatActivity extends BaseFragment implements
 
     private final static int search = 40;
     private final static int sg_streak = 1101;
+    private final static int sg_shot = 1102;
 
     private final static int topic_close = 60;
     private final static int open_forum = 61;
@@ -3366,17 +3367,70 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
-    /** Solegram: this chat shows a theme sent in a chat, tried on (SolegramThemePreview). */
-    private boolean sgThemePreview() {
-        return arguments != null && arguments.getBoolean(com.solegram.messenger.ui.SolegramThemePreview.ARG, false);
+    // region Solegram: beautiful screenshots
+
+    /** The messages on the screen, without the header and the input, into the editor (SolegramShotEditor). */
+    public void solegramOpenShotEditor() {
+        if (chatListView == null || getParentActivity() == null) {
+            return;
+        }
+        final int top = Math.max(0, (int) (chatListViewPaddingTop - chatListViewPaddingVisibleOffset));
+        final int bottom = Math.min(chatListView.getHeight(), chatListView.getHeight() - Math.max(chatListView.getPaddingBottom(), 0));
+        final java.util.ArrayList<com.solegram.messenger.ui.SolegramShotEditor.Piece> pieces =
+            com.solegram.messenger.ui.SolegramShotEditor.capture(chatListView, top, bottom > top ? bottom : chatListView.getHeight());
+        if (pieces == null) {
+            BulletinFactory.of(this).createErrorBulletin(getString(R.string.SG_ShotNothing)).show();
+            return;
+        }
+        presentFragment(new com.solegram.messenger.ui.SolegramShotEditor(pieces, chatListView.getWidth()));
     }
+
+    private Object solegramShotCallback;
+
+    /** Android 14+: a screenshot taken in this chat offers the editor (a bulletin with «Настроить»). */
+    private void solegramWatchScreenshots(boolean on) {
+        if (Build.VERSION.SDK_INT < 34 || getParentActivity() == null || currentEncryptedChat != null || chatMode != 0) {
+            return;
+        }
+        try {
+            if (on && solegramShotCallback == null && com.solegram.messenger.SolegramConfig.shotOffer) {
+                solegramShotCallback = SolegramShots.register(getParentActivity(), () -> AndroidUtilities.runOnUIThread(this::solegramOfferShot));
+            } else if (!on && solegramShotCallback != null) {
+                SolegramShots.unregister(getParentActivity(), solegramShotCallback);
+                solegramShotCallback = null;
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+            solegramShotCallback = null;
+        }
+    }
+
+    private void solegramOfferShot() {
+        if (getParentActivity() == null || isFinishing() || fragmentView == null) {
+            return;
+        }
+        BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_save_to_gallery, getString(R.string.SG_ShotTaken),
+            getString(R.string.SG_ShotTakenInfo), getString(R.string.SG_ShotCustomize), this::solegramOpenShotEditor).show();
+    }
+
+    @androidx.annotation.RequiresApi(34)
+    private static final class SolegramShots {
+        static Object register(Activity activity, Runnable onShot) {
+            final Activity.ScreenCaptureCallback callback = onShot::run;
+            activity.registerScreenCaptureCallback(activity.getMainExecutor(), callback);
+            return callback;
+        }
+
+        static void unregister(Activity activity, Object callback) {
+            activity.unregisterScreenCaptureCallback((Activity.ScreenCaptureCallback) callback);
+        }
+    }
+
+    // endregion
 
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
-        if (sgThemePreview()) {
-            com.solegram.messenger.ui.SolegramThemePreview.closed(this);
-        }
         if (solegramMenuLiquid != null) {
             solegramMenuLiquid.finishNow();
         }
@@ -4028,6 +4082,8 @@ public class ChatActivity extends BaseFragment implements
                     getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/settings", dialog_id, null, null, null, false, null, null, null, true, 0, 0, null, false));
                 } else if (id == sg_streak) {
                     com.solegram.messenger.ui.SolegramStreakSheet.show(ChatActivity.this, dialog_id);
+                } else if (id == sg_shot) {
+                    solegramOpenShotEditor();
                 } else if (id == search) {
                     openSearchWithText(isSupportedTags() ? "" : null);
                 } else if (id == translate) {
@@ -4442,6 +4498,10 @@ public class ChatActivity extends BaseFragment implements
             if (currentUser != null && chatMode == 0 && com.solegram.messenger.SolegramStreak.eligible(currentAccount, currentUser.id)) {
                 headerItem.lazilyAddSubItem(sg_streak, R.drawable.notification, LocaleController.getString(R.string.SG_StreakMenu));
                 sgUpdateStreakItem();
+            }
+            if (chatMode == 0 && currentEncryptedChat == null) {
+                // Solegram: the messages on the screen as a tidy picture to edit and share
+                headerItem.lazilyAddSubItem(sg_shot, R.drawable.msg_screencast, LocaleController.getString(R.string.SG_ShotMenu));
             }
             if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, dp(24), dp(24));
@@ -28377,9 +28437,6 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
         super.onTransitionAnimationEnd(isOpen, backward);
-        if (isOpen && sgThemePreview()) {
-            com.solegram.messenger.ui.SolegramThemePreview.attach(this); // Solegram: the card of a theme tried on
-        }
         if (isOpen) {
             if (backward) {
                 if (showPinBulletin && pinBulletin != null) {
@@ -30904,6 +30961,7 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onResume() {
         super.onResume();
+        solegramWatchScreenshots(true);
         checkShowBlur(false);
         activityResumeTime = System.currentTimeMillis();
         if (solegramConfigVersion != com.solegram.messenger.SolegramConfig.version) {
@@ -31130,9 +31188,7 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onPause() {
         super.onPause();
-        if (sgThemePreview()) {
-            com.solegram.messenger.ui.SolegramThemePreview.paused();
-        }
+        solegramWatchScreenshots(false);
         scrolling = false;
         if (scrimPopupWindow != null) {
             scrimPopupWindow.setPauseNotifications(false);
@@ -34215,23 +34271,35 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         final View root = container.getRootView();
-        // what it wants, not what it was cut to: a menu cut to the window kept its icons' pill past the window's edge
-        final int need = Math.max(container.getMeasuredWidth(), container.solegramWantedWidth);
-        final int have = root != null ? root.getWidth() : 0;
-        if (have <= 0 || need <= have) {
+        if (root == null || root.getWidth() <= 0) {
+            return;
+        }
+        // where the content really ends: the icons' pill as it is laid out (it decides), else what the menu wants
+        final int[] at = new int[2];
+        root.getLocationOnScreen(at);
+        final int rootLeft = at[0], rootRight = rootLeft + root.getWidth();
+        int contentRight = rootLeft + Math.max(container.getMeasuredWidth(), container.solegramWantedWidth);
+        final View pill = container.solegramSidePill();
+        if (pill != null && pill.getWidth() > 0) {
+            container.getLocationOnScreen(at);
+            contentRight = Math.max(contentRight, at[0] + pill.getRight() + dp(4));
+        }
+        final int over = contentRight - rootRight;
+        if (over <= 0) {
             return;
         }
         final View screenRoot = fragmentView != null ? fragmentView.getRootView() : null;
         final int screen = screenRoot != null && screenRoot.getWidth() > 0 ? screenRoot.getWidth() : AndroidUtilities.displaySize.x;
+        final int width = Math.min(screen, root.getWidth() + over);
         int x = scrimPopupX;
-        if (x + need > screen) {
-            x = Math.max(0, screen - need);
+        if (x + width > screen) {
+            x = Math.max(0, screen - width); // no room on the right: the menu steps left
         }
         final int fx = x;
         container.post(() -> {
             if (window.isShowing() && window == scrimPopupWindow) {
                 scrimPopupX = fx;
-                window.update(fx, scrimPopupY, need, -1);
+                window.update(fx, scrimPopupY, width, -1);
             }
         });
     }

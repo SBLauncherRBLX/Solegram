@@ -2538,5 +2538,28 @@
     <string name="SG_ThemeShareSettings">Настроек вида: %1$d</string>
     <string name="SG_ThemePreviewTitle">Тема «%1$s»</string>
     <string name="SG_ThemePreviewInfo">Так тема выглядит у вас: цвета, иконки, форма аватарок и стекло. «Отмена» вернёт прежний вид.</string>
+    <string name="SG_ShotMenu">Красивый скриншот</string>
+    <string name="SG_ShotTitle">Поделиться красиво</string>
+    <string name="SG_ShotSubtitle">Скриншот · сообщений: %1$d</string>
+    <string name="SG_ShotSave">Сохранить</string>
+    <string name="SG_ShotShare">Поделиться</string>
+    <string name="SG_ShotSaved">Скриншот сохранён в галерею</string>
+    <string name="SG_ShotSent">Скриншот отправлен</string>
+    <string name="SG_ShotNothing">На экране нет сообщений для скриншота</string>
+    <string name="SG_ShotTaken">Скриншот сделан</string>
+    <string name="SG_ShotTakenInfo">Скройте сообщения или текст</string>
+    <string name="SG_ShotCustomize">Настроить</string>
+    <string name="SG_ShotHideMessage">Убрать</string>
+    <string name="SG_ShotSelectText">Скрыть текст</string>
+    <string name="SG_ShotSelectHint">Выделите текст пальцем</string>
+    <string name="SG_ShotHideText">Скрыть текст</string>
+    <string name="SG_ShotOffer">Красивые скриншоты</string>
+    <string name="SG_ShotOfferInfo">После скриншота в чате — предложение убрать сообщения, скрыть текст и поделиться картинкой (Android 14+). Также в меню чата</string>
+    <string name="SG_TestGiftsPick">Выбрать тестовые подарки</string>
+    <string name="SG_TestGiftsPickInfo">Отмеченные встанут первыми в том порядке, в каком вы их отметили; остальные добираются из каталога до нужного количества</string>
+    <string name="SG_TestGiftsCount">Количество: %1$d</string>
+    <string name="SG_TestGiftsReset">Сбросить</string>
+    <string name="SG_TestGiftsSaved">Тестовые подарки сохранены — откройте профиль заново</string>
+    <string name="SG_TestGiftsLoading">Каталог подарков загружается, откройте ещё раз через секунду</string>
     <!-- SOLEGRAM END -->
 </resources>

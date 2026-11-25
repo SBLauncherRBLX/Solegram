@@ -25,8 +25,11 @@ public final class SolegramBeat {
     }
 
     private static final ArrayList<Listener> listeners = new ArrayList<>();
-    private static float avgLow, avgAll;
+    // onset detection: the rise of the low end and of the loudness from one update to the next ("spectral flux"), against
+    // its own running mean and spread, so a beat is a rise clearly bigger than the music's usual movement
+    private static float prevLow, prevAll, fluxMean, fluxVar;
     private static long lastBeat;
+    private static boolean warm;
 
     public static void add(Listener l) {
         if (l != null && !listeners.contains(l)) {
@@ -46,22 +49,34 @@ public final class SolegramBeat {
     /** From the player's visualizer: values[0..5] = parts of the spectrum (low first), values[6] = loudness. UI thread. */
     public static void onWaveform(boolean playing, float[] values) {
         if (!playing || values == null || values.length < 7) {
-            avgLow *= 0.5f;
-            avgAll *= 0.5f;
+            prevLow = prevAll = 0;
+            warm = false;
             return;
         }
-        final float low = Math.max(values[0], values[1] * 0.8f);
+        final float low = values[0] * 0.7f + values[1] * 0.3f;
         final float all = values[6];
+        final float flux = Math.max(0f, low - prevLow) + 0.6f * Math.max(0f, all - prevAll);
+        prevLow = low;
+        prevAll = all;
+        if (!warm) {
+            warm = true;
+            fluxMean = flux;
+            fluxVar = 0.01f;
+            return;
+        }
+        final float std = (float) Math.sqrt(fluxVar);
+        final float threshold = fluxMean + 1.3f * std + 0.025f;
         final long now = SystemClock.elapsedRealtime();
-        final boolean warm = avgAll > 0.05f;
-        final boolean jump = low > 0.25f && low > avgLow * 1.35f + 0.05f || all > 0.45f && all > avgAll * 1.25f + 0.04f;
-        avgLow = avgLow * 0.82f + low * 0.18f;
-        avgAll = avgAll * 0.85f + all * 0.15f;
-        if (!warm || !jump || now - lastBeat < 230) {
+        final boolean beat = flux > threshold && now - lastBeat > 170;
+        // the statistics follow the music (about a second of memory at ~15 updates a second)
+        final float d = flux - fluxMean;
+        fluxMean += 0.08f * d;
+        fluxVar = 0.92f * (fluxVar + 0.08f * d * d);
+        if (!beat) {
             return;
         }
         lastBeat = now;
-        final float strength = Math.max(0.35f, Math.min(1f, Math.max(low - avgLow, all - avgAll) * 2.5f + 0.35f));
+        final float strength = Math.max(0.4f, Math.min(1f, 0.4f + (flux - threshold) / (3f * std + 0.05f)));
         for (Listener l : new ArrayList<>(listeners)) {
             l.onBeat(strength);
         }

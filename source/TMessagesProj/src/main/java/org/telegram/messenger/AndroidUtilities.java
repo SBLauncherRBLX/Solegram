@@ -1970,6 +1970,16 @@ public class AndroidUtilities {
         if (pathString.endsWith(".attheme")) {
             return false;
         }
+        // Solegram: a beautiful screenshot the user made is written to cache/sg_shots (only .png there may leave)
+        if (pathString.toLowerCase().endsWith(".png")) {
+            try {
+                final String shots = new File(ApplicationLoader.applicationContext.getCacheDir(), "sg_shots").getCanonicalPath() + "/";
+                if (pathString.startsWith(shots) && pathString.indexOf('/', shots.length()) < 0) {
+                    return false;
+                }
+            } catch (Exception ignore) {
+            }
+        }
         // Solegram: a theme the user shares is written to cache/sg_themes; only such files may leave the app's own folder
         if (pathString.toLowerCase().endsWith(com.solegram.messenger.SolegramThemeShare.EXTENSION)) {
             try {
