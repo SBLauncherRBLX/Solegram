@@ -33767,7 +33767,7 @@ public class ChatActivity extends BaseFragment implements
                 popupY = liquidMenu.windowY;
             }
             solegramPlaceCompactMenu(scrimPopupContainerLayout, liquidMenu); // Solegram: a compact menu above the message sits by it
-            solegramFixMenuWidth(scrimPopupContainerLayout, scrimPopupWindow); // Solegram: the icons' pill is never cut off
+            popupX = solegramFixMenuWidth(scrimPopupContainerLayout, scrimPopupWindow, popupX, liquidMenu == null); // Solegram: the icons' pill is never cut off
             {
                 // and if the menu still grows wider once shown (a longer row, the reactions), the window grows with it
                 final ChatScrimPopupContainerLayout sgContainer = scrimPopupContainerLayout;
@@ -34254,20 +34254,54 @@ public class ChatActivity extends BaseFragment implements
     }
 
     /**
-     * Solegram: with the icons' pill the menu window gets an exact width, the width the menu and the pill take side by
-     * side on this screen. Left to wrap its content, Android first measures a window as narrow as a dialog and then
-     * keeps that width: the menu came out wider than it, and the pill at its right was cut off.
+     * Solegram: with the icons' pill the menu window reaches from the menu to the right edge of the screen (the menu
+     * stays its own size at its left), so nothing the menu grows into once shown — a longer row, «Ещё», the reactions —
+     * can be cut by the window's edge. If the menu and its pill would not fit on the right, the window moves left.
+     * Taps on the window's empty part close the menu as taps beside it do. Returns the window's x.
      */
-    private void solegramFixMenuWidth(ChatScrimPopupContainerLayout container, ActionBarPopupWindow window) {
+    private int solegramFixMenuWidth(ChatScrimPopupContainerLayout container, ActionBarPopupWindow window, int x, boolean canMove) {
         final LinearLayout pill = solegramQuickPill;
         if (pill == null || pill.getParent() != container || window == null) {
-            return;
+            return x;
         }
         container.measure(solegramMenuWidthSpec(), View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST));
-        final int sgWidth = Math.max(container.getMeasuredWidth(), container.solegramWantedWidth);
-        if (sgWidth > 0) {
-            window.setWidth(sgWidth);
+        final int wanted = Math.max(container.getMeasuredWidth(), container.solegramWantedWidth);
+        if (wanted <= 0) {
+            return x;
         }
+        final View screenRoot = fragmentView != null ? fragmentView.getRootView() : null;
+        final int screen = screenRoot != null && screenRoot.getWidth() > 0 ? screenRoot.getWidth() : AndroidUtilities.displaySize.x;
+        if (canMove && x + wanted > screen) {
+            x = Math.max(0, screen - wanted);
+        }
+        window.setWidth(Math.max(wanted, screen - x));
+        container.solegramWrapInWide = true; // the menu keeps its own width inside the wide window
+        // the window's own entrance scales it from its corner: in a wide window the menu would slide; a fade instead
+        if (window.getAnimationStyle() == R.style.PopupContextAnimation) {
+            window.setAnimationStyle(R.style.PopupAnimation); // (none set: the reactions animate it themselves)
+        }
+        window.setTouchInterceptor((v, e) -> {
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN && window == scrimPopupWindow && window.isShowing()) {
+                final View content = window.getContentView();
+                if (content != null) {
+                    final int[] at = new int[2];
+                    content.getLocationInWindow(at);
+                    final float cx = e.getRawX(), cy = e.getRawY();
+                    content.getLocationOnScreen(at);
+                    final View sidePill = container.solegramSidePill();
+                    float right = at[0] + content.getWidth();
+                    if (sidePill != null) {
+                        right = Math.max(right, at[0] + sidePill.getRight() + sidePill.getTranslationX());
+                    }
+                    if (cx < at[0] || cx > right || cy < at[1] || cy > at[1] + content.getHeight()) {
+                        closeMenu();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+        return x;
     }
 
     /**

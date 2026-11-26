@@ -56,6 +56,8 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
     public Runnable solegramAfterLayout;
     /** Solegram: the width the menu with its pill wants, before it is cut to the width the window gave. */
     public int solegramWantedWidth;
+    /** Solegram: the window is wider than the menu (to the screen's edge): measure to the content, not to the window. */
+    public boolean solegramWrapInWide;
 
     // region Solegram side pill
 
@@ -138,6 +140,9 @@ public class ChatScrimPopupContainerLayout extends LinearLayout {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         // Solegram: the room of the icons' pill is kept first, so the menu is measured narrower when it must be and the
         // pill never ends past the window's edge (the window gives no more width than it measured with)
+        if (solegramWrapInWide && MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) {
+            widthMeasureSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.AT_MOST);
+        }
         final int sgReserve = solegramSidePillReserve();
         final int sgMode = MeasureSpec.getMode(widthMeasureSpec), sgSize = MeasureSpec.getSize(widthMeasureSpec);
         if (sgReserve > 0 && sgMode != MeasureSpec.UNSPECIFIED) {
