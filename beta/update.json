@@ -1,19 +1,19 @@
 {
-  "salt": "a33e53f8dc19325d66a8f3041047416f",
+  "salt": "5069c80e1b3004152ec3c86d133dc51d",
   "iter": 120000,
-  "check": "d716d9a68ca9009b8a7ee579203bb5cd7a7d70ab5b03a4a35c9f2569f559cf80",
-  "version": "3.5.2-beta18",
-  "build": 279,
-  "apk": "beta/Solegram-3.5.2-beta18-b279.sealed",
-  "size": 73005801,
-  "sha256": "07c663752a9c776f54c1bc4a543597db2a32032f9b65ddfb9c227f80a23ec50b",
-  "sealedSize": 73005801,
-  "sealedSha256": "4d5d19c0b28d1c5682f6f9ba569a029140c155fc124c7d4063608479a2b196b3",
-  "iv": "e7e1f6d71f5b2a6e0c054da0b2ef1383",
-  "mac": "27b9b765054bf7b0dad06234e4b7377e878347c21a622ce6ed1b8d04515a73fd",
+  "check": "c189f9295745806ae1bef8c729445653f0bb1a3de27a718478bbae58eb872073",
+  "version": "3.5.2-beta19",
+  "build": 280,
+  "apk": "beta/Solegram-3.5.2-beta19-b280.sealed",
+  "size": 73006230,
+  "sha256": "b66d66052b27f5cad1c073d1facc49d98dc090f99ea437ac3591d7d4eaaae84f",
+  "sealedSize": 73006230,
+  "sealedSha256": "90c7f694c0bb1875d2a49707f258497ce5cf1a88e7a25443af88a238f6811a88",
+  "iv": "b12a0d4abd79fe4b8e384ed76955d531",
+  "mac": "97f911e48da57c830fd8efe4768df577dd3e52017d4dc33044e22fb33691083e",
   "changelog": {
-    "iv": "a1a65bdf675b8871285421a347864e49",
-    "data": "tBE06x4sU7wsnwhTH49y7rTXysfvkZ4FAajq9Hv+21mRWLqNxJnhT0Azp6+CxApV1xW+pk4eeVuYEX9jacB1wjdU36A/XCe2TLJrYI0KOEv/myMz/WR6saRcLW3y05qAx0jmciikP7KkrfxRSZpjeEYiDyqR8DYE5CB30+r5kN+uJMyqosfxusgkt1oF0dTSeoZUYxQzF7lvoIleo3qssWH1/DcXmYQaitlBHkk8hdZYMCRV1CNv+DzvQ+z5kCXF8vP2GMVu7lB1aXDp5CJTH8i4gpROXaY7HJFjwnWlMwiigv3MwzfVGl+kmlIyTvytsbHJ3mEiVWzrKkvnMc8Oei2E4AtO1VO8AbcDepF0RVcY3oDByMEcc7rypXMMewGw27mqyUY=",
-    "mac": "3b7d7c1306de0034dcb33a4e571d03a126c48148884cc3ca4fc6493809053444"
+    "iv": "82b279759f8c4b339f825400a6559239",
+    "data": "4+d38M6Zl6uACQAg+Yz+15pLWH/ER+EoUOXq3IKwiAUTbmsKoNlxQBgVZFnKcpuQbIqoGlKIGtaPXYiFeh9dnt7TYlLi5wnlcocQ9QcQ239KTvVTGwA8kpNcyw9X9hOhw1QTkQmhMHBD3fy1EQcSlHQEYLbwOioQ//CpI8vkSYoqDs94e/N31g3TmnxKeQ9c/fmMXFB0SdY7ZN0sIjJ429XiSCeJtAlvnJACWDHpOgp0dWdLdVkB5LUHQfHk1bede5aP79T9a4PO2Ndom/JIaK5BSMu3sEoqhhrnCKiQ1U9A1Rki8vMKIW8IuZ0449cuZS3w5hvQOoacV6zLariNOwSzvM41nUjQgkgfpnrDfeaANoyJSFlSLzkcWWlKY9v0WmPY/N+5qM+ehGCEgHXloXSPV6PwJEqyktRRYvZtoRO/yBNqBtkcMDeWoCvWibpuIPTQAbtqxdnLs4xbyH0YzqX7okh64hShKi9/z18fzUH5mtgeFsesRLGDwd/f8yXjtQ7488YDxe4DJDYwrA==",
+    "mac": "271b9cb80ff7924051a7a7781bfd8cd0be64cfca0fe41ab71f71935fbf25677f"
   }
 }

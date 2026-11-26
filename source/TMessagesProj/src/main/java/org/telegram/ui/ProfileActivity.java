@@ -2901,8 +2901,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         letters.add(nameTextView);
         final View round = com.solegram.messenger.SolegramUi.avatarPercent(com.solegram.messenger.SolegramUi.SHAPE_DEFAULT) >= 50 && !isTopic ? avatarContainer : null;
         hide.add(storyView);
-        hide.add(giftsView);
-        hide.add(giftsView != null ? giftsView.sgFront : null);
+        // the gift bubbles are not hidden: they fly up and away by themselves (giftsView.sgSetAwayWhile)
         hide.add(animatedStatusView);
         hide.add(avatarsViewPagerIndicatorView);
         sgShake = com.solegram.messenger.ui.SolegramProfileShake.toggle(sgShake, (ViewGroup) fragmentView, actionsView, views, letters, round, hide, actionsView);
@@ -6221,6 +6220,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         giftsView = new ProfileGiftsView(context, currentAccount, getDialogId(), avatarContainer, avatarImage, resourcesProvider);
         // Solegram: the gifts hop to the beat of this profile's own music while it plays
         giftsView.sgSetMusicPlays(() -> sgPlaysSavedMusic(MediaController.getInstance().getPlayingMessageObject()) && !MediaController.getInstance().isMessagePaused());
+        // Solegram: the shake egg sends the gift bubbles up and away while the header lies fallen
+        giftsView.sgSetAwayWhile(() -> sgShake != null && sgShake.getParent() != null && !sgShake.isReturning());
         avatarContainer2.addView(giftsView, 0, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         // Solegram: the gift bubbles that come nearer pass in front of the avatar
         final int sgGooeyIndex = avatarContainer2.indexOfChild(avatarGooey);
@@ -10504,9 +10505,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         // Solegram: a shake here drops the header (the easter egg), the shake shortcut waits outside the profile
         com.solegram.messenger.SolegramGestures.addShakeHandler(sgShakeHandler);
         super.onResume();
-        if (userId != 0) {
-            com.solegram.messenger.SolegramBeat.add(sgAvatarBeat);
-        }
+        // the avatar's beat motion was turned off on request (3.5.2-beta19); sgAvatarBeat is kept unused
         sgStatsResumed = true;
         if (userInfo != null) {
             sgRefreshStatsFm(); // what plays on stats.fm, while the profile is open

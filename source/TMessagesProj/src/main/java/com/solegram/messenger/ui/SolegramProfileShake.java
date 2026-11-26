@@ -124,6 +124,11 @@ public class SolegramProfileShake extends View implements SensorEventListener {
     private View anchor;
     private long lastFrame, returnStart, quietSince;
     private boolean returning;
+
+    /** Whether the fallen header is on its way back (the gift bubbles come down with it). */
+    public boolean isReturning() {
+        return returning;
+    }
     // gravity on the screen, in g: x to the right, y down (straight down until the sensor says otherwise)
     private volatile float gx = 0f, gy = 1f;
     private float lastGx = 0f, lastGy = 1f;

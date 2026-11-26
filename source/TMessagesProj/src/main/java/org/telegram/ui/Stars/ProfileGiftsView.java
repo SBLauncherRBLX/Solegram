@@ -696,7 +696,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 
     /** Whether a touch at (x, y) (this view's coordinates) is on a bubble that should take it. */
     public boolean sgTakesTouch(float x, float y) {
-        if (!sgOrbit || !active || sgAlpha <= 0.01f) {
+        if (!sgOrbit || !active || sgAlpha <= 0.01f || sgAway > 0.01f) {
             return false;
         }
         final Gift g = sgGiftUnder(x, y);
@@ -945,6 +945,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 
         final long now = android.os.SystemClock.uptimeMillis();
         final float dt = sgLastFrame == 0 ? 1f / 60f : Math.min(1f / 30f, (now - sgLastFrame) / 1000f);
+        // the shake egg: away (up and off) while the header lies fallen, down again when it comes back
+        final boolean away = sgAwayWhile != null && sgAwayWhile.getAsBoolean();
+        sgAway = away ? Math.min(1f, sgAway + dt / 1.1f) : Math.max(0f, sgAway - dt / 0.75f);
         sgLastFrame = now;
         sgTime += dt;
         if (sgAlpha > 0.01f) {
@@ -1200,6 +1203,16 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     }
 
     /** {@code front}: the bubbles in front of the avatar (those coming nearer, and swollen ones), else those behind. */
+    /** While this says so (the profile's shake egg), the bubbles fly up and away; then they come down again. */
+    private java.util.function.BooleanSupplier sgAwayWhile;
+    /** 0: in their places, 1: flown away above the screen. */
+    private float sgAway;
+
+    public void sgSetAwayWhile(java.util.function.BooleanSupplier awayWhile) {
+        sgAwayWhile = awayWhile;
+        invalidate();
+    }
+
     /** Drawing the bubbles into the header's capture (for the glass buttons over them): no glass of their own then. */
     private boolean sgCapturing;
 
@@ -1248,15 +1261,29 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             final float enter = gift.animatedFloat.set(1.0f);
             final float collapse = Utilities.clamp01(isOpening || enter >= 1f ? sgCollapse : Math.min(enter, sgCollapse));
             final float ease = 1f - (1f - collapse) * (1f - collapse);
-            final float cx = AndroidUtilities.lerp(sgRealCx, sgAcx + b.x, ease);
-            final float cy = AndroidUtilities.lerp(sgRealCy, sgAcy + b.y, ease);
+            float cx = AndroidUtilities.lerp(sgRealCx, sgAcx + b.x, ease);
+            float cy = AndroidUtilities.lerp(sgRealCy, sgAcy + b.y, ease);
+            float awayFade = 1f;
+            if (sgAway > 0f) {
+                // flying off: each a little later and its own way, faster and faster upwards, past the top of the screen
+                final float lag = 0.12f * (float) ((Math.sin(b.phase * 7.3f) + 1f) / 2f);
+                final float t = Utilities.clamp01((sgAway - lag) / (1f - lag));
+                final float e = t * t * (1.6f - 0.6f * t);
+                cy -= e * (cy + dp(140));
+                cx += e * dp(46) * (float) Math.sin(b.phase * 3.1f) + e * e * dp(18) * (float) Math.cos(b.phase * 5.3f);
+                awayFade = 1f - Utilities.clamp01((t - 0.75f) / 0.25f);
+            }
             // the near ones bigger, the far ones smaller and dimmer: depth
-            final float scale = (0.5f + 0.5f * ease) * (1f + 0.2f * depth) * (1f + 0.12f * b.pulse) * b.inflate;
+            final float scale = (0.5f + 0.5f * ease) * (1f + 0.2f * depth) * (1f + 0.12f * b.pulse) * b.inflate * (1f - 0.12f * sgAway);
             final float r = dp(21) * b.size * scale * gift.bounce.getScale(0.1f);
             b.drawX = cx;
             b.drawY = cy;
             b.drawR = r;
-            final float alpha = enter * sgAlpha * (0.62f + 0.38f * (depth + 1f) / 2f) * viewAlpha;
+            final float alpha = enter * sgAlpha * (0.62f + 0.38f * (depth + 1f) / 2f) * viewAlpha * awayFade;
+            if (alpha <= 0.005f) {
+                b.drawR = 0; // gone: nothing to tap
+                continue;
+            }
             sgDrawBubble(canvas, gift, cx, cy, r, alpha, front, owner);
         }
         canvas.restore();
