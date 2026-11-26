@@ -34570,8 +34570,9 @@ public class ChatActivity extends BaseFragment implements
 
     /**
      * Solegram: places the message menu (the reactions with it) next to the message: below it, or above it when there is
-     * no room below, so it never covers the message. When neither side has room, the chat moves just enough for one
-     * side to have it (to the message's end or its start, whichever is nearer). Returns the window's position, or null
+     * no room below. When neither side has room, the chat moves just enough for one side to have it — but only if the
+     * message then fits whole with the menu; a bigger message stays where it is and the menu goes over its end that
+     * hides the least of it. Returns the window's position, or null
      * to keep Telegram's (a menu taller than the screen, a message not in the list).
      */
     @Nullable
@@ -34628,6 +34629,16 @@ public class ChatActivity extends BaseFragment implements
             return null;
         }
         float top = solegramMenuTopByMessage(message, seen, gap, topLimit, bottomLimit);
+        if (Float.isNaN(top) && message.height() + gap + seen.height() > bottomLimit - topLimit) {
+            // a message too big to be seen whole with the menu: the chat does not move it away (it would go off the
+            // screen); the menu goes over it instead, at the end where it covers the least of what is seen
+            final float visTop = Math.max(message.top, topLimit), visBottom = Math.min(message.bottom, bottomLimit);
+            final float belowTop = Math.max(topLimit - seen.top, Math.min(visBottom + gap - seen.top, bottomLimit - seen.bottom));
+            final float aboveTop = Math.min(bottomLimit - seen.bottom, Math.max(visTop - gap - seen.bottom, topLimit - seen.top));
+            final float coverBelow = Math.max(0f, visBottom + gap - (belowTop + seen.top));
+            final float coverAbove = Math.max(0f, (aboveTop + seen.bottom) - (visTop - gap));
+            top = coverBelow <= coverAbove ? belowTop : aboveTop;
+        }
         if (Float.isNaN(top)) {
             // no room on either side: the chat moves (the message's nearer end comes out from under where the menu goes)
             final float up = message.bottom - (bottomLimit - gap - seen.height());
