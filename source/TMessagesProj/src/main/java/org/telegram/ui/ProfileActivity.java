@@ -2844,6 +2844,24 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 sgBanner.setAllowStartAnimation(true);
                 sgBanner.setAutoRepeat(1);
                 sgBanner.onAttachedToWindow();
+                // the banner's picture gives the page its colour once it is there
+                sgBanner.setDelegate((receiver, set, thumb, memCache) -> {
+                    if (!set) return;
+                    try {
+                        Bitmap picture = receiver.getBitmap();
+                        if (picture == null || picture.isRecycled()) return;
+                        if (Build.VERSION.SDK_INT >= 26 && picture.getConfig() == Bitmap.Config.HARDWARE) {
+                            picture = picture.copy(Bitmap.Config.ARGB_8888, false);
+                        }
+                        final int tone = sgBannerBottomTone(picture);
+                        if (tone != 0 && tone != sgBannerTone) {
+                            sgBannerTone = tone;
+                            sgRefreshPageTint();
+                        }
+                    } catch (Throwable e) {
+                        FileLog.e(e);
+                    }
+                });
             }
             final MessageObject post = card.post;
             final TLRPC.Document doc = post.getDocument();
@@ -3113,6 +3131,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         BaseFragment lastFragment = parentLayout.getLastFragment();
         if (lastFragment instanceof ChatActivity && ((ChatActivity) lastFragment).themeDelegate != null && ((ChatActivity) lastFragment).themeDelegate.getCurrentTheme() != null && !((ChatActivity) lastFragment).themeDelegate.isGiftTheme()) {
             resourcesProvider = lastFragment.getResourceProvider();
+        }
+        if (resourcesProvider == null) {
+            resourcesProvider = new SgPageTint(); // Solegram: the page takes the colour of the header's fill
         }
         searchTransitionOffset = 0;
         searchTransitionProgress = 1f;
@@ -3584,8 +3605,35 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         fragmentView = new NestedFrameLayout(context) {
 
+            // Solegram: a touch on a gift bubble belongs to the bubbles from its start, whatever lies over them there
+            // (the name, the status, the header's own gestures, the tabs' swipe)
+            private boolean sgBubbleGesture;
+            private final RectF sgGiftsRect = new RectF();
+
             @Override
             public boolean dispatchTouchEvent(MotionEvent ev) {
+                if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    sgBubbleGesture = false;
+                    if (giftsView != null && giftsView.isAttachedToWindow() && giftsView.getVisibility() == View.VISIBLE
+                        && !pinchToZoomHelper.isInOverlayMode()
+                        && ViewPositionWatcher.computeRectInParent(giftsView, this, sgGiftsRect)
+                        && giftsView.sgTakesTouch(ev.getX() - sgGiftsRect.left, ev.getY() - sgGiftsRect.top)) {
+                        sgBubbleGesture = true;
+                        if (getParent() != null) {
+                            getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                    }
+                }
+                if (sgBubbleGesture) {
+                    final int action = ev.getActionMasked();
+                    ev.offsetLocation(-sgGiftsRect.left, -sgGiftsRect.top);
+                    giftsView.dispatchTouchEvent(ev);
+                    ev.offsetLocation(sgGiftsRect.left, sgGiftsRect.top);
+                    if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                        sgBubbleGesture = false;
+                    }
+                    return true;
+                }
                 if (pinchToZoomHelper.isInOverlayMode()) {
                     return pinchToZoomHelper.onTouchEvent(ev);
                 }
@@ -5763,6 +5811,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         topView.setBackgroundColorId(peerColor, false);
         topView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
         frameLayout.addView(topView);
+        sgRefreshPageTint();
 
         animatedStatusView = new AnimatedStatusView(context, 20, 60);
         animatedStatusView.setPivotX(dp(30));
@@ -13289,6 +13338,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (topView != null) {
             topView.setBackgroundColorId(peerColor, true);
         }
+        sgRefreshPageTint();
         if (onlineTextView != null) {
             int statusColor;
             if (onlineTextView.getTag() instanceof Integer) {
@@ -13763,7 +13813,89 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public Theme.ResourcesProvider getResourceProvider() {
-        return resourcesProvider;
+        // the page tint is this screen's own: sheets and screens opened from here keep the app's colours
+        return resourcesProvider instanceof SgPageTint ? null : resourcesProvider;
+    }
+
+    /**
+     * Solegram: the profile's page (the background under its cards) is the very colour the header ends in, so no line
+     * shows between them: the banner picture's lower edge (with its dim), else the profile colour's outer colour;
+     * without either, the theme's.
+     * Only this key changes; every other colour is the app's own.
+     */
+    private final class SgPageTint implements Theme.ResourcesProvider {
+        @Override
+        public int getColor(int key) {
+            return key == Theme.key_windowBackgroundGray ? sgPageColor() : Theme.getColor(key);
+        }
+    }
+
+    private int sgBannerTone;
+
+    private int sgPageColor() {
+        final int base = Theme.getColor(Theme.key_windowBackgroundGray);
+        int tone = 0;
+        if (sgBannerTone != 0 && sgCard != null && sgCard.hasBanner() && com.solegram.messenger.SolegramConfig.profileCards) {
+            tone = sgBannerTone; // the banner picture covers the header: the colour of its lower edge
+        } else if (topView != null && topView.hasColorById) {
+            tone = topView.color1; // the header's gradient ends in its outer colour at the bottom
+        }
+        // exactly the colour the header ends in, so the header and the page meet with no line between them
+        return tone == 0 ? base : tone | 0xFF000000;
+    }
+
+    /**
+     * The colour of the banner picture's lower edge as the header shows it: the picture is drawn centre-cropped into
+     * the open header, so its bottom visible rows are averaged, then darkened as the card's dim darkens the bottom.
+     */
+    private int sgBannerBottomTone(Bitmap b) {
+        final int bw = b.getWidth(), bh = b.getHeight();
+        if (bw <= 0 || bh <= 0) return 0;
+        final float areaH = (actionBar != null && actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
+            + ActionBar.getCurrentActionBarHeight() + getHeaderExtraHeight();
+        final float areaW = AndroidUtilities.displaySize.x;
+        float visibleH = bh;
+        if (areaH > 0 && areaW / areaH > bw / (float) bh) {
+            visibleH = bw * areaH / areaW; // a picture taller than the header: its top and bottom are cut off
+        }
+        final int bottom = (int) Math.min(bh - 1, (bh + visibleH) / 2f - 1);
+        final int from = (int) Math.max(0, bottom - Math.max(2, visibleH * 0.06f));
+        long r = 0, g = 0, bl = 0, n = 0;
+        for (int y = from; y <= bottom; y += Math.max(1, (bottom - from) / 6)) {
+            for (int i = 0; i < 24; i++) {
+                final int px = b.getPixel(Math.min(bw - 1, (int) ((i + 0.5f) * bw / 24f)), y);
+                if (Color.alpha(px) < 200) continue;
+                r += Color.red(px);
+                g += Color.green(px);
+                bl += Color.blue(px);
+                n++;
+            }
+        }
+        if (n == 0) return 0;
+        int tone = Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n));
+        if (sgCard != null && sgCard.dim > 0) {
+            tone = ColorUtils.blendARGB(tone, Color.BLACK, Math.min(1f, sgCard.dim / 100f));
+        }
+        return tone;
+    }
+
+    /** The header's fill changed (colour, banner): the page's background follows. */
+    private void sgRefreshPageTint() {
+        if (!(resourcesProvider instanceof SgPageTint)) {
+            return;
+        }
+        if (listView != null) {
+            ThemeBind.backgroundColor(listView, Theme.key_windowBackgroundGray, resourcesProvider);
+        }
+        if (topView != null && !topView.hasColorById) {
+            topView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        }
+        if (fragmentView != null) {
+            fragmentView.invalidate();
+        }
+        if (sharedMediaLayout != null) {
+            sharedMediaLayout.invalidate();
+        }
     }
 
     public int getThemedColor(int key) {
@@ -16677,7 +16809,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     @Override
     public ArrayList<ThemeDescription> getThemeDescriptions() {
-        if (resourcesProvider != null) {
+        if (resourcesProvider != null && !(resourcesProvider instanceof SgPageTint)) {
             return null;
         }
         ThemeDescription.ThemeDescriptionDelegate themeDelegate = this::themeDelegateThemeColors;

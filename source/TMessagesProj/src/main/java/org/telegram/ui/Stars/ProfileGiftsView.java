@@ -340,9 +340,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     /** More than the pinned ones float: the next collectible gifts of the profile fill up to this. */
     private static final int SG_MAX = 9;
     /** The symbols inside a bubble (a snow globe of the gift's pattern). */
-    private static final int SG_FLAKES = 7;
+    private static final int SG_FLAKES = 14;
     /** Where the symbols stay inside, in bubble radii; their size in bubble radii. */
-    private static final float SG_FLAKE_ROOM = 0.7f, SG_FLAKE_SIZE = 0.3f;
+    private static final float SG_FLAKE_ROOM = 0.8f, SG_FLAKE_SIZE = 0.3f;
 
     /** One floating bubble: where it is (px from the avatar's centre), how it moves, wobbles, swells; its snow. */
     static final class SgBubble {
@@ -984,9 +984,12 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             if (!b.snowPlaced) {
                 b.snowPlaced = true;
                 for (int k = 0; k < SG_FLAKES; k++) {
-                    b.fx[k] = (sgRandom.nextFloat() * 2 - 1) * 0.5f;
-                    b.fy[k] = 0.2f + sgRandom.nextFloat() * 0.4f;
-                    b.fa[k] = sgRandom.nextFloat() * 60 - 30;
+                    // spread through the whole bubble (they float, they do not lie at the bottom)
+                    final double a = sgRandom.nextFloat() * Math.PI * 2;
+                    final float rr = (float) Math.sqrt(sgRandom.nextFloat()) * 0.7f;
+                    b.fx[k] = (float) Math.cos(a) * rr;
+                    b.fy[k] = (float) Math.sin(a) * rr;
+                    b.fa[k] = 0;
                 }
             }
         }
@@ -1151,26 +1154,32 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         return f;
     }
 
-    /** The snow inside a bubble: falls down the real gravity through thick water, lags behind the bubble and the phone. */
+    /**
+     * The light specks inside a bubble: each drifts slowly its own way (a gentle velocity that turns with time); when the
+     * bubble or the phone moves they lag behind it and hit the wall, then the thick water calms them down to the slow
+     * drift again.
+     */
     private void sgStepSnow(SgBubble b, float dt, float r) {
-        // in bubble radii per second squared
-        final float gravity = 3.2f;
+        // in bubble radii per second squared: the bubble's own acceleration pushes them the other way, as the phone's does
         final float bubbleAx = (b.vx - b.lastVx) / Math.max(dt, 1e-4f) / r, bubbleAy = (b.vy - b.lastVy) / Math.max(dt, 1e-4f) / r;
-        float ax = sgGx * gravity - bubbleAx * 0.35f - sgAx * 0.55f;
-        float ay = sgGy * gravity - bubbleAy * 0.35f - sgAy * 0.55f;
+        float ax = -bubbleAx * 0.45f - sgAx * 0.5f;
+        float ay = -bubbleAy * 0.45f - sgAy * 0.5f;
         final float max = 40f;
         ax = Math.max(-max, Math.min(max, ax));
         ay = Math.max(-max, Math.min(max, ay));
-        final float drag = (float) Math.exp(-2.6f * dt);
+        // a push dies out in about a second, back to the drift
+        final float calm = (float) Math.exp(-1.7f * dt);
         final float room = SG_FLAKE_ROOM;
-        final float minGap = SG_FLAKE_SIZE * 0.8f;
         for (int k = 0; k < SG_FLAKES; k++) {
-            b.fvx[k] = (b.fvx[k] + ax * dt) * drag;
-            b.fvy[k] = (b.fvy[k] + ay * dt) * drag;
+            final float ph = sgTime * 0.3f + k * 1.7f + b.phase * 3f;
+            final float wx = 0.08f * (float) Math.cos(ph * 0.9f + k), wy = 0.08f * (float) Math.sin(ph * 1.1f + k * 0.6f);
+            b.fvx[k] += ax * dt;
+            b.fvy[k] += ay * dt;
+            b.fvx[k] = wx + (b.fvx[k] - wx) * calm;
+            b.fvy[k] = wy + (b.fvy[k] - wy) * calm;
             b.fx[k] += b.fvx[k] * dt;
             b.fy[k] += b.fvy[k] * dt;
-            b.fa[k] += b.fvx[k] * 40f * dt;
-            // the bubble's wall
+            // the bubble's wall: a soft bounce
             final float d = (float) Math.hypot(b.fx[k], b.fy[k]);
             if (d > room) {
                 final float nx = b.fx[k] / d, ny = b.fy[k] / d;
@@ -1178,25 +1187,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                 b.fy[k] = ny * room;
                 final float vn = b.fvx[k] * nx + b.fvy[k] * ny;
                 if (vn > 0) {
-                    b.fvx[k] -= vn * nx * 1.3f;
-                    b.fvy[k] -= vn * ny * 1.3f;
-                }
-                b.fvx[k] *= 0.9f;
-                b.fvy[k] *= 0.9f;
-            }
-        }
-        // they lie on each other instead of in one spot
-        for (int k = 0; k < SG_FLAKES; k++) {
-            for (int m = k + 1; m < SG_FLAKES; m++) {
-                final float dx = b.fx[m] - b.fx[k], dy = b.fy[m] - b.fy[k];
-                final float d = (float) Math.hypot(dx, dy);
-                if (d < minGap && d > 1e-4f) {
-                    final float push = (minGap - d) / 2f;
-                    final float nx = dx / d, ny = dy / d;
-                    b.fx[k] -= nx * push;
-                    b.fy[k] -= ny * push;
-                    b.fx[m] += nx * push;
-                    b.fy[m] += ny * push;
+                    b.fvx[k] -= vn * nx * 1.5f;
+                    b.fvy[k] -= vn * ny * 1.5f;
                 }
             }
         }
@@ -1539,17 +1531,18 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgFill.setShader(b.body);
         sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.95f + 0.2f * flash)));
         canvas.drawPaint(sgFill);
-        // the snow: the pattern's symbol, settled at the bottom or swirling
-        if (gift.sgPattern != null) {
-            final int fs = (int) (r * SG_FLAKE_SIZE);
-            gift.sgPattern.setAlpha((int) (0xB0 * alpha));
+        // the light specks floating in the jelly (a soft halo each, twinkling a little)
+        {
+            final int speck = androidx.core.graphics.ColorUtils.blendARGB(light, 0xFFFFFFFF, 0.65f);
+            sgFill.setShader(null);
             for (int i = 0; i < SG_FLAKES; i++) {
-                final float fx = cx + b.fx[i] * r, fy = cy + b.fy[i] * r;
-                canvas.save();
-                canvas.rotate(b.fa[i], fx, fy);
-                gift.sgPattern.setBounds((int) (fx - fs / 2f), (int) (fy - fs / 2f), (int) (fx + fs / 2f), (int) (fy + fs / 2f));
-                gift.sgPattern.draw(canvas);
-                canvas.restore();
+                final float fx = cx + b.fx[i] * shapeR, fy = cy + b.fy[i] * shapeR;
+                final float size = dp(0.7f + 0.9f * ((i * 37) % 10) / 10f) * k;
+                final float tw = 0.65f + 0.35f * (float) Math.sin(sgTime * 1.6f + i * 2.1f + b.phase);
+                sgFill.setColor(Theme.multAlpha(speck, 0.18f * tw * alpha));
+                canvas.drawCircle(fx, fy, size * 2.6f, sgFill);
+                sgFill.setColor(Theme.multAlpha(speck, 0.85f * tw * alpha));
+                canvas.drawCircle(fx, fy, size, sgFill);
             }
         }
         // the liquid near the edge: streaks of light and of shifted hue that flow round the rim (two layers turning
