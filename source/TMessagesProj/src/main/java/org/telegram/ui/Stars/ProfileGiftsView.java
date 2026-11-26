@@ -1531,17 +1531,16 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgFill.setShader(b.body);
         sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.95f + 0.2f * flash)));
         canvas.drawPaint(sgFill);
-        // the light specks floating in the jelly (a soft halo each, twinkling a little)
+        // the light specks floating in the jelly (solid dots, twinkling a little)
         {
             final int speck = androidx.core.graphics.ColorUtils.blendARGB(light, 0xFFFFFFFF, 0.65f);
             sgFill.setShader(null);
             for (int i = 0; i < SG_FLAKES; i++) {
                 final float fx = cx + b.fx[i] * shapeR, fy = cy + b.fy[i] * shapeR;
-                final float size = dp(0.7f + 0.9f * ((i * 37) % 10) / 10f) * k;
-                final float tw = 0.65f + 0.35f * (float) Math.sin(sgTime * 1.6f + i * 2.1f + b.phase);
-                sgFill.setColor(Theme.multAlpha(speck, 0.18f * tw * alpha));
-                canvas.drawCircle(fx, fy, size * 2.6f, sgFill);
-                sgFill.setColor(Theme.multAlpha(speck, 0.85f * tw * alpha));
+                // small, solid, no halo round them
+                final float size = dp(0.45f + 0.55f * ((i * 37) % 10) / 10f) * k;
+                final float tw = 0.7f + 0.3f * (float) Math.sin(sgTime * 1.6f + i * 2.1f + b.phase);
+                sgFill.setColor(Theme.multAlpha(speck, 0.9f * tw * alpha));
                 canvas.drawCircle(fx, fy, size, sgFill);
             }
         }

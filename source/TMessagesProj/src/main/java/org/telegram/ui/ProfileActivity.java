@@ -1455,6 +1455,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
             if (y1 != 0) {
                 sgDrawHeaderMelt(canvas, y1);
+                sgDrawHeaderFlow(canvas, y1);
             }
             if (fading) {
                 canvas.restore();
@@ -1477,6 +1478,41 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         private final Paint sgHeaderMeltPaint = new Paint();
         private int sgHeaderMeltColor;
         private float sgHeaderMeltHeight;
+
+        private Paint sgFlowPaint;
+        private float sgFlowFrom = -1, sgFlowTo = -1;
+        private int sgFlowTone;
+
+        /**
+         * Solegram: right from the middle of the avatar down, the header turns into the page's colour (the colour the
+         * header ends in), fully at its bottom where the page begins: no line between them at any height.
+         */
+        private void sgDrawHeaderFlow(Canvas canvas, int y1) {
+            if (!(resourcesProvider instanceof SgPageTint) || avatarContainer == null || avatarContainer2 == null) {
+                return;
+            }
+            final int tone = sgHeaderTone();
+            if (tone == 0) {
+                return;
+            }
+            float from = avatarContainer2.getY() + avatarContainer.getY() + avatarContainer.getMeasuredHeight() * avatarContainer.getScaleY() / 2f;
+            from = Math.max(0, Math.min(from, y1 - dp(24)));
+            if (y1 - from < dp(8)) {
+                return;
+            }
+            if (sgFlowPaint == null) {
+                sgFlowPaint = new Paint();
+            }
+            if (sgFlowFrom != from || sgFlowTo != y1 || sgFlowTone != tone) {
+                sgFlowFrom = from;
+                sgFlowTo = y1;
+                sgFlowTone = tone;
+                sgFlowPaint.setShader(new android.graphics.LinearGradient(0, from, 0, y1,
+                    new int[]{tone & 0x00FFFFFF, Theme.multAlpha(tone, 0.35f), Theme.multAlpha(tone, 0.8f), tone},
+                    new float[]{0f, 0.4f, 0.75f, 1f}, Shader.TileMode.CLAMP));
+            }
+            canvas.drawRect(0, from, getMeasuredWidth(), y1, sgFlowPaint);
+        }
 
         private void sgDrawHeaderMelt(Canvas canvas, int y1) {
             if (!SG_MELTS) {
@@ -2853,7 +2889,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         if (Build.VERSION.SDK_INT >= 26 && picture.getConfig() == Bitmap.Config.HARDWARE) {
                             picture = picture.copy(Bitmap.Config.ARGB_8888, false);
                         }
-                        final int tone = sgBannerBottomTone(picture);
+                        sgBannerSmall = Bitmap.createScaledBitmap(picture, 48, Math.max(1, Math.round(48f * picture.getHeight() / Math.max(1, picture.getWidth()))), true);
+                        final float openH = (actionBar != null && actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
+                            + ActionBar.getCurrentActionBarHeight() + getHeaderExtraHeight();
+                        final int tone = sgBannerBottomTone(sgBannerSmall, AndroidUtilities.displaySize.x, openH);
                         if (tone != 0 && tone != sgBannerTone) {
                             sgBannerTone = tone;
                             sgRefreshPageTint();
@@ -13826,34 +13865,63 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final class SgPageTint implements Theme.ResourcesProvider {
         @Override
         public int getColor(int key) {
-            return key == Theme.key_windowBackgroundGray ? sgPageColor() : Theme.getColor(key);
+            if (key == Theme.key_windowBackgroundGray) {
+                return sgPageColor();
+            }
+            // the rest of the profile takes a shade of the page: the cards most, the grey texts, icons and lines a little;
+            // the main text and the accent keep the theme's own (readable as ever)
+            final float amount;
+            if (key == Theme.key_windowBackgroundWhite || key == Theme.key_graySection) {
+                amount = 0.2f;
+            } else if (key == Theme.key_windowBackgroundWhiteGrayText || key == Theme.key_windowBackgroundWhiteGrayText2
+                || key == Theme.key_windowBackgroundWhiteGrayText3 || key == Theme.key_windowBackgroundWhiteGrayIcon
+                || key == Theme.key_divider || key == Theme.key_windowBackgroundWhiteHintText) {
+                amount = 0.22f;
+            } else if (key == Theme.key_listSelector) {
+                amount = 0.3f;
+            } else {
+                return Theme.getColor(key);
+            }
+            final int own = Theme.getColor(key);
+            final int tone = sgHeaderTone();
+            if (tone == 0) {
+                return own;
+            }
+            final boolean dark = ColorUtils.calculateLuminance(Theme.getColor(Theme.key_windowBackgroundGray)) < 0.5f;
+            final float k = key == Theme.key_windowBackgroundWhite || key == Theme.key_graySection ? (dark ? amount : amount * 0.55f) : amount;
+            final int mixed = ColorUtils.blendARGB(own | 0xFF000000, tone, k);
+            return (own & 0xFF000000) | (mixed & 0x00FFFFFF); // the key's own transparency kept
         }
     }
 
     private int sgBannerTone;
+    private Bitmap sgBannerSmall;
 
     private int sgPageColor() {
         final int base = Theme.getColor(Theme.key_windowBackgroundGray);
+        final int tone = sgHeaderTone();
+        // exactly the colour the header ends in, so the header and the page meet with no line between them
+        return tone == 0 ? base : tone;
+    }
+
+    /** The colour the header ends in (its banner's lower edge, or its profile colour), 0 when it has the theme's. */
+    private int sgHeaderTone() {
         int tone = 0;
         if (sgBannerTone != 0 && sgCard != null && sgCard.hasBanner() && com.solegram.messenger.SolegramConfig.profileCards) {
             tone = sgBannerTone; // the banner picture covers the header: the colour of its lower edge
         } else if (topView != null && topView.hasColorById) {
             tone = topView.color1; // the header's gradient ends in its outer colour at the bottom
         }
-        // exactly the colour the header ends in, so the header and the page meet with no line between them
-        return tone == 0 ? base : tone | 0xFF000000;
+        return tone == 0 ? 0 : tone | 0xFF000000;
     }
 
     /**
-     * The colour of the banner picture's lower edge as the header shows it: the picture is drawn centre-cropped into
-     * the open header, so its bottom visible rows are averaged, then darkened as the card's dim darkens the bottom.
+     * The colour of the banner picture's lower edge as the open header shows it: the picture is drawn centre-cropped,
+     * so its bottom visible rows are averaged, then darkened as the card's dim darkens the bottom.
      */
-    private int sgBannerBottomTone(Bitmap b) {
+    private int sgBannerBottomTone(Bitmap b, float areaW, float areaH) {
         final int bw = b.getWidth(), bh = b.getHeight();
         if (bw <= 0 || bh <= 0) return 0;
-        final float areaH = (actionBar != null && actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
-            + ActionBar.getCurrentActionBarHeight() + getHeaderExtraHeight();
-        final float areaW = AndroidUtilities.displaySize.x;
         float visibleH = bh;
         if (areaH > 0 && areaW / areaH > bw / (float) bh) {
             visibleH = bw * areaH / areaW; // a picture taller than the header: its top and bottom are cut off
@@ -13895,6 +13963,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
         if (sharedMediaLayout != null) {
             sharedMediaLayout.invalidate();
+        }
+        if (listView != null && listView.getAdapter() != null && !listView.isComputingLayout()) {
+            listView.getAdapter().notifyDataSetChanged(); // the rows take the shade of the page again
         }
     }
 
