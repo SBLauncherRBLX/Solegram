@@ -10902,6 +10902,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         listView.setAlpha(progress);
 
         listView.setTranslationX(dp(48) - dp(48) * progress);
+        sgPourIntoPill(progress); // Solegram: to and from a chat, the rest of the profile pours into the chat's header pill
 
         int color;
         if (playProfileAnimation == 2 && avatarColor != 0) {
@@ -10970,6 +10971,58 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
 
     boolean profileTransitionInProgress;
+
+    private final int[] sgPillAt = new int[2], sgRootAt = new int[2];
+    private final RectF sgPourRect = new RectF();
+    private boolean sgPoured;
+
+    /**
+     * Solegram: while the profile closes into a chat (or opens from it) the avatar and the name fly to the chat header's
+     * pill by themselves; everything else — the header's colour and banner, the rows, the buttons, the music line, the
+     * gift bubbles — is drawn into that same pill, the way a Dynamic Island takes things in: squeezed towards it (more
+     * in height than in width) and fading at the very end. {@code p}: 1 the profile, 0 the chat.
+     */
+    private void sgPourIntoPill(float p) {
+        final View[] views = {listView, topView, actionsView, musicView, giftsView, giftsView != null ? giftsView.sgFront : null};
+        final ChatAvatarContainer pill = previousTransitionFragment != null ? previousTransitionFragment.getAvatarContainer() : null;
+        final boolean pour = p < 1f && playProfileAnimation != 0 && pill != null && pill.isAttachedToWindow() && fragmentView != null
+            && previousTransitionFragment instanceof ChatActivity && LiteMode.isEnabled(LiteMode.FLAGS_CHAT);
+        if (!pour) {
+            if (sgPoured) {
+                sgPoured = false;
+                for (View v : views) {
+                    if (v != null) {
+                        v.setScaleX(1f);
+                        v.setScaleY(1f);
+                    }
+                }
+                if (giftsView != null) giftsView.setAlpha(1f);
+            }
+            return;
+        }
+        sgPoured = true;
+        // where the pill is, in the profile's own coordinates
+        pill.getLocationInWindow(sgPillAt);
+        fragmentView.getLocationInWindow(sgRootAt);
+        final float tx = sgPillAt[0] - sgRootAt[0] + pill.getWidth() / 2f;
+        final float ty = sgPillAt[1] - sgRootAt[1] + pill.getHeight() / 2f;
+        final float e = CubicBezierInterpolator.EASE_OUT.getInterpolation(p);
+        final float sx = AndroidUtilities.lerp(0.16f, 1f, e), sy = AndroidUtilities.lerp(0.05f, 1f, (float) Math.pow(e, 0.85f));
+        final float fade = Utilities.clamp01((p - 0.04f) / 0.45f);
+        listView.setTranslationX(0); // it pours in, it does not slide
+        for (View v : views) {
+            if (v == null || v.getWidth() <= 0 || !ViewPositionWatcher.computeRectInParent(v, fragmentView, sgPourRect)) {
+                continue;
+            }
+            // the pivot in the view's own coordinates (its left/top without its own translation)
+            v.setPivotX(tx - (sgPourRect.left - v.getTranslationX()));
+            v.setPivotY(ty - (sgPourRect.top - v.getTranslationY()));
+            v.setScaleX(sx);
+            v.setScaleY(sy);
+        }
+        listView.setAlpha(fade);
+        if (giftsView != null) giftsView.setAlpha(fade);
+    }
 
     private float prevAvatarTranslation;
 

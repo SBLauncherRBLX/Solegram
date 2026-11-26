@@ -380,6 +380,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         int bodyColor;
         // the snow: positions and speeds in bubble radii from its centre, and their turn
         final float[] fx = new float[SG_FLAKES], fy = new float[SG_FLAKES], fvx = new float[SG_FLAKES], fvy = new float[SG_FLAKES], fa = new float[SG_FLAKES];
+        // each speck's own place it drifts round; the bubble's usual (slow) acceleration, which the specks ignore
+        final float[] hx = new float[SG_FLAKES], hy = new float[SG_FLAKES];
+        float sax, say;
         boolean snowPlaced;
 
         void copy(SgBubble b) {
@@ -398,6 +401,10 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             System.arraycopy(b.fx, 0, fx, 0, SG_FLAKES);
             System.arraycopy(b.fy, 0, fy, 0, SG_FLAKES);
             System.arraycopy(b.fa, 0, fa, 0, SG_FLAKES);
+            System.arraycopy(b.hx, 0, hx, 0, SG_FLAKES);
+            System.arraycopy(b.hy, 0, hy, 0, SG_FLAKES);
+            sax = b.sax;
+            say = b.say;
         }
 
         /** Stirs the snow up. */
@@ -987,8 +994,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
                     // spread through the whole bubble (they float, they do not lie at the bottom)
                     final double a = sgRandom.nextFloat() * Math.PI * 2;
                     final float rr = (float) Math.sqrt(sgRandom.nextFloat()) * 0.7f;
-                    b.fx[k] = (float) Math.cos(a) * rr;
-                    b.fy[k] = (float) Math.sin(a) * rr;
+                    b.fx[k] = b.hx[k] = (float) Math.cos(a) * rr;
+                    b.fy[k] = b.hy[k] = (float) Math.sin(a) * rr;
                     b.fa[k] = 0;
                 }
             }
@@ -1160,10 +1167,15 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
      * drift again.
      */
     private void sgStepSnow(SgBubble b, float dt, float r) {
-        // in bubble radii per second squared: the bubble's own acceleration pushes them the other way, as the phone's does
+        // in bubble radii per second squared. The bubble always moves (its orbit, its drift): that steady acceleration
+        // would press the specks to one side for good, so only its sudden changes count (a drag, a throw, a bump),
+        // and those only a little; the phone's own shake as well
         final float bubbleAx = (b.vx - b.lastVx) / Math.max(dt, 1e-4f) / r, bubbleAy = (b.vy - b.lastVy) / Math.max(dt, 1e-4f) / r;
-        float ax = -bubbleAx * 0.45f - sgAx * 0.5f;
-        float ay = -bubbleAy * 0.45f - sgAy * 0.5f;
+        final float follow = 1f - (float) Math.exp(-dt / 0.5f);
+        b.sax += (bubbleAx - b.sax) * follow;
+        b.say += (bubbleAy - b.say) * follow;
+        float ax = -(bubbleAx - b.sax) * 0.18f - sgAx * 0.3f;
+        float ay = -(bubbleAy - b.say) * 0.18f - sgAy * 0.3f;
         final float max = 40f;
         ax = Math.max(-max, Math.min(max, ax));
         ay = Math.max(-max, Math.min(max, ay));
@@ -1173,8 +1185,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         for (int k = 0; k < SG_FLAKES; k++) {
             final float ph = sgTime * 0.3f + k * 1.7f + b.phase * 3f;
             final float wx = 0.08f * (float) Math.cos(ph * 0.9f + k), wy = 0.08f * (float) Math.sin(ph * 1.1f + k * 0.6f);
-            b.fvx[k] += ax * dt;
-            b.fvy[k] += ay * dt;
+            // a gentle pull back to its own place, so they stay spread through the bubble
+            b.fvx[k] += (ax + (b.hx[k] - b.fx[k]) * 0.8f) * dt;
+            b.fvy[k] += (ay + (b.hy[k] - b.fy[k]) * 0.8f) * dt;
             b.fvx[k] = wx + (b.fvx[k] - wx) * calm;
             b.fvy[k] = wy + (b.fvy[k] - wy) * calm;
             b.fx[k] += b.fvx[k] * dt;
