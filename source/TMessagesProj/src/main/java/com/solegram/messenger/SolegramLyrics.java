@@ -83,22 +83,26 @@ public final class SolegramLyrics {
     private static final String OVH = "https://api.lyrics.ovh/v1/";
     private static final String AGENT = "Solegram (https://github.com/SBLauncherRBLX/Solegram)";
     private static final String BROWSER = "Mozilla/5.0";
-    private static final Pattern TAG = Pattern.compile("\\[(\\d{1,3}):(\\d{1,2})(?:[.:](\\d{1,3}))?]");
-    private static final Pattern ANY_TAG = Pattern.compile("\\[[^\\]]*]");
-    private static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
-    private static final Pattern EXTENSION = Pattern.compile("\\.(mp3|m4a|flac|ogg|opus|wav|aac|wma)$", FLAGS);
-    private static final Pattern TRACK_NUMBER = Pattern.compile("^\\d{1,3}\\s*[.\\-_)]\\s*");
-    private static final Pattern JUNK = Pattern.compile("\\s*[(\\[]\\s*(?:official|lyric|lyrics|audio|video|music video|clip|клип|премьера|hd|hq|4k|mv|visuali[sz]er|explicit|clean|prod\\.?|remaster|remastered|bonus|текст)[^)\\]]*[)\\]]", FLAGS);
-    private static final Pattern FEAT = Pattern.compile("\\s*[(\\[]?\\s*(?:feat\\.?|ft\\.?|featuring|при уч\\.?)\\s+[^)\\]]*[)\\]]?", FLAGS);
-    private static final Pattern TAIL = Pattern.compile("\\s+-\\s+(?:(?:\\d{4}\\s+)?remaster(?:ed)?|radio edit|single version|original mix).*$", FLAGS);
-    private static final Pattern BRACKETS = Pattern.compile("\\s*[(\\[][^)\\]]*[)\\]]");
-    private static final Pattern ARTIST_SPLIT = Pattern.compile("\\s*(?:,|&|;|/|\\bfeat\\.?|\\bft\\.?|\\bfeaturing\\b|\\bx\\b|\\bх\\b|\\bvs\\.?)\\s*", FLAGS | Pattern.UNICODE_CHARACTER_CLASS);
-    private static final Pattern NOT_LETTER = Pattern.compile("[^\\p{L}\\p{Nd}]");
     /** NetEase credit lines («作词 : …», «制作人 : …»). */
-    private static final Pattern CREDIT = Pattern.compile("^\\s*[^:：]{0,24}[\\u4e00-\\u9fff][^:：]{0,24}[:：]");
     private static final String CYRILLIC = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяіїєґ";
     private static final String[] LATIN = {"a", "b", "v", "g", "d", "e", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p", "r",
             "s", "t", "u", "f", "kh", "ts", "ch", "sh", "shch", "", "y", "", "e", "yu", "ya", "i", "yi", "ye", "g"};
+
+    /** Patterns apart: if one ever fails on a device it fails the lookup (caught there), not the player. */
+    private static final class Rx {
+        static final Pattern TAG = Pattern.compile("\\[(\\d{1,3}):(\\d{1,2})(?:[.:](\\d{1,3}))?]");
+        static final Pattern ANY_TAG = Pattern.compile("\\[[^\\]]*]");
+        static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
+        static final Pattern EXTENSION = Pattern.compile("\\.(mp3|m4a|flac|ogg|opus|wav|aac|wma)$", FLAGS);
+        static final Pattern TRACK_NUMBER = Pattern.compile("^\\d{1,3}\\s*[.\\-_)]\\s*");
+        static final Pattern JUNK = Pattern.compile("\\s*[(\\[]\\s*(?:official|lyric|lyrics|audio|video|music video|clip|клип|премьера|hd|hq|4k|mv|visuali[sz]er|explicit|clean|prod\\.?|remaster|remastered|bonus|текст)[^)\\]]*[)\\]]", FLAGS);
+        static final Pattern FEAT = Pattern.compile("\\s*[(\\[]?\\s*(?:feat\\.?|ft\\.?|featuring|при уч\\.?)\\s+[^)\\]]*[)\\]]?", FLAGS);
+        static final Pattern TAIL = Pattern.compile("\\s+-\\s+(?:(?:\\d{4}\\s+)?remaster(?:ed)?|radio edit|single version|original mix).*$", FLAGS);
+        static final Pattern BRACKETS = Pattern.compile("\\s*[(\\[][^)\\]]*[)\\]]");
+        static final Pattern ARTIST_SPLIT = Pattern.compile("\\s*(?:,|&|;|/|\\bfeat\\.?|\\bft\\.?|\\bfeaturing\\b|\\bx\\b|\\bх\\b|\\bvs\\.?)\\s*", FLAGS); // Android: \b and \w are Unicode already, UNICODE_CHARACTER_CLASS throws
+        static final Pattern NOT_LETTER = Pattern.compile("[^\\p{L}\\p{Nd}]");
+        static final Pattern CREDIT = Pattern.compile("^\\s*[^:：]{0,24}[\\u4e00-\\u9fff][^:：]{0,24}[:：]");
+    }
 
     /** Results by track (null value: looked up, nothing found). */
     private static final HashMap<String, Lyrics> cache = new HashMap<>();
@@ -153,11 +157,11 @@ public final class SolegramLyrics {
     // ------------------------------------------------------------------ matching
 
     static String cleanTitle(String t) {
-        t = EXTENSION.matcher(t.trim()).replaceAll("").trim();
-        t = TRACK_NUMBER.matcher(t).replaceAll("");
-        t = JUNK.matcher(t).replaceAll("");
-        t = FEAT.matcher(t).replaceAll("");
-        t = TAIL.matcher(t).replaceAll("");
+        t = Rx.EXTENSION.matcher(t.trim()).replaceAll("").trim();
+        t = Rx.TRACK_NUMBER.matcher(t).replaceAll("");
+        t = Rx.JUNK.matcher(t).replaceAll("");
+        t = Rx.FEAT.matcher(t).replaceAll("");
+        t = Rx.TAIL.matcher(t).replaceAll("");
         t = t.replaceAll("\\s+", " ").trim();
         int a = 0, b = t.length();
         while (a < b && " -_".indexOf(t.charAt(a)) >= 0) a++;
@@ -170,7 +174,7 @@ public final class SolegramLyrics {
         if (a == null) {
             return out;
         }
-        for (String x : ARTIST_SPLIT.split(a)) {
+        for (String x : Rx.ARTIST_SPLIT.split(a)) {
             x = x.trim();
             if (!x.isEmpty()) {
                 out.add(x);
@@ -193,11 +197,11 @@ public final class SolegramLyrics {
             }
         }
         s = b.toString().replace('j', 'y').replace("x", "ks").replace("h", "");
-        return NOT_LETTER.matcher(s).replaceAll("");
+        return Rx.NOT_LETTER.matcher(s).replaceAll("");
     }
 
     private static String bare(String t) {
-        final String b = BRACKETS.matcher(t).replaceAll("").trim();
+        final String b = Rx.BRACKETS.matcher(t).replaceAll("").trim();
         return b.isEmpty() ? t : b;
     }
 
@@ -473,7 +477,7 @@ public final class SolegramLyrics {
         final String[] rows = text.split("\n");
         boolean timed = false;
         for (String raw : rows) {
-            final Matcher m = TAG.matcher(raw);
+            final Matcher m = Rx.TAG.matcher(raw);
             if (m.find() && m.start() == 0) {
                 timed = true;
                 break;
@@ -482,7 +486,7 @@ public final class SolegramLyrics {
         if (timed) {
             l.synced = true;
             for (String raw : rows) {
-                final Matcher m = TAG.matcher(raw);
+                final Matcher m = Rx.TAG.matcher(raw);
                 final ArrayList<Long> times = new ArrayList<>();
                 int end = 0;
                 while (m.find() && m.start() == end) {
@@ -497,7 +501,7 @@ public final class SolegramLyrics {
                     end = m.end();
                 }
                 final String line = raw.substring(end).trim();
-                if (dropCredits && CREDIT.matcher(line).find()) {
+                if (dropCredits && Rx.CREDIT.matcher(line).find()) {
                     continue;
                 }
                 for (long t : times) {
@@ -511,8 +515,8 @@ public final class SolegramLyrics {
             }
         } else {
             for (String raw : rows) {
-                final String line = ANY_TAG.matcher(raw).replaceAll("").trim();
-                if (dropCredits && CREDIT.matcher(line).find()) {
+                final String line = Rx.ANY_TAG.matcher(raw).replaceAll("").trim();
+                if (dropCredits && Rx.CREDIT.matcher(line).find()) {
                     continue;
                 }
                 l.lines.add(new Line(-1, line));

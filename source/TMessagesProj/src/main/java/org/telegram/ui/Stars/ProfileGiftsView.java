@@ -289,7 +289,56 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             return sgTone != 0 ? sgTone : color;
         }
 
+        /** Solegram: the gift's emoji (the sticker's own one, e.g. 🧸 for a bear), drawn small inside its bubble. */
+        private android.graphics.drawable.Drawable sgEmoji;
+        private int sgEmojiTries;
+
+        android.graphics.drawable.Drawable sgEmoji() {
+            if (sgEmoji != null || sgEmojiTries >= 400) {
+                return sgEmoji;
+            }
+            sgEmojiTries++;
+            try {
+                TLRPC.Document doc = document;
+                if (doc == null && emojiDrawable != null) {
+                    doc = emojiDrawable.getDocument();
+                }
+                if (doc == null && sgEmojiTries < 400) {
+                    return null; // the collectible's sticker is not here yet: ask again on a later frame
+                }
+                String e = org.telegram.messenger.MessageObject.findAnimatedEmojiEmoticon(doc, null);
+                android.graphics.drawable.Drawable d = sgEmojiOf(e);
+                if (d == null && e != null) {
+                    d = sgEmojiOf(e.replace("\uFE0F", ""));
+                }
+                if (d == null) {
+                    d = sgEmojiOf("\u2728");
+                }
+                sgEmoji = d;
+                sgEmojiTries = 400;
+            } catch (Throwable t) {
+                sgEmojiTries = 400;
+            }
+            return sgEmoji;
+        }
+
+        private android.graphics.drawable.Drawable sgEmojiOf(String e) {
+            if (android.text.TextUtils.isEmpty(e)) {
+                return null;
+            }
+            // the first emoji of the text (a sticker may carry several)
+            final CharSequence one = org.telegram.messenger.Emoji.fullyConsistsOfEmojis(e) ? e : null;
+            android.graphics.drawable.Drawable d = one != null ? org.telegram.messenger.Emoji.getEmojiDrawable(one) : null;
+            if (d == null) {
+                final int n = Character.charCount(e.codePointAt(0));
+                d = org.telegram.messenger.Emoji.getEmojiDrawable(e.substring(0, n));
+            }
+            return d;
+        }
+
         public void copy(Gift b) {
+            sgEmoji = b.sgEmoji;
+            sgEmojiTries = b.sgEmojiTries;
             sgTone = b.sgTone;
             sgToneTries = b.sgToneTries;
             gradient = b.gradient;
@@ -1544,17 +1593,34 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgFill.setShader(b.body);
         sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.95f + 0.2f * flash)));
         canvas.drawPaint(sgFill);
-        // the light specks floating in the jelly (solid dots, twinkling a little)
+        // the gift's emoji floating small in the jelly (tiny like specks; a little bigger while the bubble is held),
+        // each slowly swaying; light specks until the emoji is known
         {
+            final android.graphics.drawable.Drawable emoji = gift.sgEmoji();
+            final float held = Math.max(0f, Math.min(1f, (b.inflate - 1f) / 0.9f));
             final int speck = androidx.core.graphics.ColorUtils.blendARGB(light, 0xFFFFFFFF, 0.65f);
             sgFill.setShader(null);
             for (int i = 0; i < SG_FLAKES; i++) {
                 final float fx = cx + b.fx[i] * shapeR, fy = cy + b.fy[i] * shapeR;
-                // small, solid, no halo round them
-                final float size = dp(0.45f + 0.55f * ((i * 37) % 10) / 10f) * k;
                 final float tw = 0.7f + 0.3f * (float) Math.sin(sgTime * 1.6f + i * 2.1f + b.phase);
-                sgFill.setColor(Theme.multAlpha(speck, 0.9f * tw * alpha));
-                canvas.drawCircle(fx, fy, size, sgFill);
+                if (emoji != null) {
+                    // r already grows with the swelling; on top of that the emoji get a bit bigger themselves
+                    final float half = dp(1.6f + 0.7f * ((i * 37) % 10) / 10f) * k * (1f + 0.45f * held);
+                    final float tilt = 14f * (float) Math.sin(sgTime * 0.7f + i * 1.3f + b.phase * 2f);
+                    canvas.save();
+                    canvas.rotate(tilt, fx, fy);
+                    emoji.setBounds((int) (fx - half), (int) (fy - half), (int) (fx + half), (int) (fy + half));
+                    emoji.setAlpha((int) (0xFF * Math.min(1f, (0.8f + 0.2f * tw) * alpha)));
+                    emoji.draw(canvas);
+                    canvas.restore();
+                } else {
+                    final float size = dp(0.45f + 0.55f * ((i * 37) % 10) / 10f) * k;
+                    sgFill.setColor(Theme.multAlpha(speck, 0.9f * tw * alpha));
+                    canvas.drawCircle(fx, fy, size, sgFill);
+                }
+            }
+            if (emoji != null) {
+                emoji.setAlpha(0xFF);
             }
         }
         // the liquid near the edge: streaks of light and of shifted hue that flow round the rim (two layers turning
