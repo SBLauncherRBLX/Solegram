@@ -260,6 +260,12 @@ public class GlassEngine {
         scrollGenerationId++;
     }
 
+    /** Solegram: the colours this glass takes from its screen changed without a theme change (a profile's own colour). */
+    public void invalidateThemed() {
+        lastThemeGenerationId = Long.MIN_VALUE;
+        otherGenerationId++;
+    }
+
     private long lastScrollGenerationId;
 
     private long lastScrollEdgesGenerationId;

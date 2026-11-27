@@ -3407,7 +3407,8 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         BulletinFactory.of(this).createSimpleBulletin(R.raw.ic_save_to_gallery, getString(R.string.SG_ShotTaken),
-            getString(R.string.SG_ShotTakenInfo), getString(R.string.SG_ShotCustomize), this::solegramOpenShotEditor).show();
+            getString(R.string.SG_ShotTakenInfo), getString(R.string.SG_ShotCustomize), this::solegramOpenShotEditor)
+            .show(true); // from the top, right under the lowest of the chat's top panels (header pill, pinned, …)
     }
 
     @androidx.annotation.RequiresApi(34)

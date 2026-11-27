@@ -331,6 +331,38 @@ public class ViewPagerFixed extends FrameLayout {
     private final Runnable solegramSettleRunnable = this::solegramSettle;
 
     /**
+     * Solegram: goes to a page whatever state the pager was left in. A scroll that can't start (an animator left over
+     * that still says it goes there, a drag that never ended) used to leave the old page on screen until the app was
+     * opened again; then the page is simply put there without the slide.
+     */
+    public void solegramGoTo(int page) {
+        if (adapter == null || page < 0 || page >= adapter.getItemCount()) {
+            return;
+        }
+        solegramSettle();
+        if (scrollToPosition(page)) {
+            return;
+        }
+        if (manualScrolling != null && manualScrolling.isRunning() && nextPosition == page) {
+            return; // already sliding there
+        }
+        if (currentPosition == page && viewPages[0] != null && viewTypes[0] == adapter.getItemViewType(page)
+                && viewPages[0].getTranslationX() == 0f && viewPages[1] == null) {
+            return; // already there
+        }
+        solegramForceIdle();
+        final int was = currentPosition;
+        if (was != page) {
+            currentPosition = page;
+            onTabPageSelected(page, was < page);
+        }
+        solegramSettle(); // binds the page for the new current position and tells the screen
+        if (viewPages[0] != null) {
+            onItemSelected(viewPages[0], viewPages[0], currentPosition, was);
+        }
+    }
+
+    /**
      * Solegram: puts the pager at rest when no scroll is running: one page, not shifted. A page transition that was
      * cut short (the pages' views rebuilt after a theme or interface change) left two half-shifted pages on screen
      * until the app was restarted.
@@ -376,6 +408,21 @@ public class ViewPagerFixed extends FrameLayout {
         if (viewPages[0] != null && viewPages[0].getTranslationX() != 0f) {
             setTranslationX(viewPages[0], 0);
             changed = true;
+        }
+        // the page on screen must be the one the pager says is current (the tabs showed «Chats» while the profile
+        // stayed on screen, and a tap on «Chats» then only scrolled the profile up)
+        if (adapter != null && currentPosition >= 0 && currentPosition < adapter.getItemCount()) {
+            if (viewPages[0] == null || viewTypes[0] != adapter.getItemViewType(currentPosition)) {
+                updateViewForIndex(0);
+                if (viewPages[0] != null) {
+                    setTranslationX(viewPages[0], 0);
+                }
+                changed = true;
+            }
+            if (viewPages[0] != null && viewPages[0].getVisibility() != View.VISIBLE) {
+                viewPages[0].setVisibility(View.VISIBLE);
+                changed = true;
+            }
         }
         if (changed) {
             currentProgress = 1f;

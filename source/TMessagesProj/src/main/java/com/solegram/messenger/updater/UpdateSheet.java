@@ -66,9 +66,13 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(0, AndroidUtilities.dp(20), 0, AndroidUtilities.dp(8));
-        addTop(resourcesProvider, context, layout, LocaleController.getString(R.string.SG_UpdateAvailable),
+        // a phone on its side has no height for all of it in one column: the notes go to the right
+        final boolean land = landscape();
+        final LinearLayout left = land ? column(context) : layout;
+        final LinearLayout right = land ? column(context) : layout;
+        addTop(resourcesProvider, context, left, right, LocaleController.getString(R.string.SG_UpdateAvailable),
             LocaleController.formatString(R.string.SG_UpdateVersionLine, info.versionName, info.build, AndroidUtilities.formatFileSize(info.size), Solegram.getVersionName()),
-            info.changelog);
+            info.changelog, land);
 
         button = new ButtonWithCounterView(context, resourcesProvider) {
             // the download fills the button from the left; the fill glides between the progress updates
@@ -94,7 +98,7 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
             }
         };
         button.setOnClickListener(v -> onButton());
-        layout.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 20, 16, 0));
+        left.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, land ? 16 : 20, 16, 0));
 
         // the other ways out: quiet text buttons in the accent, rounded like the main one
         final LinearLayout secondary = new LinearLayout(context);
@@ -105,11 +109,14 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
 
         laterButton = textButton(resourcesProvider, context, LocaleController.getString(R.string.SG_SkipVersion));
         secondary.addView(laterButton, LayoutHelper.createLinear(0, 44, 1f, 8, 0, 0, 0));
-        layout.addView(secondary, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 8, 16, 0));
+        left.addView(secondary, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 8, 16, 0));
         laterButton.setOnClickListener(v -> {
             UpdateController.getInstance().skip(info);
             dismiss();
         });
+        if (land) {
+            layout.addView(row(context, left, right), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        }
 
         setCustomView(layout);
         solegramReadingGlass(); // release notes are read: a denser glass than other sheets
@@ -119,7 +126,27 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
     // region Shared look (the update prompt and the notes of an installed update)
 
     /** The app's icon, a title, a line under it and the release notes in a soft card. */
-    private static void addTop(Theme.ResourcesProvider rp, Context context, LinearLayout layout, String titleText, String subtitleText, String notes) {
+    /** A phone (not a tablet) on its side: the screen is low. */
+    private static boolean landscape() {
+        return !AndroidUtilities.isTabletByScreen() && AndroidUtilities.displaySize.x > AndroidUtilities.displaySize.y;
+    }
+
+    private static LinearLayout column(Context context) {
+        final LinearLayout l = new LinearLayout(context);
+        l.setOrientation(LinearLayout.VERTICAL);
+        return l;
+    }
+
+    /** The two columns side by side: the app and the buttons on the left, the notes on the right. */
+    private static LinearLayout row(Context context, LinearLayout left, LinearLayout right) {
+        final LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.addView(left, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER_VERTICAL));
+        row.addView(right, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1.25f, Gravity.TOP));
+        return row;
+    }
+
+    private static void addTop(Theme.ResourcesProvider rp, Context context, LinearLayout layout, LinearLayout notesLayout, String titleText, String subtitleText, String notes, boolean land) {
         ImageView logo = new ImageView(context);
         Drawable bg = ContextCompat.getDrawable(context, R.drawable.sg_icon_bg_sunset);
         Drawable fg = ContextCompat.getDrawable(context, R.drawable.sg_icon_fg_sunset);
@@ -132,7 +159,8 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         });
         logo.setClipToOutline(true);
         logo.setElevation(AndroidUtilities.dp(2));
-        layout.addView(logo, LayoutHelper.createLinear(68, 68, Gravity.CENTER_HORIZONTAL, 0, 2, 0, 0));
+        final int logoSize = land ? 52 : 68;
+        layout.addView(logo, LayoutHelper.createLinear(logoSize, logoSize, Gravity.CENTER_HORIZONTAL, 0, 2, 0, 0));
 
         TextView title = new TextView(context);
         title.setText(titleText);
@@ -140,7 +168,7 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         title.setTypeface(AndroidUtilities.bold());
         title.setGravity(Gravity.CENTER);
         title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, rp));
-        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, 14, 24, 0));
+        layout.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 24, land ? 10 : 14, 24, 0));
 
         TextView subtitle = new TextView(context);
         subtitle.setText(subtitleText);
@@ -158,12 +186,16 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         header.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         header.setTypeface(AndroidUtilities.bold());
         header.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueHeader, rp));
-        layout.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 22, 20, 22, 8));
+        notesLayout.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, land ? 6 : 22, land ? 0 : 20, 22, 8));
 
         ScrollView scroll = new ScrollView(context) {
             @Override
             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(260), MeasureSpec.AT_MOST));
+                // on its side the notes take the height the left column has, as much as the screen allows
+                final int max = landscape()
+                    ? Math.max(AndroidUtilities.dp(120), Math.min(AndroidUtilities.dp(340), AndroidUtilities.displaySize.y - AndroidUtilities.dp(110)))
+                    : AndroidUtilities.dp(260);
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(max, MeasureSpec.AT_MOST));
             }
         };
         scroll.setVerticalScrollBarEnabled(false);
@@ -179,7 +211,7 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         changelog.setTextIsSelectable(true);
         changelog.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
         scroll.addView(changelog);
-        layout.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 16, 0, 16, 0));
+        notesLayout.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, land ? 0 : 16, 0, 16, 0));
     }
 
     private static TextView textButton(Theme.ResourcesProvider rp, Context context, String text) {
@@ -244,12 +276,18 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(0, AndroidUtilities.dp(20), 0, AndroidUtilities.dp(16));
-        addTop(fragment.getResourceProvider(), context, layout, LocaleController.formatString(R.string.SG_UpdatedTo, version),
-            LocaleController.getString(R.string.SG_UpdatedNotesSub), changelog);
+        final boolean land = landscape() && !TextUtils.isEmpty(changelog);
+        final LinearLayout left = land ? column(context) : layout;
+        final LinearLayout right = land ? column(context) : layout;
+        addTop(fragment.getResourceProvider(), context, left, right, LocaleController.formatString(R.string.SG_UpdatedTo, version),
+            LocaleController.getString(R.string.SG_UpdatedNotesSub), changelog, land);
         final com.solegram.messenger.ui.SolegramProfileLinksSheet.ActionButton ok = new com.solegram.messenger.ui.SolegramProfileLinksSheet.ActionButton(context, fragment.getResourceProvider());
         ok.setText(LocaleController.getString(R.string.GotIt), false);
         ok.setOnClickListener(v -> sheet.dismiss());
-        layout.addView(ok, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 20, 16, 0));
+        left.addView(ok, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 16, 20, 16, 0));
+        if (land) {
+            layout.addView(row(context, left, right), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        }
         sheet.setCustomView(layout);
         sheet.solegramReadingGlass(); // notes to read: the denser glass of the update sheet
         fragment.showDialog(sheet);

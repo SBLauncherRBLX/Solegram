@@ -1552,6 +1552,15 @@ public abstract class BaseFragment {
 
     private @Nullable BaseFragmentSimpleGlass simpleGlass;
 
+    /** Solegram: re-reads the colours of this screen's glass (its pills, the colour under them) and redraws them. */
+    public void solegramRefreshGlassColors() {
+        glassEngine.invalidateThemed();
+        if (fragmentView != null) {
+            fragmentView.invalidate();
+            AndroidUtilities.forEachViews(fragmentView, View::invalidate);
+        }
+    }
+
     protected BaseFragmentSimpleGlass getBaseSimpleGlass() {
         if (simpleGlass == null) {
             simpleGlass = new BaseFragmentSimpleGlass(glassEngine, () -> getThemedColor(Theme.key_windowBackgroundGray));

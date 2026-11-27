@@ -14027,6 +14027,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (topView != null) {
             topView.invalidate();
         }
+        // the glass over the page (the header's pills here, the tabs' bar of the main screen) took the page's colour
+        // when it was made: it reads it again now, not only after the profile is opened anew
+        solegramRefreshGlassColors();
+        if (getParentLayout() != null && getParentLayout().getFragmentStack() != null) {
+            for (BaseFragment f : getParentLayout().getFragmentStack()) {
+                if (f instanceof MainTabsActivity) {
+                    f.solegramRefreshGlassColors();
+                }
+            }
+        }
         if (actionsView != null) {
             actionsView.invalidate();
         }

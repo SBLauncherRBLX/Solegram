@@ -415,7 +415,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 }
 
                 selectTab(position, true);
-                viewPager.scrollToPosition(position);
+                viewPager.solegramGoTo(position);
             });
 
             tabs[index].setIconOnly(DialogsActivity.MAIN_TABS_COMPACT); // Solegram: no labels on the small bar
@@ -572,7 +572,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         }
         if (viewPager.getCurrentPosition() != POSITION_CHATS) {
             selectTab(POSITION_CHATS, true);
-            viewPager.scrollToPosition(POSITION_CHATS);
+            viewPager.solegramGoTo(POSITION_CHATS);
             AndroidUtilities.runOnUIThread(() -> {
                 if (dialogsActivity != null) {
                     dialogsActivity.solegramOpenSearch();
@@ -835,7 +835,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             }
             pendingFolderId = folderId;
             selectTab(POSITION_CHATS, true);
-            viewPager.scrollToPosition(POSITION_CHATS);
+            viewPager.solegramGoTo(POSITION_CHATS);
         }
     }
 
@@ -1070,7 +1070,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             final int startPosition = getStartPosition();
             if (viewPager.getCurrentPosition() != startPosition) {
                 if (invoked) {
-                    viewPager.scrollToPosition(startPosition);
+                    viewPager.solegramGoTo(startPosition);
                 }
                 return false;
             }
@@ -1297,7 +1297,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             if (POSITION_CALLS_OR_SETTINGS < 0) {
                 // Solegram: an own layout has no shared Calls/Settings page
             } else if (viewPager != null && viewPager.getCurrentPosition() == POSITION_CALLS_OR_SETTINGS) {
-                viewPager.scrollToPosition(POSITION_CHATS);
+                viewPager.solegramGoTo(POSITION_CHATS);
                 selectTab(POSITION_CHATS, true);
                 dropCallsFragmentAfterPageScroll = true;
             } else {
