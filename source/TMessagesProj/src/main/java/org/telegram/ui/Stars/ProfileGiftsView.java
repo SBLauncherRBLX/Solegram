@@ -289,56 +289,11 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             return sgTone != 0 ? sgTone : color;
         }
 
-        /** Solegram: the gift's emoji (the sticker's own one, e.g. 🧸 for a bear), drawn small inside its bubble. */
-        private android.graphics.drawable.Drawable sgEmoji;
-        private int sgEmojiTries;
-
-        android.graphics.drawable.Drawable sgEmoji() {
-            if (sgEmoji != null || sgEmojiTries >= 400) {
-                return sgEmoji;
-            }
-            sgEmojiTries++;
-            try {
-                TLRPC.Document doc = document;
-                if (doc == null && emojiDrawable != null) {
-                    doc = emojiDrawable.getDocument();
-                }
-                if (doc == null && sgEmojiTries < 400) {
-                    return null; // the collectible's sticker is not here yet: ask again on a later frame
-                }
-                String e = org.telegram.messenger.MessageObject.findAnimatedEmojiEmoticon(doc, null);
-                android.graphics.drawable.Drawable d = sgEmojiOf(e);
-                if (d == null && e != null) {
-                    d = sgEmojiOf(e.replace("\uFE0F", ""));
-                }
-                if (d == null) {
-                    d = sgEmojiOf("\u2728");
-                }
-                sgEmoji = d;
-                sgEmojiTries = 400;
-            } catch (Throwable t) {
-                sgEmojiTries = 400;
-            }
-            return sgEmoji;
-        }
-
-        private android.graphics.drawable.Drawable sgEmojiOf(String e) {
-            if (android.text.TextUtils.isEmpty(e)) {
-                return null;
-            }
-            // the first emoji of the text (a sticker may carry several)
-            final CharSequence one = org.telegram.messenger.Emoji.fullyConsistsOfEmojis(e) ? e : null;
-            android.graphics.drawable.Drawable d = one != null ? org.telegram.messenger.Emoji.getEmojiDrawable(one) : null;
-            if (d == null) {
-                final int n = Character.charCount(e.codePointAt(0));
-                d = org.telegram.messenger.Emoji.getEmojiDrawable(e.substring(0, n));
-            }
-            return d;
-        }
+        /** Solegram: the tint last put on the pattern symbol (the bubble's colour). */
+        int sgPatternTint;
 
         public void copy(Gift b) {
-            sgEmoji = b.sgEmoji;
-            sgEmojiTries = b.sgEmojiTries;
+            sgPatternTint = b.sgPatternTint;
             sgTone = b.sgTone;
             sgToneTries = b.sgToneTries;
             gradient = b.gradient;
@@ -1404,10 +1359,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         }
         final int avg = 0xFF000000 | ((int) (r / total) << 16) | ((int) (g / total) << 8) | (int) (bl / total);
         android.graphics.Color.colorToHSV(avg, hsv);
-        if (hsv[1] > 0.1f) {
-            hsv[1] = Math.min(1f, hsv[1] * 1.25f + 0.08f);
-        }
-        hsv[2] = Math.max(hsv[2], 0.82f);
+        // a little muted (the owner found them too saturated): saturation kept as it is, at most 0.8
+        hsv[1] = Math.min(0.8f, hsv[1]);
+        hsv[2] = Math.min(0.92f, Math.max(hsv[2], 0.76f));
         return android.graphics.Color.HSVToColor(hsv);
     }
 
@@ -1416,9 +1370,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         final float[] hsv = new float[3];
         android.graphics.Color.colorToHSV(color | 0xFF000000, hsv);
         if (hsv[1] > 0.08f) {
-            hsv[1] = Math.min(1f, hsv[1] * 1.55f + 0.18f);
+            hsv[1] = Math.min(0.78f, hsv[1] * 1.15f + 0.05f);
         }
-        hsv[2] = Math.max(hsv[2], 0.62f);
+        hsv[2] = Math.min(0.9f, Math.max(hsv[2], 0.6f));
         return android.graphics.Color.HSVToColor(hsv);
     }
 
@@ -1593,10 +1547,18 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         sgFill.setShader(b.body);
         sgFill.setAlpha((int) (0xFF * alpha * Math.min(1f, 0.95f + 0.2f * flash)));
         canvas.drawPaint(sgFill);
-        // the gift's emoji floating small in the jelly (tiny like specks; a little bigger while the bubble is held),
-        // each slowly swaying; light specks until the emoji is known
+        // the gift's symbol (its pattern emoji, the kind a profile background takes) floating small in the jelly,
+        // one colour = the gift's own, lighter so it shows on the jelly; tiny like specks, a little bigger while the
+        // bubble is held, each slowly swaying; light specks when the gift has no symbol
         {
-            final android.graphics.drawable.Drawable emoji = gift.sgEmoji();
+            final AnimatedEmojiDrawable emoji = gift.sgPattern;
+            if (emoji != null) {
+                final int tint = androidx.core.graphics.ColorUtils.blendARGB(rich, 0xFFFFFFFF, 0.32f);
+                if (gift.sgPatternTint != tint) {
+                    gift.sgPatternTint = tint;
+                    emoji.setColorFilter(new android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_IN));
+                }
+            }
             final float held = Math.max(0f, Math.min(1f, (b.inflate - 1f) / 0.9f));
             final int speck = androidx.core.graphics.ColorUtils.blendARGB(light, 0xFFFFFFFF, 0.65f);
             sgFill.setShader(null);
