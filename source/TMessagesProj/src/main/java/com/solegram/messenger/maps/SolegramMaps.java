@@ -64,10 +64,28 @@ public final class SolegramMaps {
 
     public static boolean useOsm() {
         final int engine = SolegramConfig.mapEngine;
-        // Google's map needs an API key registered for this app; the one in the manifest is Telegram's own, which Google
-        // only serves to Telegram — so Google's tiles barely load here. «Auto» therefore means OpenStreetMap; Google stays
-        // a choice for whoever wants it.
-        return engine == ENGINE_OSM || engine == ENGINE_AUTO;
+        // Google's map needs an API key registered for this app (Telegram's own key is served only to Telegram). With our
+        // key in the build «Auto» is Google where Google's services are; without it, or without the services, OpenStreetMap.
+        return engine == ENGINE_OSM || engine == ENGINE_AUTO && !(hasGoogleKey() && hasGoogleServices());
+    }
+
+    private static Boolean googleKey;
+
+    /** The build carries a Google Maps key of its own (from local.properties at build time). */
+    public static boolean hasGoogleKey() {
+        if (googleKey == null) {
+            boolean ok = false;
+            try {
+                final android.content.Context c = ApplicationLoader.applicationContext;
+                final android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(c.getPackageName(), PackageManager.GET_META_DATA);
+                final String key = ai.metaData != null ? ai.metaData.getString("com.google.android.maps.v2.API_KEY") : null;
+                ok = key != null && key.startsWith("AIza") && key.length() > 30;
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            googleKey = ok;
+        }
+        return googleKey;
     }
 
     public static boolean hasGoogleServices() {

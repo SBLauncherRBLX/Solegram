@@ -189,6 +189,9 @@ android {
         ndkVersion "27.2.12479018"
 
         multiDexEnabled true
+        // Solegram: our own Google Maps key (Maps SDK for Android, restricted to this package and our certificate),
+        // from local.properties only, never in git. Empty: Google's map can't load and «Auto» uses OpenStreetMap.
+        manifestPlaceholders = [solegramMapsKey: solegramProp("SOLEGRAM_MAPS_API_KEY", "")]
 
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 
