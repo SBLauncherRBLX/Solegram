@@ -1302,6 +1302,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (!animated) {
                 color1Animated.set(color1, true);
                 color2Animated.set(color2, true);
+                hasColorAnimated.set(hasColorById, true);
             }
             invalidate();
         }
@@ -12891,7 +12892,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 final MessagesController.PeerColors peerColors = MessagesController.getInstance(currentAccount).profilePeerColors;
                 peerColor = peerColors == null ? null : peerColors.getColor(colorId);
             }
-            if (wasPeerColor != peerColor) {
+            if (!sgSamePeerColor(wasPeerColor, peerColor)) {
                 updatedPeerColor();
             }
             if (topView != null) {
@@ -13159,7 +13160,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 MessagesController.PeerColors peerColors = MessagesController.getInstance(currentAccount).profilePeerColors;
                 peerColor = peerColors == null ? null : peerColors.getColor(colorId);
             }
-            if (wasPeerColor != peerColor) {
+            if (!sgSamePeerColor(wasPeerColor, peerColor)) {
                 updatedPeerColor();
             }
             if (topView != null) {
@@ -13428,7 +13429,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private void updatedPeerColor() {
         adaptedColors.clear();
         if (topView != null) {
-            topView.setBackgroundColorId(peerColor, true);
+            // Solegram: at once, as everything else on the page changes (the page, cards, buttons, glass): an animated
+            // header showed the old colour for a while next to the new page
+            topView.setBackgroundColorId(peerColor, false);
         }
         sgRefreshPageTint();
         if (onlineTextView != null) {
@@ -14000,10 +14003,48 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return tone;
     }
 
+    /** The same colours (Solegram's own colours come as a new object on every profile update). */
+    private static boolean sgSamePeerColor(MessagesController.PeerColor a, MessagesController.PeerColor b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.id == b.id && a.patternColor == b.patternColor
+            && a.getBgColor1(false) == b.getBgColor1(false) && a.getBgColor2(false) == b.getBgColor2(false)
+            && a.getBgColor1(true) == b.getBgColor1(true) && a.getBgColor2(true) == b.getBgColor2(true)
+            && a.getColor1() == b.getColor1() && a.getColor2() == b.getColor2() && a.getColor3() == b.getColor3();
+    }
+
+    private boolean sgPageTintPosted;
+
     /** The header's fill changed (colour, banner): the page's background follows. */
     private void sgRefreshPageTint() {
         if (!(resourcesProvider instanceof SgPageTint)) {
             return;
+        }
+        if (topView != null) {
+            topView.invalidate();
+        }
+        if (actionsView != null) {
+            actionsView.invalidate();
+        }
+        if (musicView != null) {
+            musicView.invalidate();
+        }
+        if (giftsView != null) {
+            giftsView.invalidate();
+        }
+        if (listView != null && listView.isComputingLayout()) {
+            // the rows can't be re-bound in the middle of a layout: right after it, not never
+            if (!sgPageTintPosted) {
+                sgPageTintPosted = true;
+                listView.post(() -> {
+                    sgPageTintPosted = false;
+                    sgRefreshPageTint();
+                });
+            }
         }
         if (listView != null) {
             ThemeBind.backgroundColor(listView, Theme.key_windowBackgroundGray, resourcesProvider);

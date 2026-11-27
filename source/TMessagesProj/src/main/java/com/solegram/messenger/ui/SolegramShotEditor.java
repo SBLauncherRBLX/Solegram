@@ -779,13 +779,12 @@ public class SolegramShotEditor {
         }
     }
 
-    private static final float PATCH_GROW = 2.5f, PATCH_FEATHER = 2.5f;
+    private static final float PATCH_GROW = 2.5f, PATCH_FEATHER = 1f;
 
     /**
-     * The patch over one hidden rect of a piece. The words are made unreadable for sure: the area is averaged down
-     * (halving again and again, so every pixel counts) to blocks about half a line high, i.e. a letter or two per
-     * block, drawn back as a mosaic, and that mosaic is blurred so it is soft smudges with no letter shapes left. Then
-     * a light frost and a rounded rect with feathered edges.
+     * The patch over one hidden rect of a piece: a clear pixel mosaic. The area is averaged down (halving again and
+     * again, so every pixel counts) to square cells bigger than half a letter line, each cell one flat colour, drawn
+     * back with hard edges; nothing of the letter shapes is left in it. Its outline is a rounded rect.
      */
     @Nullable
     private Bitmap makePatch(Bitmap source, RectF r) {
@@ -795,11 +794,12 @@ public class SolegramShotEditor {
             final int pw = (int) Math.ceil(shape.width() + 2 * feather), ph = (int) Math.ceil(shape.height() + 2 * feather);
             if (pw <= 2 || ph <= 2) return null;
             final float ox = shape.left - feather, oy = shape.top - feather;
-            // the area itself, as it is in the picture (outside the piece: transparent)
-            Bitmap cur = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
+            // square cells: about 0.7 of a text line (a letter and a half per cell), never smaller than 7dp
+            final int block = Math.max(dp(7), Math.min(Math.round(r.height() * 0.7f), dp(13)));
+            final int tw = Math.max(1, (int) Math.ceil(pw / (float) block)), th = Math.max(1, (int) Math.ceil(ph / (float) block));
+            // the area the cells cover (a little past the patch on the right/bottom), as it is in the picture
+            Bitmap cur = Bitmap.createBitmap(tw * block, th * block, Bitmap.Config.ARGB_8888);
             new Canvas(cur).drawBitmap(source, -ox, -oy, null);
-            final int block = Math.max(dp(5), Math.round(r.height() * 0.5f));
-            final int tw = Math.max(1, Math.round(pw / (float) block)), th = Math.max(1, Math.round(ph / (float) block));
             while (cur.getWidth() / 2 >= tw && cur.getHeight() / 2 >= th && cur.getWidth() > 1 && cur.getHeight() > 1) {
                 final Bitmap half = Bitmap.createScaledBitmap(cur, Math.max(1, cur.getWidth() / 2), Math.max(1, cur.getHeight() / 2), true);
                 cur.recycle();
@@ -813,27 +813,15 @@ public class SolegramShotEditor {
             final Bitmap patch = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
             final Canvas pc = new Canvas(patch);
             pc.save();
-            pc.scale(pw / (float) tw, ph / (float) th);
-            pc.drawBitmap(cur, 0, 0, null); // nearest: the mosaic
+            pc.scale(block, block);
+            pc.drawBitmap(cur, 0, 0, null); // no filtering: hard-edged cells
             pc.restore();
             cur.recycle();
-            // the blocks' edges melted away: soft smudges, nothing to read
-            Utilities.stackBlurBitmap(patch, Math.max(2, Math.min(60, block / 2)));
+            // the outline: a rounded rect, smooth edge only
             final RectF local = new RectF(feather, feather, feather + shape.width(), feather + shape.height());
-            final float round = Math.min(local.height() / 2f, dp(9));
-            // a light frost, so it reads as hidden rather than as an empty bubble
-            final Paint frost = new Paint(Paint.ANTI_ALIAS_FLAG);
-            final boolean night = look != null ? look.night : startDark;
-            frost.setColor(night ? 0x24FFFFFF : 0x2EFFFFFF);
-            pc.drawRoundRect(local, round, round, frost);
-            frost.setColor(night ? 0x14FFFFFF : 0x0F000000);
-            frost.setStyle(Paint.Style.STROKE);
-            frost.setStrokeWidth(Math.max(1, dp(0.6f)));
-            pc.drawRoundRect(local, round, round, frost);
-            // the shape, its edge feathered
+            final float round = Math.min(local.height() / 2f, dp(8));
             final Paint mask = new Paint(Paint.ANTI_ALIAS_FLAG);
             mask.setXfermode(new android.graphics.PorterDuffXfermode(PorterDuff.Mode.DST_IN));
-            mask.setMaskFilter(new android.graphics.BlurMaskFilter(feather, android.graphics.BlurMaskFilter.Blur.NORMAL));
             pc.drawRoundRect(local, round, round, mask);
             return patch;
         } catch (Throwable e) {
