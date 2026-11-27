@@ -51,7 +51,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Maps without Google: OpenStreetMap data drawn by osmdroid, with CARTO's tiles (light and dark) and Esri's imagery
+ * Maps without Google: OpenStreetMap data drawn by osmdroid, with OpenStreetMap's tiles (dark through a filter) and Esri's imagery
  * for the satellite view. Implements Telegram's map interface, so the location screens work with it unchanged.
  */
 public final class OsmMapsProvider implements IMapsProvider {
@@ -93,12 +93,40 @@ public final class OsmMapsProvider implements IMapsProvider {
     }
 
     private static final String OSM = "© OpenStreetMap contributors";
-    static final OnlineTileSourceBase LIGHT = new XyzSource("CartoVoyager", 20, OSM + " © CARTO", false,
-        "https://a.basemaps.cartocdn.com/rastertiles/voyager/", "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
-        "https://c.basemaps.cartocdn.com/rastertiles/voyager/");
-    static final OnlineTileSourceBase DARK = new XyzSource("CartoDark", 20, OSM + " © CARTO", false,
-        "https://a.basemaps.cartocdn.com/dark_all/", "https://b.basemaps.cartocdn.com/dark_all/",
-        "https://c.basemaps.cartocdn.com/dark_all/");
+    // CARTO's basemaps now answer every request without a key with an «API KEY REQUIRED» picture, so the map comes
+    // straight from OpenStreetMap's own tile servers (no key; the user agent names the app, as their policy asks).
+    // The night map is the same tiles through a colour filter (inverted, hue turned back, a little dimmed), so water
+    // stays blue and forests green on a dark ground — and both looks share one tile cache.
+    static final OnlineTileSourceBase LIGHT = new XyzSource("OpenStreetMap", 19, OSM, false,
+        "https://tile.openstreetmap.org/");
+    static final OnlineTileSourceBase DARK = LIGHT;
+
+    /** Light tiles → a dark map: invert, rotate the hue by 180° (colours come back), dim and lift a little, bluish. */
+    static final android.graphics.ColorMatrixColorFilter NIGHT_FILTER;
+    static {
+        final android.graphics.ColorMatrix invert = new android.graphics.ColorMatrix(new float[]{
+            -1, 0, 0, 0, 255,
+            0, -1, 0, 0, 255,
+            0, 0, -1, 0, 255,
+            0, 0, 0, 1, 0});
+        final float lr = .213f, lg = .715f, lb = .072f;   // hue rotation by 180° (cos = -1, sin = 0)
+        final android.graphics.ColorMatrix hue = new android.graphics.ColorMatrix(new float[]{
+            lr - (1 - lr), lg + lg, lb + lb, 0, 0,
+            lr + lr, lg - (1 - lg), lb + lb, 0, 0,
+            lr + lr, lg + lg, lb - (1 - lb), 0, 0,
+            0, 0, 0, 1, 0});
+        final float k = .85f;
+        final android.graphics.ColorMatrix dim = new android.graphics.ColorMatrix(new float[]{
+            k, 0, 0, 0, 20,
+            0, k, 0, 0, 22,
+            0, 0, k, 0, 28,
+            0, 0, 0, 1, 0});
+        final android.graphics.ColorMatrix m = new android.graphics.ColorMatrix();
+        m.postConcat(invert);
+        m.postConcat(hue);
+        m.postConcat(dim);
+        NIGHT_FILTER = new android.graphics.ColorMatrixColorFilter(m);
+    }
     static final OnlineTileSourceBase SATELLITE = new XyzSource("EsriImagery", 19, "Esri, Maxar, Earthstar Geographics", true,
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/");
 
@@ -524,7 +552,10 @@ public final class OsmMapsProvider implements IMapsProvider {
         }
 
         private void applyTiles() {
-            mapView.setTileSource(mapType == MAP_TYPE_NORMAL ? (night ? DARK : LIGHT) : SATELLITE);
+            final boolean normal = mapType == MAP_TYPE_NORMAL;
+            mapView.setTileSource(normal ? (night ? DARK : LIGHT) : SATELLITE);
+            mapView.getOverlayManager().getTilesOverlay().setColorFilter(normal && night ? NIGHT_FILTER : null);
+            mapView.invalidate();
         }
 
         @Override

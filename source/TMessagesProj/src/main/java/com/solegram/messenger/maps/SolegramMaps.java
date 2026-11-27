@@ -64,7 +64,10 @@ public final class SolegramMaps {
 
     public static boolean useOsm() {
         final int engine = SolegramConfig.mapEngine;
-        return engine == ENGINE_OSM || engine == ENGINE_AUTO && !hasGoogleServices();
+        // Google's map needs an API key registered for this app; the one in the manifest is Telegram's own, which Google
+        // only serves to Telegram — so Google's tiles barely load here. «Auto» therefore means OpenStreetMap; Google stays
+        // a choice for whoever wants it.
+        return engine == ENGINE_OSM || engine == ENGINE_AUTO;
     }
 
     public static boolean hasGoogleServices() {
