@@ -301,7 +301,15 @@ def install(roots, package):
 
     def check_java_class(name):
         """For SDK helpers that look classes up by name for a plugin (hook_utils.find_class)."""
-        check_java(name, caller(1))
+        frame = caller(1)
+        if str(name).replace("/", ".") == pc_name:
+            # find_class hands out the java.lang.Class itself (to reflect on, not a stand-in): plugins that look
+            # PluginsController up this way get it when reflection is theirs anyway (soft / medium level, or a
+            # report that shows reflection); hooking its methods stays refused on the Java side
+            pid = plugin_at(frame)
+            if pid is not None and permits(pid, "reflection"):
+                return
+        check_java(name, frame)
 
     # --- dangerous Java *packages* a plugin must not import as a module (import java.io, from java import io,
     # importlib.import_module("java.io")). The jclass rules above see a class name; this sees a package the
