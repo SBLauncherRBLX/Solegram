@@ -9,3 +9,18 @@ class FileInputStream:
 class File:
     def __init__(self, path, *a, **k):
         self.path = path
+
+
+class FileOutputStream:
+    def __init__(self, path, *a, **k):
+        self.path = path
+    def write(self, *a): pass
+    def close(self): pass
+
+
+def _abs(self):
+    import os
+    return os.path.abspath(self.path)
+
+
+File.getAbsolutePath = _abs

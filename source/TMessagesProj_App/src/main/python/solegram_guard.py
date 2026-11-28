@@ -415,12 +415,76 @@ def install(roots, package):
 
         return PluginsControllerView()
 
+    # --- Java's file streams. Plugins need them (Bitmap.compress writes only into a Java stream), but a raw stream
+    # would take any path past the checks open() gets. A plugin gets a stand-in that checks the path the same way
+    # (the session, keys, preferences, databases and plugin code stay out of reach) and then makes the real stream.
+    java_streams = {"java.io.FileInputStream": "r", "java.io.FileReader": "r", "java.io.FileOutputStream": "w",
+                    "java.io.FileWriter": "w", "java.io.RandomAccessFile": "raf"}
+
+    def stream_path(target):
+        if isinstance(target, (str, bytes)) or hasattr(target, "__fspath__"):
+            try:
+                return os.fsdecode(os.fspath(target))
+            except Exception:
+                return None
+        # a java.io.File
+        getter = getattr(target, "getAbsolutePath", None)
+        if callable(getter):
+            try:
+                return str(getter())
+            except Exception:
+                return None
+        return None
+
+    def java_stream_for(pid, name):
+        real = original_jclass(name)
+        mode = java_streams[name]
+
+        class JavaStreamView(object):
+            __slots__ = ()
+
+            def __call__(self, *args):
+                if not args:
+                    return real()
+                path = stream_path(args[0])
+                if path is None:
+                    # a FileDescriptor or anything else that is not a path: the guard can't see where it leads
+                    deny(pid, "files", "%s(%s)" % (name, type(args[0]).__name__))
+                write = mode == "w" or (mode == "raf" and len(args) > 1 and "w" in str(args[1]))
+                try:
+                    resolved = os.path.realpath(path)
+                except Exception:
+                    resolved = path
+                inside = norm(resolved)
+                if inside is not None:
+                    if secret(inside):
+                        deny(pid, "secrets", os.path.basename(inside))
+                    if write:
+                        if guarded(inside):
+                            deny(pid, "files", inside)
+                        if inside.lower().endswith(code_ext) and not (permits(pid, "native") or permits(pid, "dex")):
+                            deny(pid, "native", os.path.basename(inside))
+                # the checked, resolved path goes to Java (not a link that could be swapped afterwards)
+                return real(resolved, *args[1:])
+
+            def __getattr__(self, attr):
+                return getattr(real, attr)
+
+            def __repr__(self):
+                return "<%s (checked)>" % name
+
+        return JavaStreamView()
+
     def plugins_controller_wanted(name, frame):
-        """The stand-in, when the plugin itself (not the SDK on its behalf) asks for PluginsController."""
-        if str(name).replace("/", ".") != pc_name:
+        """A stand-in, when the plugin itself (not the SDK on its behalf) asks for PluginsController or a Java file
+        stream; None for every other name."""
+        name = str(name).replace("/", ".")
+        if name != pc_name and name not in java_streams:
             return None
         pid = plugin_at(frame, immediate=True)
-        return None if pid is None else plugins_controller_for(pid)
+        if pid is None:
+            return None
+        return plugins_controller_for(pid) if name == pc_name else java_stream_for(pid, name)
 
     def guarded_jclass(name, *args, **kwargs):
         view = plugins_controller_wanted(name, caller(1))

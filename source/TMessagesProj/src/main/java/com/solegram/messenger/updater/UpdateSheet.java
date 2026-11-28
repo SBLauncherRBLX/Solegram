@@ -189,11 +189,32 @@ public class UpdateSheet extends BottomSheet implements NotificationCenter.Notif
         notesLayout.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, land ? 6 : 22, land ? 0 : 20, 22, 8));
 
         ScrollView scroll = new ScrollView(context) {
+            // the sheet takes vertical drags to close itself (and on a phone on its side the notes are most of it):
+            // while the notes have more to show, a finger on them scrolls them and the sheet stays put
+            @Override
+            public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+                final int action = ev.getActionMasked();
+                if (action == android.view.MotionEvent.ACTION_DOWN && getParent() != null
+                        && (canScrollVertically(1) || canScrollVertically(-1))) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                } else if ((action == android.view.MotionEvent.ACTION_UP || action == android.view.MotionEvent.ACTION_CANCEL) && getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                return super.dispatchTouchEvent(ev);
+            }
+
+            @Override
+            public boolean onTouchEvent(android.view.MotionEvent ev) {
+                // the selectable text must not keep the drag: the notes scroll from anywhere on them
+                super.onTouchEvent(ev);
+                return true;
+            }
+
             @Override
             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 // on its side the notes take the height the left column has, as much as the screen allows
                 final int max = landscape()
-                    ? Math.max(AndroidUtilities.dp(120), Math.min(AndroidUtilities.dp(340), AndroidUtilities.displaySize.y - AndroidUtilities.dp(110)))
+                    ? Math.max(AndroidUtilities.dp(120), Math.min(AndroidUtilities.dp(340), AndroidUtilities.displaySize.y - AndroidUtilities.dp(150)))
                     : AndroidUtilities.dp(260);
                 super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(max, MeasureSpec.AT_MOST));
             }
