@@ -14016,7 +14016,12 @@
     <string name="SG_ExportForwarded">Forwarded from %1$s</string>
     <string name="SG_ExportEdited">edited</string>
     <string name="SG_ExportFooter">Exported from Solegram</string>
-    <string name="SG_SecStrictGuard">Strict plugin check</string>
-    <string name="SG_SecStrictGuardInfo">A plugin may do only what the check found in its code. Without it only what harms the account or the device is blocked: session and key files, the app\'s settings and databases, the protection itself, shell commands, native code and installing apps</string>
+    <string name="SG_SecGuardLevel">Protection while plugins run</string>
+    <string name="SG_SecGuardSoft">Soft</string>
+    <string name="SG_SecGuardMedium">Medium</string>
+    <string name="SG_SecGuardStrict">Strict</string>
+    <string name="SG_SecGuardSoftInfo">only what harms the account or the device is blocked</string>
+    <string name="SG_SecGuardMediumInfo">like soft, but hidden code (built from strings or unpacked) runs only if the check found it</string>
+    <string name="SG_SecGuardStrictInfo">a plugin may do only what the check found in its code</string>
     <!-- SOLEGRAM END -->
 </resources>

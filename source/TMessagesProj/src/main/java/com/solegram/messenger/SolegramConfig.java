@@ -375,8 +375,9 @@ public class SolegramConfig {
     public static boolean pluginsScanBeforeInstall = true;
     /** Refuse plugins rated dangerous instead of only warning. */
     public static boolean pluginsBlockDangerous;
-    /** Strict plugin guard: at run time a plugin may do only what its file showed (off: only the harmful is refused). */
-    public static boolean pluginsStrictGuard;
+    /** How much a plugin may do at run time beyond what its file showed (PluginRuntimeGuard): soft, medium, strict. */
+    public static final int PLUGINS_GUARD_SOFT = 0, PLUGINS_GUARD_MEDIUM = 1, PLUGINS_GUARD_STRICT = 2;
+    public static int pluginsGuardLevel = PLUGINS_GUARD_MEDIUM;
     /** Plugins may pay (Stars, gifts, chat ownership): off, see PluginRuntimeGuard. */
     public static boolean pluginsAllowPayments;
     // endregion
@@ -703,7 +704,11 @@ public class SolegramConfig {
         }
         pluginsBlockDangerous = p.getBoolean("pluginsBlockDangerous", true);
         pluginsAllowPayments = p.getBoolean("pluginsAllowPayments", false);
-        pluginsStrictGuard = p.getBoolean("pluginsStrictGuard", false);
+        // beta4 had a strict on/off switch: whoever turned it on keeps the strict level
+        if (!p.contains("pluginsGuardLevel") && p.getBoolean("pluginsStrictGuard", false)) {
+            p.edit().putInt("pluginsGuardLevel", PLUGINS_GUARD_STRICT).apply();
+        }
+        pluginsGuardLevel = Math.max(PLUGINS_GUARD_SOFT, Math.min(PLUGINS_GUARD_STRICT, p.getInt("pluginsGuardLevel", PLUGINS_GUARD_MEDIUM)));
 
         // before the modes there was only the check switch: whoever turned it off keeps updates off
         // automatic installing is gone: who had it is told about new versions instead, and installs them himself
@@ -978,12 +983,12 @@ public class SolegramConfig {
 
     // a settings file somebody sent may only make protection stronger: these switches are taken from it only when they
     // turn protection on (or, for the plugins' payments, off); the trusted sites and the scam sensitivity stay
-    private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode", "pluginsStrictGuard",
+    private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode",
         "pluginsScanBeforeInstall", "pluginsSecurityV2", "scamAccounts", "scamLinks", "scamNano", "warnDangerousFiles", "secureRecents",
         "cleanLinks", "stripFileMetadata");
     // the automatic proxy routes the account's traffic through public proxies of strangers: a settings file may turn it off, never on
     private static final java.util.List<String> PROTECTION_OFF = java.util.Arrays.asList("pluginsAllowPayments", "proxyAuto");
-    private static final java.util.List<String> PROTECTION_KEPT = java.util.Arrays.asList("scamTrustedSites", "scamSensitivity", "adBlockAllowed");
+    private static final java.util.List<String> PROTECTION_KEPT = java.util.Arrays.asList("pluginsGuardLevel", "pluginsStrictGuard", "scamTrustedSites", "scamSensitivity", "adBlockAllowed");
 
     public static String exportToJson() {
         try {

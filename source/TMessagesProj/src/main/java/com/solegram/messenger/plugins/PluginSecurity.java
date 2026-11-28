@@ -36,7 +36,7 @@ import java.util.zip.Inflater;
 public final class PluginSecurity {
 
     /** Bump when the rules change: cached reports of an older analyzer are computed again. */
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     public static final int VERDICT_SAFE = 0;
     public static final int VERDICT_WARNING = 1;
@@ -238,7 +238,7 @@ public final class PluginSecurity {
         rule("sec_phone", CAT_SECRETS, MEDIUM);
         rule("sec_clipboard", CAT_SECRETS, MEDIUM);
         rule("sec_keystore", CAT_SECRETS, HIGH);
-        rule("sec_plugins_control", CAT_SECRETS, HIGH);
+        rule("sec_plugins_control", CAT_SECRETS, MEDIUM);  // plugins get a stand-in of PluginsController (solegram_guard)
         rule("sec_tamper", CAT_SECRETS, CRITICAL);
         rule("combo_exfil_secrets", CAT_SECRETS, CRITICAL);
 
@@ -520,7 +520,7 @@ public final class PluginSecurity {
 
     /** Settings and files of the plugin security itself. */
     private static final String[] TAMPER_STRINGS = {
-        "pluginsBlockDangerous", "pluginsScanBeforeInstall", "pluginsSafeMode", "pluginsStrictGuard", "solegram_plugins", "solegram_plugin_security",
+        "pluginsBlockDangerous", "pluginsScanBeforeInstall", "pluginsSafeMode", "pluginsStrictGuard", "pluginsGuardLevel", "solegram_plugins", "solegram_plugin_security",
         "plugins_blocklist", "pluginsAllowPayments", "solegram_guard", "__sg_plugin__", "plugin_libs", "plugin_dex",
         "PluginRuntimeGuard", "integrity_v1", "reviewed_"};
 

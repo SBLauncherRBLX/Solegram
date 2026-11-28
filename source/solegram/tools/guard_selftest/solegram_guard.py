@@ -349,7 +349,83 @@ def install(roots, package):
 
     original_jclass = java.jclass
 
+    # --- PluginsController (installing, enabling, deleting plugins, the security policy) is never given to a plugin.
+    # Plugins written against it get a stand-in instead: the read-only parts, and the parts that act on the plugin
+    # itself (its settings, hooks, menu items). Anything else on it is refused with its name, so it is clear what was
+    # asked for.
+    pc_name = "com.solegram.messenger.plugins.PluginsController"
+    pc_passthrough = ("isEngineAvailable", "isEngineRunning", "hasLoadedPlugins", "getLoadedCount", "hasRequestHooks",
+                      "hasUpdateHooks", "hasSendMessageHooks", "isEnabledInPrefs", "getPluginsDir", "tlName",
+                      "resolveDrawable", "isPluginFileName", "pluginsQueue", "APP_EVENT_START", "APP_EVENT_STOP",
+                      "APP_EVENT_PAUSE", "APP_EVENT_RESUME")
+    pc_own = ("getSettingJson", "setSettingJson", "getAllSettingsJson", "clearSettings", "notifySettingsReload",
+              "registerHook", "unregisterHook", "registerSendMessageHook", "unregisterSendMessageHook",
+              "setUpdatesHook", "addMenuItem", "removeMenuItem", "reportHookError")
+
+    class PluginInfo(object):
+        """What a plugin may know of an installed plugin (a copy: changing it changes nothing)."""
+        __slots__ = ("id", "name", "description", "author", "version", "enabled")
+
+        def __init__(self, meta):
+            for field in ("id", "name", "description", "author", "version"):
+                value = getattr(meta, field, None)
+                object.__setattr__(self, field, None if value is None else str(value))
+            object.__setattr__(self, "enabled", bool(getattr(meta, "enabled", False)))
+
+        def __setattr__(self, key, value):
+            raise AttributeError("read-only")
+
+        def __repr__(self):
+            return "PluginInfo(%r)" % (self.id,)
+
+    def plugins_controller_for(pid):
+        real = original_jclass(pc_name)
+
+        class PluginsControllerView(object):
+            __slots__ = ()
+
+            def __getattr__(self, attr):
+                if attr == "getInstance":
+                    return lambda: self
+                if attr in pc_passthrough:
+                    return getattr(real, attr)
+                if attr in pc_own:
+                    method = getattr(real, attr)
+
+                    def own(plugin_id, *rest):
+                        if str(plugin_id) != pid:
+                            deny(pid, "tamper", "%s.%s for another plugin" % (pc_name, attr))
+                        return method(plugin_id, *rest)
+                    own.__name__ = attr
+                    return own
+                if attr == "getPlugin":
+                    def get_plugin(plugin_id):
+                        meta = real.getInstance().getPlugin(plugin_id)
+                        return None if meta is None else PluginInfo(meta)
+                    return get_plugin
+                if attr == "getPlugins":
+                    return lambda: [PluginInfo(m) for m in real.getInstance().getPlugins()]
+                deny(pid, "tamper", "%s.%s" % (pc_name, attr))
+
+            def __setattr__(self, key, value):
+                deny(pid, "tamper", "%s.%s" % (pc_name, key))
+
+            def __repr__(self):
+                return "<PluginsController (plugin view)>"
+
+        return PluginsControllerView()
+
+    def plugins_controller_wanted(name, frame):
+        """The stand-in, when the plugin itself (not the SDK on its behalf) asks for PluginsController."""
+        if str(name).replace("/", ".") != pc_name:
+            return None
+        pid = plugin_at(frame, immediate=True)
+        return None if pid is None else plugins_controller_for(pid)
+
     def guarded_jclass(name, *args, **kwargs):
+        view = plugins_controller_wanted(name, caller(1))
+        if view is not None:
+            return view
         check_java(name, caller(1))
         return original_jclass(name, *args, **kwargs)
 
@@ -370,9 +446,14 @@ def install(roots, package):
                 # is not ("from java import io" still checks the package, as java.io below)
                 if not fromlist or "*" in fromlist:
                     check_import(name, frame)
+                views = {}
                 if fromlist:
                     for item in fromlist:
                         if not isinstance(item, str) or item == "*":
+                            continue
+                        view = plugins_controller_wanted(name + "." + item, frame)
+                        if view is not None:
+                            views[item] = view
                             continue
                         # from java.io import FileInputStream  /  from java import io
                         check_java(name + "." + item, frame)
@@ -386,6 +467,9 @@ def install(roots, package):
                         stand_in = types.ModuleType(name)
                         for item in fromlist:
                             if isinstance(item, str) and item != "*":
+                                if item in views:
+                                    setattr(stand_in, item, views[item])
+                                    continue
                                 try:
                                     setattr(stand_in, item, getattr(module, item))
                                 except AttributeError:

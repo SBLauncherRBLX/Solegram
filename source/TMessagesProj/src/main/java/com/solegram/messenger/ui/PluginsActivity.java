@@ -53,7 +53,7 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
     public static final int ID_SCAN = 6;
     public static final int ID_BLOCK_DANGEROUS = 7;
     public static final int ID_ALLOW_PAYMENTS = 8;
-    public static final int ID_STRICT_GUARD = 9;
+    public static final int ID_GUARD_LEVEL = 9;
     private static final int REQUEST_PICK_PLUGIN = 0x5052;
 
     @Override
@@ -184,7 +184,7 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
         items.add(UItem.asHeader(getString(R.string.SG_SecSection)));
         items.add(UItem.asButtonCheck(ID_SCAN, getString(R.string.SG_SecScanBeforeInstall), getString(R.string.SG_SecScanBeforeInstallInfo)).setChecked(SolegramConfig.pluginsScanBeforeInstall));
         items.add(UItem.asButtonCheck(ID_BLOCK_DANGEROUS, getString(R.string.SG_SecBlockDangerous), getString(R.string.SG_SecBlockDangerousInfo)).setChecked(SolegramConfig.pluginsBlockDangerous));
-        items.add(UItem.asButtonCheck(ID_STRICT_GUARD, getString(R.string.SG_SecStrictGuard), getString(R.string.SG_SecStrictGuardInfo)).setChecked(SolegramConfig.pluginsStrictGuard));
+        items.add(UItem.asButton(ID_GUARD_LEVEL, getString(R.string.SG_SecGuardLevel), guardLevelName(SolegramConfig.pluginsGuardLevel)));
         items.add(UItem.asButtonCheck(ID_ALLOW_PAYMENTS, getString(R.string.SG_GuardAllowPayments), getString(R.string.SG_GuardAllowPaymentsInfo)).setChecked(SolegramConfig.pluginsAllowPayments));
         items.add(UItem.asShadow(getString(R.string.SG_SecSettingsInfo)));
 
@@ -261,10 +261,17 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
                 PluginsController.getInstance().applySecurityPolicy();
                 break;
             }
-            case ID_STRICT_GUARD: {
-                boolean value = SolegramConfig.toggle("pluginsStrictGuard");
-                ((NotificationsCheckCell) view).setChecked(value);
-                PluginsController.getInstance().applySecurityPolicy();
+            case ID_GUARD_LEVEL: {
+                final String[] names = {
+                    guardLevelName(SolegramConfig.PLUGINS_GUARD_SOFT) + " — " + getString(R.string.SG_SecGuardSoftInfo),
+                    guardLevelName(SolegramConfig.PLUGINS_GUARD_MEDIUM) + " — " + getString(R.string.SG_SecGuardMediumInfo),
+                    guardLevelName(SolegramConfig.PLUGINS_GUARD_STRICT) + " — " + getString(R.string.SG_SecGuardStrictInfo)};
+                showDialog(org.telegram.ui.Components.AlertsCreator.createSingleChoiceDialog(getParentActivity(), names,
+                    getString(R.string.SG_SecGuardLevel), SolegramConfig.pluginsGuardLevel, (d, which) -> {
+                        SolegramConfig.putInt("pluginsGuardLevel", which);
+                        PluginsController.getInstance().applySecurityPolicy();
+                        listView.adapter.update(true);
+                    }));
                 break;
             }
             case ID_ALLOW_PAYMENTS: {
@@ -387,5 +394,10 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
             FileLog.e(e);
             BulletinFactory.of(this).createErrorBulletin(TextUtils.isEmpty(e.getMessage()) ? getString(R.string.SG_PluginInstallFailed) : e.getMessage()).show();
         }
+    }
+
+    private static String guardLevelName(int level) {
+        return getString(level == SolegramConfig.PLUGINS_GUARD_SOFT ? R.string.SG_SecGuardSoft
+            : level == SolegramConfig.PLUGINS_GUARD_STRICT ? R.string.SG_SecGuardStrict : R.string.SG_SecGuardMedium);
     }
 }

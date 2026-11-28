@@ -105,18 +105,24 @@ public final class PluginRuntimeGuard {
     }
 
     /**
-     * Without the strict check (the default since 3.5.3-beta4) every plugin may do these at run time even when its
-     * file did not show them: they hurt neither the account nor the device by themselves, and the guard keeps its
-     * hard lines whatever the permissions (the session and key files, preferences, databases' files, plugin code,
-     * the guard itself, Java's file streams). A shell, native code, loading dex and installing apps still need the
-     * report to show them.
+     * What every plugin may do at run time even when its file did not show it, by SolegramConfig.pluginsGuardLevel.
+     * Whatever the level, the guard keeps its hard lines (the session and key files, preferences, databases' files,
+     * plugin code, the guard itself, Java's file streams), and a shell, native code, loading dex and installing apps
+     * need the report to show them.
+     * Medium (the default): what ordinary plugins do (network, Java reflection on the app, their files, the messages
+     * database), but code built from strings or unpickled data runs only when the file showed it: that is how hidden
+     * payloads run. Soft: those too. Strict: only what the file showed.
      */
-    private static final String[] RELAXED = {PERM_NETWORK, PERM_REFLECTION, PERM_FILES, PERM_EXEC, PERM_DESERIALIZE, PERM_DATABASE};
+    private static final String[] MEDIUM = {PERM_NETWORK, PERM_REFLECTION, PERM_FILES, PERM_DATABASE};
+    private static final String[] SOFT = {PERM_NETWORK, PERM_REFLECTION, PERM_FILES, PERM_DATABASE, PERM_EXEC, PERM_DESERIALIZE};
 
     static Set<String> permissionsOf(PluginSecurity.Report report) {
         HashSet<String> set = new HashSet<>();
-        if (!com.solegram.messenger.SolegramConfig.pluginsStrictGuard) {
-            Collections.addAll(set, RELAXED);
+        final int level = com.solegram.messenger.SolegramConfig.pluginsGuardLevel;
+        if (level == com.solegram.messenger.SolegramConfig.PLUGINS_GUARD_SOFT) {
+            Collections.addAll(set, SOFT);
+        } else if (level == com.solegram.messenger.SolegramConfig.PLUGINS_GUARD_MEDIUM) {
+            Collections.addAll(set, MEDIUM);
         }
         if (report == null) {
             return set;
