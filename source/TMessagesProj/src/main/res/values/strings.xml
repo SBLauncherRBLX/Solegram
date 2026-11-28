@@ -14023,5 +14023,29 @@
     <string name="SG_SecGuardSoftInfo">only what harms the account or the device is blocked</string>
     <string name="SG_SecGuardMediumInfo">like soft, but hidden code (built from strings or unpacked) runs only if the check found it</string>
     <string name="SG_SecGuardStrictInfo">a plugin may do only what the check found in its code</string>
+    <string name="SG_LeaveChats">Leave channels and groups</string>
+    <string name="SG_LeaveChatsInfo">Leave all channels and groups at once. Untick the ones you want to stay in</string>
+    <string name="SG_LeaveChatsTitle">Leave channels and groups</string>
+    <string name="SG_LeaveChatsLoading">Loading all chats, including the archive…</string>
+    <string name="SG_LeaveChatsNone">You are not in any channel or group</string>
+    <string name="SG_LeaveChatsSelectAll">Select all</string>
+    <string name="SG_LeaveChatsSelectNone">Clear selection</string>
+    <string name="SG_LeaveChatsChannels">Channels</string>
+    <string name="SG_LeaveChatsGroups">Groups</string>
+    <string name="SG_LeaveChatsOwn">Created by you</string>
+    <string name="SG_LeaveChatsOwnInfo">Channels and groups you created stay by default. Leaving does not delete them, but you will no longer be a member</string>
+    <string name="SG_LeaveChatsButton">Leave selected (%1$d)</string>
+    <string name="SG_LeaveChatsNothing">Nothing selected</string>
+    <string name="SG_LeaveChatsConfirmTitle">Leave channels and groups?</string>
+    <string name="SG_LeaveChatsConfirmButton">Leave</string>
+    <string name="SG_LeaveChatsProgress">Leaving chats: %1$d of %2$d. You can close this screen, leaving goes on</string>
+    <string name="SG_LeaveChatsStop">Stop</string>
+    <string name="SG_LeaveChatsDone">Chats left: %1$d</string>
+    <string name="SG_LeaveChatsConfirm_one">You will leave %1$d chat. Private groups and channels can only be joined again with a new invite link</string>
+    <string name="SG_LeaveChatsConfirm_other">You will leave %1$d chats. Private groups and channels can only be joined again with a new invite link</string>
+    <string name="SG_LeaveChatsConfirm_zero">You will leave %1$d chats. Private groups and channels can only be joined again with a new invite link</string>
+    <string name="SG_LeaveChatsConfirm_two">You will leave %1$d chats. Private groups and channels can only be joined again with a new invite link</string>
+    <string name="SG_LeaveChatsConfirm_few">You will leave %1$d chats. Private groups and channels can only be joined again with a new invite link</string>
+    <string name="SG_LeaveChatsConfirm_many">You will leave %1$d chats. Private groups and channels can only be joined again with a new invite link</string>
     <!-- SOLEGRAM END -->
 </resources>

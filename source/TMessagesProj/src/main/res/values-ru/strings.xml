@@ -2607,5 +2607,29 @@
     <string name="SG_SecGuardSoftInfo">блокируется только то, что вредит аккаунту и устройству</string>
     <string name="SG_SecGuardMediumInfo">как мягкая, но скрытый код (собранный из строк или распакованный) запускается, только если его нашла проверка</string>
     <string name="SG_SecGuardStrictInfo">плагин может делать только то, что нашла проверка его кода</string>
+    <string name="SG_LeaveChats">Выйти из каналов и групп</string>
+    <string name="SG_LeaveChatsInfo">Выйти сразу из всех каналов и групп. Снимите галочки с тех, где хотите остаться</string>
+    <string name="SG_LeaveChatsTitle">Выход из каналов и групп</string>
+    <string name="SG_LeaveChatsLoading">Загружаем все чаты, включая архив…</string>
+    <string name="SG_LeaveChatsNone">Вы не состоите ни в одном канале или группе</string>
+    <string name="SG_LeaveChatsSelectAll">Отметить все</string>
+    <string name="SG_LeaveChatsSelectNone">Снять все отметки</string>
+    <string name="SG_LeaveChatsChannels">Каналы</string>
+    <string name="SG_LeaveChatsGroups">Группы</string>
+    <string name="SG_LeaveChatsOwn">Созданные вами</string>
+    <string name="SG_LeaveChatsOwnInfo">Созданные вами каналы и группы по умолчанию остаются. Выход из них не удаляет их, но вы перестанете быть их участником</string>
+    <string name="SG_LeaveChatsButton">Выйти из отмеченных (%1$d)</string>
+    <string name="SG_LeaveChatsNothing">Ничего не отмечено</string>
+    <string name="SG_LeaveChatsConfirmTitle">Выйти из каналов и групп?</string>
+    <string name="SG_LeaveChatsConfirmButton">Выйти</string>
+    <string name="SG_LeaveChatsProgress">Выходим из чатов: %1$d из %2$d. Можно закрыть этот экран — выход продолжится</string>
+    <string name="SG_LeaveChatsStop">Остановить</string>
+    <string name="SG_LeaveChatsDone">Вы вышли из чатов: %1$d</string>
+    <string name="SG_LeaveChatsConfirm_one">Вы выйдете из %1$d чата. Вернуться в закрытые группы и каналы можно будет только по новой ссылке-приглашению</string>
+    <string name="SG_LeaveChatsConfirm_other">Вы выйдете из %1$d чата. Вернуться в закрытые группы и каналы можно будет только по новой ссылке-приглашению</string>
+    <string name="SG_LeaveChatsConfirm_zero">Вы выйдете из %1$d чатов. Вернуться в закрытые группы и каналы можно будет только по новой ссылке-приглашению</string>
+    <string name="SG_LeaveChatsConfirm_two">%1$d трека</string>
+    <string name="SG_LeaveChatsConfirm_few">Вы выйдете из %1$d чатов. Вернуться в закрытые группы и каналы можно будет только по новой ссылке-приглашению</string>
+    <string name="SG_LeaveChatsConfirm_many">Вы выйдете из %1$d чатов. Вернуться в закрытые группы и каналы можно будет только по новой ссылке-приглашению</string>
     <!-- SOLEGRAM END -->
 </resources>

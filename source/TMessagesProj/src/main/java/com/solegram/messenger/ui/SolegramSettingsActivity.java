@@ -318,6 +318,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
     private static final int ID_TEST_GIFTS = 4306;
     private static final int ID_SHARE_THEME = 4307;
     private static final int ID_SHOT_OFFER = 4308;
+    private static final int ID_LEAVE_CHATS = 4390;
     private static final int ID_TEST_GIFTS_PICK = 4309;
     private static final int ID_STREAKS = 1140;
     private static final int ID_NEW_PLAYER = 1141;
@@ -833,6 +834,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         items.add(UItem.asHeader(getString(R.string.SG_ChannelsHeader)));
         items.add(UItem.asCheck(ID_NO_NEXT_CHANNEL, getString(R.string.SG_NoNextChannel)).setChecked(SolegramConfig.disableJumpToNextChannel));
         items.add(UItem.asCheck(ID_HIDE_SHARE, getString(R.string.SG_HideShareButton)).setChecked(SolegramConfig.hideShareButton));
+        items.add(UItem.asButton(ID_LEAVE_CHATS, getString(R.string.SG_LeaveChats)).red());
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SG_Confirmations)));
@@ -1063,6 +1065,7 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
         {PAGE_CHATS, ID_DOUBLE_TAP, R.string.SG_DoubleTap, -1},
         {PAGE_CHATS, ID_IOS_INPUT_BAR, R.string.SG_IosInputBar, -1},
         {PAGE_CHATS, ID_SHOW_SECONDS, R.string.SG_ShowSeconds, -1},
+        {PAGE_CHATS, ID_LEAVE_CHATS, R.string.SG_LeaveChats, -1},
         {PAGE_CHATS, ID_STREAKS, R.string.SG_Streaks, -1},
         {PAGE_MUSIC, ID_NEW_PLAYER, R.string.SG_NewPlayer, -1},
         {PAGE_MUSIC, ID_MUSIC_TAB, R.string.SG_MusicTab, -1},
@@ -2802,6 +2805,9 @@ public class SolegramSettingsActivity extends UniversalFragment implements Notif
                 return;
             case ID_SHOT_OFFER:
                 toggleCheck(view, "shotOffer");
+                return;
+            case ID_LEAVE_CHATS:
+                presentFragment(new SolegramLeaveChatsActivity());
                 return;
             case ID_REMEMBER_FOLDER:
                 toggleCheck(view, "rememberFolder");
