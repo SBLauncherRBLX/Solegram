@@ -235,7 +235,7 @@ public class MotionBackgroundPaint {
             private final float[] transformPattern = new float[] { 1, 1, 0, 0 };
 
             RuntimeShaderState(@RawRes int res) {
-                shader = new RuntimeShader(AndroidUtilities.readRes(res));
+                shader = com.solegram.messenger.SolegramShaderPool.take(res); // Solegram: compiled ahead, not on opening a chat
             }
 
             void setMiniMatrixGradient(float[] miniMatrix) {

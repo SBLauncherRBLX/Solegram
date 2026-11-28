@@ -32,7 +32,7 @@ public class LiquidGlassEffect {
         // Solegram: its shader adds the colour split at the bend and the light on the rim (Telegram's one is the fallback)
         RuntimeShader s = null;
         try {
-            s = new RuntimeShader(AndroidUtilities.readRes(R.raw.solegram_glass_shader));
+            s = com.solegram.messenger.SolegramShaderPool.take(R.raw.solegram_glass_shader); // ready, compiled ahead
         } catch (Throwable e) {
             org.telegram.messenger.FileLog.e(e);
         }
@@ -170,7 +170,7 @@ public class LiquidGlassEffect {
             squircleChanged = false;
             if (arrowHeight > 0) {
                 if (arrowShader == null) {
-                    arrowShader = new RuntimeShader(AndroidUtilities.readRes(R.raw.liquid_glass_arrow_shader));
+                    arrowShader = com.solegram.messenger.SolegramShaderPool.take(R.raw.liquid_glass_arrow_shader);
                 }
                 shader = arrowShader;
             } else {

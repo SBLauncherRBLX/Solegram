@@ -71,6 +71,16 @@ public final class SolegramRefreshRate {
             if (changed) {
                 window.setAttributes(params);
             }
+            if (Build.VERSION.SDK_INT >= 35) {
+                // Android 15+ lowers the rate on its own when it thinks little moves (and for power): the app asks
+                // to stay at the screen's top rate, and to go up at once on touch
+                try {
+                    window.setFrameRatePowerSavingsBalanced(false);
+                    window.setFrameRateBoostOnTouchEnabled(true);
+                    window.getDecorView().setRequestedFrameRate(android.view.View.REQUESTED_FRAME_RATE_CATEGORY_HIGH);
+                } catch (Throwable ignore) {
+                }
+            }
             listen();
         } catch (Throwable e) {
             FileLog.e(e);

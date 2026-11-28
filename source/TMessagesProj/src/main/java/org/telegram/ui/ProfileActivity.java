@@ -14020,12 +14020,27 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private boolean sgPageTintPosted;
 
     /** The header's fill changed (colour, banner): the page's background follows. */
+    /** The page colour (and theme) the page was last tinted for: the costly part runs only when it changes. */
+    private int sgTintedFor;
+    private boolean sgTintedDark;
+
     private void sgRefreshPageTint() {
         if (!(resourcesProvider instanceof SgPageTint)) {
             return;
         }
         if (topView != null) {
             topView.invalidate();
+        }
+        // the profile updates many times while it opens (user info, gifts, the banner): with the same colour there is
+        // nothing to re-tint, and re-binding the list and re-reading every glass then made the opening stutter
+        final int pageColor = sgPageColor();
+        final boolean dark = Theme.isCurrentThemeDark();
+        final boolean same = sgTintedFor == pageColor && sgTintedDark == dark && listView != null && listView.getAdapter() != null;
+        if (same) {
+            if (actionsView != null) actionsView.invalidate();
+            if (musicView != null) musicView.invalidate();
+            if (giftsView != null) giftsView.invalidate();
+            return;
         }
         // the glass over the page (the header's pills here, the tabs' bar of the main screen) took the page's colour
         // when it was made: it reads it again now, not only after the profile is opened anew
@@ -14070,6 +14085,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
         if (listView != null && listView.getAdapter() != null && !listView.isComputingLayout()) {
             listView.getAdapter().notifyDataSetChanged(); // the rows take the shade of the page again
+            sgTintedFor = pageColor;
+            sgTintedDark = dark;
         }
     }
 

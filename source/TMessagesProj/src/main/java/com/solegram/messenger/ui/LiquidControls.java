@@ -119,7 +119,7 @@ public final class LiquidControls {
     @RequiresApi(33)
     private static final class ShaderLens {
         private final RenderNode node = new RenderNode("solegramLens");
-        private final RuntimeShader shader = new RuntimeShader(AndroidUtilities.readRes(R.raw.solegram_lens_shader));
+        private final RuntimeShader shader = com.solegram.messenger.SolegramShaderPool.take(R.raw.solegram_lens_shader);
 
         void draw(Canvas canvas, int viewW, int viewH, float cx, float cy, float w, float h, float a, LensContent content) {
             node.setPosition(0, 0, viewW, viewH);

@@ -554,7 +554,10 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             "}\n";
 
         private final android.graphics.RenderNode node = new android.graphics.RenderNode("sgBubbleLens");
-        private final android.graphics.RuntimeShader shader = new android.graphics.RuntimeShader(SHADER);
+        // one compiled shader for every bubble: each frame's effect is made right after its uniforms are set and keeps
+        // them (compiling it per bubble on opening a profile was a hitch)
+        private static android.graphics.RuntimeShader sharedShader;
+        private final android.graphics.RuntimeShader shader = sharedShader != null ? sharedShader : (sharedShader = new android.graphics.RuntimeShader(SHADER));
 
         void draw(Canvas canvas, android.graphics.drawable.Drawable glass, int left, int top, int right, int bottom,
                   float cx, float cy, float r, SgBubble b, float c1, float s1, float c2, float s2, float alpha) {

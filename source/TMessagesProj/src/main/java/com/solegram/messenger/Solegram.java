@@ -123,6 +123,8 @@ public final class Solegram {
         }
         // chats exported, screenshots made, files sent without their metadata, themes shared: copies of private things
         // the user made for one moment; they don't stay in the app's cache for weeks
+        // the glass, lens and wallpaper shaders get compiled ahead, off the UI thread
+        SolegramShaderPool.warmUp();
         org.telegram.messenger.Utilities.globalQueue.postRunnable(Solegram::cleanPrivateLeftovers, 5000);
         // reminders: missed ones are shown and the alarm is set again (a force stop or an update removes it)
         SolegramReminders.warmUp();

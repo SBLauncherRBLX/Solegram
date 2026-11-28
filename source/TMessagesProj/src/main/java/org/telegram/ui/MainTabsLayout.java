@@ -962,7 +962,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     @RequiresApi(33)
     private static final class LensShader {
         private final RenderNode node = new RenderNode("solegramTabLens");
-        private final RuntimeShader shader = new RuntimeShader(AndroidUtilities.readRes(R.raw.solegram_tab_lens_shader));
+        private final RuntimeShader shader = com.solegram.messenger.SolegramShaderPool.take(R.raw.solegram_tab_lens_shader);
 
         private RenderEffect effect;
         private final float[] last = new float[10];
