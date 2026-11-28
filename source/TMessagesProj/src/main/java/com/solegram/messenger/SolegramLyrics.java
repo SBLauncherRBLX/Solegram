@@ -81,7 +81,7 @@ public final class SolegramLyrics {
     private static final String API = "https://lrclib.net/api/";
     private static final String NETEASE = "https://music.163.com/api/";
     private static final String OVH = "https://api.lyrics.ovh/v1/";
-    private static final String AGENT = "Solegram (https://github.com/SBLauncherRBLX/Solegram)";
+    private static final String AGENT = "Solegram (https://github.com/ykypa/Solegram)";
     private static final String BROWSER = "Mozilla/5.0";
     /** NetEase credit lines («作词 : …», «制作人 : …»). */
     private static final String CYRILLIC = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяіїєґ";

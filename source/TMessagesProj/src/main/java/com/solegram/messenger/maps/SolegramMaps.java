@@ -162,8 +162,8 @@ public final class SolegramMaps {
         String uri = null;
         switch (app) {
             case NAV_GOOGLE:
-                uri = hasFrom ? String.format(Locale.US, "http://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f", fromLat, fromLon, toLat, toLon)
-                    : String.format(Locale.US, "http://maps.google.com/maps?saddr=&daddr=%f,%f", toLat, toLon);
+                uri = hasFrom ? String.format(Locale.US, "https://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f", fromLat, fromLon, toLat, toLon)
+                    : String.format(Locale.US, "https://maps.google.com/maps?saddr=&daddr=%f,%f", toLat, toLon);
                 break;
             case NAV_YANDEX_MAPS:
                 uri = hasFrom ? String.format(Locale.US, "yandexmaps://maps.yandex.ru/?rtext=%f,%f~%f,%f&rtt=auto", fromLat, fromLon, toLat, toLon)

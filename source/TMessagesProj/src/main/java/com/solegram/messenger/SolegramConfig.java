@@ -783,6 +783,10 @@ public class SolegramConfig {
         if (!parts[0].matches("[A-Za-z0-9-]{1,39}") || !parts[1].matches("[A-Za-z0-9._-]{1,100}") || parts[1].matches("\\.+")) {
             return Solegram.GITHUB_REPO;
         }
+        // the project's old account name (renamed): it may be taken by anyone now, so it means the project's repo
+        if (parts[0].equalsIgnoreCase("SBLauncherRBLX") && parts[1].equalsIgnoreCase("Solegram")) {
+            return Solegram.GITHUB_REPO;
+        }
         return parts[0] + "/" + parts[1];
     }
 
@@ -974,7 +978,8 @@ public class SolegramConfig {
     private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode",
         "pluginsScanBeforeInstall", "pluginsSecurityV2", "scamAccounts", "scamLinks", "scamNano", "warnDangerousFiles", "secureRecents",
         "cleanLinks", "stripFileMetadata");
-    private static final java.util.List<String> PROTECTION_OFF = java.util.Arrays.asList("pluginsAllowPayments");
+    // the automatic proxy routes the account's traffic through public proxies of strangers: a settings file may turn it off, never on
+    private static final java.util.List<String> PROTECTION_OFF = java.util.Arrays.asList("pluginsAllowPayments", "proxyAuto");
     private static final java.util.List<String> PROTECTION_KEPT = java.util.Arrays.asList("scamTrustedSites", "scamSensitivity", "adBlockAllowed");
 
     public static String exportToJson() {

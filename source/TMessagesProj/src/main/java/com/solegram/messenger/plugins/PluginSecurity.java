@@ -388,6 +388,12 @@ public final class PluginSecurity {
         {"setStaticObjectField", "sys_reflection"}, {"callMethod", "sys_reflection"}, {"callStaticMethod", "sys_reflection"},
         {"get_private_field", "sys_reflection"}, {"set_private_field", "sys_reflection"},
         {"get_static_private_field", "sys_reflection"}, {"set_static_private_field", "sys_reflection"},
+        // public reflection too: from any Java object getClass() → Class.forName(...) → getConstructor().newInstance()
+        // reaches every class the runtime guard refuses by name (FileInputStream, Runtime...), past the guard
+        {"forName", "sys_reflection"}, {"getConstructor", "sys_reflection"}, {"getConstructors", "sys_reflection"},
+        {"newInstance", "sys_reflection"}, {"getMethod", "sys_reflection"}, {"getMethods", "sys_reflection"},
+        {"getField", "sys_reflection"}, {"getFields", "sys_reflection"}, {"getClassLoader", "sys_reflection"},
+        {"getSuperclass", "sys_reflection"}, {"getEnclosingClass", "sys_reflection"},
         {"loadClass", "sys_dex"}, {"defineClass", "sys_dex"}, {"loadLibrary", "sys_native_lib"},
         {"getInstalledPackages", "sys_apps"}, {"getInstalledApplications", "sys_apps"}, {"queryIntentActivities", "sys_apps"},
         {"requestPermissions", "sys_permissions"},
@@ -505,6 +511,7 @@ public final class PluginSecurity {
     private static final Set<String> DANGEROUS_ATTRS = new HashSet<>(java.util.Arrays.asList(
         "exec", "eval", "compile", "__import__", "system", "popen", "spawn", "loads", "load", "b64decode", "decompress",
         "getSharedPreferences", "getRuntime", "loadClass", "loadLibrary", "getDeclaredField", "setAccessible", "import_module",
+        "getClass", "forName", "getConstructor", "newInstance", "getMethod", "getDeclaredMethod", "invoke", "getClassLoader",
         "open", "remove", "unlink", "rmtree", "urlopen", "post", "get", "connect", "socket", "fork", "execv", "execve"));
 
     /** Paths and names of the files that hold the Telegram session and settings. */

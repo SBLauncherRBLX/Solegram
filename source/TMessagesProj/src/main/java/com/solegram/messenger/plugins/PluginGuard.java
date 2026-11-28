@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class PluginGuard {
 
-    public static final String BLOCKLIST_URL = "https://raw.githubusercontent.com/SBLauncherRBLX/Solegram/main/plugins_blocklist.txt";
+    public static final String BLOCKLIST_URL = "https://raw.githubusercontent.com/ykypa/Solegram/main/plugins_blocklist.txt";
 
     /** Install errors understood by the UI. */
     public static final String ERROR_BLOCKLISTED = "sg_security_blocklisted";

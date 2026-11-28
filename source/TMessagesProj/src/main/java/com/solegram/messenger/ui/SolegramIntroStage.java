@@ -9,13 +9,21 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 import android.content.Context;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.Premium.GLIcon.GLIconRenderer;
+import org.telegram.ui.Components.Premium.GLIcon.GLIconTextureView;
+import org.telegram.ui.Components.Premium.GLIcon.Icon3D;
+import org.telegram.ui.Components.Premium.StarParticlesView;
 import org.telegram.ui.Components.RLottieImageView;
+import org.telegram.ui.Stars.StarsIntroActivity;
 
 /**
  * The pictures of the welcome screen, one for each page: Solegram's avatar first, then an animated sticker in
@@ -35,15 +43,50 @@ public class SolegramIntroStage extends FrameLayout {
     private static final int SIZE_DP = 150;
 
     private final SolegramIntroView logo;
+    /** The first page: the logo in 3D (turns under the finger, sparks behind it); the flat logo until it draws, or if GL fails. */
+    private final FrameLayout logo3d;
+    private StarParticlesView sparks;
+    private GLIconTextureView glLogo;
+    private static final int GL_SIZE_DP = 180;
     private final RLottieImageView[] stickers = new RLottieImageView[STICKERS.length];
     private int playing = -1;
     private float page;
+    private boolean hidden;
 
     public SolegramIntroStage(Context context) {
         super(context);
         setClipChildren(false);
+        logo3d = new FrameLayout(context);
+        logo3d.setClipChildren(false);
+        addView(logo3d, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         logo = new SolegramIntroView(context);
-        addView(logo, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        logo3d.addView(logo, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        try {
+            sparks = StarsIntroActivity.makeParticlesView(context, 60, 0);
+            sparks.setAlpha(0f);
+            logo3d.addView(sparks, LayoutHelper.createFrame(300, 240, Gravity.CENTER));
+            glLogo = new GLIconTextureView(context, GLIconRenderer.FRAGMENT_STYLE, Icon3D.TYPE_SOLEGRAM) {
+                @Override
+                protected void onRenderError() {
+                    gl3dFailed();
+                }
+            };
+            glLogo.setStarParticlesView(sparks);
+            glLogo.setAlpha(0f);
+            logo3d.addView(glLogo, LayoutHelper.createFrame(GL_SIZE_DP, GL_SIZE_DP, Gravity.CENTER));
+            glLogo.whenReady(() -> {
+                // the 3D logo drew its first frame: it takes the flat one's place
+                if (glLogo == null) return;
+                glLogo.animate().alpha(1f).setDuration(260).start();
+                sparks.animate().alpha(1f).setDuration(420).start();
+                logo.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+                    if (glLogo != null) logo.setVisibility(GONE);
+                }).start();
+            });
+        } catch (Throwable e) {
+            FileLog.e(e);
+            gl3dFailed();
+        }
         for (int i = 0; i < STICKERS.length; i++) {
             final RLottieImageView sticker = new RLottieImageView(context);
             sticker.setAnimation(STICKERS[i], SIZE_DP, SIZE_DP);
@@ -62,7 +105,11 @@ public class SolegramIntroStage extends FrameLayout {
     public void setPage(float page) {
         this.page = page;
         logo.setPage(page);
-        place(logo, 0);
+        place(logo3d, 0);
+        if (glLogo != null) {
+            // nothing to draw while another page is on screen
+            glLogo.setPaused(hidden || Math.abs(page) > 0.98f);
+        }
         for (int i = 0; i < stickers.length; i++) {
             place(stickers[i], i + 1);
         }
@@ -70,6 +117,51 @@ public class SolegramIntroStage extends FrameLayout {
         if (Math.abs(page - settled) < 0.02f && settled != playing) {
             replay(settled);
         }
+    }
+
+    /** The screen went away (or came back): the 3D logo stops drawing meanwhile. */
+    public void setHidden(boolean hidden) {
+        this.hidden = hidden;
+        if (glLogo != null) {
+            glLogo.setPaused(hidden || Math.abs(page) > 0.98f);
+            glLogo.setDialogVisible(hidden);
+        }
+    }
+
+    private void gl3dFailed() {
+        final View gl = glLogo, sp = sparks;
+        glLogo = null;
+        sparks = null;
+        logo.animate().cancel();
+        logo.setVisibility(VISIBLE);
+        logo.setAlpha(1f);
+        for (View v : new View[] { gl, sp }) {
+            if (v != null && v.getParent() instanceof ViewGroup) {
+                ((ViewGroup) v.getParent()).removeView(v);
+            }
+        }
+    }
+
+    /** True when a finger put down here (screen coordinates) should turn the 3D logo rather than swipe the pages. */
+    public boolean takesTouch(float rawX, float rawY) {
+        if (glLogo == null || glLogo.getAlpha() < 0.5f || logo3d.getAlpha() < 0.9f || !glLogo.isAttachedToWindow()) {
+            return false;
+        }
+        final int[] at = new int[2];
+        glLogo.getLocationOnScreen(at);
+        final float pad = dp(8);
+        return rawX >= at[0] - pad && rawX <= at[0] + glLogo.getWidth() + pad && rawY >= at[1] - pad && rawY <= at[1] + glLogo.getHeight() + pad;
+    }
+
+    /** One event of a gesture that {@link #takesTouch} kept for the logo. */
+    public void touchLogo(MotionEvent screenEvent) {
+        if (glLogo == null) return;
+        final int[] at = new int[2];
+        glLogo.getLocationOnScreen(at);
+        final MotionEvent e = MotionEvent.obtain(screenEvent);
+        e.setLocation(screenEvent.getRawX() - at[0], screenEvent.getRawY() - at[1]);
+        glLogo.dispatchTouchEvent(e);
+        e.recycle();
     }
 
     private void place(View view, int index) {

@@ -23,7 +23,7 @@ public final class Solegram {
     public static final String NAME = "Solegram";
     public static final String SOURCE_URL = "https://github.com/DrKLO/Telegram";
     /** Repository with update.json and release APKs (owner/name). */
-    public static final String GITHUB_REPO = "SBLauncherRBLX/Solegram";
+    public static final String GITHUB_REPO = "ykypa/Solegram";
 
     private static boolean inited;
     private static boolean postInited;
@@ -75,6 +75,37 @@ public final class Solegram {
     }
 
     /** Late init: accounts are loaded. */
+    /** Files older than a day in the caches of exports, screenshots, metadata-free copies and shared themes. */
+    private static void cleanPrivateLeftovers() {
+        try {
+            final java.io.File cache = ApplicationLoader.applicationContext.getCacheDir();
+            final long before = System.currentTimeMillis() - 24L * 60 * 60 * 1000;
+            for (String dir : new String[]{"sg_exports", "sg_shots", "sg_clean", "sg_themes"}) {
+                deleteOlder(new java.io.File(cache, dir), before, 0);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void deleteOlder(java.io.File dir, long before, int depth) {
+        final java.io.File[] files = depth > 3 ? null : dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (java.io.File f : files) {
+            if (f.isDirectory()) {
+                deleteOlder(f, before, depth + 1);
+                final String[] left = f.list();
+                if (left != null && left.length == 0) {
+                    f.delete();
+                }
+            } else if (f.lastModified() < before) {
+                f.delete();
+            }
+        }
+    }
+
     public static void postInit() {
         if (postInited) {
             return;
@@ -90,6 +121,9 @@ public final class Solegram {
         } catch (Throwable e) {
             FileLog.e(e);
         }
+        // chats exported, screenshots made, files sent without their metadata, themes shared: copies of private things
+        // the user made for one moment; they don't stay in the app's cache for weeks
+        org.telegram.messenger.Utilities.globalQueue.postRunnable(Solegram::cleanPrivateLeftovers, 5000);
         // reminders: missed ones are shown and the alarm is set again (a force stop or an update removes it)
         SolegramReminders.warmUp();
         // the ad block list, loaded in the background when blocking is on

@@ -172,6 +172,24 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
         int themeMargin = 4;
         frameContainerView = new FrameLayout(context) {
+            // Solegram: a finger put down on the 3D logo turns it; the pages swipe everywhere else
+            private boolean solegramLogoTouch;
+
+            @Override
+            public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+                final int action = ev.getActionMasked();
+                if (action == android.view.MotionEvent.ACTION_DOWN) {
+                    solegramLogoTouch = solegramIntroView != null && solegramIntroView.takesTouch(ev.getRawX(), ev.getRawY());
+                }
+                if (solegramLogoTouch) {
+                    solegramIntroView.touchLogo(ev);
+                    if (action == android.view.MotionEvent.ACTION_UP || action == android.view.MotionEvent.ACTION_CANCEL) {
+                        solegramLogoTouch = false;
+                    }
+                    return true;
+                }
+                return super.dispatchTouchEvent(ev);
+            }
 
             @Override
             protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
@@ -463,12 +481,18 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             justCreated = false;
         }
         AndroidUtilities.lockOrientation(getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        if (solegramIntroView != null) {
+            solegramIntroView.setHidden(false);
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
         AndroidUtilities.unlockOrientation(getParentActivity());
+        if (solegramIntroView != null) {
+            solegramIntroView.setHidden(true);
+        }
     }
 
     @Override

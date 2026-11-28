@@ -827,6 +827,9 @@ public final class SolegramChatExport {
                         + ",\n\"messages\": [\n";
                 default:
                     return "<!doctype html>\n<html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                        // a second wall behind the escaping: no script, frame, form or remote resource ever runs or loads
+                        + "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\">"
+                        + "<meta name=\"referrer\" content=\"no-referrer\">"
                         + "<title>" + esc(title) + "</title><style>" + CSS + "</style></head><body>\n<header><h1>" + esc(title) + "</h1><p>"
                         + esc(LocaleController.formatString(R.string.SG_ExportedAt, when)) + " · "
                         + esc(LocaleController.formatString(R.string.SG_ExportMessages, count)) + "</p></header>\n<main>\n";

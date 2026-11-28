@@ -1141,13 +1141,13 @@
         <service
             android:name=".BringAppForegroundService"
             android:enabled="true"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="mediaPlayback"
         />
         <service
             android:name=".NotificationsService"
             android:enabled="true"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="remoteMessaging"
         />
         <service
@@ -1158,25 +1158,25 @@
         <service
             android:name=".VideoEncodingService"
             android:enabled="true"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
         />
         <service
             android:name="org.telegram.ui.Stories.recorder.StoryUploadingService"
             android:enabled="true"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
         />
         <service
             android:name=".ImportingService"
             android:enabled="true"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
         />
         <service
             android:name=".LocationSharingService"
             android:enabled="true"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="location"
         />
         <service

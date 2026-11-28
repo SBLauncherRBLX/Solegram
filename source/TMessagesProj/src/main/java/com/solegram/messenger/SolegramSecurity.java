@@ -130,7 +130,12 @@ public final class SolegramSecurity {
     private static final String[] INSTALLERS = {"apk", "apks", "xapk", "apkm", "aab"};
     /** Programs and scripts for computers and phones: asked about when the sender is not a contact. */
     private static final String[] PROGRAMS = {"exe", "msi", "bat", "cmd", "com", "scr", "pif", "vbs", "vbe", "js", "jse", "wsf",
-        "hta", "ps1", "jar", "lnk", "reg", "dll", "sh", "dmg", "pkg", "app", "deb", "rpm", "appimage", "iso", "img"};
+        "hta", "ps1", "jar", "lnk", "reg", "dll", "sh", "dmg", "pkg", "app", "deb", "rpm", "appimage", "iso", "img",
+        // web pages and drawings with scripts: opened in a browser they run code (a page dressed up as a video was a
+        // known attack on Telegram)
+        "html", "htm", "xhtml", "shtml", "mht", "mhtml", "svg", "svgz", "xht", "url", "webloc", "desktop", "py", "msix", "appx"};
+    /** The system's type of an installer: an APK may come without its extension. */
+    private static final String APK_MIME = "application/vnd.android.package-archive";
 
     private static boolean in(String[] list, String ext) {
         for (String e : list) {
@@ -145,8 +150,20 @@ public final class SolegramSecurity {
         if (TextUtils.isEmpty(fileName)) {
             return null;
         }
-        final int dot = fileName.lastIndexOf('.');
-        return dot < 0 || dot == fileName.length() - 1 ? null : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
+        // "evil.apk." or "evil.apk " is still an APK to the system: trailing dots, spaces and invisible characters go
+        String name = fileName;
+        int end = name.length();
+        while (end > 0) {
+            final char c = name.charAt(end - 1);
+            if (c == '.' || Character.isWhitespace(c) || Character.getType(c) == Character.FORMAT || Character.isISOControl(c)) {
+                end--;
+            } else {
+                break;
+            }
+        }
+        name = name.substring(0, end);
+        final int dot = name.lastIndexOf('.');
+        return dot < 0 || dot == name.length() - 1 ? null : name.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -158,10 +175,12 @@ public final class SolegramSecurity {
             return false;
         }
         final String ext = extOf(fileName);
-        if (ext == null) {
+        final TLRPC.Document doc = message.getDocument();
+        final boolean apkByType = doc != null && doc.mime_type != null && APK_MIME.equalsIgnoreCase(doc.mime_type.trim());
+        if (ext == null && !apkByType) {
             return false;
         }
-        final boolean installer = in(INSTALLERS, ext);
+        final boolean installer = apkByType || in(INSTALLERS, ext);
         if (!installer && !in(PROGRAMS, ext)) {
             return false;
         }
@@ -191,7 +210,9 @@ public final class SolegramSecurity {
             return;
         }
         final String ext = extOf(fileName);
-        final boolean installer = ext != null && in(INSTALLERS, ext);
+        final TLRPC.Document doc = message != null ? message.getDocument() : null;
+        final boolean installer = ext != null && in(INSTALLERS, ext)
+            || doc != null && doc.mime_type != null && APK_MIME.equalsIgnoreCase(doc.mime_type.trim());
         String sender = null;
         try {
             final long from = message.getFromChatId();

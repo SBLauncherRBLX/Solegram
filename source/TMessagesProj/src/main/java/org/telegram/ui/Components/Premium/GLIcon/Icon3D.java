@@ -95,6 +95,8 @@ public class Icon3D {
     public static final int TYPE_GOLDEN_STAR = 2;
     public static final int TYPE_DEAL = 3;
     public static final int TYPE_DIAMOND = 4;
+    // Solegram: the app's logo on the intro screen (models/solegram_logo.binobj, shaders/fragment_sg.glsl)
+    public static final int TYPE_SOLEGRAM = 5;
 
     private static final String[] starModel = new String[] {
         "models/star.binobj"
@@ -130,6 +132,8 @@ public class Icon3D {
             modelPaths = dealModel;
         } else if (type == TYPE_STAR || type == TYPE_GOLDEN_STAR) {
             modelPaths = starModel;
+        } else if (type == TYPE_SOLEGRAM) {
+            modelPaths = new String[] { "models/solegram_logo.binobj" };
         } else {
             modelPaths = new String[0];
         }
@@ -167,6 +171,8 @@ public class Icon3D {
         String fragmentShaderSource;
         if (type == TYPE_STAR || type == TYPE_GOLDEN_STAR) {
             fragmentShaderSource = "shaders/fragment4.glsl";
+        } else if (type == TYPE_SOLEGRAM) {
+            fragmentShaderSource = "shaders/fragment_sg.glsl";
         } else {
             fragmentShaderSource = "shaders/fragment3.glsl";
         }
@@ -180,6 +186,9 @@ public class Icon3D {
 //        GLES20.glBindAttribLocation(programObject, 0, "vPosition");
         GLES20.glLinkProgram(programObject);
         GLES20.glGetProgramiv(programObject, GLES20.GL_LINK_STATUS, linked, 0);
+        if (type == TYPE_SOLEGRAM && linked[0] == 0) {
+            throw new IllegalStateException("Solegram logo shader: " + GLES20.glGetProgramInfoLog(programObject));
+        }
 
         mProgramObject = programObject;
         init(context);

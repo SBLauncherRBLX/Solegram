@@ -57,7 +57,7 @@ public final class SolegramProxy implements NotificationCenter.NotificationCente
      */
     public static final String[][] SOURCES = {
         // Solegram's own list, kept by the project: tried first
-        {"https://raw.githubusercontent.com/SBLauncherRBLX/Solegram/main/proxies.txt", "https://cdn.jsdelivr.net/gh/SBLauncherRBLX/Solegram@main/proxies.txt"},
+        {"https://raw.githubusercontent.com/ykypa/Solegram/main/proxies.txt", "https://cdn.jsdelivr.net/gh/ykypa/Solegram@main/proxies.txt"},
         {"https://raw.githubusercontent.com/SoliSpirit/mtproto/master/all_proxies.txt", "https://cdn.jsdelivr.net/gh/SoliSpirit/mtproto@master/all_proxies.txt"},
         {"https://raw.githubusercontent.com/Grim1313/mtproto-for-telegram/master/all_proxies.txt", "https://cdn.jsdelivr.net/gh/Grim1313/mtproto-for-telegram@master/all_proxies.txt"},
         {"https://raw.githubusercontent.com/Argh94/Proxy-List/main/MTProto.txt", "https://cdn.jsdelivr.net/gh/Argh94/Proxy-List@main/MTProto.txt"},
