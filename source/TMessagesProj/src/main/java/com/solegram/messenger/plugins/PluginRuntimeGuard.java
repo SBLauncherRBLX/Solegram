@@ -104,8 +104,20 @@ public final class PluginRuntimeGuard {
         }
     }
 
+    /**
+     * Without the strict check (the default since 3.5.3-beta4) every plugin may do these at run time even when its
+     * file did not show them: they hurt neither the account nor the device by themselves, and the guard keeps its
+     * hard lines whatever the permissions (the session and key files, preferences, databases' files, plugin code,
+     * the guard itself, Java's file streams). A shell, native code, loading dex and installing apps still need the
+     * report to show them.
+     */
+    private static final String[] RELAXED = {PERM_NETWORK, PERM_REFLECTION, PERM_FILES, PERM_EXEC, PERM_DESERIALIZE, PERM_DATABASE};
+
     static Set<String> permissionsOf(PluginSecurity.Report report) {
         HashSet<String> set = new HashSet<>();
+        if (!com.solegram.messenger.SolegramConfig.pluginsStrictGuard) {
+            Collections.addAll(set, RELAXED);
+        }
         if (report == null) {
             return set;
         }

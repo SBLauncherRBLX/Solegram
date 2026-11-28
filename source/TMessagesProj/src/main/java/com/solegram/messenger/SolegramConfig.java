@@ -375,6 +375,8 @@ public class SolegramConfig {
     public static boolean pluginsScanBeforeInstall = true;
     /** Refuse plugins rated dangerous instead of only warning. */
     public static boolean pluginsBlockDangerous;
+    /** Strict plugin guard: at run time a plugin may do only what its file showed (off: only the harmful is refused). */
+    public static boolean pluginsStrictGuard;
     /** Plugins may pay (Stars, gifts, chat ownership): off, see PluginRuntimeGuard. */
     public static boolean pluginsAllowPayments;
     // endregion
@@ -701,6 +703,7 @@ public class SolegramConfig {
         }
         pluginsBlockDangerous = p.getBoolean("pluginsBlockDangerous", true);
         pluginsAllowPayments = p.getBoolean("pluginsAllowPayments", false);
+        pluginsStrictGuard = p.getBoolean("pluginsStrictGuard", false);
 
         // before the modes there was only the check switch: whoever turned it off keeps updates off
         // automatic installing is gone: who had it is told about new versions instead, and installs them himself
@@ -975,7 +978,7 @@ public class SolegramConfig {
 
     // a settings file somebody sent may only make protection stronger: these switches are taken from it only when they
     // turn protection on (or, for the plugins' payments, off); the trusted sites and the scam sensitivity stay
-    private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode",
+    private static final java.util.List<String> PROTECTION_ON = java.util.Arrays.asList("pluginsBlockDangerous", "pluginsSafeMode", "pluginsStrictGuard",
         "pluginsScanBeforeInstall", "pluginsSecurityV2", "scamAccounts", "scamLinks", "scamNano", "warnDangerousFiles", "secureRecents",
         "cleanLinks", "stripFileMetadata");
     // the automatic proxy routes the account's traffic through public proxies of strangers: a settings file may turn it off, never on

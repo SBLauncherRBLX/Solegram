@@ -249,6 +249,8 @@ public class StarParticlesView extends View implements Theme.Colorable {
         public long pausedTime;
 
         public final static int TYPE_SETTINGS = 101;
+        /** Solegram: glints with small Solegram logos among them, for its intro screen. */
+        public final static int TYPE_SOLEGRAM = 1106;
 
         public Drawable(int count) {
             this.count = count;
@@ -420,6 +422,10 @@ public class StarParticlesView extends View implements Theme.Colorable {
                         flip[i] = true;
                         continue;
                     }
+                } else if (type == TYPE_SOLEGRAM && i == 0) {
+                    // Solegram's intro: the first kind is a tiny Solegram logo (the others stay glints)
+                    stars[i] = com.solegram.messenger.ui.SolegramIntroStage.logoBitmap(size);
+                    continue;
                 } else if (type == 105) {
                     int res;
                     if (i == 0) {

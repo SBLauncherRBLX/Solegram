@@ -62,7 +62,7 @@ public class SolegramIntroStage extends FrameLayout {
         logo = new SolegramIntroView(context);
         logo3d.addView(logo, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         try {
-            sparks = StarsIntroActivity.makeParticlesView(context, 60, 0);
+            sparks = StarsIntroActivity.makeParticlesView(context, 60, 3);
             sparks.setAlpha(0f);
             logo3d.addView(sparks, LayoutHelper.createFrame(300, 240, Gravity.CENTER));
             glLogo = new GLIconTextureView(context, GLIconRenderer.FRAGMENT_STYLE, Icon3D.TYPE_SOLEGRAM) {
@@ -117,6 +117,27 @@ public class SolegramIntroStage extends FrameLayout {
         if (Math.abs(page - settled) < 0.02f && settled != playing) {
             replay(settled);
         }
+    }
+
+    /** Solegram's flat logo (half-sun over two bars) in white on a transparent square, for the sparks. */
+    public static android.graphics.Bitmap logoBitmap(int size) {
+        final android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(Math.max(1, size), Math.max(1, size), android.graphics.Bitmap.Config.ARGB_8888);
+        final android.graphics.Canvas c = new android.graphics.Canvas(b);
+        final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setColor(0xFFFFFFFF);
+        // the logo's own box: 34.9 36.295 38.2 x 35.41, centred in the square
+        final float k = size / 38.2f;
+        c.translate(-34.9f * k, -36.295f * k + (size - 35.41f * k) / 2f);
+        c.scale(k, k);
+        final android.graphics.Path sun = new android.graphics.Path();
+        sun.addArc(new android.graphics.RectF(35.4f, 36.795f, 72.6f, 73.995f), 180, 180);
+        sun.lineTo(72.6f, 56.635f);
+        sun.lineTo(35.4f, 56.635f);
+        sun.close();
+        c.drawPath(sun, p);
+        c.drawRoundRect(new android.graphics.RectF(38.345f, 59.115f, 69.655f, 63.765f), 2.325f, 2.325f, p);
+        c.drawRoundRect(new android.graphics.RectF(45.165f, 66.555f, 62.835f, 71.205f), 2.325f, 2.325f, p);
+        return b;
     }
 
     /** The screen went away (or came back): the 3D logo stops drawing meanwhile. */

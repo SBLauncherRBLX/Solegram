@@ -528,6 +528,9 @@ public class PluginsController {
                 if (meta.blocked != PluginGuard.BLOCK_NONE && meta.enabled) {
                     unloadInternal(meta);
                     passesSecurity(meta);
+                } else if (meta.enabled && meta.blocked == PluginGuard.BLOCK_NONE) {
+                    // the strict check switched: a running plugin gets its run-time rights anew
+                    PluginRuntimeGuard.register(meta);
                 }
             }
             postChanged(null);

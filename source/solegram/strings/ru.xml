@@ -2346,4 +2346,6 @@
     <string name="SG_ExportForwarded">Переслано от %1$s</string>
     <string name="SG_ExportEdited">изменено</string>
     <string name="SG_ExportFooter">Экспортировано из Solegram</string>
+    <string name="SG_SecStrictGuard">Строгая проверка плагинов</string>
+    <string name="SG_SecStrictGuardInfo">Плагин может делать только то, что нашла проверка его кода. Без неё блокируется лишь то, что вредит аккаунту и устройству: файлы сессии и ключей, настройки и базы приложения, сама защита, команды оболочки, нативный код и установка приложений</string>
 </resources>

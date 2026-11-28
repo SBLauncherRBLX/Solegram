@@ -769,6 +769,11 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                     drawable.randLifeTime = 1600;
                     drawable.forceMaxAlpha = true;
                 }
+                if (type == 3) {
+                    // Solegram's intro: its own logo among the glints instead of Telegram's star
+                    drawable.type = org.telegram.ui.Components.Premium.StarParticlesView.Drawable.TYPE_SOLEGRAM;
+                    drawable.size1 = 16;
+                }
                 drawable.colorKey = Theme.key_windowBackgroundWhiteBlackText;
                 drawable.init();
             }

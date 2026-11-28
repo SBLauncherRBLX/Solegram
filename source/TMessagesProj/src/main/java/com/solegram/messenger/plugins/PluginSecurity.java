@@ -36,7 +36,7 @@ import java.util.zip.Inflater;
 public final class PluginSecurity {
 
     /** Bump when the rules change: cached reports of an older analyzer are computed again. */
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     public static final int VERDICT_SAFE = 0;
     public static final int VERDICT_WARNING = 1;
@@ -520,7 +520,7 @@ public final class PluginSecurity {
 
     /** Settings and files of the plugin security itself. */
     private static final String[] TAMPER_STRINGS = {
-        "pluginsBlockDangerous", "pluginsScanBeforeInstall", "pluginsSafeMode", "solegram_plugins", "solegram_plugin_security",
+        "pluginsBlockDangerous", "pluginsScanBeforeInstall", "pluginsSafeMode", "pluginsStrictGuard", "solegram_plugins", "solegram_plugin_security",
         "plugins_blocklist", "pluginsAllowPayments", "solegram_guard", "__sg_plugin__", "plugin_libs", "plugin_dex",
         "PluginRuntimeGuard", "integrity_v1", "reviewed_"};
 
@@ -1917,9 +1917,12 @@ public final class PluginSecurity {
             boolean network = has("net_python") || has("net_java") || has("net_webview");
             boolean readsMessages = has("msg_updates") || has("msg_outgoing") || has("msg_requests") || has("msg_read")
                 || has("msg_contacts") || has("msg_database") || has("sec_phone") || has("sec_clipboard");
+            // 3.5.3-beta4: "dangerous" (blocked) is kept for what takes over the account or the device. The messages
+            // database counts as reading messages (a warning), and getattr / imports and jclass by a variable name are
+            // ordinary in plugins: alone they never make a combination dangerous (they stay warnings of their own)
             boolean secrets = has("sec_session_files") || has("sec_auth_internals") || has("sec_prefs") || has("sec_login_export")
-                || has("sec_2fa") || has("sec_login_codes") || has("sec_keystore") || has("sec_sessions") || has("msg_database");
-            boolean obfuscated = has("code_blob") || has("code_hidden_string") || has("code_getattr") || has("code_dynamic_import") || has("code_chr");
+                || has("sec_2fa") || has("sec_login_codes") || has("sec_keystore") || has("sec_sessions");
+            boolean obfuscated = has("code_blob") || has("code_hidden_string") || has("code_chr");
             boolean runsCode = has("code_exec") || has("code_deserialize");
 
             for (int line : hiddenExecLines) {
@@ -1929,11 +1932,11 @@ public final class PluginSecurity {
             if (blobIsCode || runsCode && (obfuscated || has("code_escapes")) || has("code_exec") && has("code_deserialize")) {
                 add("combo_hidden_code", firstOf("code_exec", "code_deserialize", "code_blob", "code_hidden_string"), null);
             }
-            if (network && (runsCode || has("code_dynamic_import") || has("sys_dex") || has("sys_native_lib") || has("code_native"))) {
-                add("combo_remote_code", firstOf("code_exec", "code_deserialize", "code_dynamic_import", "sys_dex", "sys_native_lib", "code_native"), null);
+            if (network && (runsCode || has("sys_dex") || has("sys_native_lib") || has("code_native"))) {
+                add("combo_remote_code", firstOf("code_exec", "code_deserialize", "sys_dex", "sys_native_lib", "code_native"), null);
             }
             if (network && obfuscated) {
-                add("combo_obfuscated_network", firstOf("code_blob", "code_hidden_string", "code_getattr", "code_dynamic_import", "code_chr"), null);
+                add("combo_obfuscated_network", firstOf("code_blob", "code_hidden_string", "code_chr"), null);
             }
             if (network && secrets) {
                 add("combo_exfil_secrets", firstOf("sec_session_files", "sec_auth_internals", "sec_prefs", "sec_login_export", "sec_2fa",
@@ -1949,8 +1952,11 @@ public final class PluginSecurity {
             if (network && has("sys_shell")) {
                 add("combo_shell_network", firstLine("sys_shell"), null);
             }
-            if (has("net_suspicious") && (readsMessages || secrets || has("file_private_dir") || has("file_io"))) {
+            if (has("net_suspicious") && (secrets || has("file_private_dir"))) {
                 add("combo_suspicious_exfil", firstLine("net_suspicious"), null);
+            } else if (has("net_suspicious") && (readsMessages || has("file_io"))) {
+                // a bot API / paste / short link next to messages or files: worth a warning, not a block
+                add("combo_exfil_messages", firstLine("net_suspicious"), null);
             }
             if (network && readsMessages) {
                 add("combo_exfil_messages", firstOf("msg_updates", "msg_outgoing", "msg_requests", "msg_read", "msg_contacts",

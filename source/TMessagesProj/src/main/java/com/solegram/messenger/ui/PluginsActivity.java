@@ -53,6 +53,7 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
     public static final int ID_SCAN = 6;
     public static final int ID_BLOCK_DANGEROUS = 7;
     public static final int ID_ALLOW_PAYMENTS = 8;
+    public static final int ID_STRICT_GUARD = 9;
     private static final int REQUEST_PICK_PLUGIN = 0x5052;
 
     @Override
@@ -183,6 +184,7 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
         items.add(UItem.asHeader(getString(R.string.SG_SecSection)));
         items.add(UItem.asButtonCheck(ID_SCAN, getString(R.string.SG_SecScanBeforeInstall), getString(R.string.SG_SecScanBeforeInstallInfo)).setChecked(SolegramConfig.pluginsScanBeforeInstall));
         items.add(UItem.asButtonCheck(ID_BLOCK_DANGEROUS, getString(R.string.SG_SecBlockDangerous), getString(R.string.SG_SecBlockDangerousInfo)).setChecked(SolegramConfig.pluginsBlockDangerous));
+        items.add(UItem.asButtonCheck(ID_STRICT_GUARD, getString(R.string.SG_SecStrictGuard), getString(R.string.SG_SecStrictGuardInfo)).setChecked(SolegramConfig.pluginsStrictGuard));
         items.add(UItem.asButtonCheck(ID_ALLOW_PAYMENTS, getString(R.string.SG_GuardAllowPayments), getString(R.string.SG_GuardAllowPaymentsInfo)).setChecked(SolegramConfig.pluginsAllowPayments));
         items.add(UItem.asShadow(getString(R.string.SG_SecSettingsInfo)));
 
@@ -255,6 +257,12 @@ public class PluginsActivity extends UniversalFragment implements NotificationCe
             }
             case ID_BLOCK_DANGEROUS: {
                 boolean value = SolegramConfig.toggle("pluginsBlockDangerous");
+                ((NotificationsCheckCell) view).setChecked(value);
+                PluginsController.getInstance().applySecurityPolicy();
+                break;
+            }
+            case ID_STRICT_GUARD: {
+                boolean value = SolegramConfig.toggle("pluginsStrictGuard");
                 ((NotificationsCheckCell) view).setChecked(value);
                 PluginsController.getInstance().applySecurityPolicy();
                 break;
